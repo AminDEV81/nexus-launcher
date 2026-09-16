@@ -1,0 +1,21 @@
+﻿@echo off
+chcp 65001 >nul
+echo ========================================================
+echo   Nexus Metadata Gateway - Cloudflare Worker Deployment
+echo ========================================================
+echo.
+echo 1. Logging in to Cloudflare...
+call npx wrangler login
+echo.
+echo 2. Uploading Secrets to Cloudflare...
+echo YOUR_IGDB_CLIENT_ID | call npx wrangler secret put IGDB_CLIENT_ID
+echo YOUR_IGDB_CLIENT_SECRET | call npx wrangler secret put IGDB_CLIENT_SECRET
+echo YOUR_STEAMGRIDDB_API_KEY | call npx wrangler secret put STEAMGRIDDB_API_KEY
+echo.
+echo 3. Deploying Worker to Cloudflare Global Edge...
+call npx wrangler deploy
+echo.
+echo ========================================================
+echo   Deployment finished!
+echo ========================================================
+pause

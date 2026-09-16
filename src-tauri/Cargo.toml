@@ -1,0 +1,113 @@
+[package]
+name = "app"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3", features = ["protocol-asset", "tray-icon"] }
+tauri-plugin-log = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-window-state = "2"
+
+# Local database
+rusqlite = { version = "0.32", features = ["bundled", "chrono"] }
+
+# Async runtime (game process tracking, background metadata downloads)
+tokio = { version = "1", features = ["full"] }
+
+# Cooperative cancellation for the download engine's parallel chunk
+# tasks — a CancellationToken shared across every chunk of a download
+# lets pause/cancel stop all of them deterministically (and we await the
+# tasks before flipping the DB status, so a resumed download never has
+# two writers on one file).
+tokio-util = "0.7"
+
+# Error handling
+thiserror = "2"
+
+# Date/time (playtime sessions, last played)
+chrono = { version = "0.4", features = ["serde"] }
+
+# Resolving OS-specific app data directories
+dirs = "5"
+
+# Primary keys for games/collections/tags/etc.
+uuid = { version = "1", features = ["v4"] }
+
+# Recursive folder scanning when adding a game by folder (Epic 4) or
+# later scanning store libraries (Epic 5).
+walkdir = "2"
+
+# Polls whether a launched game's process is still alive (Epic 11's
+# playtime tracker) — both for processes we spawned directly (by PID)
+# and for Steam games handed off via `steam://`, where the only way to
+# find the resulting process is to watch for its executable name to
+# appear in the system's process list.
+sysinfo = { version = "0.32", default-features = false, features = ["system", "disk"] }
+
+
+# Cropping user-selected artwork to a target rect (Epic 10's cover/
+# banner/logo/background editor) — decode/crop/re-encode only, no need
+# for the `default-features` codec set beyond what PNG/JPEG/WebP need.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+
+# Locates Steam's install directories and enumerates installed apps by
+# reading its VDF/ACF files for us, rather than hand-parsing Valve's
+# text format (Epic 5's automatic scan).
+steamlocate = "2"
+
+# HTTP client for the IGDB and SteamGridDB metadata APIs, and for
+# downloading artwork images (Epic 6).
+reqwest = { version = "0.12", features = ["json", "stream"] }
+futures-util = "0.3"
+zip = "2"
+tauri-plugin-single-instance = "2.4.3"
+sevenz-rust = "0.6.1"
+# Official UnRAR code (C++), statically linked — no RAR tool install needed.
+unrar = "0.5"
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.22"
+
+[target.'cfg(windows)'.dependencies]
+# Resolves .lnk shortcuts via the real Windows Shell COM APIs
+# (IShellLinkW), rather than hand-parsing the binary format — this is
+# Windows-only by nature, hence the target-specific dependency.
+lnks = "0.2"
+
+# Reads the Windows Registry keys that Epic/EA/Ubisoft/GOG (and, via
+# the generic Uninstall key, Battle.net) record their installed games
+# under, for Epic 5's automatic scan. Also used by Game Booster's CPU
+# priority tweaks (commands/booster.rs).
+winreg = "0.52"
+
+# Game Booster's RAM-freeing step calls EmptyWorkingSet/OpenProcess
+# directly — pinned to the same version tauri itself already resolves
+# transitively, so this doesn't add a second copy to the dependency tree.
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+    "Win32_System_JobObjects",
+    "Win32_Storage_FileSystem",
+    "Win32_System_LibraryLoader",
+] }

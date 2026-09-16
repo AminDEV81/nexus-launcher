@@ -1,0 +1,14 @@
+name = "nexus-metadata-gateway"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Public environment variables
+[vars]
+ENVIRONMENT = "production"
+API_VERSION = "v1"
+
+# Secrets required via `wrangler secret put <NAME>`:
+# - IGDB_CLIENT_ID
+# - IGDB_CLIENT_SECRET
+# - STEAMGRIDDB_API_KEY

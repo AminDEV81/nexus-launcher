@@ -1,0 +1,133 @@
+/*
+ * Ambient background blobs.
+ *
+ * Every animated property below is `transform` or `opacity` — nothing
+ * that forces layout/paint — so this can run indefinitely in the
+ * background without showing up as a CPU cost. `will-change: transform`
+ * hints the compositor to keep these on their own GPU layer.
+ */
+
+.ambient-root {
+  contain: strict;
+}
+
+/* Used while the startup splash (which has its own, identical ambient
+   blobs and is fully opaque) is covering this layer — freezing the
+   animation instead of unmounting it avoids doubling up on compositor
+   work during app startup. */
+.ambient-root--paused .ambient-blob {
+  animation-play-state: paused;
+}
+
+.ambient-blob {
+  position: absolute;
+  border-radius: 9999px;
+  contain: paint;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+  opacity: 0.38;
+}
+
+[data-theme='light'] .ambient-blob {
+  opacity: 0.24;
+}
+
+.ambient-blob--accent {
+  left: -10%;
+  top: -15%;
+  width: 55vw;
+  height: 55vw;
+  background: radial-gradient(circle, var(--nx-accent) 0%, transparent 70%);
+}
+
+.ambient-blob--secondary {
+  right: -15%;
+  bottom: -20%;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
+}
+
+.ambient-blob--tertiary {
+  left: 30%;
+  bottom: -25%;
+  width: 40vw;
+  height: 40vw;
+  background: radial-gradient(circle, #d946ef 0%, transparent 70%);
+}
+
+/* Optional gentle drift when ambient motion is explicitly enabled */
+[data-ambient-motion='true'] .ambient-blob--accent {
+  animation: drift-a 120s steps(30, end) infinite;
+}
+[data-ambient-motion='true'] .ambient-blob--secondary {
+  animation: drift-b 144s steps(30, end) infinite;
+}
+[data-ambient-motion='true'] .ambient-blob--tertiary {
+  animation: drift-c 96s steps(30, end) infinite;
+}
+
+@keyframes drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4%, 6%, 0) scale(1.08);
+  }
+}
+
+@keyframes drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-5%, -4%, 0) scale(1.05);
+  }
+}
+
+@keyframes drift-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, -5%, 0) scale(1.1);
+  }
+}
+
+[data-reduce-motion='true'] .ambient-root {
+  transform: none !important;
+  transition: none !important;
+}
+
+[data-reduce-motion='true'] .ambient-blob {
+  animation: none !important;
+}
+
+/* An unfocused desktop WebView is still rendered every compositor frame.
+   Remove the backdrop entirely while it cannot be seen; it is restored before
+   the next interaction when focus returns. */
+[data-window-active='false'] .ambient-root,
+[data-gpu-eco='true'] .ambient-root,
+[data-ambient-enabled='false'] .ambient-root {
+  display: none !important;
+}
+
+[data-window-active='false'] *,
+[data-window-active='false'] *::before,
+[data-window-active='false'] *::after {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient-root {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .ambient-blob {
+    animation: none !important;
+  }
+}

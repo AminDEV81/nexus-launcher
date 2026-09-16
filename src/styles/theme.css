@@ -1,0 +1,207 @@
+/*
+ * Theme foundation.
+ *
+ * Two modes (dark / light), each independently paired with one of 5
+ * accent palettes via `data-palette` on <html> (set from
+ * `useThemeStore`, alongside `data-theme`). Every palette rule below
+ * only overrides `--nx-accent`/`--nx-accent-hover` — the
+ * surface/text/border scale above stays identical across all of them,
+ * so switching palettes never looks like a different app, just a
+ * different accent color.
+ *
+ * Variables are namespaced `--nx-*` at the implementation level, then
+ * re-exposed under Tailwind's `--color-*` namespace via `@theme inline`
+ * so utilities like `bg-surface`, `text-muted`, `bg-accent/10` work
+ * everywhere without a tailwind.config.js.
+ */
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --nx-bg: #0a0a0e;
+  --nx-surface: #131318;
+  --nx-surface-raised: #1a1a22;
+  --nx-border: #26262f;
+
+  --nx-text: #f2f2f5;
+  --nx-muted: #9a9aa8;
+  --nx-subtle: #616170;
+
+  --nx-accent: #7c5cff;
+  --nx-accent-hover: #8f72ff;
+
+  --nx-shadow-card: 0 8px 24px -8px rgb(0 0 0 / 0.5);
+  --nx-shadow-elevated: 0 16px 48px -12px rgb(0 0 0 / 0.6);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --nx-bg: #f5f5f8;
+  --nx-surface: #ffffff;
+  --nx-surface-raised: #ffffff;
+  --nx-border: #e2e2ea;
+
+  --nx-text: #16161c;
+  --nx-muted: #55555f;
+  --nx-subtle: #8a8a94;
+
+  --nx-accent: #6a4bfa;
+  --nx-accent-hover: #5b3ce6;
+
+  --nx-shadow-card: 0 8px 24px -8px rgb(20 20 30 / 0.12);
+  --nx-shadow-elevated: 0 16px 48px -12px rgb(20 20 30 / 0.18);
+}
+
+/* Palette accents — higher specificity than the base [data-theme] rules
+   above (two attribute selectors vs one), so these win regardless of
+   source order. `violet` intentionally repeats the base --nx-accent
+   values above so "no palette set yet" and "Violet selected" render
+   identically. */
+
+[data-theme='dark'][data-palette='violet'] {
+  --nx-accent: #7c5cff;
+  --nx-accent-hover: #8f72ff;
+}
+[data-theme='dark'][data-palette='ocean'] {
+  --nx-accent: #3b82f6;
+  --nx-accent-hover: #60a5fa;
+}
+[data-theme='dark'][data-palette='emerald'] {
+  --nx-accent: #10b981;
+  --nx-accent-hover: #34d399;
+}
+[data-theme='dark'][data-palette='crimson'] {
+  --nx-accent: #f43f5e;
+  --nx-accent-hover: #fb7185;
+}
+[data-theme='dark'][data-palette='amber'] {
+  --nx-accent: #f59e0b;
+  --nx-accent-hover: #fbbf24;
+}
+[data-theme='dark'][data-palette='cyberpunk'] {
+  --nx-accent: #ec4899;
+  --nx-accent-hover: #f472b6;
+}
+[data-theme='dark'][data-palette='solaris'] {
+  --nx-accent: #eab308;
+  --nx-accent-hover: #facc15;
+}
+[data-theme='dark'][data-palette='toxic'] {
+  --nx-accent: #84cc16;
+  --nx-accent-hover: #a3e635;
+}
+[data-theme='dark'][data-palette='aquamarine'] {
+  --nx-accent: #06b6d4;
+  --nx-accent-hover: #22d3ee;
+}
+[data-theme='dark'][data-palette='amethyst'] {
+  --nx-accent: #8b5cf6;
+  --nx-accent-hover: #a78bfa;
+}
+[data-theme='dark'][data-palette='inferno'] {
+  --nx-accent: #f97316;
+  --nx-accent-hover: #fb923c;
+}
+
+[data-theme='light'][data-palette='violet'] {
+  --nx-accent: #6a4bfa;
+  --nx-accent-hover: #5b3ce6;
+}
+[data-theme='light'][data-palette='ocean'] {
+  --nx-accent: #2563eb;
+  --nx-accent-hover: #1d4ed8;
+}
+[data-theme='light'][data-palette='emerald'] {
+  --nx-accent: #059669;
+  --nx-accent-hover: #047857;
+}
+[data-theme='light'][data-palette='crimson'] {
+  --nx-accent: #e11d48;
+  --nx-accent-hover: #be123c;
+}
+[data-theme='light'][data-palette='amber'] {
+  --nx-accent: #d97706;
+  --nx-accent-hover: #b45309;
+}
+[data-theme='light'][data-palette='cyberpunk'] {
+  --nx-accent: #db2777;
+  --nx-accent-hover: #be185d;
+}
+[data-theme='light'][data-palette='solaris'] {
+  --nx-accent: #ca8a04;
+  --nx-accent-hover: #a16207;
+}
+[data-theme='light'][data-palette='toxic'] {
+  --nx-accent: #65a30d;
+  --nx-accent-hover: #4d7c0f;
+}
+[data-theme='light'][data-palette='aquamarine'] {
+  --nx-accent: #0891b2;
+  --nx-accent-hover: #0e7490;
+}
+[data-theme='light'][data-palette='amethyst'] {
+  --nx-accent: #7c3aed;
+  --nx-accent-hover: #6d28d9;
+}
+[data-theme='light'][data-palette='inferno'] {
+  --nx-accent: #ea580c;
+  --nx-accent-hover: #c2410c;
+}
+
+@theme inline {
+  --color-bg: var(--nx-bg);
+  --color-surface: var(--nx-surface);
+  --color-surface-raised: var(--nx-surface-raised);
+  --color-border: var(--nx-border);
+
+  --color-text: var(--nx-text);
+  --color-muted: var(--nx-muted);
+  --color-subtle: var(--nx-subtle);
+
+  --color-accent: var(--nx-accent);
+  --color-accent-hover: var(--nx-accent-hover);
+
+  --shadow-card: var(--nx-shadow-card);
+  --shadow-elevated: var(--nx-shadow-elevated);
+}
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+/* Lightweight fallback for WebViews without View Transitions. Keep this
+   to paint-affecting color tokens only; animating shadows and SVG paint on
+   every descendant forces expensive redraws during the switch. */
+.theme-transitioning,
+.theme-transitioning * {
+  transition:
+    background-color 260ms ease,
+    border-color 260ms ease,
+    color 260ms ease !important;
+}
+
+/* Chromium/WebView2 handles this as a compositor snapshot crossfade, so it
+   avoids walking and repainting every card independently. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 260ms;
+  animation-timing-function: ease;
+}
+
+[data-reduce-motion='true'].theme-transitioning,
+[data-reduce-motion='true'].theme-transitioning * {
+  transition: none !important;
+}
+
+/*
+ * Compact Mode (Settings > Appearance). Nearly every spacing and
+ * type-size utility Tailwind generates for this project is rem-based,
+ * so scaling the root font-size scales all of them together — padding,
+ * gaps, text — without a parallel "compact" variant of every component.
+ * 14/16 mirrors roughly what a dedicated compact density preset would
+ * hand-tune to (about a 12% reduction), while staying above the point
+ * where text starts looking cramped rather than just "tighter".
+ */
+html[data-compact='true'] {
+  font-size: 14px;
+}

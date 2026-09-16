@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Chakra+Petch:ital,wght@0,500;0,700;1,700&family=JetBrains+Mono:wght@500;700&family=Orbitron:wght@600;800;900&family=Outfit:wght@500;700;800&family=Plus+Jakarta+Sans:wght@500;700;800&family=Rajdhani:wght@600;700&family=Russo+One&family=Teko:wght@500;600;700&display=swap');
+@import 'tailwindcss';
+@import './styles/fonts.css';
+@import './styles/theme.css';
+@import './styles/ambient.css';
+@import './styles/effects.css';
+
+/* Sora (variable, weights 100-800) bundled locally rather than loaded
+   from Google Fonts: the launcher must render identically offline, and
+   local files keep the CSP free of third-party font origins. Persian/
+   Arabic text isn't covered by these subsets and falls back to the
+   system stack — deliberate, matching every other Latin-only UI font
+   choice here. */
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/fonts/sora-latin.woff2') format('woff2');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/fonts/sora-latin-ext.woff2') format('woff2');
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    background-color: var(--nx-bg);
+  }
+
+  body {
+    @apply text-text antialiased;
+    font-family: var(
+      --nx-font-family,
+      'Sora',
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      sans-serif
+    );
+    /* Native apps aren't selectable like documents; text fields opt back
+       in below. Anything genuinely copyable ships a Copy button instead. */
+    user-select: none;
+    overflow: hidden;
+  }
+
+  input,
+  textarea,
+  [contenteditable='true'] {
+    user-select: text;
+  }
+
+  ::selection {
+    @apply bg-accent/30;
+  }
+
+  /* Slim floating scrollbars everywhere. WebView2 is Chromium, so the
+     ::-webkit-* rules apply; the thick transparent border plus
+     background-clip makes the thumb appear rounded and detached from
+     the edge (macOS-style) instead of a flat system bar. Colors come
+     from theme tokens, so dark/light both look right. */
+  *::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--nx-border);
+    border-radius: 9999px;
+    border: 4px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--nx-muted);
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}

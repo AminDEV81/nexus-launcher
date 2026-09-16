@@ -1,0 +1,191 @@
+/*
+ * Reusable visual-polish utilities used across later Epics:
+ *  - `.glass-panel`: the acrylic/glassmorphism surface for the title bar
+ *    and sidebar, letting the ambient background bleed through softly.
+ *  - `.glow-pulse`: a gentle breathing glow for primary actions.
+ */
+
+.glass-panel {
+  background: color-mix(in srgb, var(--nx-surface) 84%, transparent);
+  backdrop-filter: blur(var(--nx-blur-intensity, 8px));
+  -webkit-backdrop-filter: blur(var(--nx-blur-intensity, 8px));
+  /* Deliberately no `saturate()` here: it added a per-pixel shader pass
+     on every glass layer (title bar, sidebar, details panel), which
+     measurably drove up idle GPU usage for a barely-visible tint. */
+}
+
+/* Backdrop filters force WebView2 to keep recompositing the layers behind
+   them. Turning them off while this window is unfocused or in GPU Eco Mode
+   avoids that work completely. */
+[data-window-active='false'] .glass-panel,
+[data-window-active='false'] [class*='backdrop-blur'],
+[data-gpu-eco='true'] .glass-panel,
+[data-gpu-eco='true'] [class*='backdrop-blur'],
+[data-ambient-enabled='false'] .glass-panel,
+[data-ambient-enabled='false'] [class*='backdrop-blur'] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+[data-gpu-eco='true'] .glass-panel {
+  background: color-mix(in srgb, var(--nx-surface) 95%, transparent) !important;
+}
+
+/* The breathing glow renders as a pseudo-element whose *opacity*
+ * animates — the (static) box-shadow texture is rasterized once and the
+ * compositor cross-fades it. The previous implementation animated
+ * `box-shadow` itself, which repainted the element every frame for as
+ * long as a details panel was open and was a major source of constant
+ * GPU work while the app was focused. */
+.glow-pulse {
+  position: relative;
+}
+
+.glow-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow:
+    0 0 16px 1px color-mix(in srgb, var(--nx-accent) 35%, transparent),
+    0 0 26px 5px color-mix(in srgb, var(--nx-accent) 45%, transparent);
+  opacity: 0.5;
+  animation: glow-breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes glow-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* Settings > Appearance's manual "disable all animations" toggle,
+   independent of (but with the same effect as) the OS-level query
+   below — see the `@media` block for why both exist. */
+[data-reduce-motion='true'] .glow-pulse::after,
+[data-gpu-eco='true'] .glow-pulse::after,
+[data-window-active='false'] .glow-pulse::after {
+  animation: none;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-pulse::after {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+/* Hover-only variant with the original box-shadow animation: the
+ * grid card's play button sits inside `overflow-hidden`, so the
+ * pseudo-element ring above would be clipped away entirely. The
+ * animation is PAUSED whenever the card isn't hovered (the glow is
+ * invisible then anyway), so an idle grid full of cards costs
+ * nothing — it only paints for the one button actually being shown. */
+.glow-hover-pulse {
+  animation: glow-pulse 2.6s ease-in-out infinite;
+  animation-play-state: paused;
+}
+
+.group:hover .glow-hover-pulse,
+.group:focus-within .glow-hover-pulse {
+  animation-play-state: running;
+}
+
+[data-reduce-motion='true'] .glow-hover-pulse,
+[data-window-active='false'] .glow-hover-pulse {
+  animation: none;
+  box-shadow: 0 0 18px 2px color-mix(in srgb, var(--nx-accent) 40%, transparent);
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 16px 1px color-mix(in srgb, var(--nx-accent) 35%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 26px 5px color-mix(in srgb, var(--nx-accent) 55%, transparent);
+  }
+}
+
+/* Solid variant for overlays — modals, context menus, filter popovers,
+   the onboarding dialog. Opaque on purpose: their backdrop is a dark
+   scrim rather than real content, so a translucent panel there blurred
+   nothing visible (which read as "the blur setting does nothing") and
+   made text sit on unpredictable mixes. Chrome that genuinely floats
+   over content — the title bar, sidebar, details panel — keeps
+   `.glass-panel`. */
+.solid-panel {
+  /* One step below surface-raised on purpose: overlay contents
+     (menu items, rows, chips) use bg-surface-raised as their hover
+     state, so the panel itself must sit at plain surface for that
+     hover to be visible. */
+  background: var(--nx-surface);
+}
+
+/* ── Game Booster "overclock cockpit" surfaces ───────────────────────
+ * Faint tech grid + scanline overlay, layered over the accent radial
+ * the panel already paints. Both read as instrument glass, not chrome. */
+
+/* 22px square grid of hairline lines — sits behind the cockpit content. */
+.nx-grid-bg {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--nx-border) 55%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--nx-border) 55%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 22px 22px;
+  background-position: center;
+}
+
+/* Horizontal scanlines, drawn over the cockpit via a pseudo-element so
+ * they never intercept pointer events. Very low alpha — texture, not noise. */
+.nx-scanlines {
+  position: relative;
+}
+.nx-scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 3px,
+    color-mix(in srgb, var(--nx-accent) 5%, transparent) 4px
+  );
+}
+
+/* Game Hub hero: slow Ken-Burns zoom on the backdrop. Transform/opacity only. */
+@keyframes nx-hero-zoom {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
+}
+.nx-hero-zoom {
+  animation: nx-hero-zoom 24s ease-out forwards;
+}
+[data-reduce-motion='true'] .nx-hero-zoom,
+[data-gpu-eco='true'] .nx-hero-zoom,
+[data-window-active='false'] .nx-hero-zoom {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nx-hero-zoom {
+    animation: none;
+  }
+}

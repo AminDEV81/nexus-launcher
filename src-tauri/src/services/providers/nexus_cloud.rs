@@ -1,0 +1,153 @@
+use super::models::{HubGameDetails, NameIdItem, UnifiedArtwork};
+use super::traits::{ArtworkProvider, MetadataProvider};
+use crate::commands::hub::HubGame;
+use crate::error::{AppError, AppResult};
+use serde::Deserialize;
+
+pub const DEFAULT_GATEWAY_URL: &str =
+    "https://nexus-metadata-gateway.nexus-amin.workers.dev";
+
+#[derive(Deserialize)]
+struct GatewayEnvelope<T> {
+    success: bool,
+    data: Option<T>,
+    error: Option<GatewayError>,
+}
+
+#[derive(Deserialize)]
+#[allow(dead_code)]
+struct GatewayError {
+    code: String,
+    message: String,
+}
+
+pub struct NexusCloudProvider {
+    http: reqwest::Client,
+    base_url: String,
+}
+
+impl NexusCloudProvider {
+    pub fn new(http: reqwest::Client, base_url: Option<String>) -> Self {
+        let url = base_url
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or_else(|| DEFAULT_GATEWAY_URL.to_string());
+        Self {
+            http,
+            base_url: url.trim_end_matches('/').to_string(),
+        }
+    }
+
+    async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> AppResult<T> {
+        let full_url = format!("{}{path}", self.base_url);
+        let res = self
+            .http
+            .get(&full_url)
+            .send()
+            .await
+            .map_err(|err| AppError::Other(format!("Nexus Gateway request failed: {err}")))?;
+
+        if res.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            return Err(AppError::Other("Gateway rate limit reached. Please wait a moment.".into()));
+        }
+
+        let envelope: GatewayEnvelope<T> = res
+            .json()
+            .await
+            .map_err(|err| AppError::Other(format!("Invalid Gateway response: {err}")))?;
+
+        if !envelope.success {
+            let msg = envelope
+                .error
+                .map(|e| e.message)
+                .unwrap_or_else(|| "Gateway returned an error".into());
+            return Err(AppError::Other(msg));
+        }
+
+        envelope
+            .data
+            .ok_or_else(|| AppError::Other("Empty Gateway payload".into()))
+    }
+}
+
+impl MetadataProvider for NexusCloudProvider {
+    fn provider_name(&self) -> &'static str {
+        "nexus_cloud"
+    }
+
+    async fn fetch_feed(&self, feed: &str, offset: i64) -> AppResult<Vec<HubGame>> {
+        let path = format!("/api/v1/games/feed/{feed}?offset={offset}");
+        self.get_json(&path).await
+    }
+
+    async fn search_games(
+        &self,
+        query: &str,
+        offset: i64,
+        genre_id: Option<i64>,
+        platform_id: Option<i64>,
+    ) -> AppResult<Vec<HubGame>> {
+        let encoded_q = urlencoding_light(query);
+        let mut path = format!("/api/v1/games/search?q={encoded_q}&offset={offset}");
+        if let Some(gid) = genre_id {
+            path.push_str(&format!("&genre={gid}"));
+        }
+        if let Some(pid) = platform_id {
+            path.push_str(&format!("&platform={pid}"));
+        }
+        self.get_json(&path).await
+    }
+
+    async fn get_game_details(&self, igdb_id: i64) -> AppResult<Option<HubGameDetails>> {
+        let path = format!("/api/v1/games/details/{igdb_id}");
+        match self.get_json(&path).await {
+            Ok(details) => Ok(Some(details)),
+            Err(_) => Ok(None),
+        }
+    }
+
+    async fn get_similar_games(&self, igdb_id: i64) -> AppResult<Vec<HubGame>> {
+        let path = format!("/api/v1/games/similar/{igdb_id}");
+        self.get_json(&path).await
+    }
+
+    async fn list_genres(&self) -> AppResult<Vec<NameIdItem>> {
+        self.get_json("/api/v1/games/genres").await
+    }
+
+    async fn list_platforms(&self) -> AppResult<Vec<NameIdItem>> {
+        self.get_json("/api/v1/games/platforms").await
+    }
+}
+
+impl ArtworkProvider for NexusCloudProvider {
+    fn provider_name(&self) -> &'static str {
+        "nexus_cloud"
+    }
+
+    async fn get_artwork_options(
+        &self,
+        kind: &str,
+        steam_app_id: Option<&str>,
+        name: &str,
+    ) -> AppResult<Vec<UnifiedArtwork>> {
+        let encoded_name = urlencoding_light(name);
+        let mut path = format!("/api/v1/artwork/options/{kind}?name={encoded_name}");
+        if let Some(app_id) = steam_app_id {
+            path.push_str(&format!("&app_id={app_id}"));
+        }
+        self.get_json(&path).await
+    }
+}
+
+fn urlencoding_light(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for byte in input.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(byte as char);
+            }
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}

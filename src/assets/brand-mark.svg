@@ -1,0 +1,23 @@
+<svg width="24" height="24" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="facetTop" x1="256" y1="60" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#b3a0ff"/>
+      <stop offset="100%" stop-color="#8a68ff"/>
+    </linearGradient>
+    <linearGradient id="facetLeft" x1="98" y1="256" x2="256" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6d4bef"/>
+      <stop offset="100%" stop-color="#7c5cff"/>
+    </linearGradient>
+    <linearGradient id="facetRight" x1="256" y1="256" x2="414" y2="256" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4c7dff"/>
+      <stop offset="100%" stop-color="#7c5cff"/>
+    </linearGradient>
+  </defs>
+
+  <polygon points="256,60 414,256 256,256 98,256" fill="url(#facetTop)"/>
+  <polygon points="98,256 256,256 256,452" fill="url(#facetLeft)"/>
+  <polygon points="256,256 414,256 256,452" fill="url(#facetRight)"/>
+
+  <polygon points="256,60 414,256 256,452 98,256" fill="none" stroke="#0a0a0e" stroke-width="14" stroke-linejoin="round"/>
+  <line x1="98" y1="256" x2="414" y2="256" stroke="#0a0a0e" stroke-width="12"/>
+</svg>

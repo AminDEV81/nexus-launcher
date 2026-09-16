@@ -1,0 +1,16 @@
+# Normalize all text files to LF in the repo and on checkout — Prettier
+# is configured for LF end-of-line, so letting git's autocrlf flip files
+# back to CRLF would show phantom diffs on every format:check.
+* text=auto eol=lf
+
+# Binaries — never normalize
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.woff2 binary
+*.exe binary
+*.db binary

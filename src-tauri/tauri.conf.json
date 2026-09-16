@@ -1,0 +1,47 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Nexus",
+  "version": "0.1.0",
+  "identifier": "com.nexus.launcher",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Nexus",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": false,
+        "transparent": false,
+        "shadow": true,
+        "center": true,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: http://asset.localhost asset: data: blob:; media-src 'self' https: http://asset.localhost asset: data: blob:; font-src 'self' data: https:; connect-src 'self' ipc: http://ipc.localhost https:; frame-src 'self' https:; child-src 'self' https:; object-src 'none'; base-uri 'self'",
+      "devCsp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: http://asset.localhost asset: data: blob:; media-src 'self' https: http://asset.localhost asset: data: blob:; font-src 'self' data: https:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420 https:; frame-src 'self' https:; child-src 'self' https:; object-src 'none'; base-uri 'self'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/artwork/**", "$EXE/artwork/**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  }
+}
