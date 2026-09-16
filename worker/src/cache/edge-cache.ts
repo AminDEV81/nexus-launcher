@@ -19,7 +19,7 @@ export function buildCacheHeaders(ttlSeconds: number, swrSeconds = 86_400): Head
   }
 }
 
-const CACHE_VERSION = 'v5'
+const CACHE_VERSION = 'v7'
 
 export async function matchEdgeCache(request: Request): Promise<Response | null> {
   try {

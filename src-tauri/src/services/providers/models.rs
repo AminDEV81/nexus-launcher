@@ -2,16 +2,66 @@ pub use crate::commands::hub::{HubGame, HubGameDetails, HubVideo};
 use crate::commands::metadata::steamgriddb::GridOption;
 use serde::{Deserialize, Serialize};
 
+fn deserialize_flexible_id<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    struct IdVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for IdVisitor {
+        type Value = String;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a string or integer id")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(value.to_string())
+        }
+
+        fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(value)
+        }
+
+        fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(value.to_string())
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(value.to_string())
+        }
+    }
+
+    deserializer.deserialize_any(IdVisitor)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedArtwork {
+    #[serde(deserialize_with = "deserialize_flexible_id")]
     pub id: String,
     pub url: String,
     pub thumbnail_url: String,
     pub mime: String,
     pub is_animated: bool,
+    #[serde(default)]
     pub width: i64,
+    #[serde(default)]
     pub height: i64,
+    #[serde(default)]
     pub provider: String, // "steam", "steamgrid", "local"
+    #[serde(alias = "type")]
     pub artwork_type: String, // "cover", "hero", "logo", "screenshot"
 }
 

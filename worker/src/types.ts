@@ -35,15 +35,23 @@ export interface HubGame {
   platforms: string[]
 }
 
+export interface HubVideo {
+  name: string | null
+  video_id: string
+}
+
 export interface HubGameDetails extends HubGame {
   developer: string | null
   publisher: string | null
   trailer_url: string | null
+  videos: HubVideo[]
   screenshot_urls: string[]
+  metacritic_score: number | null
+  steam_app_id: string | null
 }
 
 export interface ArtworkOption {
-  id: string | number
+  id: string
   url: string
   thumbnail_url: string
   mime: string
@@ -52,6 +60,7 @@ export interface ArtworkOption {
   height: number
   provider: 'steam' | 'steamgrid' | 'local'
   type: 'cover' | 'hero' | 'logo' | 'screenshot'
+  artwork_type: 'cover' | 'hero' | 'logo' | 'screenshot'
 }
 
 export interface TwitchToken {

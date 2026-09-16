@@ -107,7 +107,14 @@ impl MetadataProvider for NexusCloudProvider {
         let path = format!("/api/v1/games/details/{igdb_id}");
         match self.get_json(&path).await {
             Ok(details) => Ok(Some(details)),
-            Err(_) => Ok(None),
+            Err(err) => {
+                let msg = err.to_string();
+                if msg.contains("404") || msg.to_lowercase().contains("not found") {
+                    Ok(None)
+                } else {
+                    Err(err)
+                }
+            }
         }
     }
 

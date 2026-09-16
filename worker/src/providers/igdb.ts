@@ -1,5 +1,6 @@
 import type { Env, HubGame, HubGameDetails } from '../types'
 import { getTwitchToken } from './twitch-auth'
+import { getSteamMetacriticScore } from './steam'
 
 const IGDB_BASE = 'https://api.igdb.com/v4'
 const STANDALONE_TYPES = '(0, 8, 9, 10, 4)'
@@ -8,7 +9,7 @@ const FIELDS_LIST =
   'fields name, summary, first_release_date, game_type, cover.image_id, screenshots.image_id, total_rating_count, aggregated_rating, hypes, genres.name, platforms.name'
 
 const FIELDS_DETAILS =
-  'fields name, summary, first_release_date, game_type, cover.image_id, screenshots.image_id, total_rating_count, aggregated_rating, hypes, genres.name, platforms.name, involved_companies.developer, involved_companies.publisher, involved_companies.company.name, videos.video_id'
+  'fields name, summary, first_release_date, game_type, cover.image_id, screenshots.image_id, total_rating_count, aggregated_rating, hypes, genres.name, platforms.name, involved_companies.developer, involved_companies.publisher, involved_companies.company.name, videos.video_id, videos.name, external_games.external_game_source, external_games.category, external_games.uid'
 
 function makeImageUrl(imageId: string | undefined, size: string): string | null {
   if (!imageId) return null
@@ -199,12 +200,33 @@ export async function getGameDetails(igdbId: number, env: Env): Promise<HubGameD
     }
   }
 
+  const videos: HubGameDetails['videos'] = Array.isArray(item.videos)
+    ? item.videos
+        .filter((v: any) => v && v.video_id)
+        .map((v: any) => ({ name: v.name || null, video_id: String(v.video_id) }))
+    : []
+
+  let steamAppId: string | null = null
+  if (Array.isArray(item.external_games)) {
+    const steamEntry = item.external_games.find(
+      (eg: any) => eg.external_game_source === 1 || eg.category === 1,
+    )
+    if (steamEntry && steamEntry.uid) {
+      steamAppId = String(steamEntry.uid)
+    }
+  }
+
+  const metacriticScore = steamAppId ? await getSteamMetacriticScore(steamAppId) : null
+
   return {
     ...base,
     developer,
     publisher,
     trailer_url: trailerUrl,
+    videos,
     screenshot_urls: screenshotUrls,
+    metacritic_score: metacriticScore,
+    steam_app_id: steamAppId,
   }
 }
 

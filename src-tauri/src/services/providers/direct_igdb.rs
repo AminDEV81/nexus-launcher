@@ -1,4 +1,4 @@
-use super::models::{HubGameDetails, NameIdItem};
+use super::models::{HubGameDetails, HubVideo, NameIdItem};
 use super::traits::MetadataProvider;
 use crate::commands::hub::{self, HubGame, STANDALONE_GAME_TYPES};
 use crate::commands::metadata::igdb;
@@ -128,7 +128,7 @@ impl MetadataProvider for DirectIgdbProvider {
             "fields name, summary, first_release_date, game_type, cover.image_id, screenshots.image_id, \
              total_rating_count, aggregated_rating, hypes, genres.name, platforms.name, \
              involved_companies.developer, involved_companies.publisher, involved_companies.company.name, \
-             videos.video_id;\nwhere id = {igdb_id};"
+             videos.video_id, videos.name;\nwhere id = {igdb_id};"
         );
 
         let value = igdb::query(&self.http, &self.client_id, &token, "games", &query).await?;
@@ -167,13 +167,22 @@ impl MetadataProvider for DirectIgdbProvider {
             }
         }
 
-        let trailer_url = first
-            .get("videos")
-            .and_then(Value::as_array)
-            .and_then(|arr| arr.first())
-            .and_then(|v| v.get("video_id"))
-            .and_then(Value::as_str)
-            .map(|vid| format!("https://www.youtube.com/watch?v={vid}"));
+        let mut videos = Vec::new();
+        if let Some(arr) = first.get("videos").and_then(Value::as_array) {
+            for v in arr {
+                if let Some(video_id) = v.get("video_id").and_then(Value::as_str) {
+                    let name = v.get("name").and_then(Value::as_str).map(str::to_string);
+                    videos.push(HubVideo {
+                        name,
+                        video_id: video_id.to_string(),
+                    });
+                }
+            }
+        }
+
+        let trailer_url = videos
+            .first()
+            .map(|v| format!("https://www.youtube.com/watch?v={}", v.video_id));
 
         let mut screenshot_urls = Vec::new();
         if let Some(screenshots) = first.get("screenshots").and_then(Value::as_array) {
@@ -189,7 +198,7 @@ impl MetadataProvider for DirectIgdbProvider {
             developer,
             publisher,
             trailer_url,
-            videos: Vec::new(),
+            videos,
             screenshot_urls,
             metacritic_score: None,
             steam_app_id: None,

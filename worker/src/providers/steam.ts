@@ -42,6 +42,21 @@ export async function searchSteamAppId(term: string): Promise<string | null> {
   }
 }
 
+export async function getSteamMetacriticScore(appId: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${STEAM_APP_DETAILS}?appids=${appId}&l=english`)
+    if (!res.ok) return null
+    const json = (await res.json()) as any
+    const entry = json?.[appId]
+    if (entry?.success && entry?.data?.metacritic?.score) {
+      return Number(entry.data.metacritic.score)
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 export function getSteamOfficialArtwork(appId: string): ArtworkOption[] {
   const options: ArtworkOption[] = []
 
@@ -56,6 +71,7 @@ export function getSteamOfficialArtwork(appId: string): ArtworkOption[] {
     height: 900,
     provider: 'steam',
     type: 'cover',
+    artwork_type: 'cover',
   })
 
   // 2. Official Horizontal Capsule (460x215)
@@ -69,6 +85,7 @@ export function getSteamOfficialArtwork(appId: string): ArtworkOption[] {
     height: 215,
     provider: 'steam',
     type: 'cover',
+    artwork_type: 'cover',
   })
 
   // 3. Official Library Hero Banner (1920x620)
@@ -82,6 +99,7 @@ export function getSteamOfficialArtwork(appId: string): ArtworkOption[] {
     height: 620,
     provider: 'steam',
     type: 'hero',
+    artwork_type: 'hero',
   })
 
   // 4. Official Logo Transparent (PNG)
@@ -95,6 +113,7 @@ export function getSteamOfficialArtwork(appId: string): ArtworkOption[] {
     height: 360,
     provider: 'steam',
     type: 'logo',
+    artwork_type: 'logo',
   })
 
   return options

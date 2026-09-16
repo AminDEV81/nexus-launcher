@@ -38,7 +38,7 @@ function normalizeAsset(
   isAnimated: boolean,
 ): ArtworkOption {
   return {
-    id: item.id,
+    id: String(item.id),
     url: item.url,
     thumbnail_url: item.thumb || item.url,
     mime: item.mime || (isAnimated ? 'image/webp' : 'image/jpeg'),
@@ -47,6 +47,7 @@ function normalizeAsset(
     height: item.height || 0,
     provider: 'steamgrid',
     type,
+    artwork_type: type,
   }
 }
 

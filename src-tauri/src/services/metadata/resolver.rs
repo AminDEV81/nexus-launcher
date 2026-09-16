@@ -263,7 +263,7 @@ impl MetadataProviderResolver {
         db: &Database,
         igdb_id: i64,
     ) -> AppResult<Option<HubGameDetails>> {
-        let cache_key = format!("details:{igdb_id}");
+        let cache_key = format!("details:v2:{igdb_id}");
 
         {
             let conn = db.connection.lock().expect("db mutex poisoned");
@@ -477,8 +477,11 @@ impl MetadataProviderResolver {
         match config.mode {
             ProviderMode::Public => {
                 let cloud = NexusCloudProvider::new(self.http.clone(), config.public_proxy_url);
-                if let Ok(assets) = cloud.get_artwork_options(kind, steam_app_id, name).await {
-                    sgdb_assets = assets;
+                match cloud.get_artwork_options(kind, steam_app_id, name).await {
+                    Ok(assets) => sgdb_assets = assets,
+                    Err(err) => {
+                        log::warn!("Failed to fetch artwork options from cloud: {err}");
+                    }
                 }
             }
             ProviderMode::Custom => {

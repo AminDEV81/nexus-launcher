@@ -852,15 +852,19 @@ pub struct HubGameDetails {
     pub developer: Option<String>,
     pub publisher: Option<String>,
     pub trailer_url: Option<String>,
+    #[serde(default)]
     pub videos: Vec<HubVideo>,
     /// Gallery images, already ordered.
+    #[serde(default)]
     pub screenshot_urls: Vec<String>,
     /// The *real* Metacritic score, fetched live from Steam's store API
     /// (which republishes it) via the game's Steam AppID resolved from
     /// IGDB `external_games`. `None` when the game isn't on Steam or
     /// Metacritic hasn't rated it — the UI falls back to the IGDB
     /// aggregate in `game.rating`.
+    #[serde(default)]
     pub metacritic_score: Option<i64>,
+    #[serde(default)]
     pub steam_app_id: Option<String>,
 }
 
