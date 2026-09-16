@@ -1,0 +1,135 @@
+﻿<svg width="1200" height="380" viewBox="0 0 1200 380" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Gradients -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#090a12" />
+      <stop offset="50%" stop-color="#0f0c1b" />
+      <stop offset="100%" stop-color="#07080d" />
+    </linearGradient>
+
+    <!-- Animated Shimmer Gradient -->
+    <linearGradient id="shimmer" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8a2be2">
+        <animate attributeName="stop-color" values="#8a2be2;#00e5ff;#ff007f;#8a2be2" dur="8s" repeatCount="indefinite" />
+      </stop>
+      <stop offset="50%" stop-color="#00e5ff">
+        <animate attributeName="stop-color" values="#00e5ff;#ff007f;#8a2be2;#00e5ff" dur="8s" repeatCount="indefinite" />
+      </stop>
+      <stop offset="100%" stop-color="#ff007f">
+        <animate attributeName="stop-color" values="#ff007f;#8a2be2;#00e5ff;#ff007f" dur="8s" repeatCount="indefinite" />
+      </stop>
+    </linearGradient>
+
+    <!-- Glowing filters -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="28" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+
+    <!-- Clip Path for Rounded Banner -->
+    <clipPath id="bannerClip">
+      <rect x="0" y="0" width="1200" height="380" rx="24" ry="24" />
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#bannerClip)">
+    <!-- Base Background -->
+    <rect width="1200" height="380" fill="url(#bgGrad)" />
+
+    <!-- Cyberpunk Mesh Grid Lines -->
+    <g opacity="0.08" stroke="#ffffff" stroke-width="1">
+      <line x1="0" y1="60" x2="1200" y2="60" />
+      <line x1="0" y1="120" x2="1200" y2="120" />
+      <line x1="0" y1="180" x2="1200" y2="180" />
+      <line x1="0" y1="240" x2="1200" y2="240" />
+      <line x1="0" y1="300" x2="1200" y2="300" />
+      <line x1="200" y1="0" x2="200" y2="380" />
+      <line x1="400" y1="0" x2="400" y2="380" />
+      <line x1="600" y1="0" x2="600" y2="380" />
+      <line x1="800" y1="0" x2="800" y2="380" />
+      <line x1="1000" y1="0" x2="1000" y2="380" />
+    </g>
+
+    <!-- Animated Ambient Light Orbs -->
+    <circle cx="240" cy="190" r="140" fill="#7928ca" opacity="0.3" filter="url(#softGlow)">
+      <animate attributeName="r" values="120;160;120" dur="6s" repeatCount="indefinite" />
+      <animate attributeName="opacity" values="0.25;0.4;0.25" dur="6s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="1020" cy="120" r="130" fill="#0070f3" opacity="0.22" filter="url(#softGlow)">
+      <animate attributeName="r" values="110;150;110" dur="7s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="950" cy="280" r="110" fill="#ff0080" opacity="0.2" filter="url(#softGlow)">
+      <animate attributeName="r" values="90;130;90" dur="5s" repeatCount="indefinite" />
+    </circle>
+
+    <!-- Outer Animated Border Glow -->
+    <rect x="2" y="2" width="1196" height="376" rx="22" fill="none" stroke="url(#shimmer)" stroke-width="2" opacity="0.8" />
+
+    <!-- Left Side: Nexus Logo (Scaled & Positioned) -->
+    <g transform="translate(100, 100) scale(3.8)" filter="url(#glow)">
+      <!-- Animated pulsating logo -->
+      <path fill="#863bff" d="M25.946 44.938c-.664.845-2.021.375-2.021-.698V33.937a2.26 2.26 0 0 0-2.262-2.262H10.287c-.92 0-1.456-1.04-.92-1.788l7.48-10.471c1.07-1.497 0-3.578-1.842-3.578H1.237c-.92 0-1.456-1.04-.92-1.788L10.013.474c.214-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.471c-1.07 1.498 0 3.579 1.842 3.579h11.377c.943 0 1.473 1.088.89 1.83L25.947 44.94z">
+        <animate attributeName="fill" values="#863bff;#00e5ff;#ff007f;#863bff" dur="8s" repeatCount="indefinite" />
+      </path>
+    </g>
+
+    <!-- Right Side: Content -->
+    <!-- Brand Title -->
+    <text x="350" y="130" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="64" font-weight="900" letter-spacing="4" fill="#ffffff">
+      NEXUS <tspan fill="url(#shimmer)">LAUNCHER</tspan>
+    </text>
+
+    <!-- Subtitle / Tagline -->
+    <text x="355" y="172" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="600" letter-spacing="2" fill="#a0aec0">
+      THE NEXT-GENERATION PC GAME LIBRARY &amp; SUITE
+    </text>
+
+    <text x="355" y="212" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#718096">
+      Native Tauri 2 + Rust Core • Zero Electron Bloat • Cloudflare Edge Metadata • Ultra-Low Latency
+    </text>
+
+    <!-- Feature Pills -->
+    <g transform="translate(355, 255)">
+      <!-- Pill 1: Booster -->
+      <g>
+        <rect x="0" y="0" width="135" height="38" rx="19" fill="#18142c" stroke="#863bff" stroke-width="1.5" />
+        <text x="67" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="700" fill="#ede6ff" text-anchor="middle">⚡ Game Booster</text>
+      </g>
+      <!-- Pill 2: Downloader -->
+      <g transform="translate(145, 0)">
+        <rect x="0" y="0" width="150" height="38" rx="19" fill="#0d1b2a" stroke="#00e5ff" stroke-width="1.5" />
+        <text x="75" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="700" fill="#d0f4ff" text-anchor="middle">📥 Downloader 6x</text>
+      </g>
+      <!-- Pill 3: Soundtrack Center -->
+      <g transform="translate(305, 0)">
+        <rect x="0" y="0" width="155" height="38" rx="19" fill="#200d1e" stroke="#ff007f" stroke-width="1.5" />
+        <text x="77" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="700" fill="#ffe0ef" text-anchor="middle">🎵 OST Visualizer</text>
+      </g>
+      <!-- Pill 4: Save Manager -->
+      <g transform="translate(470, 0)">
+        <rect x="0" y="0" width="145" height="38" rx="19" fill="#131c18" stroke="#10b981" stroke-width="1.5" />
+        <text x="72" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="700" fill="#d1fae5" text-anchor="middle">🛡️ Save Guardian</text>
+      </g>
+      <!-- Pill 5: Cloud Hub -->
+      <g transform="translate(625, 0)">
+        <rect x="0" y="0" width="125" height="38" rx="19" fill="#241a0d" stroke="#f59e0b" stroke-width="1.5" />
+        <text x="62" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="700" fill="#fef3c7" text-anchor="middle">🎮 Cloud Hub</text>
+      </g>
+    </g>
+
+    <!-- Bottom Status Line -->
+    <g transform="translate(355, 330)">
+      <circle cx="6" cy="6" r="4" fill="#10b981">
+        <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" />
+      </circle>
+      <text x="20" y="10" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="13" font-weight="500" fill="#94a3b8">
+        Production Ready • High Performance Offline First • Windows 10 &amp; 11
+      </text>
+    </g>
+  </g>
+</svg>
