@@ -56,10 +56,13 @@ impl NexusCloudProvider {
             return Err(AppError::Other("Gateway rate limit reached. Please wait a moment.".into()));
         }
 
-        let envelope: GatewayEnvelope<T> = res
-            .json()
+        let body_text = res
+            .text()
             .await
-            .map_err(|_| AppError::Other("Unable to parse game catalog response. Please try again.".into()))?;
+            .map_err(|e| AppError::Other(format!("Failed to read response body: {e}")))?;
+
+        let envelope: GatewayEnvelope<T> = serde_json::from_str(&body_text)
+            .map_err(|err| AppError::Other(format!("Unable to parse game catalog response: {err}")))?;
 
         if !envelope.success {
             let msg = envelope
@@ -164,3 +167,36 @@ fn urlencoding_light(input: &str) -> String {
     }
     out
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_live_cloud_artwork_options() {
+        let http = reqwest::Client::new();
+        let cloud = NexusCloudProvider::new(http, None);
+        let res = cloud.get_artwork_options("cover", None, "Cyberpunk 2077").await;
+        println!("Result for Cyberpunk: {:?}", res.as_ref().map(|v| v.len()));
+        assert!(res.is_ok());
+        let artworks = res.unwrap();
+        assert!(artworks.len() > 10, "Expected >10 artworks, got {}", artworks.len());
+
+        let res2 = cloud.get_artwork_options("cover", None, "Replaced").await;
+        println!("Result for Replaced covers: {:?}", res2.as_ref().map(|v| v.len()));
+        assert!(res2.is_ok());
+        let artworks2 = res2.unwrap();
+        assert!(artworks2.len() > 10, "Expected >10 artworks, got {}", artworks2.len());
+
+        let res_hero = cloud.get_artwork_options("hero", None, "Cyberpunk 2077").await;
+        println!("Result for Cyberpunk heroes: {:?}", res_hero.as_ref().map(|v| v.len()));
+        assert!(res_hero.is_ok());
+        assert!(res_hero.unwrap().len() > 10);
+
+        let res_logo = cloud.get_artwork_options("logo", None, "Cyberpunk 2077").await;
+        println!("Result for Cyberpunk logos: {:?}", res_logo.as_ref().map(|v| v.len()));
+        assert!(res_logo.is_ok());
+        assert!(res_logo.unwrap().len() > 10);
+    }
+}
+

@@ -47,22 +47,62 @@ where
     deserializer.deserialize_any(IdVisitor)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct UnifiedArtwork {
-    #[serde(deserialize_with = "deserialize_flexible_id")]
     pub id: String,
     pub url: String,
     pub thumbnail_url: String,
     pub mime: String,
     pub is_animated: bool,
-    #[serde(default)]
     pub width: i64,
-    #[serde(default)]
     pub height: i64,
-    #[serde(default)]
     pub provider: String, // "steam", "steamgrid", "local"
-    #[serde(alias = "type")]
     pub artwork_type: String, // "cover", "hero", "logo", "screenshot"
+}
+
+impl<'de> Deserialize<'de> for UnifiedArtwork {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RawArtwork {
+            #[serde(deserialize_with = "deserialize_flexible_id")]
+            id: String,
+            url: String,
+            thumbnail_url: String,
+            mime: String,
+            is_animated: bool,
+            #[serde(default)]
+            width: i64,
+            #[serde(default)]
+            height: i64,
+            #[serde(default)]
+            provider: String,
+            #[serde(default)]
+            artwork_type: Option<String>,
+            #[serde(default, rename = "type")]
+            legacy_type: Option<String>,
+        }
+
+        let raw = RawArtwork::deserialize(deserializer)?;
+        let artwork_type = raw
+            .artwork_type
+            .or(raw.legacy_type)
+            .unwrap_or_else(|| "cover".to_string());
+
+        Ok(UnifiedArtwork {
+            id: raw.id,
+            url: raw.url,
+            thumbnail_url: raw.thumbnail_url,
+            mime: raw.mime,
+            is_animated: raw.is_animated,
+            width: raw.width,
+            height: raw.height,
+            provider: raw.provider,
+            artwork_type,
+        })
+    }
 }
 
 impl UnifiedArtwork {
