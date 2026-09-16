@@ -44,7 +44,9 @@ import {
 import { useHubSearchStore } from '../store/hub-search-store'
 import { HUB_FEEDS, type HubFeedId } from '../feeds'
 import { MissingKeysPanel } from '../components/missing-keys-panel'
+import { HubOfflinePanel } from '../components/hub-offline-panel'
 import { isMissingIgdbKeys } from '../utils/is-missing-keys'
+import { useSettings } from '@/features/settings/hooks/use-settings'
 import { HubFeaturedHero } from '../components/hub-featured-hero'
 import { HubGameCard } from '../components/hub-game-card'
 import { HubFeedSkeleton } from '../components/hub-game-skeleton'
@@ -234,9 +236,14 @@ export function HubPage() {
   const isPending =
     newReleases.isPending || comingSoon.isPending || topRated.isPending || gamesPending
 
-  const missingKeys = [newReleases, comingSoon, topRated, recommended].some((query) =>
-    isMissingIgdbKeys(query.error),
-  )
+  const { data: settings } = useSettings()
+  const providerMode = settings?.metadata_provider_mode ?? 'public'
+
+  const missingKeys =
+    providerMode === 'custom' &&
+    [newReleases, comingSoon, topRated, recommended].some((query) =>
+      isMissingIgdbKeys(query.error, providerMode),
+    )
   // Any other failure (network down, IGDB outage) must still show a
   // message — never a silently blank page. Partial data still wins:
   // one flaky query shouldn't hide shelves that did load.
@@ -741,28 +748,21 @@ export function HubPage() {
         {missingKeys ? (
           <MissingKeysPanel />
         ) : firstError ? (
-          <section className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-border bg-surface px-8 py-16 text-center">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-surface-raised">
-              <Compass className="size-6 text-accent" />
-            </span>
-            <div>
-              <div className="text-base font-semibold text-text">Couldn't reach IGDB</div>
-              <p className="mx-auto mt-1 max-w-md text-sm text-muted">{firstError.message}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                void newReleases.refetch()
-                void comingSoon.refetch()
-                void topRated.refetch()
-                void recommended.refetch()
-              }}
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-sm font-medium text-muted transition-colors hover:border-accent/45 hover:text-text"
-            >
-              <Loader2 className="size-4" />
-              Try again
-            </button>
-          </section>
+          <HubOfflinePanel
+            onRetry={() => {
+              void newReleases.refetch()
+              void comingSoon.refetch()
+              void topRated.refetch()
+              void recommended.refetch()
+            }}
+            isRetrying={
+              newReleases.isFetching ||
+              comingSoon.isFetching ||
+              topRated.isFetching ||
+              recommended.isFetching
+            }
+            message={firstError.message}
+          />
         ) : isFiltering ? (
           <SearchResults
             query={searchQuery}
@@ -850,17 +850,20 @@ function SearchResults({
   const results = search.data?.pages.flat() ?? []
   const hasTerm = query.trim().length >= 2
   const partsLabel = filterParts.join(' · ')
+  const { data: settings } = useSettings()
+  const providerMode = settings?.metadata_provider_mode ?? 'public'
 
-  if (isMissingIgdbKeys(search.error)) {
+  if (isMissingIgdbKeys(search.error, providerMode)) {
     return <MissingKeysPanel />
   }
 
   if (search.error) {
     return (
-      <section className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-surface px-8 py-16 text-center">
-        <Search className="size-6 text-accent" />
-        <p className="text-sm text-muted">{search.error.message}</p>
-      </section>
+      <HubOfflinePanel
+        onRetry={() => search.fetchNextPage()}
+        isRetrying={search.isFetching}
+        message={search.error.message}
+      />
     )
   }
 

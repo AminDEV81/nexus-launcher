@@ -421,15 +421,19 @@ pub async fn list_hub_genres(
 ) -> AppResult<Vec<HubGenre>> {
     let config = resolver.get_config(&db);
     if config.mode == ProviderMode::Public {
-        if let Ok(genres) = resolver.list_genres(&db).await {
-            return Ok(genres
+        return match resolver.list_genres(&db).await {
+            Ok(genres) => Ok(genres
                 .into_iter()
                 .map(|item| HubGenre {
                     id: item.id,
                     name: item.name,
                 })
-                .collect());
-        }
+                .collect()),
+            Err(err) => {
+                log::warn!("Could not load genres from public gateway (offline or unreachable): {err}");
+                Ok(Vec::new())
+            }
+        };
     }
 
     let (client_id, client_secret) = igdb_credentials(&db)?;
@@ -479,16 +483,20 @@ pub async fn list_hub_platforms(
 ) -> AppResult<Vec<HubPlatform>> {
     let config = resolver.get_config(&db);
     if config.mode == ProviderMode::Public {
-        if let Ok(platforms) = resolver.list_platforms(&db).await {
-            return Ok(platforms
+        return match resolver.list_platforms(&db).await {
+            Ok(platforms) => Ok(platforms
                 .into_iter()
                 .map(|item| HubPlatform {
                     id: item.id,
                     name: item.name,
                     abbreviation: String::new(),
                 })
-                .collect());
-        }
+                .collect()),
+            Err(err) => {
+                log::warn!("Could not load platforms from public gateway (offline or unreachable): {err}");
+                Ok(Vec::new())
+            }
+        };
     }
 
     let (client_id, client_secret) = igdb_credentials(&db)?;
@@ -866,9 +874,10 @@ pub async fn get_hub_game_details(
 ) -> AppResult<HubGameDetails> {
     let config = resolver.get_config(&db);
     if config.mode == ProviderMode::Public {
-        if let Ok(Some(details)) = resolver.get_game_details(&db, igdb_id).await {
-            return Ok(details);
-        }
+        return match resolver.get_game_details(&db, igdb_id).await? {
+            Some(details) => Ok(details),
+            None => Err(AppError::NotFound("Game not found on IGDB".into())),
+        };
     }
 
     let (client_id, client_secret) = igdb_credentials(&db)?;

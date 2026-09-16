@@ -44,7 +44,13 @@ impl NexusCloudProvider {
             .get(&full_url)
             .send()
             .await
-            .map_err(|err| AppError::Other(format!("Nexus Gateway request failed: {err}")))?;
+            .map_err(|err| {
+                if err.is_connect() || err.is_timeout() {
+                    AppError::Other("Network disconnected or server unreachable. Please check your internet connection.".into())
+                } else {
+                    AppError::Other("Unable to connect to game catalog. Please check your internet connection.".into())
+                }
+            })?;
 
         if res.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
             return Err(AppError::Other("Gateway rate limit reached. Please wait a moment.".into()));
@@ -53,19 +59,19 @@ impl NexusCloudProvider {
         let envelope: GatewayEnvelope<T> = res
             .json()
             .await
-            .map_err(|err| AppError::Other(format!("Invalid Gateway response: {err}")))?;
+            .map_err(|_| AppError::Other("Unable to parse game catalog response. Please try again.".into()))?;
 
         if !envelope.success {
             let msg = envelope
                 .error
                 .map(|e| e.message)
-                .unwrap_or_else(|| "Gateway returned an error".into());
+                .unwrap_or_else(|| "Game catalog returned an error".into());
             return Err(AppError::Other(msg));
         }
 
         envelope
             .data
-            .ok_or_else(|| AppError::Other("Empty Gateway payload".into()))
+            .ok_or_else(|| AppError::Other("No game data available.".into()))
     }
 }
 

@@ -5,9 +5,11 @@ import { useHubFeed } from '../hooks/use-hub'
 import { HUB_FEEDS, isHubFeedId } from '../feeds'
 import { HubBackButton } from '../components/hub-back-button'
 import { MissingKeysPanel } from '../components/missing-keys-panel'
+import { HubOfflinePanel } from '../components/hub-offline-panel'
 import { isMissingIgdbKeys } from '../utils/is-missing-keys'
 import { HubGameCard } from '../components/hub-game-card'
 import { useGames } from '@/features/library/hooks/use-games'
+import { useSettings } from '@/features/settings/hooks/use-settings'
 import {
   buildHubLibraryMatcher,
   buildHubWishlistMatcher,
@@ -35,6 +37,9 @@ export function HubFeedPage() {
 
   const results = browse.data?.pages.flat() ?? []
 
+  const { data: settings } = useSettings()
+  const providerMode = settings?.metadata_provider_mode ?? 'public'
+
   return (
     <div className="h-full overflow-y-auto p-5 sm:p-8">
       <div className="flex flex-col gap-6">
@@ -59,12 +64,14 @@ export function HubFeedPage() {
           </section>
         )}
 
-        {feed && isMissingIgdbKeys(browse.error) && <MissingKeysPanel />}
+        {feed && isMissingIgdbKeys(browse.error, providerMode) && <MissingKeysPanel />}
 
-        {feed && browse.error && !isMissingIgdbKeys(browse.error) && (
-          <section className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-surface px-8 py-16 text-center">
-            <p className="text-sm text-muted">{browse.error.message}</p>
-          </section>
+        {feed && browse.error && !isMissingIgdbKeys(browse.error, providerMode) && (
+          <HubOfflinePanel
+            onRetry={() => void browse.refetch()}
+            isRetrying={browse.isFetching}
+            message={browse.error.message}
+          />
         )}
 
         {feed && browse.isPending && (

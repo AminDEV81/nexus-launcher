@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { ChevronDown, ChevronUp, Film, Gamepad2, Sparkles } from 'lucide-react'
+import { ChevronDown, ChevronUp, Film, Sparkles } from 'lucide-react'
 import { useHubGameDetails } from '../hooks/use-hub'
 import { HubBackButton } from '../components/hub-back-button'
 import { MissingKeysPanel } from '../components/missing-keys-panel'
+import { HubOfflinePanel } from '../components/hub-offline-panel'
 import { isMissingIgdbKeys } from '../utils/is-missing-keys'
+import { useSettings } from '@/features/settings/hooks/use-settings'
 import { HubTrailerModal } from '../components/hub-trailer-modal'
 import { HubRegionalPriceModal } from '../components/hub-regional-price-modal'
 import { HubGameHero } from '../components/hub-game-hero'
@@ -65,11 +67,14 @@ export function HubGamePage() {
     setTrailerModalOpen(true)
   }
 
+  const { data: settings } = useSettings()
+  const providerMode = settings?.metadata_provider_mode ?? 'public'
+
   if (isPending) {
     return <HubDetailsSkeleton />
   }
 
-  if (isMissingIgdbKeys(error)) {
+  if (isMissingIgdbKeys(error, providerMode)) {
     return (
       <div className="h-full overflow-y-auto p-4 sm:p-6 lg:p-8 xl:px-10">
         <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-7">
@@ -82,17 +87,11 @@ export function HubGamePage() {
 
   if (error || !game) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-        <span className="flex size-14 items-center justify-center rounded-2xl bg-surface-raised shadow-inner">
-          <Gamepad2 className="size-6 text-accent" />
-        </span>
-        <div>
-          <div className="text-base font-semibold text-text">Couldn't load this game</div>
-          <p className="mt-1 max-w-sm text-sm text-muted">
-            {error?.message ?? 'IGDB has no game with this id.'}
-          </p>
+      <div className="h-full overflow-y-auto p-4 sm:p-6 lg:p-8 xl:px-10">
+        <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-7">
+          <HubBackButton />
+          <HubOfflinePanel onRetry={() => window.location.reload()} message={error?.message} />
         </div>
-        <HubBackButton />
       </div>
     )
   }
