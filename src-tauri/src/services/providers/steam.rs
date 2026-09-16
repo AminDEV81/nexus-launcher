@@ -7,12 +7,37 @@ pub struct SteamArtworkProvider {
     http: reqwest::Client,
 }
 
+fn clean_title(title: &str) -> String {
+    let lower = title.to_lowercase();
+    let words_to_remove = [
+        "edition", "deluxe", "complete", "remastered", "goty", "repack", "fitgirl", "dodi",
+    ];
+    let mut words: Vec<&str> = lower.split_whitespace().collect();
+    words.retain(|w| {
+        let cleaned = w.trim_matches(|c: char| !c.is_alphanumeric());
+        !words_to_remove.contains(&cleaned) && !cleaned.starts_with('v')
+    });
+    let joined = words.join(" ");
+    joined
+        .chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<&str>>()
+        .join(" ")
+}
+
 impl SteamArtworkProvider {
     pub fn new(http: reqwest::Client) -> Self {
         Self { http }
     }
 
     pub async fn resolve_app_id(&self, name: &str) -> Option<String> {
+        let clean_q = clean_title(name);
+        if clean_q.is_empty() {
+            return None;
+        }
+
         let url = "https://store.steampowered.com/api/storesearch";
         let res = self
             .http
@@ -24,8 +49,19 @@ impl SteamArtworkProvider {
 
         let json: Value = res.json().await.ok()?;
         let items = json.get("items").and_then(Value::as_array)?;
-        let first = items.first()?;
-        first.get("id").and_then(|id| id.as_i64()).map(|id| id.to_string())
+
+        for item in items {
+            if let Some(cand_name) = item.get("name").and_then(Value::as_str) {
+                let clean_cand = clean_title(cand_name);
+                if clean_cand == clean_q
+                    || (clean_cand.starts_with(&clean_q) && clean_q.len() >= 4)
+                    || (clean_q.starts_with(&clean_cand) && clean_cand.len() >= 4)
+                {
+                    return item.get("id").and_then(|id| id.as_i64()).map(|id| id.to_string());
+                }
+            }
+        }
+        None
     }
 }
 

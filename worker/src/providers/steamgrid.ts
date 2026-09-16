@@ -23,13 +23,26 @@ async function querySgdb(path: string, env: Env): Promise<any> {
   return await res.json()
 }
 
-function normalizeAsset(item: any, type: 'cover' | 'hero' | 'logo'): ArtworkOption {
+function cleanTitle(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/\b(edition|deluxe|complete|remastered|goty|v\d+(\.\d+)*|repack|fitgirl|dodi)\b/gi, '')
+    .replace(/[()[\]]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function normalizeAsset(
+  item: any,
+  type: 'cover' | 'hero' | 'logo',
+  isAnimated: boolean,
+): ArtworkOption {
   return {
     id: item.id,
     url: item.url,
     thumbnail_url: item.thumb || item.url,
-    mime: item.mime || 'image/jpeg',
-    is_animated: Boolean(item.animated),
+    mime: item.mime || (isAnimated ? 'image/webp' : 'image/jpeg'),
+    is_animated: isAnimated,
     width: item.width || 0,
     height: item.height || 0,
     provider: 'steamgrid',
@@ -38,18 +51,36 @@ function normalizeAsset(item: any, type: 'cover' | 'hero' | 'logo'): ArtworkOpti
 }
 
 export async function searchSgdbGameId(name: string, env: Env): Promise<number | null> {
-  const encoded = encodeURIComponent(name.trim())
-  const json = await querySgdb(`/search/autocomplete/${encoded}`, env)
+  if (!name || !name.trim()) return null
+  const trimmed = name.trim()
+  const encoded = encodeURIComponent(trimmed)
+  let json = await querySgdb(`/search/autocomplete/${encoded}`, env)
+
+  // Fallback: If no results with full title, retry with cleaned title
+  if (!json?.data || !Array.isArray(json.data) || json.data.length === 0) {
+    const cleaned = cleanTitle(trimmed)
+    if (cleaned && cleaned !== trimmed.toLowerCase()) {
+      json = await querySgdb(`/search/autocomplete/${encodeURIComponent(cleaned)}`, env)
+    }
+  }
+
   if (!json?.data || !Array.isArray(json.data) || json.data.length === 0) {
     return null
   }
+
+  // Check for exact title match among candidates first
+  const lower = trimmed.toLowerCase()
+  const exact = json.data.find((c: any) => c.name?.toLowerCase() === lower)
+  if (exact) {
+    return exact.id
+  }
+
   return json.data[0].id
 }
 
-export async function getSgdbArtwork(
+async function fetchKindAssets(
   kind: 'grids' | 'heroes' | 'logos',
-  appId: string | null,
-  gameId: number | null,
+  targetSegment: string, // e.g. "game/12345" or "steam/620"
   env: Env,
 ): Promise<ArtworkOption[]> {
   const typeMap: Record<string, 'cover' | 'hero' | 'logo'> = {
@@ -59,19 +90,68 @@ export async function getSgdbArtwork(
   }
   const type = typeMap[kind] || 'cover'
 
-  let path = ''
+  const promises: Promise<{ items: any[]; isAnimated: boolean }>[] = []
+
+  // 1. Static items (page 0)
+  promises.push(
+    querySgdb(`/${kind}/${targetSegment}?types=static&page=0&nsfw=false`, env)
+      .then((res) => ({ items: Array.isArray(res?.data) ? res.data : [], isAnimated: false }))
+      .catch(() => ({ items: [], isAnimated: false })),
+  )
+
+  // 2. For covers (grids), fetch page 1 static as well to get up to 100 static options
+  if (kind === 'grids') {
+    promises.push(
+      querySgdb(`/${kind}/${targetSegment}?types=static&page=1&nsfw=false`, env)
+        .then((res) => ({ items: Array.isArray(res?.data) ? res.data : [], isAnimated: false }))
+        .catch(() => ({ items: [], isAnimated: false })),
+    )
+  }
+
+  // 3. Animated items (page 0)
+  promises.push(
+    querySgdb(`/${kind}/${targetSegment}?types=animated&page=0&nsfw=false`, env)
+      .then((res) => ({ items: Array.isArray(res?.data) ? res.data : [], isAnimated: true }))
+      .catch(() => ({ items: [], isAnimated: true })),
+  )
+
+  const batches = await Promise.all(promises)
+  const results: ArtworkOption[] = []
+  const seenIds = new Set<number | string>()
+
+  for (const batch of batches) {
+    for (const item of batch.items) {
+      if (item && item.id && !seenIds.has(item.id)) {
+        seenIds.add(item.id)
+        results.push(normalizeAsset(item, type, batch.isAnimated))
+      }
+    }
+  }
+
+  return results
+}
+
+export async function getSgdbArtwork(
+  kind: 'grids' | 'heroes' | 'logos',
+  appId: string | null,
+  gameId: number | null,
+  env: Env,
+): Promise<ArtworkOption[]> {
+  // Try canonical gameId first if available
+  if (gameId) {
+    const assets = await fetchKindAssets(kind, `game/${gameId}`, env)
+    if (assets.length > 0) {
+      return assets
+    }
+  }
+
+  // Fallback to steam appId if gameId was missing or yielded no results
   if (appId) {
-    path = `/${kind}/steam/${appId}`
-  } else if (gameId) {
-    path = `/${kind}/game/${gameId}`
-  } else {
-    return []
+    const assets = await fetchKindAssets(kind, `steam/${appId}`, env)
+    if (assets.length > 0) {
+      return assets
+    }
   }
 
-  const json = await querySgdb(path, env)
-  if (!json?.data || !Array.isArray(json.data)) {
-    return []
-  }
-
-  return json.data.map((item: any) => normalizeAsset(item, type))
+  return []
 }

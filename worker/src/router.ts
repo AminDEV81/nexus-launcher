@@ -165,37 +165,53 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
         let steamAppId = url.searchParams.get('app_id')
         const name = url.searchParams.get('name') || ''
 
-        // Fallback: If no steamAppId provided, resolve via Steam Search
+        // 1. Resolve SGDB Game ID from name first (primary for rich community artwork)
+        let sgdbGameId: number | null = null
+        if (name && env.STEAMGRIDDB_API_KEY) {
+          try {
+            sgdbGameId = await sgdb.searchSgdbGameId(name, env)
+          } catch {
+            // ignore
+          }
+        }
+
+        // 2. If no steamAppId passed, resolve via Steam Store search with verified title matching
         if (!steamAppId && name) {
           steamAppId = await steam.searchSteamAppId(name)
         }
 
         const results: ArtworkOption[] = []
+        const seenUrls = new Set<string>()
 
-        // 1. Fetch Official Steam Assets if AppID exists
+        // 3. Fetch Official Steam Assets only if verified AppID exists
         if (steamAppId) {
           const steamAssets = steam.getSteamOfficialArtwork(steamAppId)
-          results.push(...steamAssets.filter((a) => a.type === type))
+          for (const a of steamAssets.filter((a) => a.type === type)) {
+            if (!seenUrls.has(a.url)) {
+              seenUrls.add(a.url)
+              results.push(a)
+            }
+          }
         }
 
-        // 2. Fetch SteamGridDB Assets via Gateway Secret
-        if (env.STEAMGRIDDB_API_KEY) {
+        // 4. Fetch Rich SteamGridDB Assets (static + animated)
+        if (env.STEAMGRIDDB_API_KEY && (sgdbGameId || steamAppId)) {
           try {
             const sgdbKind = type === 'cover' ? 'grids' : type === 'hero' ? 'heroes' : 'logos'
-            let sgdbGameId: number | null = null
-            if (!steamAppId && name) {
-              sgdbGameId = await sgdb.searchSgdbGameId(name, env)
-            }
-
             const sgdbAssets = await sgdb.getSgdbArtwork(sgdbKind, steamAppId, sgdbGameId, env)
-            results.push(...sgdbAssets)
+            for (const a of sgdbAssets) {
+              if (!seenUrls.has(a.url)) {
+                seenUrls.add(a.url)
+                results.push(a)
+              }
+            }
           } catch {
             // Graceful degradation: if SGDB fails, Steam art is still returned!
           }
         }
 
         return createSuccessResponse(results, {
-          provider: results[0]?.provider || 'steam',
+          provider: 'steamgrid',
           source: 'upstream',
           ttlSeconds: TTL.ARTWORK,
         })

@@ -4,15 +4,39 @@ const STEAM_STORE_SEARCH = 'https://store.steampowered.com/api/storesearch'
 const STEAM_APP_DETAILS = 'https://store.steampowered.com/api/appdetails'
 const STEAM_CDN_BASE = 'https://shared.fastly.steamstatic.com/store_item_assets/steam/apps'
 
+function cleanTitle(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/\b(edition|deluxe|complete|remastered|goty|v\d+(\.\d+)*|repack|fitgirl|dodi)\b/gi, '')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export async function searchSteamAppId(term: string): Promise<string | null> {
   try {
     const res = await fetch(
       `${STEAM_STORE_SEARCH}/?term=${encodeURIComponent(term)}&l=english&cc=US`,
     )
     if (!res.ok) return null
-    const json = (await res.json()) as { items?: { id: number }[] }
+    const json = (await res.json()) as { items?: { id: number; name?: string }[] }
     if (!json.items || json.items.length === 0) return null
-    return json.items[0].id.toString()
+
+    const cleanTerm = cleanTitle(term)
+    if (!cleanTerm) return null
+
+    for (const item of json.items) {
+      if (!item.name || !item.id) continue
+      const cleanItemName = cleanTitle(item.name)
+      if (
+        cleanItemName === cleanTerm ||
+        (cleanItemName.startsWith(cleanTerm) && cleanTerm.length >= 4) ||
+        (cleanTerm.startsWith(cleanItemName) && cleanItemName.length >= 4)
+      ) {
+        return item.id.toString()
+      }
+    }
+    return null
   } catch {
     return null
   }

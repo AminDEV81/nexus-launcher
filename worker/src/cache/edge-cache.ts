@@ -19,7 +19,7 @@ export function buildCacheHeaders(ttlSeconds: number, swrSeconds = 86_400): Head
   }
 }
 
-const CACHE_VERSION = 'v4'
+const CACHE_VERSION = 'v5'
 
 export async function matchEdgeCache(request: Request): Promise<Response | null> {
   try {
@@ -27,7 +27,7 @@ export async function matchEdgeCache(request: Request): Promise<Response | null>
     url.searchParams.set('_cv', CACHE_VERSION)
     const versionedRequest = new Request(url.toString(), request)
     const cache = caches.default
-    return await cache.match(versionedRequest)
+    return (await cache.match(versionedRequest)) ?? null
   } catch {
     return null
   }
