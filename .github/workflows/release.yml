@@ -138,6 +138,8 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Nexus Launcher ${{ github.ref_name }}'
+          retryAttempts: 3
+          updaterJsonPreferNsis: true
           releaseBody: |
             # 🚀 Nexus Game Launcher ${{ github.ref_name }}
 
