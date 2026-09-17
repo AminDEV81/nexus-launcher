@@ -122,7 +122,47 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Nexus Launcher ${{ github.ref_name }}'
-          releaseBody: 'Nexus Game Launcher ${{ github.ref_name }} release. Includes signed update payloads and official standalone installer.'
+          releaseName: 'Nexus Launcher v${{ github.ref_name }}'
+          releaseBody: |
+            # 🚀 Nexus Game Launcher ${{ github.ref_name }}
+
+            به اولین نسخه رسمی لانچر بازی نکسوس خوش آمدید!
+            Welcome to the official release of **Nexus Game Launcher**!
+
+            ---
+
+            ### ✨ ویژگی‌ها و قابلیت‌های کلیدی (Key Highlights)
+
+            - 🎮 **کتابخانه هوشمند بازی‌ها (Modern Game Library):**
+              - مدیریت، دسته‌بندی و اجرای سریع بازی‌های سیستم
+              - دریافت خودکار پوسترها، بنرها و اطلاعات غنی بازی‌ها از IGDB و SteamGridDB
+              - رابط کاربری شیشه‌ای، تاریک و با انیمیشن‌های روان و فوق‌سریع
+
+            - ⚡ **تقویت‌کننده هوشمند بازی (Game Booster):**
+              - پاک‌سازی پس‌زمینه و بهینه‌سازی منابع سیستم قبل از اجرای بازی
+              - اولویت‌بندی هسته‌های CPU و آزادسازی حافظه RAM جهت دستیابی به بالاترین فریم‌ریت (FPS)
+
+            - 🎵 **مرکز موسیقی متن (Soundtrack Center):**
+              - جستجو و استریم موسیقی‌های متن بازی‌ها با آرشیو جامع
+              - ویژوالایزر صوتی سینماتیک زنده با پاسخگویی فرکانسی
+
+            - 💾 **مدیریت پیشرفته سیو بازی‌ها (Save Game Manager):**
+              - شناسایی خودکار پوشه ذخیره‌سازی بیش از ۱۹,۰۰۰ بازی
+              - پشتیبان‌گیری، ره‌گیری تغییرات و سیستم ژورنال ریکاوری در برابر خرابی
+
+            - 🔄 **سیستم به‌روزرسانی درون‌برنامه‌ای (In-App Auto-Update):**
+              - به‌روزرسانی خودکار و روان در حالت Passive بدون نیاز به دانلود یا نصب دستی مجدد
+              - مانیتورینگ زنده دانلود (نمایش مگابایت دریافت‌شده از کل، سرعت پایدار و زمان باقی‌مانده)
+              - امضای امنیتی معتبر Minisign (Ed25519) جهت تضمین اصالت و عدم دستکاری فایل‌ها
+              - حفظ دائمی و ۱۰۰٪ اطلاعات کاربر، پایگاه داده و تنظیمات در `%APPDATA%`
+              - سیستم محافظت در برابر کرش (Crash Guard) جهت بازیابی ایمن
+
+            - 🎨 **موتور استایل و تم (Theme Engine):**
+              - تم‌های رنگی مدرن، تایپوگرافی‌های گیمینگ، افکت‌های صوتی تعاملی و تنظیمات عملکردی
+
+            ---
+
+            ### 📦 راهنمای نصب
+            فایل نصبی ویندوز `Nexus_0.1.0_x64-setup.exe` را از لیست **Assets** زیر دانلود کرده و با یک کلیک نصب نمایید.
           releaseDraft: false
           prerelease: false
