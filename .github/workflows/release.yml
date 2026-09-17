@@ -1,0 +1,128 @@
+name: Release & Auto-Update Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-test:
+    name: Validate, Lint & Test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install Node dependencies
+        run: npm ci || npm install
+
+      - name: Validate version synchronization
+        shell: bash
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const tauri = require('./src-tauri/tauri.conf.json');
+            const ref = process.env.GITHUB_REF_NAME || '';
+            const tagVer = ref.replace(/^v/, '');
+            console.log('Validating versions: package.json=' + pkg.version + ', tauri.conf.json=' + tauri.version + ', tag=' + ref);
+            if (pkg.version !== tauri.version) {
+              console.error('ERROR: Mismatch between package.json (' + pkg.version + ') and tauri.conf.json (' + tauri.version + ')');
+              process.exit(1);
+            }
+            if (ref.startsWith('v') && tagVer !== pkg.version) {
+              console.error('ERROR: Git tag (' + ref + ') does not match version in config files (' + pkg.version + ')');
+              process.exit(1);
+            }
+            console.log('Version synchronization check passed: v' + pkg.version);
+          "
+
+      - name: Run ESLint / Oxlint
+        run: npm run lint
+
+      - name: Run TypeScript type check
+        run: npx tsc -b
+
+      - name: Run Prettier check
+        run: npm run format:check
+
+      - name: Run Cargo Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+      - name: Run Cargo Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Test frontend production build
+        run: npm run build
+
+  build-and-release:
+    name: Build Signed Artifacts & Publish
+    needs: validate-and-test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install Node dependencies
+        run: npm ci || npm install
+
+      # Optional Authenticode signing certificate preparation if configured in repository secrets
+      - name: Setup Windows Authenticode Certificate (Optional)
+        if: env.WINDOWS_CERTIFICATE != ''
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: powershell
+        run: |
+          Write-Host "Authenticode certificate secret detected. Decoding certificate..."
+          $certBytes = [System.Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+          [System.IO.File]::WriteAllBytes("$env:TEMP\authenticode.pfx", $certBytes)
+          Write-Host "Importing certificate into current user store..."
+          $pfx = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
+          $pfx.Import("$env:TEMP\authenticode.pfx", $env:WINDOWS_CERTIFICATE_PASSWORD, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
+
+      - name: Build, Sign and Publish Tauri Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Nexus Launcher ${{ github.ref_name }}'
+          releaseBody: 'Nexus Game Launcher ${{ github.ref_name }} release. Includes signed update payloads and official standalone installer.'
+          releaseDraft: false
+          prerelease: false
