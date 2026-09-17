@@ -114,11 +114,26 @@ jobs:
           $pfx = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
           $pfx.Import("$env:TEMP\authenticode.pfx", $env:WINDOWS_CERTIFICATE_PASSWORD, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
 
+      - name: Prepare Tauri signing key
+        shell: powershell
+        env:
+          RAW_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if ($env:RAW_KEY) {
+            $cleanKey = $env:RAW_KEY.Trim()
+            $keyPath = "$env:RUNNER_TEMP\nexus-updater.key"
+            [System.IO.File]::WriteAllText($keyPath, $cleanKey)
+            Write-Host "Sanitized signing key written to $keyPath"
+            "TAURI_SIGNING_PRIVATE_KEY_PATH=$keyPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "TAURI_SIGNING_PRIVATE_KEY=$cleanKey" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+
       - name: Build, Sign and Publish Tauri Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PATH: ${{ env.TAURI_SIGNING_PRIVATE_KEY_PATH }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
