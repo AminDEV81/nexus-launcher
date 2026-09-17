@@ -39,9 +39,26 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEyMUVCRDcxQzY0QjlEOApSV1RZdVdRYzErc2hBYzNhRWVoZXJZR0tPcjZ3REo5ek94VHZTKy9DcXdhZ2c5ZkdCc3ptVVljUQo=",
+      "endpoints": [
+        "https://github.com/AminDEV81/nexus-launcher/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }

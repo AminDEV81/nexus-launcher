@@ -32,6 +32,10 @@ src-tauri/gen/schemas/
 .dev.vars
 *.pem
 *.key
+*.key.pub
+*.priv
+minisign.key
+*.pfx
 deploy.bat
 worker/deploy.bat
 

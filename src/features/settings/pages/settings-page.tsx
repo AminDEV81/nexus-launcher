@@ -10,9 +10,11 @@ import {
   Rocket,
   Settings2,
   Sparkles,
+  ArrowUpCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
+import { useUpdaterStore } from '@/store/updater-store'
 import { AppearancePanel } from '../components/appearance-panel'
 import { PerformancePanel } from '../components/performance-panel'
 import { ApiKeysPanel } from '../components/api-keys-panel'
@@ -20,6 +22,7 @@ import { BackupPanel } from '../components/backup-panel'
 import { SystemSpecsPanel } from '../components/system-specs-panel'
 import { SoundtrackSettingsPanel } from '../components/soundtrack-settings-panel'
 import { BoosterPanel } from '@/features/booster/components/booster-panel'
+import { UpdatesPanel } from '../components/updates-panel'
 
 const SECTIONS = [
   {
@@ -59,11 +62,18 @@ const SECTIONS = [
     description: 'Save and restore your library',
     icon: DatabaseBackup,
   },
+  {
+    id: 'updates',
+    label: 'Updates',
+    description: 'App version and auto-updates',
+    icon: ArrowUpCircle,
+  },
 ] as const
 
 export function SettingsPage() {
   const [activeSection, setActiveSection] = useState<(typeof SECTIONS)[number]['id']>('appearance')
   const speed = useAnimationSpeed()
+  const updaterStatus = useUpdaterStore((s) => s.status)
   const active = SECTIONS.find((section) => section.id === activeSection) ?? SECTIONS[0]
 
   return (
@@ -101,6 +111,9 @@ export function SettingsPage() {
           {SECTIONS.map((section) => {
             const Icon = section.icon
             const isActive = section.id === activeSection
+            const hasUpdate =
+              section.id === 'updates' &&
+              (updaterStatus === 'available' || updaterStatus === 'ready-to-install')
             return (
               <button
                 key={section.id}
@@ -113,8 +126,13 @@ export function SettingsPage() {
                 >
                   <Icon className="size-4" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold">{section.label}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between text-sm font-semibold">
+                    <span>{section.label}</span>
+                    {hasUpdate && (
+                      <span className="size-2 rounded-full bg-accent shadow-[0_0_8px_var(--nx-accent)] animate-pulse" />
+                    )}
+                  </span>
                   <span className="mt-0.5 block truncate text-xs text-subtle">
                     {section.description}
                   </span>
@@ -172,6 +190,7 @@ export function SettingsPage() {
               {activeSection === 'soundtrack' && <SoundtrackSettingsPanel />}
               {activeSection === 'metadata' && <ApiKeysPanel />}
               {activeSection === 'backup' && <BackupPanel />}
+              {activeSection === 'updates' && <UpdatesPanel />}
             </motion.div>
           </AnimatePresence>
         </main>

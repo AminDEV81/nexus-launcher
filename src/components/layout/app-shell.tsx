@@ -41,6 +41,10 @@ import { useWindowFillsScreen } from '@/hooks/use-window-maximized'
 import { queryClient } from '@/app/query-client'
 import { gamesKey } from '@/features/library/hooks/use-games'
 import { listGames } from '@/services/games'
+import { UpdateModal } from '@/features/updater/components/update-modal'
+import { RecoveryBanner } from '@/features/updater/components/recovery-banner'
+import { useUpdaterStore } from '@/store/updater-store'
+import { markLaunchSuccessful } from '@/services/health-guard'
 import { cn } from '@/lib/utils'
 
 /**
@@ -109,6 +113,18 @@ export function AppShell() {
     queryClient.prefetchQuery({ queryKey: gamesKey, queryFn: () => listGames() })
   }, [])
 
+  // Auto-Update system initialization, launch health registration, and background check
+  useEffect(() => {
+    const initUpdater = async () => {
+      await useUpdaterStore.getState().init()
+      const ver = useUpdaterStore.getState().currentVersion
+      await markLaunchSuccessful(ver)
+      // Non-blocking check for updates on startup
+      void useUpdaterStore.getState().checkUpdates(false)
+    }
+    void initUpdater()
+  }, [])
+
   return (
     <div
       className={cn(
@@ -124,6 +140,7 @@ export function AppShell() {
       <AmbientBackground paused={showSplash || isGateOpen} />
       <ResizeHandles />
       <TitleBar />
+      <RecoveryBanner />
 
       <div className="flex min-h-0 flex-1">
         <Sidebar />
@@ -165,6 +182,7 @@ export function AppShell() {
       <ProfileSelectScreen />
       <LaunchBoostModal />
       <ExpandedPlayer />
+      <UpdateModal />
 
       {/* Nested features (notably the game details panel) portal their
           dialogs here. Keeping this host inside the rounded shell lets those
