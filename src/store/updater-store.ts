@@ -66,7 +66,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => {
 
   return {
     status: 'idle',
-    currentVersion: '0.1.0',
+    currentVersion: '0.2.0',
     update: null,
     error: null,
     totalBytes: 0,

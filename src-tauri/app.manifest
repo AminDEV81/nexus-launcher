@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity version="0.1.0.0" processorArchitecture="*" name="com.nexus.launcher" type="win32"/>
+  <assemblyIdentity version="0.2.0.0" processorArchitecture="*" name="com.nexus.launcher" type="win32"/>
   <!-- Common-Controls v6: without this the loader binds comctl32 v5,
        which lacks TaskDialogIndirect -> "entry point not found". -->
   <dependency>

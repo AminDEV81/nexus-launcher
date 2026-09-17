@@ -611,10 +611,10 @@ mod tests {
         let exe = Path::new(r"D:\Games\Call of Duty- Modern Warfare 2\MW2CR\h2-mod.exe");
         let candidates = SaveDetector::detect_save_locations("Call of Duty: Modern Warfare 2", None, Some(exe));
         assert!(!candidates.is_empty());
-        assert!(candidates.iter().any(|c| c.path.contains("players")));
-        let top = &candidates[0];
-        assert!(top.confidence >= 90);
+        let players = candidates.iter().find(|c| c.path.contains("players")).expect("players candidate found");
+        assert!(players.confidence >= 90);
         if exe.exists() {
+            let top = &candidates[0];
             assert_eq!(top.confidence, 100);
             assert!(top.exists);
         }
