@@ -143,12 +143,12 @@ export function ExpandedPlayer() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.98 }}
           transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed inset-0 z-[120] flex flex-col justify-between overflow-hidden bg-bg/95 text-text backdrop-blur-3xl select-none"
+          className="fixed inset-0 z-[120] flex flex-col justify-between overflow-hidden bg-bg/95 text-text select-none"
         >
           {/* 1. Dynamic Ambient Aura Mesh Gradient */}
           {coverSrc && (
             <div
-              className="pointer-events-none absolute inset-0 -z-10 scale-125 opacity-25 blur-[100px] transition-all duration-1000 saturate-150 dark:opacity-35"
+              className="pointer-events-none absolute inset-0 -z-10 scale-110 opacity-25 blur-2xl transition-opacity duration-700 dark:opacity-35"
               style={{
                 backgroundImage: `url(${coverSrc})`,
                 backgroundSize: 'cover',
@@ -159,7 +159,7 @@ export function ExpandedPlayer() {
           <div className="pointer-events-none absolute inset-0 -z-10 bg-radial-[ellipse_at_center,_var(--tw-gradient-stops)] from-transparent via-surface/40 to-bg/90 dark:via-black/40 dark:to-black/85" />
 
           {/* 2. Top Navigation & Status Bar */}
-          <header className="flex items-center justify-between px-6 py-5 sm:px-10 border-b border-border/80 bg-surface/50 backdrop-blur-xl">
+          <header className="flex items-center justify-between px-6 py-5 sm:px-10 border-b border-border/80 bg-surface/90">
             {/* Collapse Button */}
             <button
               type="button"
@@ -307,11 +307,9 @@ export function ExpandedPlayer() {
                       }}
                       transition={{
                         x: { duration: 0.8, ease: [0.16, 1, 0.3, 1] },
-                        rotate: {
-                          repeat: Infinity,
-                          duration: 8,
-                          ease: 'linear',
-                        },
+                        rotate: isPlaying
+                          ? { repeat: Infinity, duration: 8, ease: 'linear' }
+                          : { duration: 0.4 },
                       }}
                       className="absolute inset-0 rounded-full bg-[#111116] border-[6px] border-[#22222d] shadow-2xl flex items-center justify-center overflow-hidden z-0 ring-1 ring-border/80 dark:ring-white/10"
                     >
@@ -413,7 +411,7 @@ export function ExpandedPlayer() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex flex-col flex-1 w-full max-h-[380px] sm:max-h-[460px] rounded-3xl border border-border/80 bg-surface/85 p-4 backdrop-blur-2xl shadow-card overflow-hidden"
+                  className="flex flex-col flex-1 w-full max-h-[380px] sm:max-h-[460px] rounded-3xl border border-border/80 bg-surface-raised/95 p-4 shadow-card overflow-hidden"
                 >
                   <div className="flex items-center justify-between pb-3 border-b border-border/80">
                     <div className="flex items-center gap-2 font-bold text-sm text-text">
@@ -503,7 +501,7 @@ export function ExpandedPlayer() {
           </main>
 
           {/* 4. Bottom Stage: Scrubber, Transport Controls, & Volume */}
-          <footer className="flex flex-col items-center gap-3 p-6 sm:px-12 sm:pb-8 max-w-4xl w-full mx-auto border-t border-border/80 bg-surface/75 backdrop-blur-xl rounded-t-3xl shadow-card">
+          <footer className="flex flex-col items-center gap-3 p-6 sm:px-12 sm:pb-8 max-w-4xl w-full mx-auto border-t border-border/80 bg-surface/95 rounded-t-3xl shadow-card">
             {/* Scrubber Bar & Hover Time Tooltip */}
             <div className="w-full relative">
               <div

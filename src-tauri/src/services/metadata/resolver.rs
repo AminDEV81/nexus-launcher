@@ -187,8 +187,8 @@ impl MetadataProviderResolver {
         db: &Database,
         query: &str,
         offset: i64,
-        genre_id: Option<i64>,
-        platform_id: Option<i64>,
+        genre_ids: &[i64],
+        platform_ids: &[i64],
     ) -> AppResult<Vec<HubGame>> {
         let config = self.get_config(db);
         let mode_str = match config.mode {
@@ -196,10 +196,18 @@ impl MetadataProviderResolver {
             ProviderMode::Custom => "custom",
         };
         let clean_q = query.trim().to_lowercase();
+        let g_str = genre_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
+        let p_str = platform_ids
+            .iter()
+            .map(|id| id.to_string())
+            .collect::<Vec<_>>()
+            .join(",");
         let cache_key = format!(
-            "search:v4:{mode_str}:{clean_q}:{offset}:{}:{}",
-            genre_id.unwrap_or(0),
-            platform_id.unwrap_or(0)
+            "search:v5:{mode_str}:{clean_q}:{offset}:{g_str}:{p_str}"
         );
 
         {
@@ -216,7 +224,7 @@ impl MetadataProviderResolver {
             ProviderMode::Public => {
                 let cloud = NexusCloudProvider::new(self.http.clone(), config.public_proxy_url);
                 cloud
-                    .search_games(query, offset, genre_id, platform_id)
+                    .search_games(query, offset, genre_ids, platform_ids)
                     .await
             }
             ProviderMode::Custom => {
@@ -233,7 +241,7 @@ impl MetadataProviderResolver {
                     sec,
                 );
                 direct
-                    .search_games(query, offset, genre_id, platform_id)
+                    .search_games(query, offset, genre_ids, platform_ids)
                     .await
             }
         };

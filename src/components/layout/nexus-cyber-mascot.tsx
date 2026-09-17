@@ -46,24 +46,17 @@ export function NexusCyberMascot({ className }: NexusCyberMascotProps) {
     >
       {/* 1. Deep Volumetric Ambient Theme Glow */}
       <motion.div
-        className="pointer-events-none absolute size-44 rounded-full blur-3xl"
+        className="pointer-events-none absolute size-36 rounded-full blur-xl"
         style={{ backgroundColor: 'var(--nx-accent)' }}
         animate={{
-          scale: isHovered ? 1.25 : 1.05,
-          opacity: isHovered ? 0.5 : 0.3,
+          scale: isHovered ? 1.2 : 1,
+          opacity: isHovered ? 0.45 : 0.25,
         }}
         transition={smoothTransition}
       />
 
-      {/* 2. Outer Holographic Gyroscope Ring (Clockwise) */}
-      <motion.div
-        className="pointer-events-none absolute size-42 rounded-full border border-dashed border-accent/25"
-        animate={{ rotate: 360, scale: isHovered ? 1.06 : 1 }}
-        transition={{
-          rotate: { duration: 24 * speed, repeat: Infinity, ease: 'linear' },
-          scale: smoothTransition,
-        }}
-      >
+      {/* 2. Outer Holographic Gyroscope Ring (Clockwise, CSS Accelerated) */}
+      <div className="pointer-events-none absolute size-42 rounded-full border border-dashed border-accent/25 nx-spin-cw">
         {/* Orbital Satellite Node with Glow */}
         <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 size-3 rounded-full bg-accent shadow-[0_0_12px_var(--nx-accent)]" />
         {/* Secondary Orbit Node */}
@@ -78,21 +71,13 @@ export function NexusCyberMascot({ className }: NexusCyberMascotProps) {
         <span className="absolute bottom-1 right-3 text-[6px] font-mono text-accent/40 select-none">
           225°
         </span>
-      </motion.div>
+      </div>
 
-      {/* 3. Middle Segmented Tactical Ring (Counter-Clockwise) */}
-      <motion.div
-        className="pointer-events-none absolute size-35 rounded-full border border-accent/20 [border-top-color:var(--nx-accent)] [border-bottom-color:transparent]"
-        animate={{ rotate: -360 }}
-        transition={{
-          duration: 16 * speed,
-          repeat: Infinity,
-          ease: 'linear',
-        }}
-      >
+      {/* 3. Middle Segmented Tactical Ring (Counter-Clockwise, CSS Accelerated) */}
+      <div className="pointer-events-none absolute size-35 rounded-full border border-accent/20 [border-top-color:var(--nx-accent)] [border-bottom-color:transparent] nx-spin-ccw">
         <span className="absolute top-2 right-4 size-1.5 rounded-full bg-white shadow-[0_0_6px_#fff]" />
         <span className="absolute bottom-2 left-4 size-1 rounded-full bg-accent shadow-[0_0_4px_var(--nx-accent)]" />
-      </motion.div>
+      </div>
 
       {/* 4. Floating Holographic HUD Brackets (Soft Reticle Lock-On on Hover) */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-60">
@@ -129,46 +114,27 @@ export function NexusCyberMascot({ className }: NexusCyberMascotProps) {
           damping: 24,
         }}
       >
-        {/* Inner Continuous Floating Bob Loop (Never stutters or resets on hover) */}
-        <motion.div
-          className="flex flex-col items-center"
-          animate={{
-            y: [-3, 3, -3],
-            rotate: isHovered ? [0, -1, 1, 0] : [0, 0.6, -0.6, 0],
-          }}
-          transition={{
-            duration: isHovered ? 2.4 * speed : 3.8 * speed,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        >
+        {/* Inner Continuous Floating Bob Loop (Hardware accelerated CSS) */}
+        <div className="flex flex-col items-center nx-mascot-bob">
           {/* Top Antenna Array & Aerodynamic Mecha Fin */}
           <div className="flex flex-col items-center">
             {/* Dual Satellite Beacon Emitters */}
             <div className="flex items-center gap-3">
               {/* Left Antenna Tip */}
-              <motion.span
-                className="size-1.5 rounded-full bg-accent shadow-[0_0_8px_var(--nx-accent)]"
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 1.4 * speed, repeat: Infinity, ease: 'easeInOut' }}
-              />
+              <span className="size-1.5 rounded-full bg-accent/80 shadow-[0_0_6px_var(--nx-accent)]" />
 
               {/* Center Main Crystal Core Beacon */}
               <motion.div
-                className="size-2.5 rounded-full bg-accent shadow-[0_0_12px_var(--nx-accent)]"
+                className="size-2.5 rounded-full bg-accent shadow-[0_0_10px_var(--nx-accent)]"
                 animate={{
-                  scale: isHovered ? [1, 1.25, 1] : [1, 1.1, 1],
-                  opacity: [0.75, 1, 0.75],
+                  scale: isHovered ? 1.25 : 1,
+                  opacity: isHovered ? 1 : 0.85,
                 }}
-                transition={{ duration: 1.2 * speed, repeat: Infinity, ease: 'easeInOut' }}
+                transition={smoothTransition}
               />
 
               {/* Right Antenna Tip */}
-              <motion.span
-                className="size-1.5 rounded-full bg-accent shadow-[0_0_8px_var(--nx-accent)]"
-                animate={{ opacity: [1, 0.5, 1] }}
-                transition={{ duration: 1.4 * speed, repeat: Infinity, ease: 'easeInOut' }}
-              />
+              <span className="size-1.5 rounded-full bg-accent/80 shadow-[0_0_6px_var(--nx-accent)]" />
             </div>
 
             {/* Center Mast Fin with Metallic Notch */}
@@ -188,14 +154,7 @@ export function NexusCyberMascot({ className }: NexusCyberMascotProps) {
             >
               <div className="h-9 w-3.5 rounded-l-xl border-l border-y border-border/80 bg-surface/95 shadow-md flex items-center justify-center overflow-hidden">
                 {/* Concentric Glow Grille */}
-                <motion.div
-                  className="size-2 rounded-full border border-accent/60 bg-accent/20"
-                  animate={{
-                    scale: isHovered ? [1, 1.25, 1] : [0.9, 1.1, 0.9],
-                    opacity: [0.6, 1, 0.6],
-                  }}
-                  transition={{ duration: 1.5 * speed, repeat: Infinity }}
-                />
+                <div className="size-2 rounded-full border border-accent/60 bg-accent/30 shadow-xs" />
               </div>
               {/* Mini Winglet Fin */}
               <div className="h-2.5 w-1.5 -ml-1.5 bg-accent/30 rounded-l-xs border-l border-accent/50" />
@@ -209,21 +168,14 @@ export function NexusCyberMascot({ className }: NexusCyberMascotProps) {
             >
               <div className="h-9 w-3.5 rounded-r-xl border-r border-y border-border/80 bg-surface/95 shadow-md flex items-center justify-center overflow-hidden">
                 {/* Concentric Glow Grille */}
-                <motion.div
-                  className="size-2 rounded-full border border-accent/60 bg-accent/20"
-                  animate={{
-                    scale: isHovered ? [1, 1.25, 1] : [0.9, 1.1, 0.9],
-                    opacity: [0.6, 1, 0.6],
-                  }}
-                  transition={{ duration: 1.5 * speed, repeat: Infinity, delay: 0.2 }}
-                />
+                <div className="size-2 rounded-full border border-accent/60 bg-accent/30 shadow-xs" />
               </div>
               {/* Mini Winglet Fin */}
               <div className="h-2.5 w-1.5 -mr-1.5 bg-accent/30 rounded-r-xs border-r border-accent/50" />
             </motion.div>
 
             {/* Main Mecha Head Chassis */}
-            <div className="relative z-10 flex size-21 items-center justify-center rounded-2xl border border-border/90 bg-surface/95 shadow-elevated backdrop-blur-md overflow-hidden">
+            <div className="relative z-10 flex size-21 items-center justify-center rounded-2xl border border-border/90 bg-surface shadow-elevated overflow-hidden">
               {/* Top Corner Chamfer Plate Accents */}
               <span className="absolute top-1 left-1.5 size-1.5 border-t border-l border-accent/40 rounded-tl-xs" />
               <span className="absolute top-1 right-1.5 size-1.5 border-t border-r border-accent/40 rounded-tr-xs" />
@@ -412,31 +364,11 @@ export function NexusCyberMascot({ className }: NexusCyberMascotProps) {
                       }}
                       transition={smoothTransition}
                     >
-                      <motion.span
-                        className="w-0.5 rounded-full bg-accent/70"
-                        animate={{ height: ['2px', '4.5px', '2px'] }}
-                        transition={{ duration: 0.8 * speed, repeat: Infinity }}
-                      />
-                      <motion.span
-                        className="w-0.5 rounded-full bg-accent/90"
-                        animate={{ height: ['3px', '6.5px', '3px'] }}
-                        transition={{ duration: 0.6 * speed, repeat: Infinity, delay: 0.1 }}
-                      />
-                      <motion.span
-                        className="w-0.5 rounded-full bg-accent"
-                        animate={{ height: ['2px', '8px', '2px'] }}
-                        transition={{ duration: 0.7 * speed, repeat: Infinity, delay: 0.2 }}
-                      />
-                      <motion.span
-                        className="w-0.5 rounded-full bg-accent/90"
-                        animate={{ height: ['3px', '6.5px', '3px'] }}
-                        transition={{ duration: 0.6 * speed, repeat: Infinity, delay: 0.15 }}
-                      />
-                      <motion.span
-                        className="w-0.5 rounded-full bg-accent/70"
-                        animate={{ height: ['2px', '4.5px', '2px'] }}
-                        transition={{ duration: 0.8 * speed, repeat: Infinity, delay: 0.05 }}
-                      />
+                      <span className="w-0.5 h-1 rounded-full bg-accent/70" />
+                      <span className="w-0.5 h-1.5 rounded-full bg-accent/90" />
+                      <span className="w-0.5 h-2 rounded-full bg-accent" />
+                      <span className="w-0.5 h-1.5 rounded-full bg-accent/90" />
+                      <span className="w-0.5 h-1 rounded-full bg-accent/70" />
                     </motion.div>
 
                     {/* Hover State: Curved Digital Smile Waveform */}
@@ -484,17 +416,13 @@ export function NexusCyberMascot({ className }: NexusCyberMascotProps) {
           {/* Floating Mecha Collar & Arc Reactor Core Assembly */}
           <div className="relative mt-1 flex flex-col items-center">
             {/* Anti-Grav Collar Plate */}
-            <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full border border-border/80 bg-surface/90 shadow-xs backdrop-blur-xs">
+            <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full border border-border/80 bg-surface shadow-xs">
               {/* Left Micro Thruster */}
               <span className="size-1 rounded-full bg-accent/50" />
 
-              {/* Center Quantum Arc Reactor Core */}
+              {/* Center Quantum Arc Reactor Core (CSS accelerated) */}
               <div className="relative flex items-center justify-center">
-                <motion.div
-                  className="size-3.5 rounded-full border border-dashed border-accent"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 6 * speed, repeat: Infinity, ease: 'linear' }}
-                />
+                <div className="size-3.5 rounded-full border border-dashed border-accent nx-spin-fast" />
                 <motion.div
                   className="absolute size-2 rounded-full bg-accent shadow-[0_0_8px_var(--nx-accent)]"
                   animate={{
@@ -510,14 +438,10 @@ export function NexusCyberMascot({ className }: NexusCyberMascotProps) {
             </div>
 
             {/* Anti-Gravity Exhaust Plumes */}
-            <motion.div
-              className="flex items-center gap-4 -mt-0.5"
-              animate={{ opacity: [0.4, 0.8, 0.4] }}
-              transition={{ duration: 1.2 * speed, repeat: Infinity }}
-            >
+            <div className="flex items-center gap-4 -mt-0.5 opacity-60">
               <span className="h-1.5 w-1 rounded-b-full bg-gradient-to-b from-accent/60 to-transparent blur-[0.5px]" />
               <span className="h-1.5 w-1 rounded-b-full bg-gradient-to-b from-accent/60 to-transparent blur-[0.5px]" />
-            </motion.div>
+            </div>
           </div>
 
           {/* Holographic Status Telemetry Badge with Smooth Label Crossfade */}
@@ -548,7 +472,7 @@ export function NexusCyberMascot({ className }: NexusCyberMascotProps) {
               </motion.span>
             </div>
           </div>
-        </motion.div>
+        </div>
       </motion.div>
     </div>
   )

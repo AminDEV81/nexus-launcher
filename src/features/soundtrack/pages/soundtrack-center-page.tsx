@@ -292,7 +292,7 @@ export function SoundtrackCenterPage() {
         {featuredAlbum && activeTab === 'overview' && !searchQuery && (
           <section className="relative overflow-hidden rounded-3xl border border-border/80 bg-surface p-6 sm:p-8 shadow-xl">
             <div
-              className="pointer-events-none absolute -right-20 -top-20 size-96 rounded-full opacity-25 blur-3xl"
+              className="pointer-events-none absolute -right-16 -top-16 size-60 rounded-full opacity-25 blur-2xl"
               style={{
                 background:
                   'radial-gradient(circle, var(--nx-accent) 0%, rgba(99, 102, 241, 0.4) 50%, transparent 70%)',

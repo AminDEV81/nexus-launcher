@@ -24,7 +24,7 @@ export function Sidebar() {
     <motion.aside
       animate={{ width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
       transition={{ duration: 0.28 * speed, ease: [0.16, 1, 0.3, 1] }}
-      className="glass-panel relative z-10 flex shrink-0 flex-col overflow-hidden border-r border-border"
+      className="chrome-surface relative z-10 flex shrink-0 flex-col overflow-hidden border-r border-border"
     >
       <div
         className={cn(

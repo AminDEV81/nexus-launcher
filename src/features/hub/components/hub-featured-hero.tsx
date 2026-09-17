@@ -352,10 +352,10 @@ export function HubFeaturedHero({
               {isActive && !isPaused && !hovering && windowActive && !reduceMotion && (
                 <motion.div
                   key={`progress-${item.igdb_id}-${itemIndex}`}
-                  initial={{ width: '0%' }}
-                  animate={{ width: '100%' }}
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
                   transition={{ duration: AUTO_ADVANCE_MS / 1000, ease: 'linear' }}
-                  className="absolute bottom-0 left-0 h-0.5 bg-accent shadow-[0_0_8px_var(--nx-accent)] z-10"
+                  className="absolute bottom-0 left-0 right-0 h-0.5 origin-left bg-accent shadow-[0_0_8px_var(--nx-accent)] z-10"
                 />
               )}
 

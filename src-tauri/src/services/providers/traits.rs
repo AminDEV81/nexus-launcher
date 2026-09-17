@@ -15,8 +15,8 @@ pub trait MetadataProvider: Send + Sync {
         &self,
         query: &str,
         offset: i64,
-        genre_id: Option<i64>,
-        platform_id: Option<i64>,
+        genre_ids: &[i64],
+        platform_ids: &[i64],
     ) -> impl std::future::Future<Output = AppResult<Vec<HubGame>>> + Send;
 
     fn get_game_details(

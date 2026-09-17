@@ -33,26 +33,26 @@
 }
 
 .ambient-blob--accent {
-  left: -10%;
-  top: -15%;
-  width: 55vw;
-  height: 55vw;
+  left: -5%;
+  top: -10%;
+  width: 34vw;
+  height: 34vw;
   background: radial-gradient(circle, var(--nx-accent) 0%, transparent 70%);
 }
 
 .ambient-blob--secondary {
-  right: -15%;
-  bottom: -20%;
-  width: 60vw;
-  height: 60vw;
+  right: -8%;
+  bottom: -10%;
+  width: 36vw;
+  height: 36vw;
   background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
 }
 
 .ambient-blob--tertiary {
-  left: 30%;
-  bottom: -25%;
-  width: 40vw;
-  height: 40vw;
+  left: 28%;
+  bottom: -15%;
+  width: 26vw;
+  height: 26vw;
   background: radial-gradient(circle, #d946ef 0%, transparent 70%);
 }
 

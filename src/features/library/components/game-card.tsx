@@ -172,7 +172,7 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
           {isDownloading ? (
             <span
               className={cn(
-                'flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-black text-white shadow-md backdrop-blur-md',
+                'flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-black text-white shadow-md',
                 activeDownload?.status === 'paused'
                   ? 'border-amber-400/40 bg-amber-500/90 shadow-amber-500/20'
                   : activeDownload?.status === 'failed'
@@ -198,7 +198,7 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
               </span>
             </span>
           ) : isRunning ? (
-            <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/50 bg-emerald-950/80 px-2.5 py-1 font-mono text-[10px] font-bold text-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.35)] backdrop-blur-md">
+            <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/50 bg-emerald-950/90 px-2.5 py-1 font-mono text-[10px] font-bold text-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.35)]">
               <span className="relative flex size-2 items-center justify-center">
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-emerald-400" />
@@ -208,12 +208,12 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
               </span>
             </span>
           ) : isWishlist ? (
-            <span className="flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-black/80 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 shadow-sm backdrop-blur-md">
+            <span className="flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-black/85 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 shadow-sm">
               <Bookmark className="size-3 fill-amber-400 text-amber-400" />
               <span>{isUnreleased ? 'Upcoming' : 'Wishlist'}</span>
             </span>
           ) : game.is_installed ? (
-            <span className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/75 px-2.5 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-md">
+            <span className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/85 px-2.5 py-0.5 text-[10px] font-bold text-white shadow-sm">
               <HardDrive className="size-3 text-emerald-400" />
               <span>Ready</span>
             </span>
@@ -221,7 +221,7 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
 
           {/* Live Cover Tag */}
           {game.cover_is_animated && (
-            <span className="flex items-center gap-1 rounded-full border border-white/25 bg-gradient-to-r from-accent via-indigo-500 to-accent-hover px-2 py-0.5 font-mono text-[9px] font-black tracking-wider text-white shadow-sm backdrop-blur-md">
+            <span className="flex items-center gap-1 rounded-full border border-white/25 bg-gradient-to-r from-accent via-indigo-500 to-accent-hover px-2 py-0.5 font-mono text-[9px] font-black tracking-wider text-white shadow-sm">
               <Sparkles className="size-2.5" />
               <span>LIVE</span>
             </span>
@@ -231,7 +231,7 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
           {game.user_rating && game.user_rating > 0 ? (
             <span
               title={`Your Rating: ${game.user_rating}/10`}
-              className="flex items-center gap-1 rounded-full border border-amber-400/40 bg-black/80 px-2 py-0.5 font-mono text-[10px] font-bold text-amber-300 shadow-sm backdrop-blur-md"
+              className="flex items-center gap-1 rounded-full border border-amber-400/40 bg-black/85 px-2 py-0.5 font-mono text-[10px] font-bold text-amber-300 shadow-sm"
             >
               <Star className="size-2.5 fill-amber-400 text-amber-400" />
               <span>{game.user_rating}</span>
@@ -242,7 +242,7 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
             <span
               title={`Metacritic: ${game.metacritic_score}`}
               className={cn(
-                'rounded-md px-1.5 py-0.5 font-mono text-[9px] font-black text-white shadow-sm ring-1 ring-white/20 backdrop-blur-md',
+                'rounded-md px-1.5 py-0.5 font-mono text-[9px] font-black text-white shadow-sm ring-1 ring-white/20',
                 game.metacritic_score >= 75
                   ? 'bg-emerald-600/90'
                   : game.metacritic_score >= 50
@@ -258,7 +258,7 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
           {Boolean(game.steam_app_id || game.igdb_id) && (
             <span
               title="Soundtrack available"
-              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold text-accent shadow-sm border border-accent/30 bg-black/80 backdrop-blur-md"
+              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold text-accent shadow-sm border border-accent/30 bg-black/85"
             >
               <Music className="size-2.5 text-accent" />
               <span>OST</span>
@@ -272,10 +272,10 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
           onClick={handleToggleFavorite}
           aria-label={game.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
           className={cn(
-            'absolute right-2.5 top-2.5 z-10 flex size-8 items-center justify-center rounded-full border backdrop-blur-md transition-all duration-200 shadow-md active:scale-90',
+            'absolute right-2.5 top-2.5 z-10 flex size-8 items-center justify-center rounded-full border transition-all duration-200 shadow-md active:scale-90',
             game.is_favorite
-              ? 'border-pink-500/40 bg-pink-500/20 text-pink-400 hover:bg-pink-500/30 hover:border-pink-500/60 shadow-[0_0_12px_rgba(236,72,153,0.35)]'
-              : 'border-white/20 bg-black/55 text-white/70 hover:border-white/40 hover:bg-black/85 hover:text-white hover:scale-110',
+              ? 'border-pink-500/40 bg-pink-500/30 text-pink-400 hover:bg-pink-500/40 hover:border-pink-500/60 shadow-[0_0_12px_rgba(236,72,153,0.35)]'
+              : 'border-white/20 bg-black/70 text-white/70 hover:border-white/40 hover:bg-black/90 hover:text-white hover:scale-110',
           )}
         >
           <Heart
@@ -291,7 +291,7 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
         {tagDots.length > 0 && (
           <span
             title={tagDots.map((tag) => tag.name).join(', ')}
-            className="absolute bottom-2.5 right-2.5 z-10 flex items-center gap-1.5 rounded-full border border-white/15 bg-black/75 px-2.5 py-1 shadow-md backdrop-blur-md"
+            className="absolute bottom-2.5 right-2.5 z-10 flex items-center gap-1.5 rounded-full border border-white/15 bg-black/85 px-2.5 py-1 shadow-md"
           >
             {tagDots.slice(0, 4).map((tag) => (
               <span
@@ -319,13 +319,13 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
         )}
 
         {/* Cinematic Hover Overlay & Center Action Command */}
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-between p-3.5 bg-gradient-to-t from-black/90 via-black/45 to-black/30 backdrop-blur-[2px] opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-between p-3.5 bg-gradient-to-t from-black/95 via-black/60 to-black/30 opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
           {/* Top spacer */}
           <div className="h-6" />
 
           {/* Center Action Command */}
           {isUnreleased ? (
-            <div className="flex items-center gap-2 rounded-full border border-amber-400/50 bg-black/85 px-4 py-2 font-mono text-xs font-bold text-amber-300 shadow-2xl backdrop-blur-md">
+            <div className="flex items-center gap-2 rounded-full border border-amber-400/50 bg-black/90 px-4 py-2 font-mono text-xs font-bold text-amber-300 shadow-2xl">
               <Calendar className="size-4 text-amber-400" />
               <span>Coming Soon</span>
             </div>
@@ -346,7 +346,7 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
               className={cn(
                 'relative flex items-center justify-center overflow-hidden shadow-2xl transition-all duration-200 active:scale-95 disabled:opacity-60',
                 downloadable
-                  ? 'h-11 px-4 gap-2 rounded-2xl border border-accent/70 bg-surface/95 text-text backdrop-blur-md shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] hover:border-accent hover:shadow-[0_0_35px_color-mix(in_srgb,var(--color-accent)_75%,transparent)] hover:scale-105'
+                  ? 'h-11 px-4 gap-2 rounded-2xl border border-accent/70 bg-surface/95 text-text shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] hover:border-accent hover:shadow-[0_0_35px_color-mix(in_srgb,var(--color-accent)_75%,transparent)] hover:scale-105'
                   : 'size-14 rounded-full text-white hover:scale-110 ring-2 ring-white/20',
                 isRunning
                   ? 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_28px_rgba(16,185,129,0.6)] ring-emerald-400/40'
@@ -425,12 +425,12 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
           <div className="flex w-full items-center justify-between font-mono text-[10px] text-white/90">
             <span
               title={game.genres.length > 0 ? game.genres.join(', ') : undefined}
-              className="truncate rounded-lg border border-white/10 bg-black/70 px-2 py-0.5 font-bold uppercase backdrop-blur-md"
+              className="truncate rounded-lg border border-white/10 bg-black/85 px-2 py-0.5 font-bold uppercase"
             >
               {game.genres.length > 0 ? game.genres.join(' · ') : isWishlist ? 'Wishlist' : 'Game'}
             </span>
             {releaseYear && (
-              <span className="rounded-lg border border-white/10 bg-black/70 px-2 py-0.5 backdrop-blur-md">
+              <span className="rounded-lg border border-white/10 bg-black/85 px-2 py-0.5">
                 {releaseYear}
               </span>
             )}

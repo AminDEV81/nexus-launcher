@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -52,7 +52,7 @@ import { HubGameCard } from '../components/hub-game-card'
 import { HubFeedSkeleton } from '../components/hub-game-skeleton'
 import { useUserTasteProfile } from '../hooks/use-personalization'
 import { calculateGameAffinity } from '../utils/personalization'
-import type { HubGame } from '@/types/models'
+import type { HubGame, HubSearchFilters } from '@/types/models'
 
 // Re-export HubGameCard for backward compatibility with existing imports
 export { HubGameCard } from '../components/hub-game-card'
@@ -94,17 +94,23 @@ const ERA_RANGES = [
   { label: '1990 – 2000 (90s Retro)', from: 1990, to: 2000 },
 ] as const
 
+interface QuickGenre {
+  name: string
+  emoji: string
+  matchTerms: string[]
+}
+
 /** Quick filter categories displayed below the search bar for instant 1-click filtering. */
-const QUICK_GENRES = [
-  { name: 'Action', emoji: '⚔️' },
-  { name: 'Role-playing (RPG)', emoji: '🛡️' },
-  { name: 'Shooter', emoji: '🎯' },
-  { name: 'Adventure', emoji: '🗺️' },
-  { name: 'Strategy', emoji: '♟️' },
-  { name: 'Indie', emoji: '✨' },
-  { name: 'Racing', emoji: '🏎️' },
-  { name: 'Simulator', emoji: '🕹️' },
-  { name: 'Fighting', emoji: '🥊' },
+const QUICK_GENRES: readonly QuickGenre[] = [
+  { name: 'Action', emoji: '⚔️', matchTerms: ['action', 'hack and slash'] },
+  { name: 'Role-playing (RPG)', emoji: '🛡️', matchTerms: ['role-playing', 'rpg'] },
+  { name: 'Shooter', emoji: '🎯', matchTerms: ['shooter'] },
+  { name: 'Adventure', emoji: '🗺️', matchTerms: ['adventure'] },
+  { name: 'Strategy', emoji: '♟️', matchTerms: ['strategy'] },
+  { name: 'Indie', emoji: '✨', matchTerms: ['indie'] },
+  { name: 'Racing', emoji: '🏎️', matchTerms: ['racing'] },
+  { name: 'Simulator', emoji: '🕹️', matchTerms: ['simulator'] },
+  { name: 'Fighting', emoji: '🥊', matchTerms: ['fighting'] },
 ] as const
 
 /** Sort options — values must stay in sync with `sort_clause` on the
@@ -172,7 +178,18 @@ export function HubPage() {
   const genres = useHubGenres()
   const platforms = useHubPlatforms()
 
-  const filters = { genreIds, platformIds, release, yearFrom, yearTo, minRating, sort }
+  const filters = useMemo<HubSearchFilters>(
+    () => ({
+      genreIds,
+      platformIds,
+      release,
+      yearFrom,
+      yearTo,
+      minRating,
+      sort,
+    }),
+    [genreIds, platformIds, release, yearFrom, yearTo, minRating, sort],
+  )
   const hasAnyFilter =
     genreIds.length > 0 ||
     platformIds.length > 0 ||
@@ -658,9 +675,10 @@ export function HubPage() {
 
               {/* Quick Action Genres */}
               {QUICK_GENRES.map((qg) => {
-                const matchingGenre = genres.data?.find((g) =>
-                  g.name.toLowerCase().includes(qg.name.toLowerCase().replace(/[^a-z]/g, '')),
-                )
+                const matchingGenre = genres.data?.find((g) => {
+                  const gName = g.name.toLowerCase()
+                  return qg.matchTerms.some((term) => gName.includes(term.toLowerCase()))
+                })
                 const isSelected = matchingGenre ? genreIds.includes(matchingGenre.id) : false
                 return (
                   <button
@@ -771,6 +789,12 @@ export function HubPage() {
             inLibrary={inLibrary}
             inWishlist={inWishlist}
             isInstalled={isInstalled}
+            selectedGenres={selectedGenres}
+            selectedPlatforms={selectedPlatforms}
+            minRating={minRating}
+            release={release}
+            yearFrom={yearFrom}
+            yearTo={yearTo}
           />
         ) : isPending ? (
           <HubFeedSkeleton />
@@ -830,6 +854,12 @@ function SearchResults({
   inLibrary,
   inWishlist,
   isInstalled,
+  selectedGenres = [],
+  selectedPlatforms = [],
+  minRating = null,
+  release = null,
+  yearFrom = null,
+  yearTo = null,
 }: {
   query: string
   /** Human labels of the active filters (genre, platform, release,
@@ -846,12 +876,83 @@ function SearchResults({
   inLibrary: HubLibraryMatcher
   inWishlist?: HubLibraryMatcher
   isInstalled?: HubLibraryMatcher
+  selectedGenres?: { id: number; name: string }[]
+  selectedPlatforms?: { id: number; name: string; abbreviation?: string }[]
+  minRating?: number | null
+  release?: string | null
+  yearFrom?: number | null
+  yearTo?: number | null
 }) {
-  const results = search.data?.pages.flat() ?? []
+  const rawResults = useMemo(() => search.data?.pages.flat() ?? [], [search.data])
   const hasTerm = query.trim().length >= 2
   const partsLabel = filterParts.join(' · ')
   const { data: settings } = useSettings()
   const providerMode = settings?.metadata_provider_mode ?? 'public'
+
+  // Conjunction filter: Every game MUST contain ALL selected genres and active filters
+  const results = useMemo(() => {
+    return rawResults.filter((game) => {
+      // 1. Must contain ALL selected genres (at least these, more is fine)
+      if (selectedGenres.length > 0) {
+        const gameGenres = (game.genres || []).map((g) => g.toLowerCase().trim())
+        const hasAllGenres = selectedGenres.every((sg) => {
+          const target = sg.name.toLowerCase().trim()
+          return gameGenres.some(
+            (gg) => gg === target || gg.includes(target) || target.includes(gg),
+          )
+        })
+        if (!hasAllGenres) return false
+      }
+
+      // 2. Platform match (if platforms are selected, must be on at least one)
+      if (selectedPlatforms.length > 0) {
+        const gamePlatforms = (game.platforms || []).map((p) => p.toLowerCase().trim())
+        const hasPlatform = selectedPlatforms.some((sp) => {
+          const abbrev = (sp.abbreviation || '').toLowerCase().trim()
+          const name = sp.name.toLowerCase().trim()
+          return gamePlatforms.some(
+            (gp) => (abbrev && gp.includes(abbrev)) || gp.includes(name) || name.includes(gp),
+          )
+        })
+        if (!hasPlatform) return false
+      }
+
+      // 3. Min rating filter
+      if (minRating !== null) {
+        if (game.rating === null || game.rating === undefined || game.rating < minRating) {
+          return false
+        }
+      }
+
+      // 4. Release year / Era filter
+      if (yearFrom !== null || yearTo !== null) {
+        if (!game.release_date) return false
+        const year = parseInt(game.release_date.slice(0, 4), 10)
+        if (isNaN(year)) return false
+        if (yearFrom !== null && year < yearFrom) return false
+        if (yearTo !== null && year > yearTo) return false
+      } else if (release === 'upcoming') {
+        const currentYear = new Date().getFullYear()
+        if (!game.release_date) return true
+        const year = parseInt(game.release_date.slice(0, 4), 10)
+        if (!isNaN(year) && year < currentYear) return false
+      }
+
+      return true
+    })
+  }, [rawResults, selectedGenres, selectedPlatforms, minRating, yearFrom, yearTo, release])
+
+  // Automatically fetch next page if filtered results are sparse and upstream has more
+  useEffect(() => {
+    if (
+      results.length < 12 &&
+      search.hasNextPage &&
+      !search.isFetching &&
+      !search.isFetchingNextPage
+    ) {
+      search.fetchNextPage()
+    }
+  }, [results.length, search])
 
   if (isMissingIgdbKeys(search.error, providerMode)) {
     return <MissingKeysPanel />

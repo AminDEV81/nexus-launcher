@@ -71,11 +71,15 @@ export function useHubSearch(query: string, filters: HubSearchFilters) {
         : allPages.length * hubService.HUB_SEARCH_PAGE_SIZE,
     enabled:
       query.trim().length >= 2 ||
-      filters.genreId !== null ||
-      filters.platformId !== null ||
-      filters.release !== null ||
-      filters.minRating !== null ||
-      filters.sort !== null,
+      filters.genreId != null ||
+      Boolean(filters.genreIds && filters.genreIds.length > 0) ||
+      filters.platformId != null ||
+      Boolean(filters.platformIds && filters.platformIds.length > 0) ||
+      Boolean(filters.release) ||
+      filters.yearFrom != null ||
+      filters.yearTo != null ||
+      filters.minRating != null ||
+      Boolean(filters.sort),
     staleTime: 60_000,
   })
 }

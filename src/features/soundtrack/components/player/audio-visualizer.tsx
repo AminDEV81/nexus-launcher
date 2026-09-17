@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { audioEngine } from '../../services/audio-engine'
-import type { VisualizerMode } from '../../store/soundtrack-store'
+import { useSoundtrackStore, type VisualizerMode } from '../../store/soundtrack-store'
+import { useWindowActive } from '@/hooks/use-window-active'
 
 interface AudioVisualizerProps {
   mode?: VisualizerMode
@@ -9,6 +10,8 @@ interface AudioVisualizerProps {
 
 export function AudioVisualizer({ mode = 'minimal', className = '' }: AudioVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const isPlaying = useSoundtrackStore((s) => s.playbackState === 'playing')
+  const windowActive = useWindowActive()
 
   useEffect(() => {
     if (mode === 'off') return
@@ -18,18 +21,57 @@ export function AudioVisualizer({ mode = 'minimal', className = '' }: AudioVisua
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    let animationId: number
+    let animationId: number | null = null
     const analyser = audioEngine.getAnalyser()
 
-    // If analyser is not available or audio is suspended, render idle ambient line
     const bufferLength = analyser ? analyser.frequencyBinCount : 32
     const dataArray = new Uint8Array(bufferLength)
+
+    // Resolve accent color once per run instead of on every single frame
+    const computedStyle = getComputedStyle(canvas)
+    const accentColor = computedStyle.getPropertyValue('--nx-accent').trim() || '#7c5cff'
+
+    const width = canvas.width
+    const height = canvas.height
+
+    // Pre-create gradient for minimal mode
+    const gradient = ctx.createLinearGradient(0, height, 0, 0)
+    gradient.addColorStop(0, `${accentColor}33`)
+    gradient.addColorStop(1, accentColor)
+
+    const drawIdleFrame = () => {
+      ctx.clearRect(0, 0, width, height)
+      if (mode === 'minimal') {
+        const barCount = 24
+        const barWidth = width / barCount - 2
+        ctx.fillStyle = `${accentColor}44`
+        for (let i = 0; i < barCount; i++) {
+          const x = i * (barWidth + 2)
+          const barHeight = 3
+          const y = height - barHeight
+          ctx.beginPath()
+          ctx.roundRect(x, y, barWidth, barHeight, 1.5)
+          ctx.fill()
+        }
+      } else if (mode === 'reactive') {
+        ctx.beginPath()
+        ctx.moveTo(0, height / 2)
+        ctx.lineTo(width, height / 2)
+        ctx.strokeStyle = `${accentColor}44`
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+      }
+    }
+
+    // If not playing or window is unfocused, render single calm frame and do not schedule RAF
+    if (!isPlaying || !windowActive) {
+      drawIdleFrame()
+      return
+    }
 
     const render = () => {
       animationId = requestAnimationFrame(render)
 
-      const width = canvas.width
-      const height = canvas.height
       ctx.clearRect(0, 0, width, height)
 
       let hasData = false
@@ -50,19 +92,9 @@ export function AudioVisualizer({ mode = 'minimal', className = '' }: AudioVisua
           const beat = Math.sin(time * 1.5 + i * 0.4) * Math.cos(time * 0.8 + i * 0.2)
           dataArray[i] = Math.min(255, Math.max(25, Math.round(Math.abs(beat) * 190 + 30)))
         }
-      } else if (!hasData) {
-        // Idle gentle wave
-        for (let i = 0; i < bufferLength; i++) {
-          dataArray[i] = Math.max(0, Math.sin(Date.now() / 600 + i * 0.4) * 8 + 6)
-        }
       }
 
-      // Dynamically resolve theme accent
-      const computedStyle = getComputedStyle(canvas)
-      const accentColor = computedStyle.getPropertyValue('--nx-accent').trim() || '#7c5cff'
-
       if (mode === 'minimal') {
-        // Minimal frequency bars
         const barCount = 24
         const barWidth = width / barCount - 2
         for (let i = 0; i < barCount; i++) {
@@ -73,17 +105,12 @@ export function AudioVisualizer({ mode = 'minimal', className = '' }: AudioVisua
           const x = i * (barWidth + 2)
           const y = height - barHeight
 
-          const gradient = ctx.createLinearGradient(0, height, 0, 0)
-          gradient.addColorStop(0, `${accentColor}44`)
-          gradient.addColorStop(1, accentColor)
-
           ctx.fillStyle = gradient
           ctx.beginPath()
           ctx.roundRect(x, y, barWidth, barHeight, 2)
           ctx.fill()
         }
       } else if (mode === 'reactive') {
-        // Glowing curved spectrum wave
         ctx.beginPath()
         ctx.moveTo(0, height / 2)
 
@@ -114,9 +141,11 @@ export function AudioVisualizer({ mode = 'minimal', className = '' }: AudioVisua
     render()
 
     return () => {
-      cancelAnimationFrame(animationId)
+      if (animationId !== null) {
+        cancelAnimationFrame(animationId)
+      }
     }
-  }, [mode])
+  }, [mode, isPlaying, windowActive])
 
   if (mode === 'off') return null
 

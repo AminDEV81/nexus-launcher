@@ -279,10 +279,8 @@ export function HubRegionalPriceModal({
                     const isPricier = item.difference_percent > 0
 
                     return (
-                      <motion.div
+                      <div
                         key={item.country_code}
-                        layout
-                        transition={{ duration: 0.2 * speed }}
                         onClick={() => setSelectedRegion(item.country_code)}
                         className={cn(
                           'group relative flex flex-wrap items-center justify-between gap-3 rounded-2xl border p-3 sm:px-4 sm:py-3 transition-all cursor-pointer',
@@ -390,7 +388,7 @@ export function HubRegionalPriceModal({
                             )}
                           </div>
                         </div>
-                      </motion.div>
+                      </div>
                     )
                   })}
                 </div>

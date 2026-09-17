@@ -538,8 +538,8 @@ function Switch({
       }
     >
       <motion.span
-        className="absolute top-1 flex size-5 items-center justify-center rounded-full bg-white shadow-sm"
-        animate={{ left: checked ? 24 : 4 }}
+        className="absolute top-1 left-1 flex size-5 items-center justify-center rounded-full bg-white shadow-sm"
+        animate={{ x: checked ? 20 : 0 }}
         transition={{ type: 'spring', stiffness: 500, damping: 32 }}
       >
         {IconOn && IconOff ? (

@@ -9,6 +9,9 @@ import {
   Activity,
   Cpu,
   Check,
+  EyeOff,
+  Minimize2,
+  AppWindow,
 } from 'lucide-react'
 import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
 import { useSettings, useSetSetting } from '../hooks/use-settings'
@@ -33,6 +36,30 @@ const SPEED_LIMITS = [
   { label: '50 MB/s (Extreme)', value: '52428800' },
 ]
 
+const LAUNCH_WINDOW_OPTIONS = [
+  {
+    id: 'hide',
+    label: 'Hide to System Tray',
+    description: 'Hides launcher window into tray while gaming. Restores upon game exit.',
+    badge: 'Recommended',
+    icon: EyeOff,
+  },
+  {
+    id: 'minimize',
+    label: 'Minimize to Taskbar',
+    description: 'Minimizes window to taskbar during gameplay, restores when game closes.',
+    badge: null,
+    icon: Minimize2,
+  },
+  {
+    id: 'keep',
+    label: 'Keep Window Open',
+    description: 'Keeps launcher open on desktop in the background while playing.',
+    badge: null,
+    icon: AppWindow,
+  },
+] as const
+
 export function PerformancePanel() {
   const reduceMotion = useAppearanceSettingsStore((s) => s.reduceMotion)
   const setReduceMotion = useAppearanceSettingsStore((s) => s.setReduceMotion)
@@ -53,6 +80,7 @@ export function PerformancePanel() {
   const speedLimit = settings?.download_speed_limit || '0'
   const isGamingMode = settings?.download_gaming_mode !== 'false'
   const autoCleanup = settings?.download_auto_cleanup === 'true'
+  const windowAction = settings?.game_launch_window_action || 'hide'
 
   return (
     <div className="flex flex-col gap-6">
@@ -178,6 +206,78 @@ export function PerformancePanel() {
             }
             ariaLabel="Auto-Delete Archives"
           />
+        </div>
+      </div>
+
+      {/* Game Launch Window Behavior */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-surface/60 p-5 shadow-sm">
+        <div className="flex items-center justify-between border-b border-border/60 pb-3">
+          <div className="flex items-center gap-2">
+            <Gamepad2 className="size-4.5 text-accent" />
+            <div>
+              <span className="text-sm font-bold text-text">On Game Launch Window Behavior</span>
+              <span className="ml-2 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-[10px] font-bold text-accent">
+                Gameplay Mode
+              </span>
+            </div>
+          </div>
+          <span className="font-mono text-[10px] font-bold text-subtle">PROCESS MANAGEMENT</span>
+        </div>
+
+        <p className="text-xs text-muted">
+          Choose what Nexus Launcher does when a game starts up to optimize background resource
+          usage:
+        </p>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {LAUNCH_WINDOW_OPTIONS.map((opt) => {
+            const Icon = opt.icon
+            const isSelected = windowAction === opt.id
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() =>
+                  setSetting.mutate({ key: 'game_launch_window_action', value: opt.id })
+                }
+                className={cn(
+                  'flex flex-col items-start gap-2 rounded-xl border p-3.5 text-left transition-all duration-200 shadow-xs relative cursor-pointer',
+                  isSelected
+                    ? 'border-accent bg-accent/15 shadow-md shadow-accent/10'
+                    : 'border-border/80 bg-surface/70 hover:border-accent/40 hover:bg-surface-raised',
+                )}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span
+                    className={cn(
+                      'flex size-8 items-center justify-center rounded-lg transition-colors',
+                      isSelected ? 'bg-accent text-white' : 'bg-surface-raised text-muted',
+                    )}
+                  >
+                    <Icon className="size-4" />
+                  </span>
+                  {opt.badge && (
+                    <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-[9px] font-bold text-emerald-400">
+                      {opt.badge}
+                    </span>
+                  )}
+                  {isSelected && !opt.badge && (
+                    <span className="flex size-5 items-center justify-center rounded-full bg-accent text-white">
+                      <Check className="size-3" strokeWidth={3} />
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <div
+                    className={cn('text-xs font-bold', isSelected ? 'text-accent' : 'text-text')}
+                  >
+                    {opt.label}
+                  </div>
+                  <div className="mt-1 text-[11px] leading-snug text-subtle">{opt.description}</div>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
 

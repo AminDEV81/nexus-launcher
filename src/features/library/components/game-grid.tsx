@@ -14,7 +14,7 @@ const CARD_GAP = 20
 const CARD_META_HEIGHT = 56
 /** Cover aspect ratio is 3:4 (width:height), so height = width * (4/3). */
 const COVER_ASPECT = 4 / 3
-const VIRTUALIZE_THRESHOLD = 150
+const VIRTUALIZE_THRESHOLD = 48
 
 interface GameGridProps {
   games: Game[]
@@ -24,12 +24,10 @@ interface GameGridProps {
 }
 
 /**
- * Renders the game cards in a responsive grid. For collections under 150 items
- * (the vast majority of user libraries and wishlists), it utilizes Framer Motion's
- * `layout` and `<AnimatePresence mode="popLayout">` so that card additions, deletions,
- * and neighbor repositioning smoothly morph and slide into place with fluid physics.
+ * Renders the game cards in a responsive grid. Virtualizes collections
+ * over 48 items to keep DOM small and GPU compositor completely free
+ * of unnecessary off-screen compositing layers.
  * Supports smooth Left-Click Hold & Drag reordering.
- * For huge collections (>150), it seamlessly switches to row virtualization.
  */
 export function GameGrid({ games, selectedId, onSelect, onContextMenu }: GameGridProps) {
   const parentRef = useRef<HTMLDivElement>(null)
@@ -127,7 +125,7 @@ export function GameGrid({ games, selectedId, onSelect, onContextMenu }: GameGri
           <AnimatePresence initial={false} mode="popLayout">
             {games.map((game) => (
               <motion.div
-                layout
+                layout={draggedId !== null}
                 key={game.id}
                 data-game-id={game.id}
                 className={cn(

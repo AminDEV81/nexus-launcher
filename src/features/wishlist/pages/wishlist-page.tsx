@@ -257,8 +257,8 @@ export function WishlistPage() {
       {/* Cinematic Header & Stats Strip */}
       <div className="relative mb-8 overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-br from-surface-raised via-surface to-surface p-6 shadow-xl sm:p-8">
         {/* Glowing backdrop atmosphere */}
-        <div className="pointer-events-none absolute -right-20 -top-20 size-80 rounded-full bg-accent/15 blur-3xl" />
-        <div className="pointer-events-none absolute -left-20 -bottom-20 size-80 rounded-full bg-amber-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 -top-16 size-52 rounded-full bg-accent/15 blur-2xl" />
+        <div className="pointer-events-none absolute -left-16 -bottom-16 size-52 rounded-full bg-amber-500/10 blur-2xl" />
 
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
@@ -460,7 +460,7 @@ export function WishlistPage() {
                 <motion.div
                   key={game.id}
                   data-game-id={game.id}
-                  layout
+                  layout={draggedId !== null}
                   onPointerDown={(e) => handlePointerDown(game.id, e)}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}

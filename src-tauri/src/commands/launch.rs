@@ -26,9 +26,9 @@ const POLL_INTERVAL: Duration = Duration::from_secs(3);
 
 /// How long we keep polling for a Steam game's process to *appear*
 /// after handing off to `steam://rungameid/...` before giving up.
-/// Kept tight (15s) so offline launches or missing processes fail fast
-/// and never leave the user staring at a frozen launch modal.
-const STEAM_LAUNCH_TIMEOUT: Duration = Duration::from_secs(15);
+/// Generous (90s) so games with cloud sync, shader compilation, or
+/// anti-cheat startup don't prematurely abort.
+const STEAM_LAUNCH_TIMEOUT: Duration = Duration::from_secs(90);
 
 /// Tracks which games currently have an active play session and, once
 /// known, the PID of their process — purely in-memory. Lets the
@@ -666,6 +666,7 @@ async fn track_session(
 
     let started_at = Utc::now();
     let _ = app.emit("game-launched", &game_id);
+    handle_launch_window_action(&app);
 
     let sys_pid = Pid::from_u32(pid);
     let is_script = exe_name
@@ -772,10 +773,52 @@ async fn track_session(
     app.state::<LaunchTracker>().finish(&game_id);
 }
 
-fn restore_launcher_window(app: &AppHandle) {
+fn handle_launch_window_action(app: &AppHandle) {
+    let action = {
+        let db = app.state::<Database>();
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        conn.query_row(
+            "SELECT value FROM settings WHERE key = 'game_launch_window_action'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .unwrap_or_else(|_| "hide".to_string())
+    };
+
     if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.set_focus();
+        match action.as_str() {
+            "minimize" => {
+                let _ = window.minimize();
+            }
+            "keep" => {
+                // Keep window open as is
+            }
+            _ => {
+                // "hide" is default: tuck cleanly into background / system tray
+                let _ = window.hide();
+            }
+        }
+    }
+}
+
+fn restore_launcher_window(app: &AppHandle) {
+    let action = {
+        let db = app.state::<Database>();
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        conn.query_row(
+            "SELECT value FROM settings WHERE key = 'game_launch_window_action'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .unwrap_or_else(|_| "hide".to_string())
+    };
+
+    if let Some(window) = app.get_webview_window("main") {
+        if action.as_str() != "keep" {
+            let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
     }
 }
 

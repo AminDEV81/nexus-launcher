@@ -705,23 +705,6 @@ pub async fn search_hub_games(
     let offset = offset.unwrap_or(0).max(0);
     let filters = filters.unwrap_or_default();
 
-    let config = resolver.get_config(&db);
-    if config.mode == ProviderMode::Public {
-        let gid = filters.genre_id.or_else(|| filters.genre_ids.as_ref().and_then(|ids| ids.first().copied()));
-        let pid = filters.platform_id.or_else(|| filters.platform_ids.as_ref().and_then(|ids| ids.first().copied()));
-        return resolver.search_games(&db, trimmed, offset, gid, pid).await;
-    }
-
-    let effective_release = match (&filters.release, filters.year_from, filters.year_to) {
-        (Some(r), _, _) if !r.trim().is_empty() => Some(r.trim().to_string()),
-        (_, Some(from), Some(to)) => Some(format!("{from}-{to}")),
-        (_, Some(from), None) => Some(format!("{from}+")),
-        (_, None, Some(to)) => Some(format!("-{to}")),
-        _ => None,
-    };
-    let release = release_clause(effective_release.as_deref(), Utc::now().timestamp())?;
-    let sort = sort_clause(filters.sort.as_deref())?;
-
     let mut genre_ids: Vec<i64> = Vec::new();
     if let Some(ids) = &filters.genre_ids {
         genre_ids.extend(ids.iter().copied().filter(|&id| id > 0));
@@ -744,6 +727,23 @@ pub async fn search_hub_games(
     platform_ids.sort_unstable();
     platform_ids.dedup();
 
+    let config = resolver.get_config(&db);
+    if config.mode == ProviderMode::Public {
+        return resolver
+            .search_games(&db, trimmed, offset, &genre_ids, &platform_ids)
+            .await;
+    }
+
+    let effective_release = match (&filters.release, filters.year_from, filters.year_to) {
+        (Some(r), _, _) if !r.trim().is_empty() => Some(r.trim().to_string()),
+        (_, Some(from), Some(to)) => Some(format!("{from}-{to}")),
+        (_, Some(from), None) => Some(format!("{from}+")),
+        (_, None, Some(to)) => Some(format!("-{to}")),
+        _ => None,
+    };
+    let release = release_clause(effective_release.as_deref(), Utc::now().timestamp())?;
+    let sort = sort_clause(filters.sort.as_deref())?;
+
     let has_filters = !genre_ids.is_empty()
         || !platform_ids.is_empty()
         || release.is_some()
@@ -765,9 +765,13 @@ pub async fn search_hub_games(
             format!("game_type = {STANDALONE_GAME_TYPES}"),
             "cover != null".to_string(),
         ];
-        // When multiple genres are selected, the game must contain ALL of them (conjunction / AND).
-        for id in &genre_ids {
-            clauses.push(format!("genres = ({id})"));
+        if !genre_ids.is_empty() {
+            let list = genre_ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            clauses.push(format!("genres = [{list}]"));
         }
         if !platform_ids.is_empty() {
             let list = platform_ids

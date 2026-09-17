@@ -81,12 +81,12 @@ export function StartupSplash({ onDone }: { onDone: () => void }) {
           }}
           onClick={finish}
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0, scale: 1.12, filter: 'blur(10px)', pointerEvents: 'none' }}
-          transition={{ duration: 0.55, ease: [0.7, 0, 0.84, 0] }}
+          exit={{ opacity: 0, scale: 1.06, pointerEvents: 'none' }}
+          transition={{ duration: 0.4, ease: [0.7, 0, 0.84, 0] }}
         >
           {/* Theme & Palette Ambient Glow Blobs */}
           <motion.div
-            className="pointer-events-none absolute size-[650px] rounded-full blur-[120px]"
+            className="pointer-events-none absolute size-[420px] rounded-full blur-3xl"
             style={{
               background: `radial-gradient(circle, color-mix(in srgb, var(--color-accent) 25%, transparent) 0%, transparent 70%)`,
             }}
@@ -96,7 +96,7 @@ export function StartupSplash({ onDone }: { onDone: () => void }) {
           />
 
           <motion.div
-            className="pointer-events-none absolute size-[450px] translate-y-32 rounded-full blur-[100px]"
+            className="pointer-events-none absolute size-[300px] translate-y-24 rounded-full blur-2xl"
             style={{
               background: `radial-gradient(circle, color-mix(in srgb, var(--color-accent-hover) 18%, transparent) 0%, transparent 70%)`,
             }}

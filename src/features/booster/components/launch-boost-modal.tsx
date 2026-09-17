@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Zap, Check, Rocket, X, Sparkles, Loader2, Activity } from 'lucide-react'
-import { toast } from 'sonner'
 import { useLaunchBoostStore } from '../store/launch-boost-store'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { assetUrl } from '@/lib/asset-url'
@@ -64,21 +63,6 @@ export function LaunchBoostModal() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, close])
 
-  // Watchdog timer: If launch sequence stays stuck in 'optimizing' or 'launching' for > 12s,
-  // auto-close the modal and alert the user so the UI is never permanently blocked.
-  useEffect(() => {
-    if (!isOpen || phase === 'ready') return
-
-    const watchdogTimer = setTimeout(() => {
-      close()
-      toast.error(
-        'Game launch timed out. Please check if the game or store client requires attention.',
-      )
-    }, 12000)
-
-    return () => clearTimeout(watchdogTimer)
-  }, [isOpen, phase, close])
-
   if (typeof document === 'undefined') return null
   const modalHost = document.getElementById('modal-host') || document.body
 
@@ -102,9 +86,9 @@ export function LaunchBoostModal() {
           />
 
           {/* Glowing Cyber Atmosphere */}
-          <div className="pointer-events-none absolute size-96 rounded-full bg-accent/20 blur-3xl" />
+          <div className="pointer-events-none absolute size-60 rounded-full bg-accent/20 blur-2xl" />
           {isReady && (
-            <div className="pointer-events-none absolute size-96 rounded-full bg-emerald-500/25 blur-3xl animate-pulse" />
+            <div className="pointer-events-none absolute size-60 rounded-full bg-emerald-500/25 blur-2xl transition-opacity duration-500" />
           )}
 
           {/* Modal Container */}
@@ -116,7 +100,7 @@ export function LaunchBoostModal() {
             exit={{ opacity: 0, scale: 0.94, y: 8 }}
             transition={{ type: 'spring', stiffness: 360, damping: 28 }}
             className={cn(
-              'relative w-full max-w-lg overflow-hidden rounded-3xl border bg-surface/95 p-6 shadow-2xl backdrop-blur-xl select-none',
+              'relative w-full max-w-lg overflow-hidden rounded-3xl border bg-surface/95 p-6 shadow-2xl select-none',
               isReady
                 ? 'border-emerald-500/60 shadow-[0_0_50px_rgba(16,185,129,0.35)]'
                 : 'border-accent/40 shadow-[0_0_50px_var(--nx-accent)]',

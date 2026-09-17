@@ -88,22 +88,32 @@ impl MetadataProvider for DirectIgdbProvider {
         &self,
         query: &str,
         offset: i64,
-        genre_id: Option<i64>,
-        platform_id: Option<i64>,
+        genre_ids: &[i64],
+        platform_ids: &[i64],
     ) -> AppResult<Vec<HubGame>> {
         let token = self.get_token().await?;
         let clean_q = query.replace(['"', '\\'], "");
 
-        let query_body = if genre_id.is_some() || platform_id.is_some() {
+        let query_body = if !genre_ids.is_empty() || !platform_ids.is_empty() {
             let mut conditions = vec![format!("game_type = {STANDALONE_GAME_TYPES}")];
             if !clean_q.is_empty() {
                 conditions.push(format!("name ~ *\"{clean_q}\"*"));
             }
-            if let Some(gid) = genre_id {
-                conditions.push(format!("genres = [{gid}]"));
+            if !genre_ids.is_empty() {
+                let list = genre_ids
+                    .iter()
+                    .map(|id| id.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                conditions.push(format!("genres = [{list}]"));
             }
-            if let Some(pid) = platform_id {
-                conditions.push(format!("platforms = [{pid}]"));
+            if !platform_ids.is_empty() {
+                let list = platform_ids
+                    .iter()
+                    .map(|id| id.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                conditions.push(format!("platforms = ({list})"));
             }
             format!(
                 "{LIST_FIELDS};\nwhere {};\nsort total_rating_count desc;\nlimit 24;\noffset {offset};",

@@ -6,12 +6,24 @@
  */
 
 .glass-panel {
-  background: color-mix(in srgb, var(--nx-surface) 84%, transparent);
-  backdrop-filter: blur(var(--nx-blur-intensity, 8px));
-  -webkit-backdrop-filter: blur(var(--nx-blur-intensity, 8px));
+  background: color-mix(in srgb, var(--nx-surface) 88%, transparent);
+  backdrop-filter: blur(var(--nx-blur-intensity, 5px));
+  -webkit-backdrop-filter: blur(var(--nx-blur-intensity, 5px));
   /* Deliberately no `saturate()` here: it added a per-pixel shader pass
-     on every glass layer (title bar, sidebar, details panel), which
-     measurably drove up idle GPU usage for a barely-visible tint. */
+     on every glass layer, which measurably drove up idle GPU usage. */
+}
+
+/* Persistent structural chrome surface for TitleBar and Sidebar.
+   Uses a rich semi-translucent surface color (93% surface opacity)
+   that lets the ambient atmosphere breathe subtly while completely
+   bypassing the GPU backdrop-filter compositing pass on full-height/width
+   persistent window chrome. */
+.chrome-surface {
+  background: color-mix(in srgb, var(--nx-surface) 93%, transparent);
+}
+
+[data-gpu-eco='true'] .chrome-surface {
+  background: var(--nx-surface);
 }
 
 /* Backdrop filters force WebView2 to keep recompositing the layers behind
@@ -188,4 +200,64 @@
   .nx-hero-zoom {
     animation: none;
   }
+}
+
+/* Hardware-accelerated CSS compositor animations for Nexus Cyber Mascot */
+@keyframes nx-spin-cw {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes nx-spin-ccw {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@keyframes nx-mascot-bob {
+  0%,
+  100% {
+    transform: translateY(-2.5px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(2.5px) rotate(0.6deg);
+  }
+}
+@keyframes nx-eq-pulse {
+  0%,
+  100% {
+    height: 2px;
+  }
+  50% {
+    height: 6.5px;
+  }
+}
+
+.nx-spin-cw {
+  animation: nx-spin-cw 24s linear infinite;
+}
+.nx-spin-ccw {
+  animation: nx-spin-ccw 16s linear infinite;
+}
+.nx-mascot-bob {
+  animation: nx-mascot-bob 3.6s ease-in-out infinite;
+}
+.nx-spin-fast {
+  animation: nx-spin-cw 6s linear infinite;
+}
+
+[data-reduce-motion='true'] .nx-spin-cw,
+[data-reduce-motion='true'] .nx-spin-ccw,
+[data-reduce-motion='true'] .nx-mascot-bob,
+[data-reduce-motion='true'] .nx-spin-fast,
+[data-window-active='false'] .nx-spin-cw,
+[data-window-active='false'] .nx-spin-ccw,
+[data-window-active='false'] .nx-mascot-bob,
+[data-window-active='false'] .nx-spin-fast {
+  animation: none !important;
 }

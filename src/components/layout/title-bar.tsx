@@ -41,7 +41,7 @@ export function TitleBar() {
   return (
     <header
       data-tauri-drag-region
-      className="glass-panel relative z-40 flex h-9 shrink-0 select-none items-center justify-between border-b border-border pl-3"
+      className="chrome-surface relative z-40 flex h-9 shrink-0 select-none items-center justify-between border-b border-border pl-3"
     >
       <div
         data-tauri-drag-region

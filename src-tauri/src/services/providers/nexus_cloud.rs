@@ -92,15 +92,15 @@ impl MetadataProvider for NexusCloudProvider {
         &self,
         query: &str,
         offset: i64,
-        genre_id: Option<i64>,
-        platform_id: Option<i64>,
+        genre_ids: &[i64],
+        platform_ids: &[i64],
     ) -> AppResult<Vec<HubGame>> {
         let encoded_q = urlencoding_light(query);
         let mut path = format!("/api/v1/games/search?q={encoded_q}&offset={offset}");
-        if let Some(gid) = genre_id {
+        for gid in genre_ids {
             path.push_str(&format!("&genre={gid}"));
         }
-        if let Some(pid) = platform_id {
+        for pid in platform_ids {
             path.push_str(&format!("&platform={pid}"));
         }
         self.get_json(&path).await
