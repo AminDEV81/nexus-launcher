@@ -1,0 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@600;700;800&family=Vazirmatn:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --font-en: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Sora', 'Inter', sans-serif;
+  --font-fa: 'Vazirmatn', system-ui, -apple-system, sans-serif;
+  --color-primary: #00e5ff;
+  --color-primary-glow: rgba(0, 229, 255, 0.35);
+  --color-violet: #8b5cf6;
+  --color-bg-base: #06080d;
+  --color-card-bg: rgba(13, 18, 28, 0.72);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(0, 229, 255, 0.35);
+}
+
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-en);
+  background-color: var(--color-bg-base);
+  color: #e2e8f0;
+}
+
+html[dir='rtl'] {
+  font-family: var(--font-fa);
+}
+
+html[dir='rtl'] h1,
+html[dir='rtl'] h2,
+html[dir='rtl'] h3,
+html[dir='rtl'] h4,
+html[dir='rtl'] .font-heading {
+  font-family: var(--font-fa);
+  font-weight: 800;
+}
+
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #06080d;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Glassmorphic Panel */
+.glass-panel {
+  background: var(--color-card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--color-border);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-panel:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: 0 10px 30px -10px rgba(0, 229, 255, 0.15);
+}
+
+/* Glowing CTA Buttons */
+.btn-primary-glow {
+  background: linear-gradient(135deg, #00e5ff 0%, #0099ff 100%);
+  color: #030816;
+  font-weight: 700;
+  box-shadow:
+    0 0 25px var(--color-primary-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: all 0.25s ease;
+}
+
+.btn-primary-glow:hover {
+  box-shadow:
+    0 0 40px rgba(0, 229, 255, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+}
+
+.btn-primary-glow:active {
+  transform: translateY(0);
+}
+
+/* Subtle Gradient Text */
+.gradient-text-cyan {
+  background: linear-gradient(135deg, #ffffff 30%, #00e5ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gradient-text-purple {
+  background: linear-gradient(135deg, #00e5ff 0%, #a855f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Ambient Background Lights */
+.ambient-glow-cyan {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(0, 229, 255, 0.12) 0%, rgba(0, 229, 255, 0) 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.ambient-glow-purple {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, rgba(139, 92, 246, 0) 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+/* Interactive Mockup */
+.mockup-window {
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.7),
+    0 0 40px rgba(0, 229, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Subtle Pulsing Animation */
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+.pulse-badge {
+  animation: soft-pulse 3s infinite ease-in-out;
+}
