@@ -115,6 +115,7 @@ const TRANSLATIONS = {
     comp_pill: 'مقایسه شفاف و بدون اغراق',
     comp_heading: 'چرا نکسوس لانچر انتخاب اول گیمرهاست؟',
     comp_subheading: 'نگاهی به تفاوت فاحش نکسوس با لانچرهای غول‌پیکر تجاری در پارامترهای حیاتی:',
+    table_scroll_hint: '👈 برای مشاهده کامل جدول، به چپ و راست بکشید 👉',
     th_feature: 'ویژگی / سنجه',
     row_ram: 'مصرف رم در حالت بیکار',
     row_boot: 'سرعت بالا آمدن (Cold Boot)',
@@ -267,6 +268,7 @@ const TRANSLATIONS = {
     comp_pill: 'TRANSPARENT BENCHMARKS',
     comp_heading: 'Why Gamers Prefer Nexus Launcher',
     comp_subheading: 'A side-by-side performance breakdown against commercial corporate launchers:',
+    table_scroll_hint: '👉 Swipe horizontally to view full table 👈',
     th_feature: 'Metric / Capability',
     row_ram: 'Idle RAM Consumption',
     row_boot: 'Cold Boot Latency',
@@ -335,6 +337,7 @@ class WebsiteEngine {
     this.setupCursorSpotlight()
     this.setupThreeBackground()
     this.setupLanguage()
+    this.setupMobileMenu()
     this.setupMockupInteractions()
     this.setupTiltCards()
     this.fetchLatestRelease()
@@ -344,14 +347,74 @@ class WebsiteEngine {
     const spotlight = document.getElementById('cursor-spotlight')
     if (!spotlight) return
 
+    const updateSpotlight = (x, y) => {
+      spotlight.style.setProperty('--spot-x', `${x}px`)
+      spotlight.style.setProperty('--spot-y', `${y}px`)
+    }
+
     window.addEventListener(
       'mousemove',
       (e) => {
-        spotlight.style.setProperty('--spot-x', `${e.clientX}px`)
-        spotlight.style.setProperty('--spot-y', `${e.clientY}px`)
+        updateSpotlight(e.clientX, e.clientY)
       },
       { passive: true },
     )
+
+    window.addEventListener(
+      'touchmove',
+      (e) => {
+        if (e.touches && e.touches.length > 0) {
+          updateSpotlight(e.touches[0].clientX, e.touches[0].clientY)
+        }
+      },
+      { passive: true },
+    )
+  }
+
+  setupMobileMenu() {
+    const toggleBtn = document.getElementById('mobile-menu-toggle')
+    const mobileMenu = document.getElementById('mobile-menu')
+    const iconOpen = document.getElementById('menu-icon-open')
+    const iconClose = document.getElementById('menu-icon-close')
+
+    if (!toggleBtn || !mobileMenu) return
+
+    const toggle = () => {
+      const isHidden = mobileMenu.classList.contains('hidden')
+      if (isHidden) {
+        mobileMenu.classList.remove('hidden')
+        mobileMenu.classList.add('flex')
+        if (iconOpen) iconOpen.classList.add('hidden')
+        if (iconClose) iconClose.classList.remove('hidden')
+      } else {
+        mobileMenu.classList.add('hidden')
+        mobileMenu.classList.remove('flex')
+        if (iconOpen) iconOpen.classList.remove('hidden')
+        if (iconClose) iconClose.classList.add('hidden')
+      }
+    }
+
+    toggleBtn.addEventListener('click', toggle)
+
+    // Close when clicking any nav link inside mobile drawer
+    document.querySelectorAll('.mobile-nav-link').forEach((link) => {
+      link.addEventListener('click', () => {
+        mobileMenu.classList.add('hidden')
+        mobileMenu.classList.remove('flex')
+        if (iconOpen) iconOpen.classList.remove('hidden')
+        if (iconClose) iconClose.classList.add('hidden')
+      })
+    })
+
+    // Auto-close on resize to desktop (>= 1024px)
+    window.addEventListener('resize', () => {
+      if (window.innerWidth >= 1024 && !mobileMenu.classList.contains('hidden')) {
+        mobileMenu.classList.add('hidden')
+        mobileMenu.classList.remove('flex')
+        if (iconOpen) iconOpen.classList.remove('hidden')
+        if (iconClose) iconClose.classList.add('hidden')
+      }
+    })
   }
 
   setupLanguage() {
@@ -382,7 +445,14 @@ class WebsiteEngine {
 
     const toggleBtn = document.getElementById('lang-toggle-btn')
     if (toggleBtn) {
-      toggleBtn.textContent = lang === 'fa' ? 'English (EN)' : 'فارسی (FA)'
+      const fullSpan = toggleBtn.querySelector('.hidden.sm\\:inline')
+      const shortSpan = toggleBtn.querySelector('.sm\\:hidden')
+      if (fullSpan && shortSpan) {
+        fullSpan.textContent = lang === 'fa' ? 'English (EN)' : 'فارسی (FA)'
+        shortSpan.textContent = lang === 'fa' ? 'EN' : 'FA'
+      } else {
+        toggleBtn.textContent = lang === 'fa' ? 'English (EN)' : 'فارسی (FA)'
+      }
     }
 
     document.querySelectorAll('[data-i18n]').forEach((el) => {
@@ -528,6 +598,17 @@ class WebsiteEngine {
       (e) => {
         mouseX = (e.clientX / window.innerWidth - 0.5) * 2
         mouseY = (e.clientY / window.innerHeight - 0.5) * 2
+      },
+      { passive: true },
+    )
+
+    window.addEventListener(
+      'touchmove',
+      (e) => {
+        if (e.touches && e.touches.length > 0) {
+          mouseX = (e.touches[0].clientX / window.innerWidth - 0.5) * 2
+          mouseY = (e.touches[0].clientY / window.innerHeight - 0.5) * 2
+        }
       },
       { passive: true },
     )
