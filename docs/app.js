@@ -1,326 +1,287 @@
 /**
- * Nexus Launcher Landing Website - Advanced 3D & Interactive Controller
- * Default Language: Persian (FA)
+ * Nexus Launcher Landing Website - Application Controller & Engine
+ * Official Brand Icons & Advanced Interactive Obsidian Mockup
  */
 
 const CONFIG = {
   defaultVersion: 'v0.2.0',
   defaultDownloadUrl:
     'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.2.0_x64-setup.exe',
-  defaultMsiUrl:
-    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.2.0_x64_en-US.msi',
   githubApiUrl: 'https://api.github.com/repos/AminDEV81/nexus-launcher/releases/latest',
   githubRepoUrl: 'https://github.com/AminDEV81/nexus-launcher',
 }
 
 const TRANSLATIONS = {
   fa: {
+    top_bar_msg: 'نسخه ۰.۲.۰ لانچر نکسوس منتشر شد — مجهز به پلیر موسیقی متن و محافظت اتمیک سیوها!',
+    top_bar_cta: 'دانلود مستقیم رایگان ←',
+    nav_showcase: 'نمای زنده برنامه',
     nav_features: 'ویژگی‌های کلیدی',
-    nav_modules: 'ماژول‌های برنامه',
+    nav_booster: 'بوستر رم',
     nav_comparison: 'چرا نکسوس؟',
-    nav_specs: 'سیستم مورد نیاز',
-    nav_faq: 'سوالات متداول',
-    nav_github: 'گیت‌هاب',
-    nav_download: 'دانلود نکسوس',
+    nav_specs: 'مشخصات فنی',
+    nav_faq: 'سوالات',
+    nav_download_btn: 'دانلود رایگان',
 
-    hero_badge: '✨ نسخه {version} منتشر شد — بومی، سه‌بعدی و فوق‌العاده سریع',
-    hero_title_1: 'لانچر بازی بومی نسل جدید',
-    hero_title_2: 'برای گیمرهای حرفه‌ای ویندوز',
+    hero_title_1: 'لانچر بومی، رعدآسا و هوشمند',
+    hero_title_2: 'برای تمام بازی‌های شما در ویندوز',
     hero_subtitle:
-      'کتابخانه بازی‌های شخصی مدرن و آفلاین‌محور با قدرت Tauri 2، زبان Rust و React 19. مجهز به بوستر هوشمند سخت‌افزاری، ویژوالایزر صوتی سینماتیک و نگهبان اتمیک فایل‌های سیو با مصرف باورنکردنی تنها ۶۰ مگابایت رم.',
-    hero_download_btn: 'دانلود مستقیم نسخه رسمی',
-    hero_download_subtext: 'ویندوز ۱۰ و ۱۱ (۶۴ بیتی) • {size} • ۱۰۰٪ رایگان و متن‌باز',
-    hero_source_btn: 'مشاهده پروژه در گیت‌هاب',
-    hero_other_downloads: 'سایر نسخه‌ها و فایل نصبی .msi',
+      'توسعه یافته بر پایه معماری بومی Rust و Tauri 2. فقط ۶۰ مگابایت مصرف رم، همراه با بوستر خودکار، پلیر موسیقی بازی‌ها و گاوصندوق اتمیک سیوها بدون ذره‌ای تبلیغات یا جاسوس‌افزار.',
+    hero_download_btn: 'دانلود نسخه رسمی ویندوز',
+    hero_source_btn: 'مشاهده سورس در گیت‌هاب',
 
-    stat_ram_num: '۶۰ MB',
+    badge_free: '۱۰۰٪ رایگان و بدون پرداخت',
+    badge_offline: 'کاملاً آفلاین بدون نیاز به لاگین',
+    badge_win: 'سازگار با ویندوز ۱۰ و ۱۱ (x64)',
+
+    stat_ram_num: '~۶۰ MB',
     stat_ram_lbl: 'مصرف رم در حالت بیکار',
-    stat_fps_num: '+۱۸٪',
-    stat_fps_lbl: 'افزایش فریم‌ریت در بازی',
-    stat_saves_num: '۱۹,۰۰۰+',
-    stat_saves_lbl: 'بازی با شناسایی خودکار سیو',
-    stat_speed_num: '< ۰.۸s',
-    stat_speed_lbl: 'سرعت لودینگ اولیه (Cold Boot)',
+    stat_boot_num: '< ۰.۴ ثانیه',
+    stat_boot_lbl: 'زمان باز شدن اولیه (Cold Start)',
+    stat_games_num: '۱۹,۰۰۰+',
+    stat_games_lbl: 'پشتیبانی خودکار از سیو بازی‌ها',
+    stat_zero_num: '۰٪ تبلیغات',
+    stat_zero_lbl: 'بدون ردیابی و بدون فروشگاه اجباری',
 
-    showcase_badge: 'تور تعاملی درون برنامه',
-    showcase_title: 'ماژول‌های پیشرفته Nexus Launcher',
-    showcase_subtitle:
-      'روی هر ماژول کلیک کنید تا قدرت عملکرد و رابط کاربری اختصاصی آن را به صورت زنده تجربه نمایید:',
+    mockup_pill: 'شبیه‌ساز تعاملی رابط کاربری برنامه',
+    mockup_heading: 'یک شاهکار واقعی روی دسکتاپ شما',
+    mockup_subheading:
+      'روی تب‌های سایدبار کلیک کنید یا دکمه «اجرای سریع» را بزنید تا قدرت، زیبایی و سرعت نکسوس لانچر را مستقیماً همین‌جا لمس کنید:',
+    badge_floating_ram: '⚡ رم فعال: ۵۸ مگابایت',
+    badge_floating_turbo: '🚀 بوستر سخت‌افزاری آماده به کار',
+    mockup_search_placeholder: 'جستجو در بازی‌ها...',
 
-    tab_library: '🎮 کتابخانه هوشمند',
-    tab_booster: '⚡ بوستر پیشرفته',
-    tab_soundtrack: '🎵 مرکز موسیقی متن',
-    tab_save: '🛡️ نگهبان سیو',
-    tab_passport: '📊 پاسپورت گیمر',
+    tab_library: 'کتابخانه بازی‌ها',
+    tab_booster: 'بوستر سیستم',
+    tab_soundtrack: 'مرکز موسیقی',
+    tab_saves: 'نگهبان سیو',
+    tab_stats: 'پاسپورت گیمر',
 
-    lib_card_search: 'جستجو در بیش از ۴۲ بازی نصب‌شده...',
-    lib_all_games: 'تمام بازی‌ها (۴۲)',
-    lib_launch_btn: 'اجرای بازی',
-    lib_playtime: 'مدت بازی:',
-    lib_genre_action: 'اکشن / ماجراجویی',
+    mockup_lib_title: 'بازی‌های نصب‌شده (۴)',
+    mockup_lib_desc: 'شناسایی خودکار و یکپارچه بدون نیاز به باز بودن استیم یا اپیک',
+    mockup_boost_title: 'وضعیت سخت‌افزاری و بوستر',
+    mockup_boost_desc: 'بهینه‌سازی دینامیک هسته‌ها و آزادسازی حافظه کاری ویندوز',
+    mockup_sound_title: 'استودیو موسیقی متن بازی‌ها',
+    mockup_sound_desc: 'استریم و دانلود نامحدود قطعات اورجینال بازی‌ها',
+    mockup_save_title: 'نگهبان اتمیک فایل‌های سیو',
+    mockup_save_desc: 'شناسایی خودکار پوشه ذخیره با تضمین سلامت ACID',
+    mockup_stats_title: 'پاسپورت اختصاصی و تحلیل گیمینگ',
+    mockup_stats_desc: 'هیت‌مپ فعالیت و مدت زمان بازی‌های شما',
 
-    boost_title: 'هوشمندسازی خودکار سیستم قبل از بازی',
-    boost_desc:
-      'بهینه‌سازی دینامیک هسته‌های پردازنده، پاک‌سازی کش رم و ساسپند کردن خودکار ۲۱ سرویس سنگین پس‌زمینه بدون آسیب به لانچرها.',
-    boost_btn_test: '🚀 تست زنده شبیه‌ساز بوست',
-    boost_tested_msg: '⚡ سیستم در حالت Ultra Performance قرار گرفت! ۱.۴ گیگابایت رم آزاد شد.',
+    bento_pill: 'معماری و قابلیت‌های اختصاصی',
+    bento_heading: 'طراحی شده با نهایت وسواس مهندسی',
+    bento_subheading:
+      'هیچ وب‌ویو کند یا فریم‌ورک‌های سنگین در کار نیست. هر خط کد نکسوس برای اوج سرعت و حداکثر بهره‌وری پردازنده نوشته شده است.',
+    bento_rust_title: 'معماری اصیل Rust و Tauri 2 بدون کرومیوم',
+    bento_rust_desc:
+      'برخلاف نرم‌افزارهای مبتنی بر الکترون که صدها مگابایت رم را صرف یک مرورگر مخفی می‌کنند، نکسوس لانچر مستقیماً به کتابخانه‌های محلی و بومی ویندوز کامپایل شده است. سرعت باز شدن زیر ۰.۴ ثانیه و مصرف رم تنها ۶۰ مگابایت!',
+    bento_booster_title: 'بوستر خودکار و آزادسازی رم',
+    bento_booster_desc:
+      'استفاده از API سیستمی EmptyWorkingSet برای پاکسازی کش‌های هرز رم قبل از اجرای هر بازی.',
+    btn_flush_ram: '🚀 تست زنده پاکسازی رم',
+    bento_save_title: 'نگهبان اتمیک فایل‌های سیو',
+    bento_save_desc:
+      'پشتیبانی از بیش از ۱۹,۰۰۰ بازی با ژورنال اتمیک ACID. حتی اگر کامپیوتر وسط بازی خاموش شود، سیوهای قبلی دست‌نخورده باقی می‌مانند.',
+    bento_sound_title: 'استودیو موسیقی متن بازی‌ها',
+    bento_sound_desc:
+      'استریم و دانلود قطعات موسیقی متن هزاران بازی ویدیویی بدون نیاز به یوتیوب با اکولایزر صوتی سینماتیک زنده.',
+    bento_passport_title: 'پاسپورت اختصاصی و حریم خصوصی',
+    bento_passport_desc:
+      'محاسبه ساعات بازی، نمودار عادات شبانه‌روز و دستاوردهای شخصی. بدون ارسال حتی ۱ بایت تلمتری یا اطلاعات هویتی به سرورها.',
 
-    soundtrack_title: 'استودیو اختصاصی موسیقی متن بازی‌ها',
-    soundtrack_desc:
-      'استریم آنلاین و دانلود ساندترک‌های بازی با ویژوالایزر فرکانسی زنده ۶۰ فریم و پشتیبانی از آرشیوهای جهانی.',
+    calc_heading: 'چقدر منابع با Nexus Launcher صرفه‌جویی می‌کنید؟',
+    calc_subheading:
+      'تعداد بازی‌های خود را انتخاب کنید تا ببینید سیستم شما چقدر سبک‌تر نفس خواهد کشید:',
+    calc_lbl_ram: 'صرفه‌جویی رم در هر لحظه',
+    calc_lbl_fps: 'افزایش پایداری فریم‌ریت',
+    calc_lbl_battery: 'بهبود مصرف باتری لپ‌تاپ',
 
-    save_title: 'سیستم ژورنال محافظت از فایل‌های سیو (ACID)',
-    save_desc:
-      'شناسایی هوشمند محل ذخیره بازی‌ها، ایجاد نسخه‌های پشتیبان خودکار و جلوگیری قطعی از خرابی فایل‌ها هنگام کرش یا قطع برق.',
-    save_restore_btn: '🔄 بازیابی آخرین اسنپ‌شات',
-    save_restored_msg: '✅ نسخه ذخیره با موفقیت بازیابی شد و تایید سلامت گرفت!',
+    comp_pill: 'مقایسه شفاف و بدون اغراق',
+    comp_heading: 'چرا نکسوس لانچر انتخاب اول گیمرهاست؟',
+    comp_subheading: 'نگاهی به تفاوت فاحش نکسوس با لانچرهای غول‌پیکر تجاری در پارامترهای حیاتی:',
+    th_feature: 'ویژگی / سنجه',
+    row_ram: 'مصرف رم در حالت بیکار',
+    row_boot: 'سرعت بالا آمدن (Cold Boot)',
+    row_size: 'حجم فایل نصبی دانلودی',
+    row_ads: 'تبلیغات و فروشگاه اجباری',
+    row_offline: 'حالت آفلاین و عدم نیاز به لاگین',
+    row_save: 'نگهبان اتمیک سیو ۱۹,۰۰۰ بازی',
 
-    passport_title: 'پاسپورت اختصاصی و ثبت لحظات گیمینگ',
-    passport_desc:
-      'نمایش هیت‌مپ ۹۱ روزه فعالیت گیمینگ، تحلیل ساعات اوج بازی و سیستم امتیازدهی و لول‌آپ با پیشرفت در بازی‌ها.',
+    specs_heading: 'مشخصات مورد نیاز سیستم',
+    specs_subheading:
+      'نکسوس به قدری سبک است که حتی روی لپ‌تاپ‌های قدیمی بدون کمترین افت سرعتی کار می‌کند:',
+    specs_os_lbl: 'سیستم‌عامل',
+    specs_os_val: 'ویندوز ۱۰ یا ۱۱ (۶۴ بیتی)',
+    specs_cpu_lbl: 'پردازنده (CPU)',
+    specs_cpu_val: 'هر پردازنده ۲ هسته‌ای x64',
+    specs_ram_lbl: 'حافظه رم',
+    specs_ram_val: '۱۲۸ مگابایت رم آزاد',
+    specs_disk_lbl: 'فضای خالی دیسک',
+    specs_disk_val: 'کمتر از ۲۵ مگابایت',
 
-    feat_section_badge: 'قابلیت‌های فنی برتر',
-    feat_section_title: 'مهندسی‌شده برای گیمرهای واقعی',
-    feat_section_subtitle:
-      'بدون ردیابی، بدون تبلیغات و بدون فروشگاه‌های اجباری. فقط عملکرد ناب بومی سیستم و تجربه لذت‌بخش گیمینگ.',
-
-    feat_booster_title: 'Game Booster Pro',
-    feat_booster_desc:
-      'بهینه‌سازی دینامیک برق ویندوز (Ultra Performance Plan)، آزادسازی رم و به صفر رساندن مصرف GPU در حالت بیکار.',
-
-    feat_library_title: 'کتابخانه بازی‌ها و گیت‌وی ابری',
-    feat_library_desc:
-      'دریافت خودکار پوسترهای باکیفیت از IGDB و SteamGridDB بدون نیاز به فیلترشکن از طریق پروکسی Edge کلودفلر.',
-
-    feat_soundtrack_title: 'مرکز موسیقی و ویژوالایزر',
-    feat_soundtrack_desc:
-      'پخش موسیقی‌های متن بازی‌ها همراه با ویژوالایزر فرکانسی سینماتیک زنده و امکان ذخیره آفلاین.',
-
-    feat_save_title: 'نگهبان امن فایل‌های سیو',
-    feat_save_desc:
-      'تشخیص خودکار پوشه ذخیره بیش از ۱۹,۰۰۰ بازی با معماری اتمیک ACID برای جلوگیری ۱۰۰٪ از سوختن سیوها.',
-
-    feat_update_title: 'به‌روزرسانی خودکار درون‌برنامه‌ای',
-    feat_update_desc:
-      'آپدیت بدون دردسر و بدون نیاز به دانلود دستی مجدد؛ اعتبارسنجی شده با امضای رمزنگاری امن Minisign Ed25519.',
-
-    feat_analytics_title: 'آمار و تحلیل گیمینگ',
-    feat_analytics_desc:
-      'نقشه حرارتی ۹۱ روزه فعالیت، رادار عادات بازی در شبانه‌روز، ره‌گیری دقیق ساعات بازی و سیستم XP.',
-
-    comp_badge: 'مقایسه بنچمارک',
-    comp_title: 'نکسوس در برابر لانچرهای سنگین سنتی',
-    comp_subtitle: 'ببینید چگونه معماری کامپایل‌شده Rust لانچرهای کند کرومیومی را پشت سر می‌گذارد:',
-    comp_metric: 'معیار بررسی',
-    comp_nexus: 'Nexus Launcher',
-    comp_others: 'استیم / اپیک / GOG',
-    comp_ram: 'مصرف حافظه رم در حالت بیکار',
-    comp_ram_nexus: 'حدود ۶۰ مگابایت',
-    comp_ram_others: '۶۰۰ الی ۱۲۰۰ مگابایت',
-    comp_boot: 'زمان راه‌اندازی اولیه (Cold Boot)',
-    comp_boot_nexus: 'کمتر از ۰.۸ ثانیه',
-    comp_boot_others: '۴ تا ۱۰ ثانیه',
-    comp_telemetry: 'ردیابی و ارسال داده (Telemetry)',
-    comp_telemetry_nexus: 'کاملاً صفر (۰٪)',
-    comp_telemetry_others: 'ارسال دائمی دیتای کاربر',
-    comp_offline: 'پشتیبانی آفلاین',
-    comp_offline_nexus: '۱۰۰٪ آفلاین‌محور',
-    comp_offline_others: 'نیاز اجباری به لاگین آنلاین',
-
-    specs_badge: 'سیستم مورد نیاز',
-    specs_title: 'سبک، فوق‌العاده بهینه و روان',
-    specs_os: 'سیستم عامل',
-    specs_os_val: 'ویندوز ۱۰ یا ۱۱ (نسخه ۶۴ بیتی)',
-    specs_cpu: 'پردازنده',
-    specs_cpu_val: 'هر پردازنده دو هسته‌ای ۶۴ بیتی',
-    specs_ram: 'حافظه رم',
-    specs_ram_val: '۵۱۲ مگابایت رم آزاد (مصرف خود اپ ~۶۰MB)',
-    specs_disk: 'فضای ذخیره‌سازی',
-    specs_disk_val: '۱۰۰ مگابایت فضای خالی هارد',
-
-    faq_badge: 'پرسش‌های متداول',
-    faq_title: 'سوالات رایج کاربران',
-    faq_q1: 'آیا لانچر نکسوس کاملاً رایگان است؟',
+    faq_heading: 'پرسش‌های متداول',
+    faq_subheading: 'پاسخ شفاف به سوالاتی که ممکن است در ذهن داشته باشید:',
+    faq_q1: 'آیا نکسوس لانچر کاملاً رایگان است؟',
     faq_a1:
-      'بله، نکسوس یک نرم‌افزار ۱۰۰٪ رایگان و متن‌باز (Open Source) تحت مجوز معتبر MIT است. هیچ هزینه، اشتراک یا تبلیغاتی در آن وجود ندارد.',
-    faq_q2: 'آیا امکان اجرای بازی‌های استیم، اپیک یا مستقل وجود دارد؟',
+      'بله، صد در صد رایگان و متن‌باز تحت لایسنس MIT. هیچ‌گونه نسخه پولی، اشتراک یا تبلیغات پنهانی در برنامه وجود ندارد.',
+    faq_q2: 'آیا بازی‌های کرک‌شده و دستی را هم پشتیبانی می‌کند؟',
     faq_a2:
-      'بله. نکسوس به عنوان داشبورد جامع عمل کرده و تمام بازی‌های استیم، اپیک گیمز، GOG و همچنین فایل‌های اجرایی exe بازی‌های کرک‌شده یا دستی را در یک محیط زیبا دسته‌بندی می‌کند.',
-    faq_q3: 'به‌روزرسانی خودکار درون‌برنامه‌ای چگونه کار می‌کند؟',
+      'بله! علاوه بر تشخیص خودکار بازی‌های استیم، اپیک گیمز و GOG، می‌توانید هر فایل اجرایی .exe یا پوشه بازی را تنها با کشیدن و رها کردن اضافه کنید. نکسوس کاورها، ژانرها و متادیتا را خودکار دریافت می‌کند.',
+    faq_q3: 'به‌روزرسانی‌ها چگونه انجام می‌شوند؟',
     faq_a3:
-      'به محض انتشار نسخه جدید در گیت‌هاب، لانچر آن را به صورت امن در پس‌زمینه دانلود کرده و با یک کلیک ارتقا می‌دهد بدون این‌که سیوها، تصاویر یا تنظیمات شما پاک شوند.',
-    faq_q4: 'آیا برای دیدن کاور و اطلاعات بازی‌ها به کلید API اختصاصی نیاز دارم؟',
+      'برنامه مجهز به سیستم خودکار Tauri Updater است. به محض انتشار نسخه جدید در گیت‌هاب، اعلان داخل برنامه نشان داده شده و با یک کلیک بدون نیاز به دانلود دوباره سایت آپدیت می‌شود.',
+    faq_q4: 'آیا اکانت یا اطلاعات من برای کسی ارسال می‌شود؟',
     faq_a4:
-      'خیر! نکسوس دارای پروکسی ابری کلودفلر لبه است که تمام تصاویر و اطلاعات دیتابیس را بدون نیاز به هیچ تنظیماتی بلافاصله بارگذاری می‌کند.',
+      'خیر! تمام داده‌ها، آمارها و سیوها به صورت محلی در دیتابیس رمزگذاری‌شده SQLite روی کامپیوتر خودتان ذخیره می‌شوند. نکسوس به هیچ سرور مرکزی متصل نیست.',
 
-    cta_title: 'آماده ارتقای تجربه گیمینگ خود هستید؟',
-    cta_subtitle:
-      'به جمع گیمرهایی بپیوندید که سرعت، حریم خصوصی و آزادی عمل را به برنامه‌های سنگین ترجیح می‌دهند.',
-    cta_download_btn: 'دانلود رایگان نکسوس لانچر',
-
-    footer_rights: 'منتشر شده تحت لایسنس MIT.',
-    footer_created_by: 'طراحی و توسعه توسط AminDEV81',
+    cta_heading: 'همین حالا Nexus Launcher را تجربه کنید',
+    cta_subheading:
+      'لذت مدیریت یکپارچه بازی‌ها با نهایت سرعت، بدون کرومیوم و با کمترین مصرف رم در تاریخ لانچرهای ویندوز.',
+    cta_btn_download: 'دانلود رایگان (فایل نصبی x64)',
+    cta_btn_all_releases: 'سایر نسخه‌ها در گیت‌هاب',
+    footer_license: 'منتشر شده تحت مجوز رسمی و آزاد MIT',
+    footer_author: 'طراحی و توسعه توسط',
   },
   en: {
+    top_bar_msg:
+      'Nexus Launcher v0.2.0 released — featuring Game Soundtrack Studio & Atomic Save Guardian!',
+    top_bar_cta: 'Download Free Direct &rarr;',
+    nav_showcase: 'Live Showcase',
     nav_features: 'Features',
-    nav_modules: 'Modules',
+    nav_booster: 'RAM Booster',
     nav_comparison: 'Why Nexus?',
-    nav_specs: 'Requirements',
+    nav_specs: 'Specs',
     nav_faq: 'FAQ',
-    nav_github: 'GitHub',
-    nav_download: 'Download',
+    nav_download_btn: 'Download Free',
 
-    hero_badge: '✨ v{version} Released — Native, 3D & Blazing Fast',
-    hero_title_1: 'The Next-Gen Native',
-    hero_title_2: 'PC Game Launcher',
+    hero_title_1: 'The Native, Blazing Fast',
+    hero_title_2: 'Game Launcher for Windows',
     hero_subtitle:
-      'A high-performance personal game library powered by Tauri 2, Rust, and React 19. Integrated hardware Game Booster, cinematic real-time Audio Visualizer, and atomic ACID Save Guardian in an ultra-light ~60MB RAM footprint.',
-    hero_download_btn: 'Download for Windows',
-    hero_download_subtext: 'Windows 10 / 11 (64-bit) • {size} • 100% Free & Open Source',
+      'Built natively with Rust and Tauri 2. Ultra-light ~60MB RAM footprint, automated hardware Game Booster, original soundtrack player, and atomic ACID save backups with zero ads or telemetry.',
+    hero_download_btn: 'Download Official Setup',
     hero_source_btn: 'View Source on GitHub',
-    hero_other_downloads: 'Other versions & .msi package',
 
-    stat_ram_num: '60 MB',
+    badge_free: '100% Free & Open Source',
+    badge_offline: 'Fully Offline (No Login Required)',
+    badge_win: 'Windows 10 & 11 (64-bit)',
+
+    stat_ram_num: '~60 MB',
     stat_ram_lbl: 'Idle RAM Footprint',
-    stat_fps_num: '+18%',
-    stat_fps_lbl: 'In-Game FPS Boost',
-    stat_saves_num: '19,000+',
-    stat_saves_lbl: 'Games with Auto-Detection',
-    stat_speed_num: '< 0.8s',
-    stat_speed_lbl: 'Cold Startup Boot Time',
+    stat_boot_num: '< 0.4s',
+    stat_boot_lbl: 'Instant Cold Boot Time',
+    stat_games_num: '19,000+',
+    stat_games_lbl: 'Games with Auto-Save Guard',
+    stat_zero_num: '0% Ads',
+    stat_zero_lbl: 'No Telemetry or Forced Stores',
 
-    showcase_badge: 'INTERACTIVE APP TOUR',
-    showcase_title: 'Explore Nexus Launcher Modules',
-    showcase_subtitle:
-      'Click through each module below to preview the interface and live features:',
+    mockup_pill: 'INTERACTIVE APP INTERFACE SIMULATOR',
+    mockup_heading: 'A True Masterpiece on Your Desktop',
+    mockup_subheading:
+      'Click through the sidebar tabs or hit "Quick Launch" to feel the speed and elegance of Nexus Launcher live right here:',
+    badge_floating_ram: '⚡ Active RAM: 58 MB',
+    badge_floating_turbo: '🚀 Hardware Booster Armed',
+    mockup_search_placeholder: 'Search installed games...',
 
-    tab_library: '🎮 Smart Library',
-    tab_booster: '⚡ Booster Pro',
-    tab_soundtrack: '🎵 Soundtrack Center',
-    tab_save: '🛡️ Save Guardian',
-    tab_passport: '📊 Gamer Passport',
+    tab_library: 'Game Library',
+    tab_booster: 'System Booster',
+    tab_soundtrack: 'Soundtrack Studio',
+    tab_saves: 'Save Guardian',
+    tab_stats: 'Gamer Passport',
 
-    lib_card_search: 'Search among 42 installed games...',
-    lib_all_games: 'All Games (42)',
-    lib_launch_btn: 'Launch Game',
-    lib_playtime: 'Playtime:',
-    lib_genre_action: 'Action / Adventure',
+    mockup_lib_title: 'Installed Games (4)',
+    mockup_lib_desc: 'Unified discovery across Steam, Epic, GOG and custom game executables',
+    mockup_boost_title: 'Hardware Telemetry & Booster',
+    mockup_boost_desc: 'Dynamic CPU thread priority & Win32 working set memory trimming',
+    mockup_sound_title: 'Original Game Soundtrack Studio',
+    mockup_sound_desc:
+      'Unlimited streaming & downloading of original game tracks with real-time visualizer',
+    mockup_save_title: 'Atomic Save Protection Journal',
+    mockup_save_desc: 'Automated ACID pre-launch snapshotting with zero corruption risk',
+    mockup_stats_title: 'Gamer Passport & Analytics',
+    mockup_stats_desc: 'Comprehensive playtime heatmaps and local XP level tracking',
 
-    boost_title: 'Automatic Pre-Launch Hardware Optimization',
-    boost_desc:
-      'Dynamic CPU core priority, memory cache trimming, and zero-load suspension of 21 background resource hogs without touching store clients.',
-    boost_btn_test: '🚀 Test Booster Simulator',
-    boost_tested_msg: '⚡ Ultra Performance Plan Engaged! 1.4 GB RAM Freed.',
+    bento_pill: 'ARCHITECTURE & ADVANCED FEATURES',
+    bento_heading: 'Engineered with Absolute Obsession',
+    bento_subheading:
+      'Zero slow webviews. Zero bloated Electron wrappers. Every single line of Nexus is tuned for maximum CPU efficiency.',
+    bento_rust_title: 'Pure Rust & Tauri 2 Architecture (No Chromium)',
+    bento_rust_desc:
+      'Unlike Electron clients that run a hidden browser consuming 600MB+ RAM, Nexus compiles straight to native Win32 APIs. Sub-0.4s boot time and ~60MB RAM footprint!',
+    bento_booster_title: 'Automated RAM & Hardware Booster',
+    bento_booster_desc:
+      'Uses native Win32 EmptyWorkingSet APIs to clear system memory caches before game launch.',
+    btn_flush_ram: '🚀 Test Live RAM Flush',
+    bento_save_title: 'Atomic ACID Save Guardian',
+    bento_save_desc:
+      'Detects save directories across 19,000+ games. Snapshots protect your progress against power outages or game crashes.',
+    bento_sound_title: 'Game Soundtrack Studio',
+    bento_sound_desc:
+      'Stream high-res audio tracks directly inside the launcher with real-time Canvas frequency spectrum.',
+    bento_passport_title: 'Gamer Passport & 100% Privacy',
+    bento_passport_desc:
+      'Tracks playtime patterns and achievements strictly in local encrypted SQLite. Not a single byte of personal data is sent to external servers.',
 
-    soundtrack_title: 'Original Game Soundtrack Studio',
-    soundtrack_desc:
-      'Stream and download official game tracks with a 60 FPS Canvas spectrum visualizer reacting dynamically to audio beats.',
+    calc_heading: 'How Much System Resources Do You Save?',
+    calc_subheading:
+      'Select your installed game count to calculate your exact memory and battery savings:',
+    calc_lbl_ram: 'Instant RAM Saved',
+    calc_lbl_fps: 'FPS Stability Gain',
+    calc_lbl_battery: 'Laptop Battery Extension',
 
-    save_title: 'ACID Journal Save Protection Engine',
-    save_desc:
-      'Auto-detects save directories for 19,000+ games. Multi-profile isolation prevents save file corruption during sudden crashes or power loss.',
-    save_restore_btn: '🔄 Restore Latest Snapshot',
-    save_restored_msg: '✅ Save snapshot verified and restored with intact integrity!',
+    comp_pill: 'TRANSPARENT BENCHMARKS',
+    comp_heading: 'Why Gamers Prefer Nexus Launcher',
+    comp_subheading: 'A side-by-side performance breakdown against commercial corporate launchers:',
+    th_feature: 'Metric / Capability',
+    row_ram: 'Idle RAM Consumption',
+    row_boot: 'Cold Boot Latency',
+    row_size: 'Installer Package Size',
+    row_ads: 'Ads & Forced Stores',
+    row_offline: 'Offline Mode & Privacy',
+    row_save: '19,000+ Game Save Guardian',
 
-    passport_title: 'Gamer Passport & Habit Radar',
-    passport_desc:
-      '91-day GitHub-style gaming activity heatmap, peak play hour analysis, and XP leveling milestones as you complete titles.',
+    specs_heading: 'System Requirements',
+    specs_subheading: 'Nexus runs effortlessly even on older budget laptops with zero slowdowns:',
+    specs_os_lbl: 'Operating System',
+    specs_os_val: 'Windows 10 or 11 (64-bit)',
+    specs_cpu_lbl: 'Processor (CPU)',
+    specs_cpu_val: 'Any Dual-Core x64 CPU',
+    specs_ram_lbl: 'Memory (RAM)',
+    specs_ram_val: '128 MB Free RAM',
+    specs_disk_lbl: 'Disk Storage',
+    specs_disk_val: 'Less than 25 MB',
 
-    feat_section_badge: 'CUTTING-EDGE CAPABILITIES',
-    feat_section_title: 'Engineered for Real Gamers',
-    feat_section_subtitle:
-      'No telemetry. No forced stores. No bloatware. Just pure native performance and total control over your library.',
-
-    feat_booster_title: 'Game Booster Pro',
-    feat_booster_desc:
-      'Dynamic OS power plan overdrive, RAM cache trimming, and zero GPU load during idle gameplay.',
-
-    feat_library_title: 'Smart Library & Cloud Hub',
-    feat_library_desc:
-      'Automated high-res posters, banners, and logos via IGDB and SteamGridDB through our global Cloudflare Edge proxy.',
-
-    feat_soundtrack_title: 'Soundtrack Center & Visualizer',
-    feat_soundtrack_desc:
-      'Stream original game soundtracks with a cinematic 60 FPS Canvas spectrum analyzer and offline playback.',
-
-    feat_save_title: 'ACID Save Game Guardian',
-    feat_save_desc:
-      'Auto-detects save paths for 19,000+ games. Multi-profile isolation with atomic journal snapshots prevents data loss.',
-
-    feat_update_title: 'Seamless In-App Updates',
-    feat_update_desc:
-      'Silent passive background updates verified with Ed25519 Minisign cryptography without re-installation.',
-
-    feat_analytics_title: 'Gamer Passport & Analytics',
-    feat_analytics_desc:
-      'GitHub-style 91-day activity heatmaps, hourly gaming habit radar charts, playtime tracking, and leveling up.',
-
-    comp_badge: 'BENCHMARK COMPARISON',
-    comp_title: 'Nexus vs Traditional Launchers',
-    comp_subtitle:
-      'See how native Rust and lightweight architecture demolish conventional Chromium-wrapped game managers.',
-    comp_metric: 'Metric',
-    comp_nexus: 'Nexus Launcher',
-    comp_others: 'Steam / GOG / Epic',
-    comp_ram: 'Idle RAM Usage',
-    comp_ram_nexus: '~60 MB',
-    comp_ram_others: '600 MB - 1.2 GB',
-    comp_boot: 'Cold Startup Time',
-    comp_boot_nexus: '< 0.8 seconds',
-    comp_boot_others: '4 - 10 seconds',
-    comp_telemetry: 'Telemetry & Trackers',
-    comp_telemetry_nexus: 'Zero (0%)',
-    comp_telemetry_others: 'Continuous background telemetry',
-    comp_offline: 'Offline Capability',
-    comp_offline_nexus: '100% Offline-First',
-    comp_offline_others: 'Requires recurring online auth',
-
-    specs_badge: 'SYSTEM SPECIFICATIONS',
-    specs_title: 'Lightweight & Compatible',
-    specs_os: 'Operating System',
-    specs_os_val: 'Windows 10 / 11 (64-bit)',
-    specs_cpu: 'Processor',
-    specs_cpu_val: 'Any 64-bit x86 Dual-Core CPU',
-    specs_ram: 'RAM',
-    specs_ram_val: '512 MB available (App uses ~60MB)',
-    specs_disk: 'Disk Space',
-    specs_disk_val: '100 MB free space',
-
-    faq_badge: 'FREQUENTLY ASKED QUESTIONS',
-    faq_title: 'Got Questions?',
+    faq_heading: 'Frequently Asked Questions',
+    faq_subheading: 'Clear answers to common questions:',
     faq_q1: 'Is Nexus Launcher completely free?',
     faq_a1:
-      'Yes, Nexus Launcher is 100% free and open-source software licensed under MIT. There are no paywalls, subscriptions, or forced advertisements.',
-    faq_q2: 'Does it launch games from Steam, Epic, or local folders?',
+      'Yes, 100% free and open-source under the MIT license. No subscriptions, paywalls, or hidden ads.',
+    faq_q2: 'Does it support manual / standalone games?',
     faq_a2:
-      'Absolutely. Nexus acts as your unified master dashboard. You can add games from Steam, Epic Games, GOG, or any local standalone executable with automatic artwork fetching.',
-    faq_q3: 'How does the in-app auto updater work?',
+      'Absolutely! Beyond Steam and Epic Games auto-detection, you can drag and drop any .exe file. Covers and metadata are fetched automatically.',
+    faq_q3: 'How do in-app updates work?',
     faq_a3:
-      'Nexus automatically checks GitHub Releases using a secure Minisign Ed25519 signature. When an update is found, it downloads in the background and upgrades cleanly without touching your database or game saves.',
-    faq_q4: 'Do I need my own IGDB or SteamGridDB API keys?',
+      'Equipped with Tauri Updater. When a new release drops on GitHub, you can upgrade with 1 click without losing saves or configuration.',
+    faq_q4: 'Is my data or account sent to any server?',
     faq_a4:
-      'No! Nexus includes a zero-config Cloudflare Edge worker that serves game artwork and metadata immediately out of the box with zero setup.',
+      'Never. All data and game stats reside strictly inside your local SQLite database on your machine.',
 
-    cta_title: 'Ready to Upgrade Your Gaming Experience?',
-    cta_subtitle:
-      'Join gamers who prioritize speed, privacy, and full control over their game library.',
-    cta_download_btn: 'Download Nexus Launcher',
-
-    footer_rights: 'Released under the MIT License.',
-    footer_created_by: 'Created by AminDEV81',
+    cta_heading: 'Experience Nexus Launcher Today',
+    cta_subheading:
+      'Take control of your gaming library with unprecedented speed and native Rust efficiency.',
+    cta_btn_download: 'Download Free (x64 Setup)',
+    cta_btn_all_releases: 'All Releases on GitHub',
+    footer_license: 'Released under the official MIT License',
+    footer_author: 'Designed & developed by',
   },
 }
 
-class NexusWebsite {
+class WebsiteEngine {
   constructor() {
-    // Default to Persian ('fa') as requested!
     this.currentLang = this.getInitialLanguage()
     this.releaseData = {
       version: CONFIG.defaultVersion,
       downloadUrl: CONFIG.defaultDownloadUrl,
-      msiUrl: CONFIG.defaultMsiUrl,
       sizeFormatted: '~7.2 MB',
-      dateFormatted: 'Latest',
     }
 
     this.init()
@@ -331,21 +292,35 @@ class NexusWebsite {
     if (saved && (saved === 'fa' || saved === 'en')) {
       return saved
     }
-    // Default strictly to Persian ('fa')
-    return 'fa'
+    return 'fa' // Persian default
   }
 
-  async init() {
-    this.setupLanguageToggle()
-    this.setupTabs()
+  init() {
+    this.setupCursorSpotlight()
+    this.setupThreeBackground()
+    this.setupLanguage()
+    this.setupMockupInteractions()
     this.setupTiltCards()
-    this.setupInteractiveSimulations()
-    this.initThreeJsBackground()
-    this.applyTranslations()
-    await this.fetchLatestRelease()
+    this.fetchLatestRelease()
   }
 
-  setupLanguageToggle() {
+  setupCursorSpotlight() {
+    const spotlight = document.getElementById('cursor-spotlight')
+    if (!spotlight) return
+
+    window.addEventListener(
+      'mousemove',
+      (e) => {
+        spotlight.style.setProperty('--spot-x', `${e.clientX}px`)
+        spotlight.style.setProperty('--spot-y', `${e.clientY}px`)
+      },
+      { passive: true },
+    )
+  }
+
+  setupLanguage() {
+    this.applyTranslations()
+
     const toggleBtn = document.getElementById('lang-toggle-btn')
     if (toggleBtn) {
       toggleBtn.addEventListener('click', () => {
@@ -369,21 +344,15 @@ class NexusWebsite {
     document.documentElement.lang = lang
     document.documentElement.dir = isRtl ? 'rtl' : 'ltr'
 
-    // Update Language Toggle Button Label
     const toggleBtn = document.getElementById('lang-toggle-btn')
     if (toggleBtn) {
       toggleBtn.textContent = lang === 'fa' ? 'English (EN)' : 'فارسی (FA)'
     }
 
-    // Apply data-i18n elements
-    const elements = document.querySelectorAll('[data-i18n]')
-    elements.forEach((el) => {
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
       const key = el.getAttribute('data-i18n')
       if (t[key]) {
-        let text = t[key]
-        text = text.replace('{version}', this.releaseData.version)
-        text = text.replace('{size}', this.releaseData.sizeFormatted)
-        el.textContent = text
+        el.textContent = t[key]
       }
     })
 
@@ -395,36 +364,24 @@ class NexusWebsite {
       const res = await fetch(CONFIG.githubApiUrl, {
         headers: { Accept: 'application/vnd.github.v3+json' },
       })
-
-      if (!res.ok) {
-        throw new Error(`GitHub API returned ${res.status}`)
-      }
+      if (!res.ok) throw new Error(`GitHub API HTTP ${res.status}`)
 
       const release = await res.json()
-      const tagName = release.tag_name || CONFIG.defaultVersion
-      this.releaseData.version = tagName
+      this.releaseData.version = release.tag_name || CONFIG.defaultVersion
 
       const assets = release.assets || []
-      const setupAsset = assets.find(
-        (a) => a.name && (a.name.endsWith('-setup.exe') || a.name.endsWith('.exe')),
-      )
-      const msiAsset = assets.find((a) => a.name && a.name.endsWith('.msi'))
-
-      if (setupAsset && setupAsset.browser_download_url) {
-        this.releaseData.downloadUrl = setupAsset.browser_download_url
-        if (setupAsset.size) {
-          this.releaseData.sizeFormatted = `${(setupAsset.size / (1024 * 1024)).toFixed(1)} MB`
+      const exeAsset = assets.find((a) => a.name && a.name.endsWith('.exe'))
+      if (exeAsset) {
+        this.releaseData.downloadUrl = exeAsset.browser_download_url
+        if (exeAsset.size) {
+          this.releaseData.sizeFormatted = `${(exeAsset.size / (1024 * 1024)).toFixed(1)} MB`
         }
       }
 
-      if (msiAsset && msiAsset.browser_download_url) {
-        this.releaseData.msiUrl = msiAsset.browser_download_url
-      }
-
-      this.applyTranslations()
-    } catch (error) {
-      console.warn('[Nexus] Live GitHub release fetch fallback active:', error)
-      this.applyTranslations()
+      this.updateDownloadLinks()
+    } catch (err) {
+      console.warn('[Nexus] Fallback release used:', err)
+      this.updateDownloadLinks()
     }
   }
 
@@ -432,17 +389,40 @@ class NexusWebsite {
     document.querySelectorAll('[data-role="download-btn"]').forEach((btn) => {
       btn.href = this.releaseData.downloadUrl
     })
-
-    document.querySelectorAll('[data-role="msi-btn"]').forEach((btn) => {
-      btn.href = this.releaseData.msiUrl
-    })
-
-    document.querySelectorAll('[data-role="version-tag"]').forEach((el) => {
-      el.textContent = this.releaseData.version
+    document.querySelectorAll('[data-role="download-size"]').forEach((el) => {
+      el.textContent = this.releaseData.sizeFormatted
     })
   }
 
-  /* --- 3D Tilt Card Interaction --- */
+  setupMockupInteractions() {
+    const tabs = document.querySelectorAll('[data-mockup-tab]')
+    const views = {
+      library: document.getElementById('mockup-view-library'),
+      booster: document.getElementById('mockup-view-booster'),
+      soundtrack: document.getElementById('mockup-view-soundtrack'),
+      saves: document.getElementById('mockup-view-saves'),
+      stats: document.getElementById('mockup-view-stats'),
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const target = tab.getAttribute('data-mockup-tab')
+        tabs.forEach((t) => t.classList.remove('active'))
+        tab.classList.add('active')
+
+        Object.keys(views).forEach((k) => {
+          if (views[k]) {
+            if (k === target) {
+              views[k].classList.remove('hidden')
+            } else {
+              views[k].classList.add('hidden')
+            }
+          }
+        })
+      })
+    })
+  }
+
   setupTiltCards() {
     const cards = document.querySelectorAll('.tilt-card')
     cards.forEach((card) => {
@@ -450,13 +430,13 @@ class NexusWebsite {
         const rect = card.getBoundingClientRect()
         const x = e.clientX - rect.left
         const y = e.clientY - rect.top
-        const centerX = rect.width / 2
-        const centerY = rect.height / 2
+        const cx = rect.width / 2
+        const cy = rect.height / 2
 
-        const rotateX = ((y - centerY) / centerY) * -10
-        const rotateY = ((x - centerX) / centerX) * 10
+        const rx = ((y - cy) / cy) * -8
+        const ry = ((x - cx) / cx) * 8
 
-        card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`
+        card.style.transform = `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg) scale3d(1.01, 1.01, 1.01)`
         card.style.setProperty('--mouse-x', `${(x / rect.width) * 100}%`)
         card.style.setProperty('--mouse-y', `${(y / rect.height) * 100}%`)
       })
@@ -467,80 +447,14 @@ class NexusWebsite {
     })
   }
 
-  /* --- Interactive Module Tabs --- */
-  setupTabs() {
-    const tabBtns = document.querySelectorAll('.tab-btn')
-    const tabPanels = document.querySelectorAll('.tab-panel')
-
-    tabBtns.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const targetTab = btn.getAttribute('data-tab')
-
-        tabBtns.forEach((b) => b.classList.remove('active'))
-        btn.classList.add('active')
-
-        tabPanels.forEach((panel) => {
-          if (panel.id === `panel-${targetTab}`) {
-            panel.classList.remove('hidden')
-            panel.classList.add('block')
-          } else {
-            panel.classList.add('hidden')
-            panel.classList.remove('block')
-          }
-        })
-      })
-    })
-  }
-
-  /* --- Interactive In-Page Simulations --- */
-  setupInteractiveSimulations() {
-    // Booster Simulator
-    const testBoostBtn = document.getElementById('btn-test-boost')
-    const boostMsg = document.getElementById('boost-status-msg')
-    const ramCounter = document.getElementById('boost-ram-display')
-    const fpsCounter = document.getElementById('boost-fps-display')
-
-    if (testBoostBtn && boostMsg && ramCounter && fpsCounter) {
-      testBoostBtn.addEventListener('click', () => {
-        testBoostBtn.disabled = true
-        testBoostBtn.innerHTML = '⚡ در حال بهینه‌سازی و آزادسازی حافظه...'
-
-        let progress = 0
-        const interval = setInterval(() => {
-          progress += 20
-          if (progress >= 100) {
-            clearInterval(interval)
-            ramCounter.textContent = '14.1 GB / 16 GB'
-            fpsCounter.textContent = '+18% (144 FPS)'
-            boostMsg.classList.remove('hidden')
-            testBoostBtn.disabled = false
-            testBoostBtn.innerHTML = '✅ بهینه‌سازی با موفقیت انجام شد!'
-            setTimeout(() => {
-              testBoostBtn.innerHTML =
-                this.currentLang === 'fa' ? '🚀 تست مجدد بوستر' : '🚀 Test Booster Again'
-            }, 3000)
-          }
-        }, 150)
-      })
-    }
-
-    // Save Restore Simulator
-    const restoreSaveBtn = document.getElementById('btn-restore-save')
-    const saveMsg = document.getElementById('save-status-msg')
-    if (restoreSaveBtn && saveMsg) {
-      restoreSaveBtn.addEventListener('click', () => {
-        saveMsg.classList.remove('hidden')
-        setTimeout(() => {
-          saveMsg.classList.add('hidden')
-        }, 4000)
-      })
-    }
-  }
-
-  /* --- Three.js 3D Floating Constellation Background --- */
-  initThreeJsBackground() {
+  setupThreeBackground() {
     const canvas = document.getElementById('bg-3d-canvas')
     if (!canvas || typeof THREE === 'undefined') return
+
+    let isVisible = true
+    document.addEventListener('visibilitychange', () => {
+      isVisible = !document.hidden
+    })
 
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(
@@ -549,96 +463,76 @@ class NexusWebsite {
       0.1,
       1000,
     )
-    camera.position.z = 80
+    camera.position.z = 40
 
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true })
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      alpha: true,
+      antialias: false,
+      powerPreference: 'low-power',
+    })
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
 
-    // Particle Stars
-    const particleCount = 180
+    // Particle Constellation
+    const particleCount = 140
     const geometry = new THREE.BufferGeometry()
     const positions = new Float32Array(particleCount * 3)
-    const colors = new Float32Array(particleCount * 3)
-
-    const cyanColor = new THREE.Color(0x00e5ff)
-    const purpleColor = new THREE.Color(0x8b5cf6)
 
     for (let i = 0; i < particleCount * 3; i += 3) {
-      positions[i] = (Math.random() - 0.5) * 160
-      positions[i + 1] = (Math.random() - 0.5) * 160
-      positions[i + 2] = (Math.random() - 0.5) * 120
-
-      const mixed = Math.random() > 0.5 ? cyanColor : purpleColor
-      colors[i] = mixed.r
-      colors[i + 1] = mixed.g
-      colors[i + 2] = mixed.b
+      positions[i] = (Math.random() - 0.5) * 85
+      positions[i + 1] = (Math.random() - 0.5) * 85
+      positions[i + 2] = (Math.random() - 0.5) * 45
     }
-
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
 
     const material = new THREE.PointsMaterial({
-      size: 2.2,
-      vertexColors: true,
+      color: 0x863bff,
+      size: 1.4,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.65,
     })
-
     const particles = new THREE.Points(geometry, material)
     scene.add(particles)
 
-    // Floating 3D Geometric Gaming Core
+    // Glowing wireframe icosahedron (Cyber Core)
     const coreGeo = new THREE.IcosahedronGeometry(12, 1)
     const coreMat = new THREE.MeshBasicMaterial({
-      color: 0x00e5ff,
+      color: 0x00f0ff,
       wireframe: true,
       transparent: true,
-      opacity: 0.18,
+      opacity: 0.09,
     })
-    const coreMesh = new THREE.Mesh(coreGeo, coreMat)
-    coreMesh.position.set(30, 5, 10)
-    scene.add(coreMesh)
+    const core = new THREE.Mesh(coreGeo, coreMat)
+    scene.add(core)
 
-    // Mouse Parallax
-    let mouseX = 0
-    let mouseY = 0
-    let targetMouseX = 0
-    let targetMouseY = 0
+    let mouseX = 0,
+      mouseY = 0
+    window.addEventListener(
+      'mousemove',
+      (e) => {
+        mouseX = (e.clientX / window.innerWidth - 0.5) * 2
+        mouseY = (e.clientY / window.innerHeight - 0.5) * 2
+      },
+      { passive: true },
+    )
 
-    window.addEventListener('mousemove', (e) => {
-      targetMouseX = (e.clientX / window.innerWidth - 0.5) * 15
-      targetMouseY = (e.clientY / window.innerHeight - 0.5) * 15
-    })
-
-    // Resize Handler
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight
       camera.updateProjectionMatrix()
       renderer.setSize(window.innerWidth, window.innerHeight)
     })
 
-    // Render Loop with visibility checking for 0% idle overhead
-    let isVisible = true
-    document.addEventListener('visibilitychange', () => {
-      isVisible = !document.hidden
-    })
-
     const animate = () => {
       requestAnimationFrame(animate)
-      if (!isVisible) return
+      if (!isVisible) return // 0% idle GPU load when tab is hidden!
 
-      mouseX += (targetMouseX - mouseX) * 0.05
-      mouseY += (targetMouseY - mouseY) * 0.05
+      particles.rotation.y += 0.0006
+      core.rotation.x += 0.0012
+      core.rotation.y += 0.0016
 
-      particles.rotation.y += 0.0008
-      particles.rotation.x += 0.0004
-
-      coreMesh.rotation.x += 0.003
-      coreMesh.rotation.y += 0.004
-
-      camera.position.x = mouseX
-      camera.position.y = -mouseY
+      camera.position.x += (mouseX * 4 - camera.position.x) * 0.04
+      camera.position.y += (-mouseY * 4 - camera.position.y) * 0.04
       camera.lookAt(scene.position)
 
       renderer.render(scene, camera)
@@ -648,6 +542,85 @@ class NexusWebsite {
   }
 }
 
+/* Global In-Page Interactive Demo Functions */
+let isAudioPlaying = true
+window.toggleMockupAudio = function () {
+  const btn = document.getElementById('mockup-play-toggle')
+  const bars = document.querySelectorAll('#mockup-view-soundtrack .wave-bar')
+  const disc = document.querySelector('#mockup-view-soundtrack .spin-disc')
+  isAudioPlaying = !isAudioPlaying
+
+  if (btn) btn.textContent = isAudioPlaying ? '⏸' : '▶'
+  if (disc) {
+    if (isAudioPlaying) disc.classList.remove('spin-disc-paused')
+    else disc.classList.add('spin-disc-paused')
+  }
+  bars.forEach((bar) => {
+    bar.style.animationPlayState = isAudioPlaying ? 'running' : 'paused'
+  })
+}
+
+window.launchGameMockup = function (gameName) {
+  const toast = document.getElementById('mockup-launch-toast')
+  const toastText = document.getElementById('mockup-launch-text')
+  if (!toast || !toastText) return
+
+  toastText.textContent = `⚡ در حال راه‌اندازی ${gameName} با بوستر سخت‌افزاری... اولویت به Realtime ارتقا یافت!`
+  toast.classList.remove('hidden')
+
+  setTimeout(() => {
+    toastText.textContent = `🎮 ${gameName} با موفقیت اجرا شد! فریم‌ریت پایدار ۶۰+ FPS.`
+  }, 1200)
+
+  setTimeout(() => {
+    toast.classList.add('hidden')
+  }, 4000)
+}
+
+window.triggerMockupRamFlush = function () {
+  const toast = document.getElementById('mockup-launch-toast')
+  const toastText = document.getElementById('mockup-launch-text')
+  if (!toast || !toastText) return
+
+  toastText.textContent = '🚀 حافظه کاری پاکسازی شد! ۱.۸ گیگابایت فضای رم آزاد شد.'
+  toast.classList.remove('hidden')
+  setTimeout(() => toast.classList.add('hidden'), 3000)
+}
+
+window.runLiveRamFlush = function () {
+  const ramVal = document.getElementById('live-ram-val')
+  const btn = document.getElementById('btn-flush-ram')
+  const status = document.getElementById('ram-flush-status')
+  if (!ramVal || !btn) return
+
+  btn.disabled = true
+  btn.textContent = '⚡ در حال پاکسازی WorkingSet...'
+  ramVal.textContent = '13.1 GB'
+
+  setTimeout(() => {
+    ramVal.textContent = '12.5 GB'
+    btn.textContent = '✓ پاکسازی کامل شد'
+    if (status) status.classList.remove('hidden')
+
+    setTimeout(() => {
+      btn.disabled = false
+      btn.textContent = '🚀 تست مجدد پاکسازی رم'
+    }, 3000)
+  }, 800)
+}
+
+window.updateCalculator = function (gamesCount) {
+  const countDisplay = document.getElementById('slider-games-count')
+  const ramSaved = document.getElementById('calc-ram-saved')
+  if (countDisplay) countDisplay.textContent = `${gamesCount} بازی`
+
+  if (ramSaved) {
+    const savedMb = Math.round(590 + (gamesCount - 5) * 12)
+    ramSaved.textContent = `~${savedMb} MB`
+  }
+}
+
+// Initialize Application Engine on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
-  window.nexusWebsite = new NexusWebsite()
+  window.nexusEngine = new WebsiteEngine()
 })
