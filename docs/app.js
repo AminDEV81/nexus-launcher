@@ -1,6 +1,6 @@
 /**
  * Nexus Launcher Landing Website - Application Controller & Engine
- * Official Brand Icons & Advanced Interactive Obsidian Mockup
+ * Official Brand Gem Identity & Interactive Obsidian Mockup
  */
 
 const CONFIG = {
@@ -27,8 +27,8 @@ const TRANSLATIONS = {
     hero_title_2: 'برای تمام بازی‌های شما در ویندوز',
     hero_subtitle:
       'توسعه یافته بر پایه معماری بومی Rust و Tauri 2. فقط ۶۰ مگابایت مصرف رم، همراه با بوستر خودکار، پلیر موسیقی بازی‌ها و گاوصندوق اتمیک سیوها بدون ذره‌ای تبلیغات یا جاسوس‌افزار.',
-    hero_download_btn: 'دانلود نسخه رسمی ویندوز',
-    hero_source_btn: 'مشاهده سورس در گیت‌هاب',
+    hero_download_btn: 'دانلود مستقیم نسخه رسمی v0.2.0',
+    hero_source_btn: 'مشاهده پروژه در گیت‌هاب',
 
     badge_free: '۱۰۰٪ رایگان و بدون پرداخت',
     badge_offline: 'کاملاً آفلاین بدون نیاز به لاگین',
@@ -46,10 +46,10 @@ const TRANSLATIONS = {
     mockup_pill: 'شبیه‌ساز تعاملی رابط کاربری برنامه',
     mockup_heading: 'یک شاهکار واقعی روی دسکتاپ شما',
     mockup_subheading:
-      'روی تب‌های سایدبار کلیک کنید یا دکمه «اجرای سریع» را بزنید تا قدرت، زیبایی و سرعت نکسوس لانچر را مستقیماً همین‌جا لمس کنید:',
+      'روی ماژول‌ها و تب‌های سایدبار کلیک کنید تا قابلیت‌های قدرتمند نکسوس لانچر را مستقیماً همین‌جا لمس کنید:',
     badge_floating_ram: '⚡ رم فعال: ۵۸ مگابایت',
     badge_floating_turbo: '🚀 بوستر سخت‌افزاری آماده به کار',
-    mockup_search_placeholder: 'جستجو در بازی‌ها...',
+    mockup_search_placeholder: 'جستجو در بازی‌ها و امکانات...',
 
     tab_library: 'کتابخانه بازی‌ها',
     tab_booster: 'بوستر سیستم',
@@ -57,8 +57,24 @@ const TRANSLATIONS = {
     tab_saves: 'نگهبان سیو',
     tab_stats: 'پاسپورت گیمر',
 
-    mockup_lib_title: 'بازی‌های نصب‌شده (۴)',
-    mockup_lib_desc: 'شناسایی خودکار و یکپارچه بدون نیاز به باز بودن استیم یا اپیک',
+    mockup_modules_title: 'ماژول‌های هوشمند و پیشرفته لانچر',
+    mockup_modules_desc: 'روی هر قابلیت کلیک کنید تا عملکرد بلادرنگ آن را تجربه نمایید',
+    mod_card_lib_title: 'کتابخانه هوشمند بازی‌ها',
+    mod_card_lib_desc: 'شناسایی خودکار بیش از ۱۹,۰۰۰ بازی نصب شده از استیم، اپیک، GOG و دستی',
+    btn_mod_lib: 'مدیریت کتابخانه',
+
+    mod_card_boost_title: 'بوستر و تقویت سخت‌افزار',
+    mod_card_boost_desc: 'پاکسازی رم با EmptyWorkingSet و ارتقای اولویت CPU به حالت Realtime',
+    btn_mod_boost: 'فعال‌سازی بوست',
+
+    mod_card_sound_title: 'استودیو موسیقی متن',
+    mod_card_sound_desc: 'استریم آنلاین و دانلود نامحدود قطعات اورجینال با اکولایزر صوتی سینماتیک',
+    btn_mod_sound: 'پخش موسیقی متن',
+
+    mod_card_save_title: 'گاوصندوق اتمیک سیوها',
+    mod_card_save_desc: 'تهیه اسنپ‌شات خودکار قبل از اجرای بازی و پیشگیری قطعی از سوختن سیو',
+    btn_mod_save: 'مشاهده اسنپ‌شات‌ها',
+
     mockup_boost_title: 'وضعیت سخت‌افزاری و بوستر',
     mockup_boost_desc: 'بهینه‌سازی دینامیک هسته‌ها و آزادسازی حافظه کاری ویندوز',
     mockup_sound_title: 'استودیو موسیقی متن بازی‌ها',
@@ -158,8 +174,8 @@ const TRANSLATIONS = {
     hero_title_2: 'Game Launcher for Windows',
     hero_subtitle:
       'Built natively with Rust and Tauri 2. Ultra-light ~60MB RAM footprint, automated hardware Game Booster, original soundtrack player, and atomic ACID save backups with zero ads or telemetry.',
-    hero_download_btn: 'Download Official Setup',
-    hero_source_btn: 'View Source on GitHub',
+    hero_download_btn: 'Download Official Setup v0.2.0',
+    hero_source_btn: 'View Project on GitHub',
 
     badge_free: '100% Free & Open Source',
     badge_offline: 'Fully Offline (No Login Required)',
@@ -177,10 +193,10 @@ const TRANSLATIONS = {
     mockup_pill: 'INTERACTIVE APP INTERFACE SIMULATOR',
     mockup_heading: 'A True Masterpiece on Your Desktop',
     mockup_subheading:
-      'Click through the sidebar tabs or hit "Quick Launch" to feel the speed and elegance of Nexus Launcher live right here:',
+      'Click through the capability modules and sidebar tabs to experience Nexus Launcher live right here:',
     badge_floating_ram: '⚡ Active RAM: 58 MB',
     badge_floating_turbo: '🚀 Hardware Booster Armed',
-    mockup_search_placeholder: 'Search installed games...',
+    mockup_search_placeholder: 'Search games and features...',
 
     tab_library: 'Game Library',
     tab_booster: 'System Booster',
@@ -188,8 +204,28 @@ const TRANSLATIONS = {
     tab_saves: 'Save Guardian',
     tab_stats: 'Gamer Passport',
 
-    mockup_lib_title: 'Installed Games (4)',
-    mockup_lib_desc: 'Unified discovery across Steam, Epic, GOG and custom game executables',
+    mockup_modules_title: 'Smart Launcher Modules',
+    mockup_modules_desc:
+      'Click each capability to experience real-time performance inside the simulator',
+    mod_card_lib_title: 'Smart Game Library',
+    mod_card_lib_desc:
+      'Auto-detecting 19,000+ installed games across Steam, Epic, GOG and custom folders',
+    btn_mod_lib: 'Manage Library',
+
+    mod_card_boost_title: 'Turbo Hardware Booster',
+    mod_card_boost_desc: 'Instant RAM working set trimming and Realtime CPU scheduling',
+    btn_mod_boost: 'Engage Booster',
+
+    mod_card_sound_title: 'Soundtrack Studio',
+    mod_card_sound_desc:
+      'Streaming high-fidelity game soundtracks with real-time 60 FPS spectrum visualizer',
+    btn_mod_sound: 'Play Soundtrack',
+
+    mod_card_save_title: 'Atomic Save Guardian',
+    mod_card_save_desc:
+      'Pre-launch snapshots ensuring zero save loss from crashes or power failures',
+    btn_mod_save: 'Inspect Snapshots',
+
     mockup_boost_title: 'Hardware Telemetry & Booster',
     mockup_boost_desc: 'Dynamic CPU thread priority & Win32 working set memory trimming',
     mockup_sound_title: 'Original Game Soundtrack Studio',
@@ -396,29 +432,10 @@ class WebsiteEngine {
 
   setupMockupInteractions() {
     const tabs = document.querySelectorAll('[data-mockup-tab]')
-    const views = {
-      library: document.getElementById('mockup-view-library'),
-      booster: document.getElementById('mockup-view-booster'),
-      soundtrack: document.getElementById('mockup-view-soundtrack'),
-      saves: document.getElementById('mockup-view-saves'),
-      stats: document.getElementById('mockup-view-stats'),
-    }
-
     tabs.forEach((tab) => {
       tab.addEventListener('click', () => {
         const target = tab.getAttribute('data-mockup-tab')
-        tabs.forEach((t) => t.classList.remove('active'))
-        tab.classList.add('active')
-
-        Object.keys(views).forEach((k) => {
-          if (views[k]) {
-            if (k === target) {
-              views[k].classList.remove('hidden')
-            } else {
-              views[k].classList.add('hidden')
-            }
-          }
-        })
+        window.switchMockupView(target)
       })
     })
   }
@@ -474,7 +491,6 @@ class WebsiteEngine {
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5))
 
-    // Particle Constellation
     const particleCount = 140
     const geometry = new THREE.BufferGeometry()
     const positions = new Float32Array(particleCount * 3)
@@ -487,15 +503,14 @@ class WebsiteEngine {
     geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
 
     const material = new THREE.PointsMaterial({
-      color: 0x863bff,
-      size: 1.4,
+      color: 0x7c5cff,
+      size: 1.5,
       transparent: true,
       opacity: 0.65,
     })
     const particles = new THREE.Points(geometry, material)
     scene.add(particles)
 
-    // Glowing wireframe icosahedron (Cyber Core)
     const coreGeo = new THREE.IcosahedronGeometry(12, 1)
     const coreMat = new THREE.MeshBasicMaterial({
       color: 0x00f0ff,
@@ -525,7 +540,7 @@ class WebsiteEngine {
 
     const animate = () => {
       requestAnimationFrame(animate)
-      if (!isVisible) return // 0% idle GPU load when tab is hidden!
+      if (!isVisible) return
 
       particles.rotation.y += 0.0006
       core.rotation.x += 0.0012
@@ -542,7 +557,48 @@ class WebsiteEngine {
   }
 }
 
-/* Global In-Page Interactive Demo Functions */
+/* Global Interactive Simulator Functions */
+window.switchMockupView = function (target) {
+  const tabs = document.querySelectorAll('[data-mockup-tab]')
+  const views = {
+    library: document.getElementById('mockup-view-library'),
+    booster: document.getElementById('mockup-view-booster'),
+    soundtrack: document.getElementById('mockup-view-soundtrack'),
+    saves: document.getElementById('mockup-view-saves'),
+    stats: document.getElementById('mockup-view-stats'),
+  }
+
+  tabs.forEach((t) => {
+    if (t.getAttribute('data-mockup-tab') === target) {
+      t.classList.add('active')
+    } else {
+      t.classList.remove('active')
+    }
+  })
+
+  Object.keys(views).forEach((k) => {
+    if (views[k]) {
+      if (k === target) {
+        views[k].classList.remove('hidden')
+      } else {
+        views[k].classList.add('hidden')
+      }
+    }
+  })
+}
+
+window.openMockupTab = function (target, toastMsg) {
+  window.switchMockupView(target)
+
+  const toast = document.getElementById('mockup-launch-toast')
+  const toastText = document.getElementById('mockup-launch-text')
+  if (toast && toastText && toastMsg) {
+    toastText.textContent = toastMsg
+    toast.classList.remove('hidden')
+    setTimeout(() => toast.classList.add('hidden'), 3500)
+  }
+}
+
 let isAudioPlaying = true
 window.toggleMockupAudio = function () {
   const btn = document.getElementById('mockup-play-toggle')
@@ -560,29 +616,12 @@ window.toggleMockupAudio = function () {
   })
 }
 
-window.launchGameMockup = function (gameName) {
-  const toast = document.getElementById('mockup-launch-toast')
-  const toastText = document.getElementById('mockup-launch-text')
-  if (!toast || !toastText) return
-
-  toastText.textContent = `⚡ در حال راه‌اندازی ${gameName} با بوستر سخت‌افزاری... اولویت به Realtime ارتقا یافت!`
-  toast.classList.remove('hidden')
-
-  setTimeout(() => {
-    toastText.textContent = `🎮 ${gameName} با موفقیت اجرا شد! فریم‌ریت پایدار ۶۰+ FPS.`
-  }, 1200)
-
-  setTimeout(() => {
-    toast.classList.add('hidden')
-  }, 4000)
-}
-
 window.triggerMockupRamFlush = function () {
   const toast = document.getElementById('mockup-launch-toast')
   const toastText = document.getElementById('mockup-launch-text')
   if (!toast || !toastText) return
 
-  toastText.textContent = '🚀 حافظه کاری پاکسازی شد! ۱.۸ گیگابایت فضای رم آزاد شد.'
+  toastText.textContent = '🚀 حافظه کاری پاکسازی شد! ۱.۸ گیگابایت فضای رم آزاد گردید.'
   toast.classList.remove('hidden')
   setTimeout(() => toast.classList.add('hidden'), 3000)
 }
@@ -620,7 +659,6 @@ window.updateCalculator = function (gamesCount) {
   }
 }
 
-// Initialize Application Engine on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   window.nexusEngine = new WebsiteEngine()
 })

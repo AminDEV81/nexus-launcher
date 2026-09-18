@@ -8,17 +8,19 @@
       name="description"
       content="سریع‌ترین لانچر شخصی بازی برای ویندوز با معماری بومی Rust و Tauri 2. مصرف تنها ۶۰ مگابایت رم، مجهز به بوستر سخت‌افزاری، استودیو ساندترک و محافظت اتمیک سیوها."
     />
-    <link rel="icon" type="image/png" href="assets/icon.png" />
-    <link rel="apple-touch-icon" href="assets/icon.png" />
+    <link rel="icon" type="image/svg+xml" href="assets/brand-mark.svg" />
+    <link rel="apple-touch-icon" href="assets/brand-mark.svg" />
 
+    <!-- Open Graph / Social Meta -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Nexus Launcher — لانچر بومی بازی‌ها برای ویندوز" />
     <meta
       property="og:description"
       content="نسخه ۰.۲.۰ منتشر شد. مصرف تنها ۶۰ مگابایت رم، بدون تبلیغات و کاملاً آفلاین‌محور."
     />
-    <meta property="og:image" content="assets/icon.png" />
+    <meta property="og:image" content="assets/brand-mark.svg" />
 
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -27,10 +29,9 @@
           extend: {
             colors: {
               nexus: {
-                purple: '#863bff',
-                'purple-dark': '#6817ea',
+                accent: '#7c5cff',
+                'accent-hover': '#8f72ff',
                 cyan: '#00f0ff',
-                pink: '#ff2a85',
                 dark: '#06070c',
                 card: '#0d111b',
               },
@@ -39,7 +40,11 @@
         },
       }
     </script>
+
+    <!-- Three.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Custom Stylesheet -->
     <link rel="stylesheet" href="style.css" />
   </head>
   <body
@@ -57,11 +62,11 @@
 
     <!-- Announcement Bar -->
     <div
-      class="relative z-50 bg-gradient-to-r from-purple-950/60 via-indigo-950/60 to-purple-950/60 border-b border-purple-500/20 py-2 px-4 text-xs font-medium text-center backdrop-blur-md"
+      class="relative z-50 bg-gradient-to-r from-purple-950/60 via-indigo-950/60 to-purple-950/60 border-b border-purple-500/20 py-2.5 px-4 text-xs font-medium text-center backdrop-blur-md"
     >
-      <div class="max-w-7xl mx-auto flex items-center justify-center gap-2 flex-wrap">
+      <div class="max-w-7xl mx-auto flex items-center justify-center gap-2 flex-wrap text-center">
         <span
-          class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30"
+          class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono"
         >
           <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse ml-1.5 mr-0.5"></span>
           NEW v0.2.0
@@ -72,32 +77,33 @@
         <a
           href="#download"
           data-i18n="top_bar_cta"
-          class="text-cyan-400 font-bold hover:text-cyan-300 underline underline-offset-4 decoration-cyan-400/50 transition-colors ml-2"
+          class="text-cyan-400 font-extrabold hover:text-cyan-300 underline underline-offset-4 decoration-cyan-400/50 transition-colors ml-2"
         >
           دانلود مستقیم رایگان &larr;
         </a>
       </div>
     </div>
 
-    <!-- Floating Navigation Bar with Real App Icon -->
+    <!-- Floating Navigation Bar with Real App Brand Gem -->
     <header class="sticky top-4 z-40 px-4 sm:px-6 max-w-7xl mx-auto">
       <nav
         class="glass-panel px-4 sm:px-6 py-3.5 flex items-center justify-between border border-white/10 shadow-2xl shadow-black/50"
       >
+        <!-- Brand Logo using Official brand-mark.svg -->
         <a href="#" class="flex items-center gap-3 group">
           <div
-            class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/30 to-cyan-500/20 p-1.5 border border-purple-500/40 flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg shadow-purple-500/20"
+            class="relative w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/30 to-cyan-500/20 p-1.5 border border-purple-500/40 flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg shadow-purple-500/25"
           >
             <img
-              src="assets/icon.png"
-              alt="Nexus Launcher Icon"
+              src="assets/brand-mark.svg"
+              alt="Nexus Launcher Mark"
               class="w-full h-full object-contain"
             />
             <div
-              class="absolute inset-0 rounded-xl bg-purple-500/10 blur-sm -z-10 group-hover:bg-purple-500/30 transition-all"
+              class="absolute inset-0 rounded-xl bg-purple-500/20 blur-md -z-10 group-hover:bg-purple-500/40 transition-all"
             ></div>
           </div>
-          <div class="flex flex-col">
+          <div class="flex flex-col text-right">
             <div class="flex items-center gap-1.5">
               <span
                 class="font-extrabold text-xl tracking-tight text-white group-hover:text-cyan-400 transition-colors"
@@ -112,6 +118,7 @@
           </div>
         </a>
 
+        <!-- Desktop Navigation Links -->
         <div class="hidden lg:flex items-center gap-7 text-sm font-medium text-slate-300">
           <a href="#mockup" data-i18n="nav_showcase" class="hover:text-cyan-400 transition-colors"
             >نمای زنده برنامه</a
@@ -139,10 +146,11 @@
           >
         </div>
 
+        <!-- Action Buttons -->
         <div class="flex items-center gap-3">
           <button
             id="lang-toggle-btn"
-            class="px-3 py-1.5 rounded-xl border border-white/10 hover:border-purple-400/40 bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-200 transition-all flex items-center gap-1.5"
+            class="px-3.5 py-2 rounded-xl border border-white/10 hover:border-purple-400/40 bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-200 transition-all flex items-center gap-1.5"
             title="تغییر زبان / Switch Language"
           >
             <span>English (EN)</span>
@@ -151,7 +159,7 @@
             href="https://github.com/AminDEV81/nexus-launcher"
             target="_blank"
             rel="noopener noreferrer"
-            class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-all"
+            class="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-all"
           >
             <svg class="w-4 h-4 text-amber-400 fill-amber-400" viewBox="0 0 24 24">
               <path
@@ -162,7 +170,7 @@
           </a>
           <a
             href="#download"
-            class="btn-nexus-primary px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-bold text-white flex items-center gap-2 shadow-lg shadow-purple-500/25"
+            class="btn-nexus-primary px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white flex items-center gap-2 shadow-lg shadow-purple-500/25"
           >
             <svg
               class="w-4 h-4"
@@ -184,10 +192,10 @@
     </header>
 
     <main class="relative z-10">
-      <!-- HERO SECTION -->
+      <!-- HERO SECTION (Centered with Thick Solid Buttons) -->
       <section class="pt-16 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center">
         <!-- Floating App Icon Hero Portal Badge -->
-        <div class="inline-flex flex-col items-center mb-8 relative group">
+        <div class="inline-flex flex-col items-center justify-center mb-8 relative group">
           <div
             class="relative w-28 h-28 sm:w-32 sm:h-32 rounded-3xl p-1 bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 shadow-2xl shadow-purple-600/40 animate-float"
           >
@@ -198,13 +206,13 @@
               class="w-full h-full rounded-[22px] bg-[#0c101a] border border-white/20 p-4 flex items-center justify-center overflow-hidden"
             >
               <img
-                src="assets/icon.png"
-                alt="Nexus App Icon"
-                class="w-full h-full object-contain drop-shadow-[0_0_20px_rgba(134,59,255,0.8)] transition-transform duration-300 group-hover:scale-110"
+                src="assets/brand-mark.svg"
+                alt="Nexus Brand Gem"
+                class="w-full h-full object-contain drop-shadow-[0_0_20px_rgba(124,92,255,0.9)] transition-transform duration-300 group-hover:scale-110"
               />
             </div>
             <div
-              class="absolute -bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-[#06070c] border border-cyan-400/60 shadow-lg text-[11px] font-extrabold text-cyan-300 font-mono flex items-center gap-1.5 whitespace-nowrap"
+              class="absolute -bottom-3 left-1/2 -translate-x-1/2 px-3.5 py-1 rounded-full bg-[#06070c] border border-cyan-400/60 shadow-lg text-[11px] font-black text-cyan-300 font-mono flex items-center gap-1.5 whitespace-nowrap"
             >
               <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
               NEXUS v0.2.0
@@ -213,7 +221,7 @@
         </div>
 
         <h1
-          class="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white max-w-5xl mx-auto leading-[1.2] sm:leading-[1.15] mb-6"
+          class="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white max-w-5xl mx-auto leading-[1.2] sm:leading-[1.15] mb-6 text-center"
         >
           <span data-i18n="hero_title_1">لانچر بومی، رعدآسا و هوشمند</span><br />
           <span
@@ -225,7 +233,7 @@
         </h1>
 
         <p
-          class="text-base sm:text-xl text-slate-300 max-w-3xl mx-auto mb-10 leading-relaxed font-normal"
+          class="text-base sm:text-xl text-slate-300 max-w-3xl mx-auto mb-10 leading-relaxed font-normal text-center"
           data-i18n="hero_subtitle"
         >
           توسعه یافته بر پایه معماری بومی <span class="text-purple-300 font-bold">Rust</span> و
@@ -236,20 +244,23 @@
           یا جاسوس‌افزار.
         </p>
 
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+        <!-- THICK, SUBSTANTIAL HERO ACTION BUTTONS -->
+        <div
+          class="flex flex-col sm:flex-row items-center justify-center gap-5 mb-8 max-w-2xl mx-auto"
+        >
           <a
             href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.2.0_x64-setup.exe"
             data-role="download-btn"
-            class="btn-nexus-primary w-full sm:w-auto px-8 py-4 rounded-2xl font-black text-base sm:text-lg text-white flex items-center justify-center gap-3 shadow-xl shadow-purple-600/30"
+            class="btn-hero-download w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-base sm:text-xl text-white flex items-center justify-center gap-3.5 shadow-2xl"
           >
-            <svg class="w-5 h-5 fill-current" viewBox="0 0 88 88">
+            <svg class="w-6 h-6 fill-current shrink-0" viewBox="0 0 88 88">
               <path
                 d="M0 12.402l35.687-4.86.016 34.423-35.67.203zm35.67 33.529l.027 34.453L.028 75.48.001 45.728zm4.326-39.027L87.914 0v41.525l-47.918.27zm47.919 44.697L87.914 88l-47.886-6.746-.027-34.793z"
               />
             </svg>
-            <span data-i18n="hero_download_btn">دانلود نسخه رسمی ویندوز</span>
+            <span data-i18n="hero_download_btn">دانلود مستقیم نسخه رسمی v0.2.0</span>
             <span
-              class="text-xs px-2 py-0.5 rounded-md bg-white/20 font-mono font-bold"
+              class="text-xs px-2.5 py-1 rounded-lg bg-black/40 border border-white/20 font-mono font-bold"
               data-role="download-size"
               >~7.2 MB</span
             >
@@ -259,20 +270,23 @@
             href="https://github.com/AminDEV81/nexus-launcher"
             target="_blank"
             rel="noopener noreferrer"
-            class="w-full sm:w-auto px-7 py-4 rounded-2xl font-bold text-sm sm:text-base text-slate-200 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all flex items-center justify-center gap-2.5 backdrop-blur-md"
+            class="btn-hero-github w-full sm:w-auto px-8 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-base sm:text-lg text-slate-100 hover:text-white flex items-center justify-center gap-3"
           >
-            <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+            <svg class="w-6 h-6 fill-current shrink-0" viewBox="0 0 24 24">
               <path
                 fill-rule="evenodd"
                 clip-rule="evenodd"
                 d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
               />
             </svg>
-            <span data-i18n="hero_source_btn">مشاهده سورس در گیت‌هاب</span>
+            <span data-i18n="hero_source_btn">مشاهده پروژه در گیت‌هاب</span>
           </a>
         </div>
 
-        <div class="flex items-center justify-center gap-6 text-xs text-slate-400 flex-wrap">
+        <!-- Trust Badges Centered -->
+        <div
+          class="flex items-center justify-center gap-6 text-xs sm:text-sm text-slate-400 flex-wrap text-center max-w-2xl mx-auto"
+        >
           <span class="flex items-center gap-1.5">
             <svg
               class="w-4 h-4 text-emerald-400"
@@ -324,10 +338,10 @@
         </div>
       </section>
 
-      <!-- METRICS STRIP -->
+      <!-- METRICS STRIP (Centered) -->
       <section class="border-y border-white/5 bg-[#0a0d16]/80 backdrop-blur-xl py-8 px-4 sm:px-6">
         <div class="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-          <div class="p-3">
+          <div class="p-3 text-center">
             <div
               class="text-3xl sm:text-4xl font-black text-white font-mono mb-1 text-cyan-400"
               data-i18n="stat_ram_num"
@@ -338,7 +352,7 @@
               مصرف رم در حالت بیکار
             </div>
           </div>
-          <div class="p-3">
+          <div class="p-3 text-center">
             <div
               class="text-3xl sm:text-4xl font-black text-white font-mono mb-1 text-purple-400"
               data-i18n="stat_boot_num"
@@ -349,7 +363,7 @@
               زمان باز شدن اولیه (Cold Start)
             </div>
           </div>
-          <div class="p-3">
+          <div class="p-3 text-center">
             <div
               class="text-3xl sm:text-4xl font-black text-white font-mono mb-1 text-pink-400"
               data-i18n="stat_games_num"
@@ -360,7 +374,7 @@
               پشتیبانی خودکار از سیو بازی‌ها
             </div>
           </div>
-          <div class="p-3">
+          <div class="p-3 text-center">
             <div
               class="text-3xl sm:text-4xl font-black text-white font-mono mb-1 text-emerald-400"
               data-i18n="stat_zero_num"
@@ -374,8 +388,8 @@
         </div>
       </section>
 
-      <!-- INTERACTIVE DESKTOP APP MOCKUP SHOWCASE -->
-      <section id="mockup" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <!-- INTERACTIVE DESKTOP APP MOCKUP SHOWCASE (Centered & Relevant Capability Modules) -->
+      <section id="mockup" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center">
         <div class="text-center max-w-3xl mx-auto mb-12">
           <div
             class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-xs font-bold text-cyan-300 mb-4"
@@ -384,17 +398,17 @@
             <span data-i18n="mockup_pill">شبیه‌ساز تعاملی رابط کاربری برنامه</span>
           </div>
           <h2
-            class="text-3xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight"
+            class="text-3xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight text-center"
             data-i18n="mockup_heading"
           >
             یک شاهکار واقعی روی دسکتاپ شما
           </h2>
           <p
-            class="text-slate-300 text-sm sm:text-base leading-relaxed"
+            class="text-slate-300 text-sm sm:text-base leading-relaxed text-center max-w-2xl mx-auto"
             data-i18n="mockup_subheading"
           >
-            روی تب‌های سایدبار کلیک کنید یا دکمه «اجرای سریع» را بزنید تا قدرت، زیبایی و سرعت نکسوس
-            لانچر را مستقیماً همین‌جا لمس کنید:
+            روی ماژول‌ها و تب‌های سایدبار کلیک کنید تا قابلیت‌های قدرتمند نکسوس لانچر را مستقیماً
+            همین‌جا لمس کنید:
           </p>
         </div>
 
@@ -420,12 +434,16 @@
           <div
             class="app-mockup-frame rounded-2xl bg-[#0c101a] border border-white/15 overflow-hidden transition-all duration-300"
           >
-            <!-- Window Title Bar with Real App Icon -->
+            <!-- Window Title Bar with Real App Brand Mark -->
             <div
               class="bg-[#080b12] border-b border-white/10 px-4 py-3 flex items-center justify-between select-none"
             >
-              <div class="flex items-center gap-3">
-                <img src="assets/icon.png" alt="Nexus App Icon" class="w-5 h-5 object-contain" />
+              <div class="flex items-center gap-2.5">
+                <img
+                  src="assets/brand-mark.svg"
+                  alt="Nexus Brand Mark"
+                  class="w-5 h-5 object-contain"
+                />
                 <span class="text-xs font-bold text-slate-200 tracking-wide">Nexus Launcher</span>
                 <span
                   class="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono"
@@ -445,7 +463,7 @@
                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                     />
                   </svg>
-                  <span data-i18n="mockup_search_placeholder">جستجو در بازی‌ها...</span>
+                  <span data-i18n="mockup_search_placeholder">جستجو در بازی‌ها و امکانات...</span>
                 </div>
                 <span class="text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono">Ctrl+K</span>
               </div>
@@ -467,7 +485,7 @@
             <div class="grid grid-cols-12 min-h-[460px]">
               <!-- Mockup Sidebar Navigation -->
               <div
-                class="col-span-3 sm:col-span-3 bg-[#090d16] border-l border-white/5 p-3 flex flex-col justify-between"
+                class="col-span-3 sm:col-span-3 bg-[#090d16] border-l border-white/5 p-3 flex flex-col justify-between text-right"
               >
                 <div class="space-y-1.5">
                   <button
@@ -512,8 +530,8 @@
                     class="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-500 to-cyan-400 p-0.5 flex items-center justify-center"
                   >
                     <img
-                      src="assets/icon.png"
-                      class="w-full h-full object-contain rounded-full bg-slate-900"
+                      src="assets/brand-mark.svg"
+                      class="w-full h-full object-contain rounded-full bg-slate-900 p-1"
                       alt="Avatar"
                     />
                   </div>
@@ -531,155 +549,186 @@
               <div
                 class="col-span-9 sm:col-span-9 p-4 sm:p-6 flex flex-col justify-between relative bg-gradient-to-b from-[#0c101a] to-[#070910]"
               >
-                <!-- Launch Feedback Toast -->
+                <!-- Interactive Action Toast in Mockup -->
                 <div
                   id="mockup-launch-toast"
-                  class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-30 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-900/95 to-cyan-900/95 border border-cyan-400/60 shadow-2xl text-xs font-bold text-white flex items-center gap-2 backdrop-blur-md"
+                  class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-30 px-5 py-3 rounded-2xl bg-gradient-to-r from-purple-900/95 via-indigo-900/95 to-cyan-900/95 border border-cyan-400/60 shadow-2xl text-xs font-bold text-white flex items-center gap-2.5 backdrop-blur-md text-center"
                 >
-                  <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-                  <span id="mockup-launch-text"
-                    >🚀 بازی راه‌اندازی شد! رم بهینه‌سازی شده و اولویت به Realtime ارتقا یافت.</span
-                  >
+                  <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+                  <span id="mockup-launch-text">عملیات با موفقیت انجام شد!</span>
                 </div>
 
-                <!-- VIEW 1: Library -->
+                <!-- VIEW 1: Main Capability Modules (Replacing individual game names) -->
                 <div id="mockup-view-library" class="space-y-4">
-                  <div class="flex items-center justify-between flex-wrap gap-2">
+                  <div class="flex items-center justify-between flex-wrap gap-2 text-right">
                     <div>
-                      <h3 class="text-lg font-bold text-white" data-i18n="mockup_lib_title">
-                        بازی‌های نصب‌شده (۴)
+                      <h3 class="text-lg font-bold text-white" data-i18n="mockup_modules_title">
+                        ماژول‌های هوشمند و پیشرفته لانچر
                       </h3>
-                      <p class="text-xs text-slate-400" data-i18n="mockup_lib_desc">
-                        شناسایی خودکار و یکپارچه بدون نیاز به باز بودن استیم یا اپیک
+                      <p class="text-xs text-slate-400" data-i18n="mockup_modules_desc">
+                        روی هر قابلیت کلیک کنید تا عملکرد بلادرنگ آن را تجربه نمایید
                       </p>
                     </div>
                     <span
-                      class="text-xs text-slate-400 bg-white/5 px-2.5 py-1 rounded-lg border border-white/5 font-mono"
-                      >All Games</span
+                      class="text-xs text-cyan-300 bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/30 font-mono"
+                      >۴ ماژول فعال</span
                     >
                   </div>
 
+                  <!-- 4 Core Functional Cards -->
                   <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                    <!-- Game 1: Cyberpunk -->
+                    <!-- Card 1: Smart Game Library -->
                     <div
-                      class="group/game bg-[#121826] border border-white/10 rounded-xl overflow-hidden hover:border-purple-400/50 transition-all"
+                      class="bg-[#121826] border border-white/10 rounded-xl overflow-hidden hover:border-cyan-400/50 transition-all flex flex-col justify-between p-3 text-center group"
                     >
-                      <div
-                        class="h-28 sm:h-32 bg-gradient-to-t from-slate-900 to-amber-600/30 p-2 flex flex-col justify-between relative overflow-hidden"
-                      >
-                        <span
-                          class="self-start text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-300 border border-amber-500/40"
-                          >RPG</span
-                        >
+                      <div class="space-y-2">
                         <div
-                          class="text-center font-black text-white text-xs sm:text-sm tracking-tight drop-shadow-md"
+                          class="w-10 h-10 mx-auto rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center text-lg border border-cyan-500/30 group-hover:scale-110 transition-transform"
                         >
-                          Cyberpunk 2077
+                          🎮
                         </div>
-                        <div class="text-[10px] text-slate-300 flex items-center justify-between">
-                          <span>⏱️ ۸۴ ساعت</span>
-                          <span class="text-emerald-400 font-mono">120 FPS</span>
+                        <div
+                          class="font-extrabold text-white text-xs sm:text-sm"
+                          data-i18n="mod_card_lib_title"
+                        >
+                          کتابخانه هوشمند بازی‌ها
                         </div>
+                        <p
+                          class="text-[11px] text-slate-400 line-clamp-2"
+                          data-i18n="mod_card_lib_desc"
+                        >
+                          شناسایی خودکار بیش از ۱۹,۰۰۰ بازی نصب شده از استیم، اپیک، GOG و دستی
+                        </p>
                       </div>
-                      <div class="p-2">
+                      <div class="mt-3">
                         <button
-                          onclick="launchGameMockup('Cyberpunk 2077')"
-                          class="w-full py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white text-xs font-bold transition-all shadow-md"
+                          onclick="
+                            openMockupTab(
+                              'library',
+                              'کتابخانه بازی‌ها با موفقیت اسکن شد! ۴۲ عنوان شناسایی شدند.',
+                            )
+                          "
+                          class="w-full py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-400/40 text-xs font-bold transition-all"
+                          data-i18n="btn_mod_lib"
                         >
-                          اجرای سریع
+                          مدیریت کتابخانه
                         </button>
                       </div>
                     </div>
 
-                    <!-- Game 2: Elden Ring -->
+                    <!-- Card 2: Turbo Hardware Booster -->
                     <div
-                      class="group/game bg-[#121826] border border-white/10 rounded-xl overflow-hidden hover:border-purple-400/50 transition-all"
+                      class="bg-[#121826] border border-white/10 rounded-xl overflow-hidden hover:border-purple-400/50 transition-all flex flex-col justify-between p-3 text-center group"
                     >
-                      <div
-                        class="h-28 sm:h-32 bg-gradient-to-t from-slate-900 to-indigo-600/30 p-2 flex flex-col justify-between relative overflow-hidden"
-                      >
-                        <span
-                          class="self-start text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-300 border border-indigo-500/40"
-                          >Action</span
-                        >
+                      <div class="space-y-2">
                         <div
-                          class="text-center font-black text-white text-xs sm:text-sm tracking-tight drop-shadow-md"
+                          class="w-10 h-10 mx-auto rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center text-lg border border-purple-500/30 group-hover:scale-110 transition-transform"
                         >
-                          Elden Ring
+                          ⚡
                         </div>
-                        <div class="text-[10px] text-slate-300 flex items-center justify-between">
-                          <span>⏱️ ۱۲۸ ساعت</span>
-                          <span class="text-emerald-400 font-mono">60 FPS</span>
+                        <div
+                          class="font-extrabold text-white text-xs sm:text-sm"
+                          data-i18n="mod_card_boost_title"
+                        >
+                          بوستر و تقویت سخت‌افزار
                         </div>
+                        <p
+                          class="text-[11px] text-slate-400 line-clamp-2"
+                          data-i18n="mod_card_boost_desc"
+                        >
+                          پاکسازی رم با EmptyWorkingSet و ارتقای اولویت CPU به حالت Realtime
+                        </p>
                       </div>
-                      <div class="p-2">
+                      <div class="mt-3">
                         <button
-                          onclick="launchGameMockup('Elden Ring')"
-                          class="w-full py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white text-xs font-bold transition-all shadow-md"
+                          onclick="
+                            openMockupTab(
+                              'booster',
+                              'بوستر سخت‌افزاری فعال شد! ۱.۸ گیگابایت فضای رم آزاد گردید.',
+                            )
+                          "
+                          class="w-full py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-400/40 text-xs font-bold transition-all"
+                          data-i18n="btn_mod_boost"
                         >
-                          اجرای سریع
+                          فعال‌سازی بوست
                         </button>
                       </div>
                     </div>
 
-                    <!-- Game 3: Wukong -->
+                    <!-- Card 3: Soundtrack Studio -->
                     <div
-                      class="group/game bg-[#121826] border border-white/10 rounded-xl overflow-hidden hover:border-purple-400/50 transition-all"
+                      class="bg-[#121826] border border-white/10 rounded-xl overflow-hidden hover:border-pink-400/50 transition-all flex flex-col justify-between p-3 text-center group"
                     >
-                      <div
-                        class="h-28 sm:h-32 bg-gradient-to-t from-slate-900 to-orange-600/30 p-2 flex flex-col justify-between relative overflow-hidden"
-                      >
-                        <span
-                          class="self-start text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-orange-500/30 text-orange-300 border border-orange-500/40"
-                          >Myth</span
-                        >
+                      <div class="space-y-2">
                         <div
-                          class="text-center font-black text-white text-xs sm:text-sm tracking-tight drop-shadow-md"
+                          class="w-10 h-10 mx-auto rounded-xl bg-pink-500/20 text-pink-300 flex items-center justify-center text-lg border border-pink-500/30 group-hover:scale-110 transition-transform"
                         >
-                          Black Myth
+                          🎵
                         </div>
-                        <div class="text-[10px] text-slate-300 flex items-center justify-between">
-                          <span>⏱️ ۳۲ ساعت</span>
-                          <span class="text-emerald-400 font-mono">90 FPS</span>
+                        <div
+                          class="font-extrabold text-white text-xs sm:text-sm"
+                          data-i18n="mod_card_sound_title"
+                        >
+                          استودیو موسیقی متن
                         </div>
+                        <p
+                          class="text-[11px] text-slate-400 line-clamp-2"
+                          data-i18n="mod_card_sound_desc"
+                        >
+                          استریم آنلاین و دانلود نامحدود قطعات اورجینال با اکولایزر صوتی سینماتیک
+                        </p>
                       </div>
-                      <div class="p-2">
+                      <div class="mt-3">
                         <button
-                          onclick="launchGameMockup('Black Myth: Wukong')"
-                          class="w-full py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white text-xs font-bold transition-all shadow-md"
+                          onclick="
+                            openMockupTab(
+                              'soundtrack',
+                              'پلیر ساندترک راه‌اندازی شد! اکولایزر ۶۰ فریم در حال اجراست.',
+                            )
+                          "
+                          class="w-full py-1.5 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-400/40 text-xs font-bold transition-all"
+                          data-i18n="btn_mod_sound"
                         >
-                          اجرای سریع
+                          پخش موسیقی متن
                         </button>
                       </div>
                     </div>
 
-                    <!-- Game 4: Forza -->
+                    <!-- Card 4: Atomic Save Guardian -->
                     <div
-                      class="group/game bg-[#121826] border border-white/10 rounded-xl overflow-hidden hover:border-purple-400/50 transition-all"
+                      class="bg-[#121826] border border-white/10 rounded-xl overflow-hidden hover:border-emerald-400/50 transition-all flex flex-col justify-between p-3 text-center group"
                     >
-                      <div
-                        class="h-28 sm:h-32 bg-gradient-to-t from-slate-900 to-rose-600/30 p-2 flex flex-col justify-between relative overflow-hidden"
-                      >
-                        <span
-                          class="self-start text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-rose-500/30 text-rose-300 border border-rose-500/40"
-                          >Racing</span
-                        >
+                      <div class="space-y-2">
                         <div
-                          class="text-center font-black text-white text-xs sm:text-sm tracking-tight drop-shadow-md"
+                          class="w-10 h-10 mx-auto rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center text-lg border border-emerald-500/30 group-hover:scale-110 transition-transform"
                         >
-                          Forza Horizon 5
+                          🛡️
                         </div>
-                        <div class="text-[10px] text-slate-300 flex items-center justify-between">
-                          <span>⏱️ ۶۰ ساعت</span>
-                          <span class="text-emerald-400 font-mono">144 FPS</span>
+                        <div
+                          class="font-extrabold text-white text-xs sm:text-sm"
+                          data-i18n="mod_card_save_title"
+                        >
+                          گاوصندوق اتمیک سیوها
                         </div>
+                        <p
+                          class="text-[11px] text-slate-400 line-clamp-2"
+                          data-i18n="mod_card_save_desc"
+                        >
+                          تهیه اسنپ‌شات خودکار قبل از اجرای بازی و پیشگیری قطعی از سوختن سیو
+                        </p>
                       </div>
-                      <div class="p-2">
+                      <div class="mt-3">
                         <button
-                          onclick="launchGameMockup('Forza Horizon 5')"
-                          class="w-full py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white text-xs font-bold transition-all shadow-md"
+                          onclick="
+                            openMockupTab(
+                              'saves',
+                              'اسنپ‌شات اتمیک ایجاد شد! وضعیت سلامت ۱۰۰٪ تایید گردید.',
+                            )
+                          "
+                          class="w-full py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-xs font-bold transition-all"
+                          data-i18n="btn_mod_save"
                         >
-                          اجرای سریع
+                          مشاهده اسنپ‌شات‌ها
                         </button>
                       </div>
                     </div>
@@ -688,7 +737,7 @@
 
                 <!-- VIEW 2: Booster -->
                 <div id="mockup-view-booster" class="hidden space-y-4">
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between text-right">
                     <div>
                       <h3 class="text-lg font-bold text-white" data-i18n="mockup_boost_title">
                         وضعیت سخت‌افزاری و بوستر
@@ -721,7 +770,7 @@
                   <div
                     class="p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 flex items-center justify-between"
                   >
-                    <div>
+                    <div class="text-right">
                       <div class="text-xs font-bold text-white">طرح بهینه برق فعال است</div>
                       <div class="text-[11px] text-slate-300">
                         Nexus Ultimate Performance Plan فعال شده است.
@@ -738,7 +787,7 @@
 
                 <!-- VIEW 3: Soundtrack -->
                 <div id="mockup-view-soundtrack" class="hidden space-y-4">
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between text-right">
                     <div>
                       <h3 class="text-lg font-bold text-white" data-i18n="mockup_sound_title">
                         استودیو موسیقی متن بازی‌ها
@@ -765,12 +814,12 @@
                         💿
                       </div>
                     </div>
-                    <div class="flex-1">
+                    <div class="flex-1 text-right">
                       <div class="text-sm font-bold text-white">
-                        Rebel Path (Original Soundtrack)
+                        The Rebel Path (Original Game Soundtrack)
                       </div>
                       <div class="text-xs text-slate-400">Cyberpunk 2077 — P.T. Adamczyk</div>
-                      <div class="flex items-end gap-1 h-5 mt-2">
+                      <div class="flex items-end gap-1 h-5 mt-2 justify-end">
                         <div class="wave-bar w-1 bg-cyan-400 rounded-full"></div>
                         <div class="wave-bar w-1 bg-purple-400 rounded-full"></div>
                         <div class="wave-bar w-1 bg-pink-400 rounded-full"></div>
@@ -785,7 +834,7 @@
 
                 <!-- VIEW 4: Saves -->
                 <div id="mockup-view-saves" class="hidden space-y-4">
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between text-right">
                     <div>
                       <h3 class="text-lg font-bold text-white" data-i18n="mockup_save_title">
                         نگهبان اتمیک فایل‌های سیو
@@ -800,12 +849,12 @@
                     >
                   </div>
 
-                  <div class="space-y-2">
+                  <div class="space-y-2 text-right">
                     <div
                       class="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between text-xs"
                     >
                       <div class="flex items-center gap-2">
-                        <span class="text-emerald-400">✓</span>
+                        <span class="text-emerald-400 font-bold">✓</span>
                         <span class="font-bold text-white">Cyberpunk 2077 (Auto Snapshot)</span>
                       </div>
                       <span class="text-slate-400 font-mono text-[11px]">امروز ۱۸:۳۰ • ۳.۴ MB</span>
@@ -814,7 +863,7 @@
                       class="p-3 rounded-xl bg-white/5 border border-white/5 flex items-center justify-between text-xs"
                     >
                       <div class="flex items-center gap-2">
-                        <span class="text-emerald-400">✓</span>
+                        <span class="text-emerald-400 font-bold">✓</span>
                         <span class="font-bold text-white">Elden Ring (Pre-Launch Backup)</span>
                       </div>
                       <span class="text-slate-400 font-mono text-[11px]">دیروز ۲۱:۱۵ • ۵.۲ MB</span>
@@ -824,7 +873,7 @@
 
                 <!-- VIEW 5: Stats -->
                 <div id="mockup-view-stats" class="hidden space-y-4">
-                  <div class="flex items-center justify-between">
+                  <div class="flex items-center justify-between text-right">
                     <div>
                       <h3 class="text-lg font-bold text-white" data-i18n="mockup_stats_title">
                         پاسپورت اختصاصی و تحلیل گیمینگ
@@ -839,7 +888,7 @@
                     >
                   </div>
 
-                  <div class="p-3 rounded-xl bg-white/5 border border-white/5">
+                  <div class="p-3 rounded-xl bg-white/5 border border-white/5 text-right">
                     <div class="text-[11px] text-slate-400 mb-2">
                       فعالیت گیمینگ در ماه‌های اخیر:
                     </div>
@@ -872,7 +921,7 @@
                     >
                       ▶
                     </button>
-                    <div>
+                    <div class="text-right">
                       <div class="font-bold text-white text-[11px] truncate max-w-[160px]">
                         The Rebel Path (OST)
                       </div>
@@ -892,8 +941,8 @@
         </div>
       </section>
 
-      <!-- 2026 BENTO GRID FEATURES SECTION -->
-      <section id="features" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <!-- 2026 BENTO GRID FEATURES SECTION (Centered) -->
+      <section id="features" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center">
         <div class="text-center max-w-3xl mx-auto mb-16">
           <div
             class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-xs font-bold text-purple-300 mb-4"
@@ -902,13 +951,13 @@
             <span data-i18n="bento_pill">معماری و قابلیت‌های اختصاصی</span>
           </div>
           <h2
-            class="text-3xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight"
+            class="text-3xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight text-center"
             data-i18n="bento_heading"
           >
             طراحی شده با نهایت وسواس مهندسی
           </h2>
           <p
-            class="text-slate-300 text-sm sm:text-base leading-relaxed"
+            class="text-slate-300 text-sm sm:text-base leading-relaxed text-center max-w-2xl mx-auto"
             data-i18n="bento_subheading"
           >
             هیچ وب‌ویو کند یا فریم‌ورک‌های سنگین در کار نیست. هر خط کد نکسوس برای اوج سرعت و حداکثر
@@ -916,22 +965,28 @@
           </p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
           <!-- Bento 1: Rust & Tauri Architecture -->
           <div
-            class="glass-panel tilt-card md:col-span-2 p-8 flex flex-col justify-between relative overflow-hidden"
+            class="glass-panel tilt-card md:col-span-2 p-8 flex flex-col justify-between relative overflow-hidden text-center"
           >
             <div class="tilt-glare"></div>
-            <div>
+            <div class="text-center">
               <div
-                class="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500/20 to-cyan-500/20 border border-purple-500/40 flex items-center justify-center mb-6 text-2xl"
+                class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-purple-500/20 to-cyan-500/20 border border-purple-500/40 flex items-center justify-center mb-6 text-3xl shadow-lg shadow-purple-500/20"
               >
                 🦀
               </div>
-              <h3 class="text-2xl font-black text-white mb-3" data-i18n="bento_rust_title">
+              <h3
+                class="text-2xl font-black text-white mb-3 text-center"
+                data-i18n="bento_rust_title"
+              >
                 معماری اصیل Rust و Tauri 2 بدون کرومیوم
               </h3>
-              <p class="text-slate-300 text-sm leading-relaxed mb-6" data-i18n="bento_rust_desc">
+              <p
+                class="text-slate-300 text-sm leading-relaxed mb-6 text-center max-w-xl mx-auto"
+                data-i18n="bento_rust_desc"
+              >
                 برخلاف نرم‌افزارهای مبتنی بر الکترون که صدها مگابایت رم را صرف یک مرورگر مخفی
                 می‌کنند، نکسوس لانچر مستقیماً به کتابخانه‌های محلی و بومی ویندوز کامپایل شده است.
                 سرعت باز شدن زیر ۰.۴ ثانیه و مصرف رم تنها ۶۰ مگابایت!
@@ -975,19 +1030,25 @@
           <!-- Bento 2: Intelligent RAM Booster -->
           <div
             id="booster-demo"
-            class="glass-panel tilt-card p-8 flex flex-col justify-between relative overflow-hidden"
+            class="glass-panel tilt-card p-8 flex flex-col justify-between relative overflow-hidden text-center"
           >
             <div class="tilt-glare"></div>
-            <div>
+            <div class="text-center">
               <div
-                class="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/40 flex items-center justify-center mb-6 text-2xl"
+                class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border border-cyan-500/40 flex items-center justify-center mb-6 text-3xl shadow-lg shadow-cyan-500/20"
               >
                 ⚡
               </div>
-              <h3 class="text-xl font-black text-white mb-2" data-i18n="bento_booster_title">
+              <h3
+                class="text-xl font-black text-white mb-2 text-center"
+                data-i18n="bento_booster_title"
+              >
                 بوستر خودکار و آزادسازی رم
               </h3>
-              <p class="text-slate-300 text-xs leading-relaxed mb-6" data-i18n="bento_booster_desc">
+              <p
+                class="text-slate-300 text-xs leading-relaxed mb-6 text-center"
+                data-i18n="bento_booster_desc"
+              >
                 استفاده از API سیستمی EmptyWorkingSet برای پاکسازی کش‌های هرز رم قبل از اجرای هر
                 بازی.
               </p>
@@ -1014,25 +1075,31 @@
 
           <!-- Bento 3: Atomic Save Guardian -->
           <div
-            class="glass-panel tilt-card p-8 flex flex-col justify-between relative overflow-hidden"
+            class="glass-panel tilt-card p-8 flex flex-col justify-between relative overflow-hidden text-center"
           >
             <div class="tilt-glare"></div>
-            <div>
+            <div class="text-center">
               <div
-                class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/40 flex items-center justify-center mb-6 text-2xl"
+                class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/40 flex items-center justify-center mb-6 text-3xl shadow-lg shadow-emerald-500/20"
               >
                 🛡️
               </div>
-              <h3 class="text-xl font-black text-white mb-2" data-i18n="bento_save_title">
+              <h3
+                class="text-xl font-black text-white mb-2 text-center"
+                data-i18n="bento_save_title"
+              >
                 نگهبان اتمیک فایل‌های سیو
               </h3>
-              <p class="text-slate-300 text-xs leading-relaxed mb-4" data-i18n="bento_save_desc">
+              <p
+                class="text-slate-300 text-xs leading-relaxed mb-4 text-center"
+                data-i18n="bento_save_desc"
+              >
                 پشتیبانی از بیش از ۱۹,۰۰۰ بازی با ژورنال اتمیک ACID. حتی اگر کامپیوتر وسط بازی خاموش
                 شود، سیوهای قبلی دست‌نخورده باقی می‌مانند.
               </p>
             </div>
             <div
-              class="px-3 py-2 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2 text-xs font-mono text-emerald-300"
+              class="px-3 py-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center gap-2 text-xs font-mono text-emerald-300"
             >
               <span>●</span>
               <span>Zero Save Corruption</span>
@@ -1041,25 +1108,31 @@
 
           <!-- Bento 4: Original Game Soundtrack Studio -->
           <div
-            class="glass-panel tilt-card p-8 flex flex-col justify-between relative overflow-hidden"
+            class="glass-panel tilt-card p-8 flex flex-col justify-between relative overflow-hidden text-center"
           >
             <div class="tilt-glare"></div>
-            <div>
+            <div class="text-center">
               <div
-                class="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/40 flex items-center justify-center mb-6 text-2xl"
+                class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/40 flex items-center justify-center mb-6 text-3xl shadow-lg shadow-purple-500/20"
               >
                 🎵
               </div>
-              <h3 class="text-xl font-black text-white mb-2" data-i18n="bento_sound_title">
+              <h3
+                class="text-xl font-black text-white mb-2 text-center"
+                data-i18n="bento_sound_title"
+              >
                 استودیو موسیقی متن بازی‌ها
               </h3>
-              <p class="text-slate-300 text-xs leading-relaxed mb-4" data-i18n="bento_sound_desc">
+              <p
+                class="text-slate-300 text-xs leading-relaxed mb-4 text-center"
+                data-i18n="bento_sound_desc"
+              >
                 استریم و دانلود قطعات موسیقی متن هزاران بازی ویدیویی بدون نیاز به یوتیوب با اکولایزر
                 صوتی سینماتیک زنده.
               </p>
             </div>
             <div
-              class="px-3 py-2 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2 text-xs font-mono text-purple-300"
+              class="px-3 py-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center gap-2 text-xs font-mono text-purple-300"
             >
               <span>●</span>
               <span>60 FPS Canvas Visualizer</span>
@@ -1068,20 +1141,23 @@
 
           <!-- Bento 5: Gamer Passport & Offline Privacy -->
           <div
-            class="glass-panel tilt-card p-8 flex flex-col justify-between relative overflow-hidden"
+            class="glass-panel tilt-card p-8 flex flex-col justify-between relative overflow-hidden text-center"
           >
             <div class="tilt-glare"></div>
-            <div>
+            <div class="text-center">
               <div
-                class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500/20 to-purple-500/20 border border-amber-500/40 flex items-center justify-center mb-6 text-2xl"
+                class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-amber-500/20 to-purple-500/20 border border-amber-500/40 flex items-center justify-center mb-6 text-3xl shadow-lg shadow-amber-500/20"
               >
                 📊
               </div>
-              <h3 class="text-xl font-black text-white mb-2" data-i18n="bento_passport_title">
+              <h3
+                class="text-xl font-black text-white mb-2 text-center"
+                data-i18n="bento_passport_title"
+              >
                 پاسپورت اختصاصی و حریم خصوصی
               </h3>
               <p
-                class="text-slate-300 text-xs leading-relaxed mb-4"
+                class="text-slate-300 text-xs leading-relaxed mb-4 text-center"
                 data-i18n="bento_passport_desc"
               >
                 محاسبه ساعات بازی، نمودار عادات شبانه‌روز و دستاوردهای شخصی. بدون ارسال حتی ۱ بایت
@@ -1089,7 +1165,7 @@
               </p>
             </div>
             <div
-              class="px-3 py-2 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2 text-xs font-mono text-cyan-300"
+              class="px-3 py-2 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center gap-2 text-xs font-mono text-cyan-300"
             >
               <span>●</span>
               <span>100% Local SQLite Encrypted</span>
@@ -1098,19 +1174,24 @@
         </div>
       </section>
 
-      <!-- INTERACTIVE RAM SAVINGS CALCULATOR -->
-      <section class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
-        <div class="glass-panel p-8 sm:p-12 border border-purple-500/30 relative overflow-hidden">
+      <!-- INTERACTIVE RAM SAVINGS CALCULATOR (Centered) -->
+      <section class="py-20 px-4 sm:px-6 max-w-5xl mx-auto text-center">
+        <div
+          class="glass-panel p-8 sm:p-12 border border-purple-500/30 relative overflow-hidden text-center"
+        >
           <div class="text-center max-w-2xl mx-auto mb-8">
-            <h3 class="text-2xl sm:text-3xl font-black text-white mb-2" data-i18n="calc_heading">
+            <h3
+              class="text-2xl sm:text-3xl font-black text-white mb-2 text-center"
+              data-i18n="calc_heading"
+            >
               چقدر منابع با Nexus Launcher صرفه‌جویی می‌کنید؟
             </h3>
-            <p class="text-slate-300 text-xs sm:text-sm" data-i18n="calc_subheading">
+            <p class="text-slate-300 text-xs sm:text-sm text-center" data-i18n="calc_subheading">
               تعداد بازی‌های خود را انتخاب کنید تا ببینید سیستم شما چقدر سبک‌تر نفس خواهد کشید:
             </p>
           </div>
 
-          <div class="max-w-xl mx-auto mb-8">
+          <div class="max-w-xl mx-auto mb-8 text-center">
             <div class="flex justify-between text-xs font-bold text-slate-300 mb-2">
               <span>تعداد بازی‌های نصب شده:</span>
               <span id="slider-games-count" class="text-cyan-400 font-mono text-base">25 بازی</span>
@@ -1122,13 +1203,13 @@
               max="150"
               value="25"
               step="5"
-              class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer"
+              class="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer"
               oninput="updateCalculator(this.value)"
             />
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center max-w-3xl mx-auto">
-            <div class="p-4 rounded-xl bg-black/40 border border-white/5">
+            <div class="p-4 rounded-xl bg-black/40 border border-white/5 text-center">
               <div class="text-xs text-slate-400 mb-1" data-i18n="calc_lbl_ram">
                 صرفه‌جویی رم در هر لحظه
               </div>
@@ -1139,7 +1220,7 @@
                 ~۵۹۰ MB
               </div>
             </div>
-            <div class="p-4 rounded-xl bg-black/40 border border-white/5">
+            <div class="p-4 rounded-xl bg-black/40 border border-white/5 text-center">
               <div class="text-xs text-slate-400 mb-1" data-i18n="calc_lbl_fps">
                 افزایش پایداری فریم‌ریت
               </div>
@@ -1147,7 +1228,7 @@
                 +۱۵ الی ۲۰٪
               </div>
             </div>
-            <div class="p-4 rounded-xl bg-black/40 border border-white/5">
+            <div class="p-4 rounded-xl bg-black/40 border border-white/5 text-center">
               <div class="text-xs text-slate-400 mb-1" data-i18n="calc_lbl_battery">
                 بهبود مصرف باتری لپ‌تاپ
               </div>
@@ -1159,8 +1240,8 @@
         </div>
       </section>
 
-      <!-- HEAD-TO-HEAD COMPARISON ARENA -->
-      <section id="comparison" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <!-- HEAD-TO-HEAD COMPARISON ARENA (Centered Table Content) -->
+      <section id="comparison" class="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center">
         <div class="text-center max-w-3xl mx-auto mb-16">
           <div
             class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-xs font-bold text-cyan-300 mb-4"
@@ -1169,13 +1250,13 @@
             <span data-i18n="comp_pill">مقایسه شفاف و بدون اغراق</span>
           </div>
           <h2
-            class="text-3xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight"
+            class="text-3xl sm:text-5xl font-extrabold text-white mb-4 tracking-tight text-center"
             data-i18n="comp_heading"
           >
             چرا نکسوس لانچر انتخاب اول گیمرهاست؟
           </h2>
           <p
-            class="text-slate-300 text-sm sm:text-base leading-relaxed"
+            class="text-slate-300 text-sm sm:text-base leading-relaxed text-center max-w-2xl mx-auto"
             data-i18n="comp_subheading"
           >
             نگاهی به تفاوت فاحش نکسوس با لانچرهای غول‌پیکر تجاری در پارامترهای حیاتی:
@@ -1183,100 +1264,102 @@
         </div>
 
         <div class="glass-panel overflow-x-auto">
-          <table class="w-full text-right text-sm">
+          <table class="w-full text-center text-sm">
             <thead
               class="bg-white/5 border-b border-white/10 text-xs text-slate-400 font-bold uppercase tracking-wider"
             >
               <tr>
-                <th class="p-4 sm:p-5" data-i18n="th_feature">ویژگی / سنجه</th>
-                <th class="p-4 sm:p-5 text-cyan-400 font-black text-sm">
-                  <div class="flex items-center gap-2">
-                    <img src="assets/icon.png" class="w-5 h-5 object-contain" alt="Nexus" />
+                <th class="p-4 sm:p-5 text-center" data-i18n="th_feature">ویژگی / سنجه</th>
+                <th class="p-4 sm:p-5 text-cyan-400 font-black text-sm text-center">
+                  <div class="flex items-center justify-center gap-2">
+                    <img src="assets/brand-mark.svg" class="w-5 h-5 object-contain" alt="Nexus" />
                     <span>Nexus Launcher</span>
                   </div>
                 </th>
-                <th class="p-4 sm:p-5 text-slate-300">Steam</th>
-                <th class="p-4 sm:p-5 text-slate-300">Epic Games</th>
-                <th class="p-4 sm:p-5 text-slate-300">Playnite</th>
+                <th class="p-4 sm:p-5 text-slate-300 text-center">Steam</th>
+                <th class="p-4 sm:p-5 text-slate-300 text-center">Epic Games</th>
+                <th class="p-4 sm:p-5 text-slate-300 text-center">Playnite</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-white/5 font-medium">
+            <tbody class="divide-y divide-white/5 font-medium text-center">
               <tr class="hover:bg-white/[0.02] transition-colors">
-                <td class="p-4 sm:p-5 text-slate-200" data-i18n="row_ram">مصرف رم در حالت بیکار</td>
-                <td class="p-4 sm:p-5 text-cyan-300 font-bold font-mono">~۶۰ MB</td>
-                <td class="p-4 sm:p-5 text-slate-400 font-mono">~۶۵۰ MB+</td>
-                <td class="p-4 sm:p-5 text-slate-400 font-mono">~۸۵۰ MB+</td>
-                <td class="p-4 sm:p-5 text-slate-400 font-mono">~۲۵۰ MB</td>
+                <td class="p-4 sm:p-5 text-slate-200 text-center font-bold" data-i18n="row_ram">
+                  مصرف رم در حالت بیکار
+                </td>
+                <td class="p-4 sm:p-5 text-cyan-300 font-bold font-mono text-center">~۶۰ MB</td>
+                <td class="p-4 sm:p-5 text-slate-400 font-mono text-center">~۶۵۰ MB+</td>
+                <td class="p-4 sm:p-5 text-slate-400 font-mono text-center">~۸۵۰ MB+</td>
+                <td class="p-4 sm:p-5 text-slate-400 font-mono text-center">~۲۵۰ MB</td>
               </tr>
               <tr class="hover:bg-white/[0.02] transition-colors">
-                <td class="p-4 sm:p-5 text-slate-200" data-i18n="row_boot">
+                <td class="p-4 sm:p-5 text-slate-200 text-center font-bold" data-i18n="row_boot">
                   سرعت بالا آمدن (Cold Boot)
                 </td>
-                <td class="p-4 sm:p-5 text-cyan-300 font-bold font-mono">۰.۳۸ ثانیه</td>
-                <td class="p-4 sm:p-5 text-slate-400 font-mono">۳.۴ ثانیه</td>
-                <td class="p-4 sm:p-5 text-slate-400 font-mono">۶.۲ ثانیه</td>
-                <td class="p-4 sm:p-5 text-slate-400 font-mono">۲.۸ ثانیه</td>
+                <td class="p-4 sm:p-5 text-cyan-300 font-bold font-mono text-center">۰.۳۸ ثانیه</td>
+                <td class="p-4 sm:p-5 text-slate-400 font-mono text-center">۳.۴ ثانیه</td>
+                <td class="p-4 sm:p-5 text-slate-400 font-mono text-center">۶.۲ ثانیه</td>
+                <td class="p-4 sm:p-5 text-slate-400 font-mono text-center">۲.۸ ثانیه</td>
               </tr>
               <tr class="hover:bg-white/[0.02] transition-colors">
-                <td class="p-4 sm:p-5 text-slate-200" data-i18n="row_size">
+                <td class="p-4 sm:p-5 text-slate-200 text-center font-bold" data-i18n="row_size">
                   حجم فایل نصبی دانلودی
                 </td>
-                <td class="p-4 sm:p-5 text-cyan-300 font-bold font-mono">~۷.۲ MB</td>
-                <td class="p-4 sm:p-5 text-slate-400 font-mono">~۳۲۰ MB</td>
-                <td class="p-4 sm:p-5 text-slate-400 font-mono">~۴۵۰ MB</td>
-                <td class="p-4 sm:p-5 text-slate-400 font-mono">~۹۵ MB</td>
+                <td class="p-4 sm:p-5 text-cyan-300 font-bold font-mono text-center">~۷.۲ MB</td>
+                <td class="p-4 sm:p-5 text-slate-400 font-mono text-center">~۳۲۰ MB</td>
+                <td class="p-4 sm:p-5 text-slate-400 font-mono text-center">~۴۵۰ MB</td>
+                <td class="p-4 sm:p-5 text-slate-400 font-mono text-center">~۹۵ MB</td>
               </tr>
               <tr class="hover:bg-white/[0.02] transition-colors">
-                <td class="p-4 sm:p-5 text-slate-200" data-i18n="row_ads">
+                <td class="p-4 sm:p-5 text-slate-200 text-center font-bold" data-i18n="row_ads">
                   تبلیغات و فروشگاه اجباری
                 </td>
-                <td class="p-4 sm:p-5 text-emerald-400 font-bold">۰٪ (کاملاً صفر)</td>
-                <td class="p-4 sm:p-5 text-amber-400">فروشگاه شلوغ</td>
-                <td class="p-4 sm:p-5 text-rose-400">تبلیغات سنگین</td>
-                <td class="p-4 sm:p-5 text-emerald-400">بدون تبلیغات</td>
+                <td class="p-4 sm:p-5 text-emerald-400 font-bold text-center">۰٪ (کاملاً صفر)</td>
+                <td class="p-4 sm:p-5 text-amber-400 text-center">فروشگاه شلوغ</td>
+                <td class="p-4 sm:p-5 text-rose-400 text-center">تبلیغات سنگین</td>
+                <td class="p-4 sm:p-5 text-emerald-400 text-center">بدون تبلیغات</td>
               </tr>
               <tr class="hover:bg-white/[0.02] transition-colors">
-                <td class="p-4 sm:p-5 text-slate-200" data-i18n="row_offline">
+                <td class="p-4 sm:p-5 text-slate-200 text-center font-bold" data-i18n="row_offline">
                   حالت آفلاین و عدم نیاز به لاگین
                 </td>
-                <td class="p-4 sm:p-5 text-emerald-400 font-bold">۱۰۰٪ آفلاین‌محور</td>
-                <td class="p-4 sm:p-5 text-amber-400">نیاز به لاگین</td>
-                <td class="p-4 sm:p-5 text-rose-400">نیاز به لاگین اجباری</td>
-                <td class="p-4 sm:p-5 text-emerald-400">آفلاین</td>
+                <td class="p-4 sm:p-5 text-emerald-400 font-bold text-center">۱۰۰٪ آفلاین‌محور</td>
+                <td class="p-4 sm:p-5 text-amber-400 text-center">نیاز به لاگین</td>
+                <td class="p-4 sm:p-5 text-rose-400 text-center">نیاز به لاگین اجباری</td>
+                <td class="p-4 sm:p-5 text-emerald-400 text-center">آفلاین</td>
               </tr>
               <tr class="hover:bg-white/[0.02] transition-colors">
-                <td class="p-4 sm:p-5 text-slate-200" data-i18n="row_save">
+                <td class="p-4 sm:p-5 text-slate-200 text-center font-bold" data-i18n="row_save">
                   نگهبان اتمیک سیو ۱۹,۰۰۰ بازی
                 </td>
-                <td class="p-4 sm:p-5 text-emerald-400 font-bold">دارد (ACID)</td>
-                <td class="p-4 sm:p-5 text-slate-500">فقط کلود استیم</td>
-                <td class="p-4 sm:p-5 text-slate-500">فقط کلود اپیک</td>
-                <td class="p-4 sm:p-5 text-slate-500">نیاز به پلاگین</td>
+                <td class="p-4 sm:p-5 text-emerald-400 font-bold text-center">دارد (ACID)</td>
+                <td class="p-4 sm:p-5 text-slate-500 text-center">فقط کلود استیم</td>
+                <td class="p-4 sm:p-5 text-slate-500 text-center">فقط کلود اپیک</td>
+                <td class="p-4 sm:p-5 text-slate-500 text-center">نیاز به پلاگین</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- SYSTEM SPECS & REQUIREMENTS -->
-      <section id="specs" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto">
-        <div class="glass-panel p-8 sm:p-10 border border-white/10">
+      <!-- SYSTEM SPECS & REQUIREMENTS (Centered) -->
+      <section id="specs" class="py-20 px-4 sm:px-6 max-w-5xl mx-auto text-center">
+        <div class="glass-panel p-8 sm:p-10 border border-white/10 text-center">
           <div class="text-center max-w-xl mx-auto mb-8">
-            <h3 class="text-2xl font-black text-white mb-2" data-i18n="specs_heading">
+            <h3 class="text-2xl font-black text-white mb-2 text-center" data-i18n="specs_heading">
               مشخصات مورد نیاز سیستم
             </h3>
-            <p class="text-xs sm:text-sm text-slate-400" data-i18n="specs_subheading">
+            <p class="text-xs sm:text-sm text-slate-400 text-center" data-i18n="specs_subheading">
               نکسوس به قدری سبک است که حتی روی لپ‌تاپ‌های قدیمی بدون کمترین افت سرعتی کار می‌کند:
             </p>
           </div>
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-            <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+            <div class="p-4 rounded-xl bg-white/5 border border-white/5 text-center">
               <div class="text-xs text-slate-400 mb-1" data-i18n="specs_os_lbl">سیستم‌عامل</div>
               <div class="text-sm font-bold text-white" data-i18n="specs_os_val">
                 ویندوز ۱۰ یا ۱۱ (۶۴ بیتی)
               </div>
             </div>
-            <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+            <div class="p-4 rounded-xl bg-white/5 border border-white/5 text-center">
               <div class="text-xs text-slate-400 mb-1" data-i18n="specs_cpu_lbl">
                 پردازنده (CPU)
               </div>
@@ -1284,13 +1367,13 @@
                 هر پردازنده ۲ هسته‌ای x64
               </div>
             </div>
-            <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+            <div class="p-4 rounded-xl bg-white/5 border border-white/5 text-center">
               <div class="text-xs text-slate-400 mb-1" data-i18n="specs_ram_lbl">حافظه رم</div>
               <div class="text-sm font-bold text-white" data-i18n="specs_ram_val">
                 ۱۲۸ مگابایت رم آزاد
               </div>
             </div>
-            <div class="p-4 rounded-xl bg-white/5 border border-white/5">
+            <div class="p-4 rounded-xl bg-white/5 border border-white/5 text-center">
               <div class="text-xs text-slate-400 mb-1" data-i18n="specs_disk_lbl">
                 فضای خالی دیسک
               </div>
@@ -1302,29 +1385,29 @@
         </div>
       </section>
 
-      <!-- FAQ ACCORDION -->
-      <section id="faq" class="py-20 px-4 sm:px-6 max-w-4xl mx-auto">
+      <!-- FAQ ACCORDION (Centered) -->
+      <section id="faq" class="py-20 px-4 sm:px-6 max-w-4xl mx-auto text-center">
         <div class="text-center max-w-2xl mx-auto mb-12">
-          <h2 class="text-3xl font-extrabold text-white mb-3" data-i18n="faq_heading">
+          <h2 class="text-3xl font-extrabold text-white mb-3 text-center" data-i18n="faq_heading">
             پرسش‌های متداول
           </h2>
-          <p class="text-slate-400 text-sm" data-i18n="faq_subheading">
+          <p class="text-slate-400 text-sm text-center" data-i18n="faq_subheading">
             پاسخ شفاف به سوالاتی که ممکن است در ذهن داشته باشید:
           </p>
         </div>
 
-        <div class="space-y-4">
+        <div class="space-y-4 text-center">
           <details
-            class="glass-panel p-5 group cursor-pointer border border-white/10 transition-all"
+            class="glass-panel p-5 group cursor-pointer border border-white/10 transition-all text-center"
           >
             <summary
-              class="flex items-center justify-between font-bold text-white text-sm sm:text-base list-none"
+              class="flex items-center justify-between font-bold text-white text-sm sm:text-base list-none text-right"
             >
               <span data-i18n="faq_q1">آیا نکسوس لانچر کاملاً رایگان است؟</span>
               <span class="faq-icon text-cyan-400 transition-transform duration-200">▼</span>
             </summary>
             <p
-              class="mt-3 text-slate-300 text-xs sm:text-sm leading-relaxed border-t border-white/5 pt-3"
+              class="mt-3 text-slate-300 text-xs sm:text-sm leading-relaxed border-t border-white/5 pt-3 text-right"
               data-i18n="faq_a1"
             >
               بله، صد در صد رایگان و متن‌باز تحت لایسنس MIT. هیچ‌گونه نسخه پولی، اشتراک یا تبلیغات
@@ -1333,16 +1416,16 @@
           </details>
 
           <details
-            class="glass-panel p-5 group cursor-pointer border border-white/10 transition-all"
+            class="glass-panel p-5 group cursor-pointer border border-white/10 transition-all text-center"
           >
             <summary
-              class="flex items-center justify-between font-bold text-white text-sm sm:text-base list-none"
+              class="flex items-center justify-between font-bold text-white text-sm sm:text-base list-none text-right"
             >
               <span data-i18n="faq_q2">آیا بازی‌های کرک‌شده و دستی را هم پشتیبانی می‌کند؟</span>
               <span class="faq-icon text-cyan-400 transition-transform duration-200">▼</span>
             </summary>
             <p
-              class="mt-3 text-slate-300 text-xs sm:text-sm leading-relaxed border-t border-white/5 pt-3"
+              class="mt-3 text-slate-300 text-xs sm:text-sm leading-relaxed border-t border-white/5 pt-3 text-right"
               data-i18n="faq_a2"
             >
               بله! علاوه بر تشخیص خودکار بازی‌های استیم، اپیک گیمز و GOG، می‌توانید هر فایل اجرایی
@@ -1352,16 +1435,16 @@
           </details>
 
           <details
-            class="glass-panel p-5 group cursor-pointer border border-white/10 transition-all"
+            class="glass-panel p-5 group cursor-pointer border border-white/10 transition-all text-center"
           >
             <summary
-              class="flex items-center justify-between font-bold text-white text-sm sm:text-base list-none"
+              class="flex items-center justify-between font-bold text-white text-sm sm:text-base list-none text-right"
             >
               <span data-i18n="faq_q3">به‌روزرسانی‌ها چگونه انجام می‌شوند؟</span>
               <span class="faq-icon text-cyan-400 transition-transform duration-200">▼</span>
             </summary>
             <p
-              class="mt-3 text-slate-300 text-xs sm:text-sm leading-relaxed border-t border-white/5 pt-3"
+              class="mt-3 text-slate-300 text-xs sm:text-sm leading-relaxed border-t border-white/5 pt-3 text-right"
               data-i18n="faq_a3"
             >
               برنامه مجهز به سیستم خودکار Tauri Updater است. به محض انتشار نسخه جدید در گیت‌هاب،
@@ -1371,16 +1454,16 @@
           </details>
 
           <details
-            class="glass-panel p-5 group cursor-pointer border border-white/10 transition-all"
+            class="glass-panel p-5 group cursor-pointer border border-white/10 transition-all text-center"
           >
             <summary
-              class="flex items-center justify-between font-bold text-white text-sm sm:text-base list-none"
+              class="flex items-center justify-between font-bold text-white text-sm sm:text-base list-none text-right"
             >
               <span data-i18n="faq_q4">آیا اکانت یا اطلاعات من برای کسی ارسال می‌شود؟</span>
               <span class="faq-icon text-cyan-400 transition-transform duration-200">▼</span>
             </summary>
             <p
-              class="mt-3 text-slate-300 text-xs sm:text-sm leading-relaxed border-t border-white/5 pt-3"
+              class="mt-3 text-slate-300 text-xs sm:text-sm leading-relaxed border-t border-white/5 pt-3 text-right"
               data-i18n="faq_a4"
             >
               خیر! تمام داده‌ها، آمارها و سیوها به صورت محلی در دیتابیس رمزگذاری‌شده SQLite روی
@@ -1390,43 +1473,48 @@
         </div>
       </section>
 
-      <!-- DOWNLOAD CTA SECTION -->
+      <!-- DOWNLOAD CTA SECTION (Centered with App Brand Gem) -->
       <section id="download" class="py-24 px-4 sm:px-6 max-w-5xl mx-auto text-center">
         <div
-          class="glass-panel p-8 sm:p-14 border border-purple-500/40 relative overflow-hidden shadow-2xl shadow-purple-600/20"
+          class="glass-panel p-8 sm:p-14 border border-purple-500/40 relative overflow-hidden shadow-2xl shadow-purple-600/20 text-center"
         >
           <div
             class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-purple-600 to-cyan-400 p-1 mx-auto mb-6 shadow-xl shadow-purple-500/30"
           >
             <div
-              class="w-full h-full rounded-[14px] bg-[#0c101a] p-2 flex items-center justify-center"
+              class="w-full h-full rounded-[14px] bg-[#0c101a] p-3 flex items-center justify-center"
             >
               <img
-                src="assets/icon.png"
-                alt="Nexus App Icon"
-                class="w-full h-full object-contain"
+                src="assets/brand-mark.svg"
+                alt="Nexus Brand Gem"
+                class="w-full h-full object-contain drop-shadow-[0_0_15px_rgba(124,92,255,0.8)]"
               />
             </div>
           </div>
 
-          <h2 class="text-3xl sm:text-5xl font-black text-white mb-4" data-i18n="cta_heading">
+          <h2
+            class="text-3xl sm:text-5xl font-black text-white mb-4 text-center"
+            data-i18n="cta_heading"
+          >
             همین حالا Nexus Launcher را تجربه کنید
           </h2>
           <p
-            class="text-slate-300 text-sm sm:text-base max-w-xl mx-auto mb-8"
+            class="text-slate-300 text-sm sm:text-base max-w-xl mx-auto mb-8 text-center"
             data-i18n="cta_subheading"
           >
             لذت مدیریت یکپارچه بازی‌ها با نهایت سرعت، بدون کرومیوم و با کمترین مصرف رم در تاریخ
             لانچرهای ویندوز.
           </p>
 
-          <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+          <div
+            class="flex flex-col sm:flex-row items-center justify-center gap-5 mb-8 max-w-2xl mx-auto"
+          >
             <a
               href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.2.0_x64-setup.exe"
               data-role="download-btn"
-              class="btn-nexus-primary w-full sm:w-auto px-10 py-4 rounded-2xl font-black text-base sm:text-lg text-white flex items-center justify-center gap-3 shadow-xl"
+              class="btn-hero-download w-full sm:w-auto px-10 py-5 rounded-2xl font-black text-base sm:text-xl text-white flex items-center justify-center gap-3.5 shadow-xl"
             >
-              <svg class="w-5 h-5 fill-current" viewBox="0 0 88 88">
+              <svg class="w-6 h-6 fill-current shrink-0" viewBox="0 0 88 88">
                 <path
                   d="M0 12.402l35.687-4.86.016 34.423-35.67.203zm35.67 33.529l.027 34.453L.028 75.48.001 45.728zm4.326-39.027L87.914 0v41.525l-47.918.27zm47.919 44.697L87.914 88l-47.886-6.746-.027-34.793z"
                 />
@@ -1438,14 +1526,16 @@
               href="https://github.com/AminDEV81/nexus-launcher/releases/latest"
               target="_blank"
               rel="noopener noreferrer"
-              class="w-full sm:w-auto px-8 py-4 rounded-2xl font-bold text-sm text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all flex items-center justify-center gap-2"
+              class="btn-hero-github w-full sm:w-auto px-8 py-5 rounded-2xl font-bold text-sm sm:text-base text-slate-200 hover:text-white flex items-center justify-center gap-2"
               data-i18n="cta_btn_all_releases"
             >
               سایر نسخه‌ها در گیت‌هاب
             </a>
           </div>
 
-          <div class="text-xs text-slate-400 flex items-center justify-center gap-4 flex-wrap">
+          <div
+            class="text-xs text-slate-400 flex items-center justify-center gap-4 flex-wrap text-center"
+          >
             <span class="font-mono">Nexus_0.2.0_x64-setup.exe (~7.2 MB)</span>
             <span>•</span>
             <span>Ed25519 Minisign Signature Verified</span>
@@ -1454,12 +1544,14 @@
       </section>
     </main>
 
-    <!-- FOOTER WITH REAL APP ICON -->
+    <!-- FOOTER WITH REAL APP BRAND GEM -->
     <footer class="border-t border-white/10 bg-[#040508] py-12 px-4 sm:px-6 relative z-10">
-      <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+      <div
+        class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-right"
+      >
         <div class="flex items-center gap-3">
-          <img src="assets/icon.png" alt="Nexus Icon" class="w-8 h-8 object-contain" />
-          <div>
+          <img src="assets/brand-mark.svg" alt="Nexus Brand Gem" class="w-8 h-8 object-contain" />
+          <div class="text-right">
             <div class="font-black text-white text-base">Nexus Launcher</div>
             <div class="text-[11px] text-slate-400" data-i18n="footer_license">
               منتشر شده تحت مجوز رسمی و آزاد MIT
@@ -1467,7 +1559,7 @@
           </div>
         </div>
 
-        <div class="text-xs text-slate-400 text-center sm:text-left">
+        <div class="text-xs text-slate-400 text-center">
           <p>
             <span data-i18n="footer_author">طراحی و توسعه توسط</span>
             <a
@@ -1483,7 +1575,7 @@
           </p>
         </div>
 
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-4 justify-center">
           <a
             href="https://github.com/AminDEV81/nexus-launcher"
             target="_blank"
