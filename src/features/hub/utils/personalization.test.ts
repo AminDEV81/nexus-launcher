@@ -46,6 +46,7 @@ function createMockGame(overrides: Partial<Game> = {}): Game {
     added_at: new Date().toISOString(),
     tag_ids: [],
     user_rating: null,
+    is_memory: false,
     ...overrides,
   }
 }

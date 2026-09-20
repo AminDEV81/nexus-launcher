@@ -16,6 +16,7 @@ export function getPlaytimeTier(seconds: number): PlaytimeTierId {
 }
 
 export function matchesScope(game: Game, scope: LibraryScope): boolean {
+  if (game.is_memory) return false
   const unreleased = isGameUnreleased(game.release_date) && !game.is_installed
   switch (scope) {
     case 'all':
@@ -52,6 +53,9 @@ export function matchesSearch(game: Game, query: string): boolean {
  *  file — this only makes sense to apply client-side after the full
  *  list is already in memory, not as a SQL WHERE clause. */
 export function matchesFilters(game: Game, filters: AdvancedFilters): boolean {
+  if (filters.favoritesOnly && !game.is_favorite) {
+    return false
+  }
   if (
     filters.genres.size > 0 &&
     ![...filters.genres].every((genre) => game.genres.includes(genre))

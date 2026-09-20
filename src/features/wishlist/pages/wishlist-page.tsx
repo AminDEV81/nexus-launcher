@@ -170,7 +170,8 @@ export function WishlistPage() {
   // Filter games that belong to wishlist
   const wishlistGames = useMemo(() => {
     return allGames.filter(
-      (g) => g.is_wishlist || (isGameUnreleased(g.release_date) && !g.is_installed),
+      (g) =>
+        !g.is_memory && (g.is_wishlist || (isGameUnreleased(g.release_date) && !g.is_installed)),
     )
   }, [allGames])
 

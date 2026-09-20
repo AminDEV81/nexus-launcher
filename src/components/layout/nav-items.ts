@@ -2,7 +2,6 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Gamepad2,
   History,
-  Heart,
   HardDrive,
   FolderHeart,
   EyeOff,
@@ -11,6 +10,7 @@ import {
   BarChart3,
   Settings,
   Download,
+  Sparkles,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -31,10 +31,10 @@ export const DISCOVER_NAV_ITEMS: NavItem[] = [
 export const LIBRARY_NAV_ITEMS: NavItem[] = [
   { label: 'Library', path: '/', icon: Gamepad2 },
   { label: 'Recently Played', path: '/recently-played', icon: History },
-  { label: 'Favorites', path: '/favorites', icon: Heart },
   { label: 'Installed', path: '/installed', icon: HardDrive },
   { label: 'Collections', path: '/collections', icon: FolderHeart },
   { label: 'Hidden', path: '/hidden', icon: EyeOff },
+  { label: 'Memory', path: '/memory', icon: Sparkles },
 ]
 
 /** Secondary items, rendered under a "Manage" divider. */

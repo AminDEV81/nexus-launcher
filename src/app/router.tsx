@@ -10,6 +10,7 @@ import { HubPage } from '@/features/hub/pages/hub-page'
 import { HubGamePage } from '@/features/hub/pages/hub-game-page'
 import { HubFeedPage } from '@/features/hub/pages/hub-feed-page'
 import { WishlistPage } from '@/features/wishlist/pages/wishlist-page'
+import { MemoryPage } from '@/features/memory/pages/memory-page'
 import { LibrarySkeleton } from '@/features/library/components/library-skeleton'
 import { LazyStatsPage } from './lazy-stats-page'
 import { LazyDownloadsPage } from './lazy-downloads-page'
@@ -124,6 +125,10 @@ export const router = createHashRouter([
             emptyDescription="Games you hide from your library will show up here."
           />
         ),
+      },
+      {
+        path: '/memory',
+        element: <MemoryPage />,
       },
       {
         path: '/stats',

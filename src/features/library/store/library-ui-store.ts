@@ -24,6 +24,7 @@ export interface AdvancedFilters {
   yearRange: { from: number | null; to: number | null }
   tags: Set<string>
   playtime: Set<PlaytimeTierId>
+  favoritesOnly: boolean
 }
 
 function emptyFilters(): AdvancedFilters {
@@ -35,6 +36,7 @@ function emptyFilters(): AdvancedFilters {
     yearRange: { from: null, to: null },
     tags: new Set(),
     playtime: new Set(),
+    favoritesOnly: false,
   }
 }
 
@@ -47,7 +49,8 @@ export function isFiltersEmpty(filters: AdvancedFilters): boolean {
     filters.yearRange.from === null &&
     filters.yearRange.to === null &&
     filters.tags.size === 0 &&
-    filters.playtime.size === 0
+    filters.playtime.size === 0 &&
+    !filters.favoritesOnly
   )
 }
 
@@ -60,6 +63,7 @@ interface LibraryUiState {
   setViewMode: (value: ViewMode) => void
   filters: AdvancedFilters
   toggleFilter: (field: FilterField, value: string) => void
+  toggleFavoritesOnly: () => void
   setYearRange: (from: number | null, to: number | null) => void
   clearFilters: () => void
   customOrder: string[]
@@ -92,6 +96,13 @@ export const useLibraryUiStore = create<LibraryUiState>()(
           else next.add(value)
           return { filters: { ...state.filters, [field]: next } }
         }),
+      toggleFavoritesOnly: () =>
+        set((state) => ({
+          filters: {
+            ...state.filters,
+            favoritesOnly: !state.filters.favoritesOnly,
+          },
+        })),
       setYearRange: (from, to) =>
         set((state) => ({
           filters: {

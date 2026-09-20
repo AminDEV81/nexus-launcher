@@ -1,6 +1,7 @@
 use crate::db::models::Game;
 use crate::db::Database;
 use crate::error::{AppError, AppResult};
+use rusqlite::OptionalExtension;
 use serde::Deserialize;
 use tauri::{AppHandle, State};
 use uuid::Uuid;
@@ -259,14 +260,66 @@ pub fn update_game_flags(
     Ok(game)
 }
 
-/// Removes the game from the library only. Per the product requirements
-/// this must never touch the actual installed game on disk — this
-/// command only ever runs a `DELETE FROM games`, nothing under
-/// `install_path`. `ON DELETE CASCADE` (declared in the migration) takes
-/// care of the game's collection memberships, tags, playtime history,
-/// and cached artwork rows.
+/// Removes the game from the active library by archiving it to Memory.
+/// Per product requirements, removing a game moves it to Memory to preserve
+/// all playtime history, achievements, and stats permanently.
 #[tauri::command]
-pub fn delete_game(app: AppHandle, db: State<'_, Database>, id: String) -> AppResult<()> {
+pub fn delete_game(db: State<'_, Database>, id: String) -> AppResult<()> {
+    let mut conn = db.connection.lock().expect("db mutex poisoned");
+    let tx = conn.transaction()?;
+
+    // 1. Remove from active downloads
+    tx.execute("DELETE FROM downloads WHERE game_id = ?1", [&id])?;
+
+    // 2. Remove from collections
+    tx.execute("DELETE FROM collection_games WHERE game_id = ?1", [&id])?;
+
+    // 3. Mark as memory and uninstalled
+    let changed = tx.execute(
+        "UPDATE games SET is_memory = 1, is_installed = 0 WHERE id = ?1",
+        [&id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!("no game with id {id}")));
+    }
+
+    tx.commit()?;
+    Ok(())
+}
+
+/// Restores an archived game from Memory back to the active library.
+#[tauri::command]
+pub fn restore_game_from_memory(
+    db: State<'_, Database>,
+    id: String,
+    profile_id: Option<String>,
+) -> AppResult<Game> {
+    let conn = db.connection.lock().expect("db mutex poisoned");
+    let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
+
+    let changed = conn.execute(
+        "UPDATE games SET is_memory = 0 WHERE id = ?1 AND is_memory = 1",
+        [&id],
+    )?;
+    if changed == 0 {
+        return Err(AppError::NotFound(format!("no memory entry with id {id}")));
+    }
+
+    let sql = format!(
+        "SELECT {} FROM games WHERE id = ?2",
+        Game::select_columns_with_profile()
+    );
+    let game = conn.query_row(&sql, rusqlite::params![&target_profile, &id], Game::from_row)?;
+    Ok(game)
+}
+
+/// Permanently purges a game, all its saves, sessions, artwork, and database records.
+#[tauri::command]
+pub fn permanently_delete_game(
+    app: AppHandle,
+    db: State<'_, Database>,
+    id: String,
+) -> AppResult<()> {
     let mut conn = db.connection.lock().expect("db mutex poisoned");
     let tx = conn.transaction()?;
 
@@ -306,29 +359,251 @@ pub fn delete_game(app: AppHandle, db: State<'_, Database>, id: String) -> AppRe
 
     tx.commit()?;
 
-    // Only delete the game's cached artwork folder if auto_delete_artwork_on_remove is enabled in settings.
-    // Otherwise, retain it until the user manually triggers Storage Cleanup in Settings.
-    let auto_delete: bool = conn
-        .query_row(
-            "SELECT value FROM settings WHERE key = 'auto_delete_artwork_on_remove'",
-            [],
-            |row| row.get(0),
-        )
-        .map(|v: String| v == "true" || v == "1")
-        .unwrap_or(false);
-
-    drop(conn);
-
-    if auto_delete {
-        if let Ok(data_dir) = crate::paths::app_data_dir(&app) {
-            let artwork_dir = data_dir.join("artwork").join(&id);
-            if artwork_dir.exists() {
-                let _ = std::fs::remove_dir_all(artwork_dir);
-            }
+    // Clean up cached artwork folder
+    if let Ok(data_dir) = crate::paths::app_data_dir(&app) {
+        let artwork_dir = data_dir.join("artwork").join(&id);
+        if artwork_dir.exists() {
+            let _ = std::fs::remove_dir_all(artwork_dir);
         }
     }
 
     Ok(())
+}
+
+fn generate_fluctuating_sessions(
+    diff_seconds: i64,
+    days_span: i64,
+    now_utc: chrono::DateTime<chrono::Utc>,
+) -> Vec<(String, String, i64)> {
+    let max_day_secs: i64 = 12 * 3600; // 12 hours max per day
+    let min_days = (diff_seconds as f64 / max_day_secs as f64).ceil() as i64;
+    let effective_days = days_span.max(min_days).max(1);
+
+    let avg_hours = (diff_seconds as f64 / 3600.0) / (effective_days as f64);
+    let mut daily_allocations: Vec<(i64, i64)> = Vec::new();
+
+    if avg_hours < 2.0 && effective_days > 5 {
+        // Sparse distribution across the timeframe (e.g. 20h over 100 days)
+        // Average session ~2.5h (9000s)
+        let target_sessions = ((diff_seconds as f64 / 9000.0).round() as i64)
+            .clamp(min_days, effective_days)
+            .max(1);
+
+        let step = effective_days as f64 / target_sessions as f64;
+        let mut active_days: Vec<i64> = (0..target_sessions)
+            .map(|i| ((i as f64 * step).round() as i64).min(effective_days - 1))
+            .collect();
+        active_days.sort_unstable();
+        active_days.dedup();
+
+        let num_active = active_days.len();
+        let mut weights: Vec<f64> = Vec::with_capacity(num_active);
+        for i in 0..num_active {
+            // Alternating wave: 1.25 and 0.75 (at least 20% diff)
+            if i % 2 == 0 {
+                weights.push(1.22);
+            } else {
+                weights.push(0.78);
+            }
+        }
+        let sum_weights: f64 = weights.iter().sum();
+        let mut allocated_sum = 0i64;
+        let mut day_map: std::collections::BTreeMap<i64, i64> = std::collections::BTreeMap::new();
+
+        for (idx, &d) in active_days.iter().enumerate() {
+            let dur = ((diff_seconds as f64 * (weights[idx] / sum_weights)).round() as i64)
+                .min(max_day_secs);
+            day_map.insert(d, dur);
+            allocated_sum += dur;
+        }
+
+        // Fix remainder
+        let mut rem = diff_seconds - allocated_sum;
+        for &d in &active_days {
+            if rem == 0 {
+                break;
+            }
+            let current = day_map.get_mut(&d).unwrap();
+            if rem > 0 && *current < max_day_secs {
+                let add = rem.min(max_day_secs - *current);
+                *current += add;
+                rem -= add;
+            } else if rem < 0 && *current > 1800 {
+                let sub = (-rem).min(*current - 1800);
+                *current -= sub;
+                rem += sub;
+            }
+        }
+
+        for (d, dur) in day_map {
+            if dur > 0 {
+                daily_allocations.push((d, dur));
+            }
+        }
+    } else if diff_seconds >= effective_days * max_day_secs {
+        // Exact capacity: all days 12h
+        for d in 0..effective_days {
+            daily_allocations.push((d, max_day_secs));
+        }
+    } else {
+        // Dense distribution: fluctuating weights differing by >= 20%
+        // Pattern: alternating between ~1.22 and ~0.78
+        let mut weights: Vec<f64> = Vec::with_capacity(effective_days as usize);
+        for i in 0..effective_days {
+            if i % 2 == 0 {
+                weights.push(1.22);
+            } else {
+                weights.push(0.78);
+            }
+        }
+        let sum_weights: f64 = weights.iter().sum();
+        let mut allocated = vec![0i64; effective_days as usize];
+        let mut current_sum = 0i64;
+
+        for i in 0..effective_days as usize {
+            let dur = ((diff_seconds as f64 * (weights[i] / sum_weights)).round() as i64)
+                .min(max_day_secs);
+            allocated[i] = dur;
+            current_sum += dur;
+        }
+
+        // Distribute remainder safely without exceeding max_day_secs
+        let mut rem = diff_seconds - current_sum;
+        for item in allocated.iter_mut().take(effective_days as usize) {
+            if rem == 0 {
+                break;
+            }
+            if rem > 0 && *item < max_day_secs {
+                let add = rem.min(max_day_secs - *item);
+                *item += add;
+                rem -= add;
+            } else if rem < 0 && *item > 1800 {
+                let sub = (-rem).min(*item - 1800);
+                *item -= sub;
+                rem += sub;
+            }
+        }
+
+        for (d, dur) in allocated.into_iter().enumerate() {
+            if dur > 0 {
+                daily_allocations.push((d as i64, dur));
+            }
+        }
+    }
+
+    let mut sessions = Vec::new();
+    for (day_offset, dur) in daily_allocations {
+        let day_date = now_utc.date_naive() - chrono::Duration::days(day_offset);
+        let start_naive = day_date
+            .and_hms_opt(15, 0, 0)
+            .unwrap_or_else(|| now_utc.naive_utc());
+        let start_utc =
+            chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(start_naive, chrono::Utc);
+        let end_utc = start_utc + chrono::Duration::seconds(dur);
+
+        sessions.push((start_utc.to_rfc3339(), end_utc.to_rfc3339(), dur));
+    }
+
+    sessions
+}
+
+/// Manually sets a game's total playtime for the active profile by adjusting sessions.
+/// If playtime is increased, it distributes the new playtime across `days_span` past days,
+/// strictly enforcing that no day receives more than 12 hours (43,200 seconds), and
+/// varying each day by at least 20% to avoid an artificial flat-line curve.
+#[tauri::command]
+pub fn set_game_playtime(
+    db: State<'_, Database>,
+    id: String,
+    profile_id: Option<String>,
+    total_seconds: i64,
+    days_span: Option<i64>,
+) -> AppResult<Game> {
+    let conn = db.connection.lock().expect("db mutex poisoned");
+    let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
+    let target_seconds = total_seconds.max(0);
+
+    let current_total: i64 = conn.query_row(
+        "SELECT COALESCE(SUM(duration_seconds), 0) FROM playtime_sessions WHERE game_id = ?1 AND profile_id = ?2",
+        [&id, &target_profile],
+        |row| row.get(0),
+    )?;
+
+    let diff = target_seconds - current_total;
+    if diff > 0 {
+        let sessions =
+            generate_fluctuating_sessions(diff, days_span.unwrap_or(1), chrono::Utc::now());
+        let mut latest_started_at: Option<String> = None;
+
+        for (start_str, end_str, day_dur) in sessions {
+            let session_id = Uuid::new_v4().to_string();
+            if latest_started_at.is_none() {
+                latest_started_at = Some(start_str.clone());
+            }
+
+            conn.execute(
+                "INSERT INTO playtime_sessions (id, game_id, profile_id, started_at, ended_at, duration_seconds)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![session_id, id, target_profile, start_str, end_str, day_dur],
+            )?;
+        }
+
+        if let Some(latest) = latest_started_at {
+            let _ = conn.execute(
+                "UPDATE games SET last_played_at = ?1, total_playtime_seconds = ?2 WHERE id = ?3",
+                rusqlite::params![latest, target_seconds, id],
+            );
+        }
+    } else if diff < 0 {
+        let mut to_remove = -diff;
+        let mut stmt = conn.prepare(
+            "SELECT id, duration_seconds FROM playtime_sessions
+             WHERE game_id = ?1 AND profile_id = ?2
+             ORDER BY started_at DESC",
+        )?;
+        let sessions: Vec<(String, i64)> = stmt
+            .query_map([&id, &target_profile], |row| {
+                Ok((row.get(0)?, row.get::<_, Option<i64>>(1)?.unwrap_or(0)))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(stmt);
+
+        for (sid, dur) in sessions {
+            if to_remove <= 0 {
+                break;
+            }
+            if dur <= to_remove {
+                conn.execute("DELETE FROM playtime_sessions WHERE id = ?1", [&sid])?;
+                to_remove -= dur;
+            } else {
+                conn.execute(
+                    "UPDATE playtime_sessions SET duration_seconds = duration_seconds - ?1 WHERE id = ?2",
+                    rusqlite::params![to_remove, sid],
+                )?;
+                to_remove = 0;
+            }
+        }
+
+        let latest_played: Option<String> = conn
+            .query_row(
+                "SELECT started_at FROM playtime_sessions WHERE game_id = ?1 AND profile_id = ?2 ORDER BY started_at DESC LIMIT 1",
+                [&id, &target_profile],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        let _ = conn.execute(
+            "UPDATE games SET last_played_at = ?1, total_playtime_seconds = ?2 WHERE id = ?3",
+            rusqlite::params![latest_played, target_seconds, id],
+        );
+    }
+
+    let sql = format!(
+        "SELECT {} FROM games WHERE id = ?2",
+        Game::select_columns_with_profile()
+    );
+    let game = conn.query_row(&sql, rusqlite::params![&target_profile, &id], Game::from_row)?;
+    Ok(game)
 }
 
 /// Moves a wishlist entry into the library proper (the context menu's

@@ -45,6 +45,23 @@ export function deleteGame(id: string) {
   return call<void>('delete_game', { id })
 }
 
+export function restoreGameFromMemory(id: string) {
+  return call<Game>('restore_game_from_memory', { id })
+}
+
+export function permanentlyDeleteGame(id: string) {
+  return call<void>('permanently_delete_game', { id })
+}
+
+export function setGamePlaytime(
+  id: string,
+  totalSeconds: number,
+  profileId?: string,
+  daysSpan?: number,
+) {
+  return call<Game>('set_game_playtime', { id, totalSeconds, profileId, daysSpan })
+}
+
 export function promoteWishlistGame(id: string) {
   return call<Game>('promote_wishlist_game', { id })
 }

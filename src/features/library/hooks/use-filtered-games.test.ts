@@ -42,6 +42,7 @@ function makeGame(overrides: Partial<Game>): Game {
     added_at: '2026-01-01 00:00:00',
     tag_ids: [],
     user_rating: null,
+    is_memory: false,
     ...overrides,
   }
 }
@@ -80,6 +81,7 @@ describe('matchesFilters', () => {
       yearRange: { from: null, to: null },
       tags: new Set(['t-backlog']),
       playtime: new Set(['10h-50h']),
+      favoritesOnly: false,
     }
     expect(matchesFilters(game, filters)).toBe(true)
 
@@ -100,6 +102,12 @@ describe('matchesFilters', () => {
     ).toBe(false)
     // No tag overlap → false.
     expect(matchesFilters(game, { ...filters, tags: new Set(['t-other']) })).toBe(false)
+
+    // Favorites only filter
+    expect(matchesFilters(game, { ...filters, favoritesOnly: true })).toBe(false)
+    expect(
+      matchesFilters(makeGame({ ...game, is_favorite: true }), { ...filters, favoritesOnly: true }),
+    ).toBe(true)
   })
 
   it('treats empty sets as "no filter on this field"', () => {
@@ -113,6 +121,7 @@ describe('matchesFilters', () => {
         yearRange: { from: null, to: null },
         tags: new Set(),
         playtime: new Set(),
+        favoritesOnly: false,
       }),
     ).toBe(true)
   })
@@ -181,5 +190,20 @@ describe('matchesScope', () => {
     })
     expect(matchesScope(installed, 'all')).toBe(true)
     expect(matchesScope(installed, 'installed')).toBe(true)
+  })
+
+  it('excludes memory games from all standard library scopes', () => {
+    const memoryGame = makeGame({
+      is_memory: true,
+      is_installed: true,
+      is_favorite: true,
+      last_played_at: '2026-01-01 00:00:00',
+    })
+    expect(matchesScope(memoryGame, 'all')).toBe(false)
+    expect(matchesScope(memoryGame, 'recent')).toBe(false)
+    expect(matchesScope(memoryGame, 'favorites')).toBe(false)
+    expect(matchesScope(memoryGame, 'installed')).toBe(false)
+    expect(matchesScope(memoryGame, 'hidden')).toBe(false)
+    expect(matchesScope(memoryGame, 'wishlist')).toBe(false)
   })
 })

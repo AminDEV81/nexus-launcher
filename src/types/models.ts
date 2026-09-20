@@ -27,6 +27,7 @@ export interface Game {
   /** Game Hub wishlist flag — the game lives in the Wishlist view until
    *  promoted to the library or installed locally. */
   is_wishlist: boolean
+  is_memory: boolean
 
   is_favorite: boolean
   is_hidden: boolean

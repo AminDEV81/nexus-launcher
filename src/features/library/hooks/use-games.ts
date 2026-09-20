@@ -119,9 +119,13 @@ export function useDeleteGame() {
       const targetGame = Array.isArray(cached) ? cached.find((g) => g.id === id) : null
       const isWishlist = Boolean(targetGame?.is_wishlist)
 
-      // Guard against non-array queries (e.g. useGame stores a single Game object under ['games', profileId, id])
+      // Mark as memory in games list cache so it leaves library views but remains for Memory view
       queryClient.setQueriesData<Game[]>({ queryKey: gamesKey }, (games) =>
-        Array.isArray(games) ? games.filter((game) => game.id !== id) : games,
+        Array.isArray(games)
+          ? games.map((game) =>
+              game.id === id ? { ...game, is_memory: true, is_installed: false } : game,
+            )
+          : games,
       )
       queryClient.setQueriesData<Game[]>({ queryKey: ['collections'] }, (games) =>
         Array.isArray(games) ? games.filter((game) => game.id !== id) : games,
@@ -145,7 +149,7 @@ export function useDeleteGame() {
         useUiStore.getState().selectGame(null)
       }
       queryClient.removeQueries({ queryKey: ['games', id] })
-      toast(context?.isWishlist ? 'Removed from your wishlist.' : 'Removed from your library.')
+      toast(context?.isWishlist ? 'Removed from your wishlist.' : 'Game moved to Memory.')
     },
   })
 }
@@ -353,6 +357,101 @@ export function useSyncWishlistMetadata() {
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : 'Failed to sync wishlist metadata.')
+    },
+  })
+}
+
+export function useRestoreGameFromMemory() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => gamesService.restoreGameFromMemory(id),
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: gamesKey })
+      queryClient.setQueriesData<Game[]>({ queryKey: gamesKey }, (games) =>
+        Array.isArray(games)
+          ? games.map((g) => (g.id === id ? { ...g, is_memory: false } : g))
+          : games,
+      )
+    },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: gamesKey })
+      toast.error(error instanceof Error ? error.message : 'Could not restore game from memory.')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: gamesKey })
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
+    },
+    onSuccess: (game) => {
+      toast.success(`${game.name} restored to your library.`)
+    },
+  })
+}
+
+export function usePermanentlyDeleteGame() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => gamesService.permanentlyDeleteGame(id),
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: gamesKey })
+      queryClient.setQueriesData<Game[]>({ queryKey: gamesKey }, (games) =>
+        Array.isArray(games) ? games.filter((g) => g.id !== id) : games,
+      )
+    },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: gamesKey })
+      toast.error(error instanceof Error ? error.message : 'Could not permanently delete game.')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: gamesKey })
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
+      queryClient.invalidateQueries({ queryKey: ['collections'] })
+    },
+    onSuccess: (_data, id) => {
+      if (useUiStore.getState().selectedGameId === id) {
+        useUiStore.getState().selectGame(null)
+      }
+      queryClient.removeQueries({ queryKey: ['games', id] })
+      toast.success('Game permanently deleted.')
+    },
+  })
+}
+
+export function useSetGamePlaytime() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      totalSeconds,
+      daysSpan,
+    }: {
+      id: string
+      totalSeconds: number
+      daysSpan?: number
+    }) => gamesService.setGamePlaytime(id, totalSeconds, undefined, daysSpan),
+    onMutate: async ({ id, totalSeconds }) => {
+      await queryClient.cancelQueries({ queryKey: gamesKey })
+      queryClient.setQueriesData<Game[]>({ queryKey: gamesKey }, (games) =>
+        Array.isArray(games)
+          ? games.map((g) => (g.id === id ? { ...g, total_playtime_seconds: totalSeconds } : g))
+          : games,
+      )
+      queryClient.setQueryData<Game>(['games', id], (game) =>
+        game ? { ...game, total_playtime_seconds: totalSeconds } : game,
+      )
+    },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: gamesKey })
+      toast.error(error instanceof Error ? error.message : 'Could not update playtime.')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: gamesKey })
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
+    },
+    onSuccess: () => {
+      toast.success('Playtime updated.')
     },
   })
 }

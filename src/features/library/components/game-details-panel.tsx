@@ -86,6 +86,7 @@ import { LogoPickerModal } from './logo-picker-modal'
 import { ArtworkEditorModal } from './artwork-editor-modal'
 import { InstallationEditorModal } from './installation-editor-modal'
 import { TagEditorModal } from './tag-editor-modal'
+import { PlaytimeEditorModal } from './playtime-editor-modal'
 import { GameSaveCard } from './game-save-card'
 import { SidebarSoundtrackWidget } from '@/features/soundtrack/components/sidebar/sidebar-soundtrack-widget'
 import type { Game } from '@/types/models'
@@ -158,6 +159,7 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
   const [backgroundEditorOpen, setBackgroundEditorOpen] = useState(false)
   const [installationEditorOpen, setInstallationEditorOpen] = useState(false)
   const [tagsEditorOpen, setTagsEditorOpen] = useState(false)
+  const [playtimeEditorOpen, setPlaytimeEditorOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'saves' | 'media' | 'launch'>('overview')
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [copiedFeedback, setCopiedFeedback] = useState(false)
@@ -802,6 +804,20 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
                 iconBg="bg-cyan-500/10 border-cyan-500/20"
                 label="Total Playtime"
                 value={formatPlaytime(game.total_playtime_seconds)}
+                action={
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPlaytimeEditorOpen(true)
+                    }}
+                    title="Edit playtime"
+                    aria-label="Edit playtime"
+                    className="flex size-6 items-center justify-center rounded-lg text-subtle opacity-0 transition-all hover:bg-surface hover:text-cyan-400 group-hover/stat:opacity-100 cursor-pointer"
+                  >
+                    <Pencil className="size-3" />
+                  </button>
+                }
               />
               <StatCard
                 icon={CalendarClock}
@@ -1265,6 +1281,12 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
 
       <TagEditorModal game={game} open={tagsEditorOpen} onClose={() => setTagsEditorOpen(false)} />
 
+      <PlaytimeEditorModal
+        game={game}
+        open={playtimeEditorOpen}
+        onClose={() => setPlaytimeEditorOpen(false)}
+      />
+
       <LogoPickerModal
         gameId={game.id}
         open={logoPickerOpen}
@@ -1447,6 +1469,7 @@ function StatCard({
   label,
   value,
   title,
+  action,
 }: {
   icon: typeof Clock
   iconColor: string
@@ -1454,11 +1477,12 @@ function StatCard({
   label: string
   value: string
   title?: string
+  action?: React.ReactNode
 }) {
   return (
     <div
       title={title}
-      className="flex items-center gap-3 rounded-2xl border border-border/80 bg-surface-raised/80 p-3 shadow-sm transition-all hover:bg-surface-raised"
+      className="group/stat flex items-center gap-3 rounded-2xl border border-border/80 bg-surface-raised/80 p-3 shadow-sm transition-all hover:bg-surface-raised"
     >
       <div
         className={cn(
@@ -1472,6 +1496,7 @@ function StatCard({
         <div className="truncate text-xs font-extrabold text-text">{value}</div>
         <div className="text-[10px] font-medium text-subtle truncate">{label}</div>
       </div>
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   )
 }

@@ -29,6 +29,8 @@ pub struct Game {
     /// Game Hub wishlist: hub games tracked for later. Cleared when the
     /// game is promoted to the library or gains a local install.
     pub is_wishlist: bool,
+    /// Memory: archived games preserved with all historical stats.
+    pub is_memory: bool,
 
     pub is_favorite: bool,
     pub is_hidden: bool,
@@ -70,7 +72,7 @@ impl Game {
     pub const SELECT_COLUMNS: &'static str = "
         id, name, executable_path, install_path, install_size_bytes, version,
         launch_arguments, is_installed, pre_launch_command, post_launch_command,
-        source, steam_app_id, igdb_id, is_wishlist, is_favorite,
+        source, steam_app_id, igdb_id, is_wishlist, is_memory, is_favorite,
         is_hidden, description, developer, publisher, release_date, genres,
         platforms, age_rating, metacritic_score, opencritic_score, trailer_url,
         cover_path, cover_is_animated, banner_path, logo_path, background_path, animated_cover_enabled,
@@ -94,7 +96,7 @@ impl Game {
     pub fn select_columns_with_profile() -> &'static str {
         "id, name, executable_path, install_path, install_size_bytes, version,
         launch_arguments, is_installed, pre_launch_command, post_launch_command,
-        source, steam_app_id, igdb_id, is_wishlist, is_favorite,
+        source, steam_app_id, igdb_id, is_wishlist, is_memory, is_favorite,
         is_hidden, description, developer, publisher, release_date, genres,
         platforms, age_rating, metacritic_score, opencritic_score, trailer_url,
         cover_path, cover_is_animated, banner_path, logo_path, background_path, animated_cover_enabled,
@@ -140,6 +142,7 @@ impl Game {
             steam_app_id: row.get("steam_app_id")?,
             igdb_id: row.get("igdb_id")?,
             is_wishlist: row.get("is_wishlist")?,
+            is_memory: row.get("is_memory").unwrap_or(false),
             is_favorite: row.get("is_favorite")?,
             is_hidden: row.get("is_hidden")?,
             description: row.get("description")?,

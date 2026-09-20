@@ -11,6 +11,7 @@ import {
   Calendar,
   Check,
   Clock,
+  Heart,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useGames } from '../hooks/use-games'
@@ -65,11 +66,13 @@ export function AdvancedFiltersPanel() {
   const containerRef = useRef<HTMLDivElement>(null)
   const filters = useLibraryUiStore((s) => s.filters)
   const toggleFilter = useLibraryUiStore((s) => s.toggleFilter)
+  const toggleFavoritesOnly = useLibraryUiStore((s) => s.toggleFavoritesOnly)
   const setYearRange = useLibraryUiStore((s) => s.setYearRange)
   const clearFilters = useLibraryUiStore((s) => s.clearFilters)
   const options = useFilterOptions()
 
   const activeCount =
+    (filters.favoritesOnly ? 1 : 0) +
     filters.genres.size +
     filters.platforms.size +
     filters.developers.size +
@@ -172,6 +175,37 @@ export function AdvancedFiltersPanel() {
             {/* Body */}
             {hasAnyOptions ? (
               <div className="mt-3 flex max-h-96 flex-col gap-4 overflow-y-auto pr-1">
+                {/* Favorites Quick Filter */}
+                <button
+                  type="button"
+                  onClick={toggleFavoritesOnly}
+                  className={cn(
+                    'flex w-full items-center justify-between rounded-xl border p-2.5 text-xs font-bold transition-all cursor-pointer select-none',
+                    filters.favoritesOnly
+                      ? 'border-red-500/40 bg-red-500/10 text-red-400 ring-2 ring-red-500/20 shadow-sm'
+                      : 'border-border/80 bg-surface/70 text-muted hover:border-border hover:bg-surface hover:text-text',
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        'flex size-6 items-center justify-center rounded-lg border',
+                        filters.favoritesOnly
+                          ? 'border-red-500/30 bg-red-500/20 text-red-400'
+                          : 'border-border/60 bg-surface text-subtle',
+                      )}
+                    >
+                      <Heart className={cn('size-3.5', filters.favoritesOnly && 'fill-red-400')} />
+                    </div>
+                    <span>Favorites Only</span>
+                  </div>
+                  {filters.favoritesOnly && (
+                    <span className="flex size-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
+                      <Check className="size-2.5" />
+                    </span>
+                  )}
+                </button>
+
                 <TagFilterSection
                   tags={options.tags}
                   selected={filters.tags}

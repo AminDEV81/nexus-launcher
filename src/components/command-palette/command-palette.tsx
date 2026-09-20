@@ -75,26 +75,28 @@ export function CommandPalette() {
               heading="Games"
               className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-subtle [&_[cmdk-group-items]]:mt-1"
             >
-              {games.map((game) => {
-                const cover = assetUrl(game.cover_path)
-                return (
-                  <Command.Item
-                    key={game.id}
-                    value={game.name}
-                    onSelect={() => handleSelectGame(game.id)}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-text data-[selected=true]:bg-surface-raised"
-                  >
-                    <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-raised">
-                      {cover ? (
-                        <img src={cover} alt="" className="size-full object-cover" />
-                      ) : (
-                        <Gamepad2 className="size-3.5 text-subtle" />
-                      )}
-                    </span>
-                    <span className="truncate">{game.name}</span>
-                  </Command.Item>
-                )
-              })}
+              {games
+                .filter((game) => !game.is_memory)
+                .map((game) => {
+                  const cover = assetUrl(game.cover_path)
+                  return (
+                    <Command.Item
+                      key={game.id}
+                      value={game.name}
+                      onSelect={() => handleSelectGame(game.id)}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-text data-[selected=true]:bg-surface-raised"
+                    >
+                      <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-raised">
+                        {cover ? (
+                          <img src={cover} alt="" className="size-full object-cover" />
+                        ) : (
+                          <Gamepad2 className="size-3.5 text-subtle" />
+                        )}
+                      </span>
+                      <span className="truncate">{game.name}</span>
+                    </Command.Item>
+                  )
+                })}
             </Command.Group>
           )}
 
