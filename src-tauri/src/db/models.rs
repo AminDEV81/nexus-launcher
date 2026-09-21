@@ -70,12 +70,12 @@ pub struct Game {
 
 impl Game {
     pub const SELECT_COLUMNS: &'static str = "
-        id, name, executable_path, install_path, install_size_bytes, version,
-        launch_arguments, is_installed, pre_launch_command, post_launch_command,
-        source, steam_app_id, igdb_id, is_wishlist, is_memory, is_favorite,
-        is_hidden, description, developer, publisher, release_date, genres,
-        platforms, age_rating, metacritic_score, opencritic_score, trailer_url,
-        cover_path, cover_is_animated, banner_path, logo_path, background_path, animated_cover_enabled,
+        games.id, games.name, games.executable_path, games.install_path, games.install_size_bytes, games.version,
+        games.launch_arguments, games.is_installed, games.pre_launch_command, games.post_launch_command,
+        games.source, games.steam_app_id, games.igdb_id, games.is_wishlist, games.is_memory, games.is_favorite,
+        games.is_hidden, games.description, games.developer, games.publisher, games.release_date, games.genres,
+        games.platforms, games.age_rating, games.metacritic_score, games.opencritic_score, games.trailer_url,
+        games.cover_path, games.cover_is_animated, games.banner_path, games.logo_path, games.background_path, games.animated_cover_enabled,
         COALESCE((
             SELECT SUM(ps.duration_seconds)
             FROM playtime_sessions ps
@@ -88,18 +88,18 @@ impl Game {
             WHERE ps.game_id = games.id
               AND ps.profile_id = COALESCE((SELECT value FROM settings WHERE key = 'active_profile_id'), 'default')
         ) AS last_played_at,
-        added_at, user_rating,
+        games.added_at, games.user_rating,
         (SELECT COALESCE(json_group_array(gt.tag_id), '[]')
          FROM game_tags AS gt WHERE gt.game_id = games.id) AS tag_ids
     ";
 
     pub fn select_columns_with_profile() -> &'static str {
-        "id, name, executable_path, install_path, install_size_bytes, version,
-        launch_arguments, is_installed, pre_launch_command, post_launch_command,
-        source, steam_app_id, igdb_id, is_wishlist, is_memory, is_favorite,
-        is_hidden, description, developer, publisher, release_date, genres,
-        platforms, age_rating, metacritic_score, opencritic_score, trailer_url,
-        cover_path, cover_is_animated, banner_path, logo_path, background_path, animated_cover_enabled,
+        "games.id, games.name, games.executable_path, games.install_path, games.install_size_bytes, games.version,
+        games.launch_arguments, games.is_installed, games.pre_launch_command, games.post_launch_command,
+        games.source, games.steam_app_id, games.igdb_id, games.is_wishlist, games.is_memory, games.is_favorite,
+        games.is_hidden, games.description, games.developer, games.publisher, games.release_date, games.genres,
+        games.platforms, games.age_rating, games.metacritic_score, games.opencritic_score, games.trailer_url,
+        games.cover_path, games.cover_is_animated, games.banner_path, games.logo_path, games.background_path, games.animated_cover_enabled,
         COALESCE((
             SELECT SUM(ps.duration_seconds)
             FROM playtime_sessions ps
@@ -112,7 +112,7 @@ impl Game {
             WHERE ps.game_id = games.id
               AND ps.profile_id = ?1
         ) AS last_played_at,
-        added_at, user_rating,
+        games.added_at, games.user_rating,
         (SELECT COALESCE(json_group_array(gt.tag_id), '[]')
          FROM game_tags AS gt WHERE gt.game_id = games.id) AS tag_ids"
     }

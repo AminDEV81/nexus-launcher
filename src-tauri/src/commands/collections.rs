@@ -213,3 +213,60 @@ pub fn list_collection_ids_for_game(
 
     Ok(ids)
 }
+
+#[cfg(test)]
+mod tests {
+    use rusqlite::Connection;
+    use crate::db::models::Game;
+
+    #[test]
+    fn test_list_games_in_collection_query_resolves_columns_cleanly() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        crate::db::migrations::run(&mut conn).unwrap();
+
+        // Insert a game
+        conn.execute(
+            "INSERT INTO games (id, name, executable_path, is_installed, added_at)
+             VALUES ('game_1', 'Hollow Knight', 'C:\\Games\\hk.exe', 1, '2026-01-01 10:00:00')",
+            [],
+        )
+        .unwrap();
+
+        // Insert a collection
+        conn.execute(
+            "INSERT INTO collections (id, name) VALUES ('col_1', 'Metroidvanias')",
+            [],
+        )
+        .unwrap();
+
+        // Insert into collection_games (note collection_games has its own added_at column)
+        conn.execute(
+            "INSERT INTO collection_games (collection_id, game_id, added_at)
+             VALUES ('col_1', 'game_1', '2026-01-02 12:00:00')",
+            [],
+        )
+        .unwrap();
+
+        // Run the exact SQL executed by list_games_in_collection
+        let sql = format!(
+            "SELECT {}
+             FROM games
+             JOIN collection_games ON collection_games.game_id = games.id
+             WHERE collection_games.collection_id = ?2
+             ORDER BY games.name COLLATE NOCASE ASC",
+            Game::select_columns_with_profile()
+        );
+
+        let mut stmt = conn.prepare(&sql).expect("prepare statement must succeed");
+        let games = stmt
+            .query_map(rusqlite::params!["default", "col_1"], Game::from_row)
+            .expect("query_map must succeed")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("deserialization into Game must succeed");
+
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].id, "game_1");
+        assert_eq!(games[0].name, "Hollow Knight");
+        assert_eq!(games[0].added_at, "2026-01-01 10:00:00");
+    }
+}

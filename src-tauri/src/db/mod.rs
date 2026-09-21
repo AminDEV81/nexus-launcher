@@ -1,5 +1,5 @@
 mod connection;
-mod migrations;
+pub(crate) mod migrations;
 pub mod models;
 
 pub use connection::Database;
