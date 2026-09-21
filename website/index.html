@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nexus Launcher — لانچر بازی بومی، سبک و پرسرعت ویندوز</title>
+    <title>Nexus Launcher — لانچر بازی بومی، سبک و پرسرعت برای ویندوز و لینوکس</title>
     <meta
       name="description"
-      content="سریع‌ترین لانچر شخصی بازی برای ویندوز با معماری بومی Rust و Tauri 2. مصرف تنها ۶۰ مگابایت رم، مجهز به بوستر سخت‌افزاری، استودیو ساندترک و محافظت اتمیک سیوها."
+      content="سریع‌ترین لانچر شخصی بازی برای ویندوز و لینوکس با معماری بومی Rust و Tauri 2. مصرف تنها ۶۰ مگابایت رم، مجهز به اسکنر خودکار سیستم، بوستر سخت‌افزاری و محافظت اتمیک سیوها."
     />
     <link rel="icon" type="image/svg+xml" href="assets/brand-mark.svg" />
     <link rel="apple-touch-icon" href="assets/brand-mark.svg" />
@@ -28,10 +28,10 @@
     <!-- Open Graph / Social Meta -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://nexuslauncher.ir/" />
-    <meta property="og:title" content="Nexus Launcher — لانچر بومی بازی‌ها برای ویندوز" />
+    <meta property="og:title" content="Nexus Launcher — لانچر بومی بازی‌ها برای ویندوز و لینوکس" />
     <meta
       property="og:description"
-      content="نسخه ۰.۲.۰ منتشر شد. مصرف تنها ۶۰ مگابایت رم، بدون تبلیغات و کاملاً آفلاین‌محور."
+      content="نسخه ۰.۳.۰ منتشر شد. مجهز به اسکنر خودکار سیستم، بوستر سخت‌افزاری و پشتیبانی رسمی از لینوکس و آرچ بدون تبلیغات."
     />
     <meta property="og:image" content="assets/brand-mark.svg" />
 
@@ -750,8 +750,54 @@
                     </div>
                     <span
                       class="text-xs text-cyan-300 bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/30 font-mono"
-                      >۴ ماژول فعال</span
+                      >v0.3.0 Ready</span
                     >
+                  </div>
+
+                  <!-- Interactive System Radar Scanner Banner (New v0.3.0) -->
+                  <div
+                    class="p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-purple-950/40 via-[#0e1424] to-cyan-950/40 border border-cyan-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-right"
+                  >
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                      <div
+                        class="relative w-11 h-11 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-xl shrink-0"
+                      >
+                        <span
+                          id="mockup-radar-ring"
+                          class="absolute inset-0 rounded-xl border-2 border-cyan-400 border-dashed"
+                        ></span>
+                        <span>📡</span>
+                      </div>
+                      <div class="flex-1 text-right">
+                        <div class="flex items-center gap-2">
+                          <span
+                            class="text-xs sm:text-sm font-black text-white"
+                            data-i18n="mockup_scanner_banner_title"
+                            >رادار اسکنر خودکار سیستم (جدید v0.3.0)</span
+                          >
+                          <span
+                            class="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-mono font-bold"
+                            >8 Stores</span
+                          >
+                        </div>
+                        <div
+                          id="mockup-scan-status"
+                          class="text-[11px] text-slate-300 line-clamp-1"
+                          data-i18n="mockup_scanner_banner_desc"
+                        >
+                          اسکن فوری درایوهای ویندوز و لینوکس برای کشف بازی‌های ۸ پلتفرم (Steam,
+                          Epic, GOG, EA, Ubisoft, Battle.net, Amazon, Xbox)
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      id="mockup-scan-btn"
+                      onclick="simulateMockupScanner()"
+                      class="w-full sm:w-auto px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white text-xs font-bold transition-all shadow-lg shadow-cyan-500/20 shrink-0 whitespace-nowrap"
+                      data-i18n="mockup_btn_scan"
+                    >
+                      📡 شروع اسکن راداری
+                    </button>
                   </div>
 
                   <!-- 4 Core Functional Cards -->
@@ -1387,6 +1433,184 @@
               <span>100% Local SQLite Encrypted</span>
             </div>
           </div>
+
+          <!-- Bento 6: Automated System Game Scanner & 3D Holographic Radar (New v0.3.0) -->
+          <div
+            class="glass-panel tilt-card md:col-span-2 lg:col-span-2 p-5 sm:p-8 flex flex-col justify-between relative overflow-hidden text-center"
+          >
+            <div class="tilt-glare"></div>
+            <div class="text-center">
+              <div
+                class="w-12 h-12 sm:w-14 sm:h-14 mx-auto rounded-2xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/40 flex items-center justify-center mb-4 sm:mb-6 text-2xl sm:text-3xl shadow-lg shadow-cyan-500/20"
+              >
+                📡
+              </div>
+              <h3
+                class="text-xl sm:text-2xl font-black text-white mb-2 sm:mb-3 text-center"
+                data-i18n="bento_scanner_title"
+              >
+                اسکنر هوشمند و رادار هولوگرافیک بازی‌ها (جدید v0.3.0)
+              </h3>
+              <p
+                class="text-slate-300 text-xs sm:text-sm leading-relaxed mb-5 sm:mb-6 text-center max-w-xl mx-auto"
+                data-i18n="bento_scanner_desc"
+              >
+                کشف خودکار و آنی تمام بازی‌های نصب شده روی ویندوز و لینوکس از ۸ فروشگاه بزرگ شامل
+                Steam, Epic Games, GOG, EA App, Ubisoft, Battle.net, Amazon و Xbox با رادار
+                هولوگرافیک سه‌بعدی و درون‌ریزی گروهی تنها با ۱ کلیک.
+              </p>
+            </div>
+            <div class="p-3.5 sm:p-4 rounded-xl bg-black/40 border border-white/5">
+              <div
+                class="text-[11px] text-cyan-300 font-mono mb-2 flex items-center justify-center gap-1.5 font-bold"
+              >
+                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                ۸ پلتفرم تحت پشتیبانی بومی در نسخه ۰.۳.۰
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono">
+                <div
+                  class="py-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-slate-200 flex items-center justify-center gap-1"
+                >
+                  <span class="text-cyan-400 font-bold">✓</span> Steam
+                </div>
+                <div
+                  class="py-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-slate-200 flex items-center justify-center gap-1"
+                >
+                  <span class="text-cyan-400 font-bold">✓</span> Epic Games
+                </div>
+                <div
+                  class="py-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-slate-200 flex items-center justify-center gap-1"
+                >
+                  <span class="text-cyan-400 font-bold">✓</span> GOG Galaxy
+                </div>
+                <div
+                  class="py-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-slate-200 flex items-center justify-center gap-1"
+                >
+                  <span class="text-cyan-400 font-bold">✓</span> EA App
+                </div>
+                <div
+                  class="py-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-slate-200 flex items-center justify-center gap-1"
+                >
+                  <span class="text-cyan-400 font-bold">✓</span> Ubisoft
+                </div>
+                <div
+                  class="py-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-slate-200 flex items-center justify-center gap-1"
+                >
+                  <span class="text-cyan-400 font-bold">✓</span> Battle.net
+                </div>
+                <div
+                  class="py-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-slate-200 flex items-center justify-center gap-1"
+                >
+                  <span class="text-cyan-400 font-bold">✓</span> Amazon Games
+                </div>
+                <div
+                  class="py-1.5 px-2 rounded-lg bg-white/5 border border-white/10 text-slate-200 flex items-center justify-center gap-1"
+                >
+                  <span class="text-cyan-400 font-bold">✓</span> Xbox PC
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bento 7: Native Linux & Arch Linux Support (New v0.3.0) -->
+          <div
+            class="glass-panel tilt-card p-5 sm:p-8 flex flex-col justify-between relative overflow-hidden text-center"
+          >
+            <div class="tilt-glare"></div>
+            <div class="text-center">
+              <div
+                class="w-12 h-12 sm:w-14 sm:h-14 mx-auto rounded-2xl bg-gradient-to-br from-amber-500/20 to-cyan-500/20 border border-amber-500/40 flex items-center justify-center mb-4 sm:mb-6 text-2xl sm:text-3xl shadow-lg shadow-amber-500/20"
+              >
+                🐧
+              </div>
+              <h3
+                class="text-lg sm:text-xl font-black text-white mb-2 text-center"
+                data-i18n="bento_linux_title"
+              >
+                پشتیبانی رسمی از لینوکس و آرچ (جدید v0.3.0)
+              </h3>
+              <p
+                class="text-slate-300 text-xs leading-relaxed mb-4 text-center"
+                data-i18n="bento_linux_desc"
+              >
+                انتشار پکیج بدون وابستگی و قابل‌حمل AppImage برای جامعه پرشور Arch Linux، Manjaro،
+                SteamOS (کنسول استیم‌دک)، Fedora و Ubuntu بدون نیاز به مفسرهای سنگین با نهایت
+                پایداری.
+              </p>
+            </div>
+            <div class="space-y-2">
+              <div class="flex items-center justify-center gap-1.5 flex-wrap text-[10px] font-mono">
+                <span
+                  class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+                  >Arch Linux</span
+                >
+                <span
+                  class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                  >SteamOS</span
+                >
+                <span
+                  class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  >AppImage</span
+                >
+                <span
+                  class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                  >.deb / .rpm</span
+                >
+              </div>
+              <div
+                class="p-2.5 rounded-xl bg-black/50 border border-white/10 font-mono text-[11px] text-cyan-300 select-all"
+              >
+                chmod +x Nexus_0.3.0_amd64.AppImage
+              </div>
+            </div>
+          </div>
+
+          <!-- Bento 8: Memory Vault & Enhanced Safety (New v0.3.0) -->
+          <div
+            class="glass-panel tilt-card md:col-span-2 lg:col-span-3 p-5 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden text-right"
+          >
+            <div class="tilt-glare"></div>
+            <div class="flex-1 text-center md:text-right">
+              <div class="flex items-center justify-center md:justify-start gap-3 mb-3">
+                <div
+                  class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/40 flex items-center justify-center text-xl shadow-lg shadow-amber-500/20"
+                >
+                  🗃️
+                </div>
+                <span
+                  class="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-bold font-mono"
+                >
+                  Obsidian &amp; Amber Identity
+                </span>
+              </div>
+              <h3
+                class="text-xl sm:text-2xl font-black text-white mb-2 text-center md:text-right"
+                data-i18n="bento_memories_title"
+              >
+                گاوصندوق خاطرات و ایمنی پیشرفته (جدید v0.3.0)
+              </h3>
+              <p
+                class="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-2xl text-center md:text-right"
+                data-i18n="bento_memories_desc"
+              >
+                ثبت اسکرین‌شات‌ها و یادداشت‌های گیمینگ با معماری ابسیدین و امبر به همراه دیالوگ‌های
+                تایید امنیتی چندمرحله‌ای برای جلوگیری از هرگونه حذف ناخواسته.
+              </p>
+            </div>
+            <div
+              class="w-full md:w-72 p-3.5 rounded-xl bg-black/40 border border-amber-500/30 text-xs space-y-2 shrink-0 text-center"
+            >
+              <div class="flex items-center justify-between text-amber-400 font-bold text-[11px]">
+                <span>🛡️ محافظت دو مرحله‌ای حذف</span>
+                <span class="text-emerald-400">Active</span>
+              </div>
+              <div
+                class="p-2 rounded-lg bg-white/5 border border-white/5 text-[11px] text-slate-300 text-right"
+              >
+                دیالوگ‌های تایید یکپارچه با انیمیشن‌های نرم Framer Motion برای امنیت ۱۰۰٪ داده‌ها
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1565,6 +1789,31 @@
                 <td class="p-3.5 sm:p-5 text-emerald-400 text-center">آفلاین</td>
               </tr>
               <tr class="hover:bg-white/[0.02] transition-colors">
+                <td
+                  class="p-3.5 sm:p-5 text-slate-200 text-center font-bold"
+                  data-i18n="row_multi_scan"
+                >
+                  اسکن خودکار سیستم (۸ پلتفرم)
+                </td>
+                <td class="p-3.5 sm:p-5 text-emerald-400 font-bold text-center">
+                  دارد (رادار ۸ پلتفرم)
+                </td>
+                <td class="p-3.5 sm:p-5 text-slate-400 text-center">فقط استیم</td>
+                <td class="p-3.5 sm:p-5 text-slate-400 text-center">فقط اپیک</td>
+                <td class="p-3.5 sm:p-5 text-slate-400 text-center">نیاز به پلاگین</td>
+              </tr>
+              <tr class="hover:bg-white/[0.02] transition-colors">
+                <td class="p-3.5 sm:p-5 text-slate-200 text-center font-bold" data-i18n="row_linux">
+                  پشتیبانی رسمی از لینوکس و آرچ
+                </td>
+                <td class="p-3.5 sm:p-5 text-emerald-400 font-bold text-center">
+                  بومی (AppImage / Arch)
+                </td>
+                <td class="p-3.5 sm:p-5 text-emerald-400 text-center">دارد (Native)</td>
+                <td class="p-3.5 sm:p-5 text-rose-400 text-center">فقط ویندوز</td>
+                <td class="p-3.5 sm:p-5 text-rose-400 text-center">فقط ویندوز</td>
+              </tr>
+              <tr class="hover:bg-white/[0.02] transition-colors">
                 <td class="p-3.5 sm:p-5 text-slate-200 text-center font-bold" data-i18n="row_save">
                   نگهبان اتمیک سیو ۱۹,۰۰۰ بازی
                 </td>
@@ -1598,7 +1847,7 @@
                 سیستم‌عامل
               </div>
               <div class="text-xs sm:text-sm font-bold text-white" data-i18n="specs_os_val">
-                ویندوز ۱۰ یا ۱۱ (۶۴ بیتی)
+                ویندوز ۱۰/۱۱ (x64) و لینوکس (Arch, SteamOS, Ubuntu, Fedora)
               </div>
             </div>
             <div class="p-3 sm:p-4 rounded-xl bg-white/5 border border-white/5 text-center">
@@ -1715,6 +1964,50 @@
             >
               خیر! تمام داده‌ها، آمارها و سیوها به صورت محلی در دیتابیس رمزگذاری‌شده SQLite روی
               کامپیوتر خودتان ذخیره می‌شوند. نکسوس به هیچ سرور مرکزی متصل نیست.
+            </p>
+          </details>
+
+          <details
+            class="glass-panel p-4 sm:p-5 group cursor-pointer border border-white/10 transition-all text-center"
+          >
+            <summary
+              class="flex items-center justify-between font-bold text-white text-xs sm:text-base list-none text-right"
+            >
+              <span data-i18n="faq_q5"
+                >پشتیبانی از لینوکس و آرچ لینوکس در نسخه ۰.۳.۰ چگونه است؟</span
+              >
+              <span class="faq-icon text-cyan-400 transition-transform duration-200">▼</span>
+            </summary>
+            <p
+              class="mt-3 text-slate-300 text-xs sm:text-sm leading-relaxed border-t border-white/5 pt-3 text-right"
+              data-i18n="faq_a5"
+            >
+              لانچر نکسوس هم‌اکنون به صورت رسمی با بسته فوق‌العاده AppImage برای تمامی توزیع‌های
+              مبتنی بر آرچ (Arch Linux, Manjaro, EndeavourOS)، استیم‌دک (SteamOS)، و همچنین بسته‌های
+              deb (دبیان/اوبونتو) و rpm (فدورا) عرضه می‌شود. تنها با دانلود و دادن مجوز اجرا (chmod
+              +x) اجرا خواهد شد.
+            </p>
+          </details>
+
+          <details
+            class="glass-panel p-4 sm:p-5 group cursor-pointer border border-white/10 transition-all text-center"
+          >
+            <summary
+              class="flex items-center justify-between font-bold text-white text-xs sm:text-base list-none text-right"
+            >
+              <span data-i18n="faq_q6"
+                >اسکنر خودکار سیستم (System Scanner) چه بازی‌هایی را پیدا می‌کند؟</span
+              >
+              <span class="faq-icon text-cyan-400 transition-transform duration-200">▼</span>
+            </summary>
+            <p
+              class="mt-3 text-slate-300 text-xs sm:text-sm leading-relaxed border-t border-white/5 pt-3 text-right"
+              data-i18n="faq_a6"
+            >
+              این اسکنر به صورت خودکار بازی‌های نصب‌شده از ۸ لانچر معتبر شامل Steam, Epic Games
+              Launcher, GOG Galaxy, EA App, Ubisoft Connect, Battle.net, Amazon Games و Xbox PC Game
+              Pass را اسکن کرده و امکان افزودن یکباره آنها با دریافت خودکار پوستر و متادیتا را به
+              شما می‌دهد.
             </p>
           </details>
         </div>

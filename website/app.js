@@ -66,6 +66,10 @@ const TRANSLATIONS = {
 
     mockup_modules_title: 'ماژول‌های هوشمند و پیشرفته لانچر',
     mockup_modules_desc: 'روی هر قابلیت کلیک کنید تا عملکرد بلادرنگ آن را تجربه نمایید',
+    mockup_scanner_banner_title: 'رادار اسکنر خودکار سیستم (جدید v0.3.0)',
+    mockup_scanner_banner_desc:
+      'اسکن فوری درایوهای ویندوز و لینوکس برای کشف بازی‌های ۸ پلتفرم (Steam, Epic, GOG, EA, Ubisoft, Battle.net, Amazon, Xbox)',
+    mockup_btn_scan: '📡 شروع اسکن راداری',
     mod_card_lib_title: 'کتابخانه هوشمند بازی‌ها',
     mod_card_lib_desc: 'شناسایی خودکار بیش از ۱۹,۰۰۰ بازی نصب شده از استیم، اپیک، GOG و دستی',
     btn_mod_lib: 'مدیریت کتابخانه',
@@ -98,6 +102,15 @@ const TRANSLATIONS = {
     bento_rust_title: 'معماری اصیل Rust و Tauri 2 بدون کرومیوم',
     bento_rust_desc:
       'برخلاف نرم‌افزارهای مبتنی بر الکترون که صدها مگابایت رم را صرف یک مرورگر مخفی می‌کنند، نکسوس لانچر مستقیماً به کتابخانه‌های محلی و بومی ویندوز کامپایل شده است. سرعت باز شدن زیر ۰.۴ ثانیه و مصرف رم تنها ۶۰ مگابایت!',
+    bento_scanner_title: 'اسکنر هوشمند و رادار هولوگرافیک بازی‌ها (جدید v0.3.0)',
+    bento_scanner_desc:
+      'کشف خودکار و آنی تمام بازی‌های نصب شده روی ویندوز و لینوکس از ۸ فروشگاه بزرگ شامل Steam, Epic Games, GOG, EA App, Ubisoft, Battle.net, Amazon و Xbox با رادار هولوگرافیک سه‌بعدی و درون‌ریزی گروهی تنها با ۱ کلیک.',
+    bento_linux_title: 'پشتیبانی رسمی از لینوکس و آرچ (جدید v0.3.0)',
+    bento_linux_desc:
+      'انتشار پکیج بدون وابستگی و قابل‌حمل AppImage برای جامعه پرشور Arch Linux، Manjaro، SteamOS (کنسول استیم‌دک)، Fedora و Ubuntu بدون نیاز به مفسرهای سنگین با نهایت پایداری.',
+    bento_memories_title: 'گاوصندوق خاطرات و ایمنی پیشرفته (جدید v0.3.0)',
+    bento_memories_desc:
+      'ثبت اسکرین‌شات‌ها و یادداشت‌های گیمینگ با معماری ابسیدین و امبر به همراه دیالوگ‌های تایید امنیتی چندمرحله‌ای برای جلوگیری از هرگونه حذف ناخواسته.',
     bento_booster_title: 'بوستر خودکار و آزادسازی رم',
     bento_booster_desc:
       'استفاده از API سیستمی EmptyWorkingSet برای پاکسازی کش‌های هرز رم قبل از اجرای هر بازی.',
@@ -129,13 +142,15 @@ const TRANSLATIONS = {
     row_size: 'حجم فایل نصبی دانلودی',
     row_ads: 'تبلیغات و فروشگاه اجباری',
     row_offline: 'حالت آفلاین و عدم نیاز به لاگین',
+    row_multi_scan: 'اسکن خودکار سیستم (۸ پلتفرم)',
+    row_linux: 'پشتیبانی رسمی از لینوکس و آرچ',
     row_save: 'نگهبان اتمیک سیو ۱۹,۰۰۰ بازی',
 
     specs_heading: 'مشخصات مورد نیاز سیستم',
     specs_subheading:
       'نکسوس به قدری سبک است که حتی روی لپ‌تاپ‌های قدیمی بدون کمترین افت سرعتی کار می‌کند:',
     specs_os_lbl: 'سیستم‌عامل',
-    specs_os_val: 'ویندوز ۱۰ یا ۱۱ (۶۴ بیتی)',
+    specs_os_val: 'ویندوز ۱۰/۱۱ (x64) و لینوکس (Arch, SteamOS, Ubuntu, Fedora)',
     specs_cpu_lbl: 'پردازنده (CPU)',
     specs_cpu_val: 'هر پردازنده ۲ هسته‌ای x64',
     specs_ram_lbl: 'حافظه رم',
@@ -157,6 +172,12 @@ const TRANSLATIONS = {
     faq_q4: 'آیا اکانت یا اطلاعات من برای کسی ارسال می‌شود؟',
     faq_a4:
       'خیر! تمام داده‌ها، آمارها و سیوها به صورت محلی در دیتابیس رمزگذاری‌شده SQLite روی کامپیوتر خودتان ذخیره می‌شوند. نکسوس به هیچ سرور مرکزی متصل نیست.',
+    faq_q5: 'پشتیبانی از لینوکس و آرچ لینوکس در نسخه ۰.۳.۰ چگونه است؟',
+    faq_a5:
+      'لانچر نکسوس هم‌اکنون به صورت رسمی با بسته فوق‌العاده AppImage برای تمامی توزیع‌های مبتنی بر آرچ (Arch Linux, Manjaro, EndeavourOS)، استیم‌دک (SteamOS)، و همچنین بسته‌های deb (دبیان/اوبونتو) و rpm (فدورا) عرضه می‌شود. تنها با دانلود و دادن مجوز اجرا (chmod +x) اجرا خواهد شد.',
+    faq_q6: 'اسکنر خودکار سیستم (System Scanner) چه بازی‌هایی را پیدا می‌کند؟',
+    faq_a6:
+      'این اسکنر به صورت خودکار بازی‌های نصب‌شده از ۸ لانچر معتبر شامل Steam, Epic Games Launcher, GOG Galaxy, EA App, Ubisoft Connect, Battle.net, Amazon Games و Xbox PC Game Pass را اسکن کرده و امکان افزودن یکباره آنها با دریافت خودکار پوستر و متادیتا را به شما می‌دهد.',
 
     cta_heading: 'همین حالا Nexus Launcher را تجربه کنید',
     cta_subheading:
@@ -218,6 +239,10 @@ const TRANSLATIONS = {
     mockup_modules_title: 'Smart Launcher Modules',
     mockup_modules_desc:
       'Click each capability to experience real-time performance inside the simulator',
+    mockup_scanner_banner_title: 'Automated System Radar Scanner (New v0.3.0)',
+    mockup_scanner_banner_desc:
+      'Instantly scan Windows & Linux drives to detect games across 8 platforms (Steam, Epic, GOG, EA, Ubisoft, Battle.net, Amazon, Xbox)',
+    mockup_btn_scan: '📡 Engage Radar Scanner',
     mod_card_lib_title: 'Smart Game Library',
     mod_card_lib_desc:
       'Auto-detecting 19,000+ installed games across Steam, Epic, GOG and custom folders',
@@ -254,6 +279,15 @@ const TRANSLATIONS = {
     bento_rust_title: 'Pure Rust & Tauri 2 Architecture (No Chromium)',
     bento_rust_desc:
       'Unlike Electron clients that run a hidden browser consuming 600MB+ RAM, Nexus compiles straight to native Win32 APIs. Sub-0.4s boot time and ~60MB RAM footprint!',
+    bento_scanner_title: 'Smart Scanner & 3D Holographic Radar (New v0.3.0)',
+    bento_scanner_desc:
+      'Instantly discovers all installed games across 8 major stores: Steam, Epic Games, GOG, EA App, Ubisoft, Battle.net, Amazon, and Xbox with real-time 3D holographic radar and 1-click batch import.',
+    bento_linux_title: 'Official Linux & Arch Support (New v0.3.0)',
+    bento_linux_desc:
+      'Self-contained, portable AppImage package released for the passionate Arch Linux, Manjaro, SteamOS (Steam Deck), Fedora, and Ubuntu communities with maximum stability.',
+    bento_memories_title: 'Memory Vault & Advanced Safety (New v0.3.0)',
+    bento_memories_desc:
+      'Capture gaming screenshots and notes in an Obsidian-and-Amber aesthetic, paired with multi-step safety confirmation dialogs to prevent accidental deletions.',
     bento_booster_title: 'Automated RAM & Hardware Booster',
     bento_booster_desc:
       'Uses native Win32 EmptyWorkingSet APIs to clear system memory caches before game launch.',
@@ -285,12 +319,14 @@ const TRANSLATIONS = {
     row_size: 'Installer Package Size',
     row_ads: 'Ads & Forced Stores',
     row_offline: 'Offline Mode & Privacy',
+    row_multi_scan: 'Automated System Scanner (8 Platforms)',
+    row_linux: 'Official Linux & Arch Support',
     row_save: '19,000+ Game Save Guardian',
 
     specs_heading: 'System Requirements',
     specs_subheading: 'Nexus runs effortlessly even on older budget laptops with zero slowdowns:',
     specs_os_lbl: 'Operating System',
-    specs_os_val: 'Windows 10 or 11 (64-bit)',
+    specs_os_val: 'Windows 10/11 (x64) & Linux (Arch, SteamOS, Ubuntu, Fedora)',
     specs_cpu_lbl: 'Processor (CPU)',
     specs_cpu_val: 'Any Dual-Core x64 CPU',
     specs_ram_lbl: 'Memory (RAM)',
@@ -312,6 +348,12 @@ const TRANSLATIONS = {
     faq_q4: 'Is my data or account sent to any server?',
     faq_a4:
       'Never. All data and game stats reside strictly inside your local SQLite database on your machine.',
+    faq_q5: 'How does Linux and Arch Linux support work in v0.3.0?',
+    faq_a5:
+      'Nexus Launcher now officially provides portable AppImage packages for Arch Linux (Manjaro, EndeavourOS), SteamOS (Steam Deck), plus Debian/Ubuntu .deb and Fedora .rpm packages. Just download and run (chmod +x).',
+    faq_q6: 'What stores and games does the automated System Scanner detect?',
+    faq_a6:
+      'The scanner automatically discovers games installed from 8 major storefronts: Steam, Epic Games Launcher, GOG Galaxy, EA App, Ubisoft Connect, Battle.net, Amazon Games, and Xbox PC Game Pass, allowing one-click import with auto-fetched covers and metadata.',
 
     cta_heading: 'Experience Nexus Launcher Today',
     cta_subheading:
@@ -724,6 +766,50 @@ window.openMockupTab = function (target, toastMsg) {
     toast.classList.remove('hidden')
     setTimeout(() => toast.classList.add('hidden'), 3500)
   }
+}
+
+window.simulateMockupScanner = function () {
+  const btn = document.getElementById('mockup-scan-btn')
+  const statusText = document.getElementById('mockup-scan-status')
+  const radarRing = document.getElementById('mockup-radar-ring')
+  const toast = document.getElementById('mockup-launch-toast')
+  const toastText = document.getElementById('mockup-launch-text')
+  const isFa = document.documentElement.lang === 'fa'
+
+  if (btn) {
+    btn.disabled = true
+    btn.innerHTML = `<span class="animate-spin inline-block mr-1">🌀</span> ${isFa ? 'در حال اسکن...' : 'Scanning...'}`
+  }
+  if (statusText) {
+    statusText.textContent = isFa
+      ? 'در حال جستجو در رجیستری و دایرکتوری‌های Steam, Epic, GOG, EA, Ubisoft...'
+      : 'Scanning manifests across Steam, Epic, GOG, EA, Ubisoft...'
+  }
+  if (radarRing) {
+    radarRing.classList.add('animate-spin')
+  }
+
+  setTimeout(() => {
+    if (btn) {
+      btn.disabled = false
+      btn.textContent = isFa ? '✓ اسکن انجام شد (تکرار)' : '✓ Scan Completed (Re-scan)'
+    }
+    if (statusText) {
+      statusText.textContent = isFa
+        ? '✓ ۲۴ بازی کشف شد (Cyberpunk 2077, Elden Ring, Hades II, Witcher 3, ...)'
+        : '✓ 24 games discovered (Cyberpunk 2077, Elden Ring, Hades II, Witcher 3, ...)'
+    }
+    if (radarRing) {
+      radarRing.classList.remove('animate-spin')
+    }
+    if (toast && toastText) {
+      toastText.textContent = isFa
+        ? '📡 اسکنر راداری v0.3.0: ۲۴ بازی در سیستم با موفقیت شناسایی شدند!'
+        : '📡 System Scanner v0.3.0: 24 games discovered across 8 platforms!'
+      toast.classList.remove('hidden')
+      setTimeout(() => toast.classList.add('hidden'), 4000)
+    }
+  }, 1200)
 }
 
 let isAudioPlaying = true
