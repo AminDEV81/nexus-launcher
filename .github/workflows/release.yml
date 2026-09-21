@@ -75,9 +75,15 @@ jobs:
         run: npm run build
 
   build-and-release:
-    name: Build Signed Artifacts & Publish
+    name: Build Signed Artifacts & Publish (${{ matrix.platform }})
     needs: validate-and-test
-    runs-on: windows-latest
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-latest'
+          - platform: 'ubuntu-22.04'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -87,6 +93,23 @@ jobs:
         with:
           node-version: 22
           cache: 'npm'
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            rpm \
+            libfuse2
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -101,7 +124,7 @@ jobs:
 
       # Optional Authenticode signing certificate preparation if configured in repository secrets
       - name: Setup Windows Authenticode Certificate (Optional)
-        if: env.WINDOWS_CERTIFICATE != ''
+        if: runner.os == 'Windows' && env.WINDOWS_CERTIFICATE != ''
         env:
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
@@ -114,7 +137,8 @@ jobs:
           $pfx = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
           $pfx.Import("$env:TEMP\authenticode.pfx", $env:WINDOWS_CERTIFICATE_PASSWORD, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable)
 
-      - name: Prepare Tauri signing key
+      - name: Prepare Tauri signing key (Windows)
+        if: runner.os == 'Windows'
         shell: powershell
         env:
           RAW_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -127,6 +151,20 @@ jobs:
             "TAURI_SIGNING_PRIVATE_KEY_PATH=$keyPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
             "TAURI_SIGNING_PRIVATE_KEY=$cleanKey" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           }
+
+      - name: Prepare Tauri signing key (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          RAW_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -n "$RAW_KEY" ]; then
+            CLEAN_KEY="$(echo "$RAW_KEY" | tr -d '\r')"
+            KEY_PATH="$RUNNER_TEMP/nexus-updater.key"
+            printf "%s" "$CLEAN_KEY" > "$KEY_PATH"
+            echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$KEY_PATH" >> $GITHUB_ENV
+            echo "TAURI_SIGNING_PRIVATE_KEY=$CLEAN_KEY" >> $GITHUB_ENV
+          fi
 
       - name: Build, Sign and Publish Tauri Release
         uses: tauri-apps/tauri-action@v0
@@ -143,41 +181,45 @@ jobs:
           releaseBody: |
             # 🚀 Nexus Game Launcher ${{ github.ref_name }}
 
-            نسخه جدید ۰.۲.۰ لانچر بازی نکسوس همراه با بهینه‌سازی‌های عمیق سخت‌افزاری و بهبودهای درخواستی منتشر شد!
-            Welcome to **Nexus Game Launcher ${{ github.ref_name }}** featuring major GPU optimizations, enhanced game boost, and smarter Hub filtering!
+            نسخه رسمی ۰.۳.۰ لانچر نکسوس با معرفی اسکنر هوشمند بازی‌های سیستم، پشتیبانی اختصاصی از لینوکس و آرچ، و ارتقای چشمگیر بخش مموری و سیوها منتشر شد!
+            Official release of **Nexus Game Launcher ${{ github.ref_name }}** featuring the brand-new System Game Scanner, native Linux & Arch support (AppImage, deb, rpm), and enhanced Memory Vault!
 
             ---
 
-            ### ⚡ ویژگی‌های جدید و بهبودهای نسخه ۰.۲.۰ (What's New in v0.2.0)
+            ### ⚡ ویژگی‌های برجسته نسخه ۰.۳.۰ (What's New in v0.3.0)
 
-            - 🚀 **بهینه‌سازی عظیم مصرف کارت گرافیک (Massive GPU Optimization):**
-              - کاهش مصرف GPU در حالت بیکار (Idle) از ۶۵٪ به زیر ۵٪ روی کارت‌های گرافیک قدرتمند (نظیر RX 6900 XT).
-              - بازنویسی کامل انیمیشن‌ها، حذف افکت‌های سنگین `backdrop-filter` تودرتو و بهینه‌سازی بار رندرینگ.
-              - توقف کامل ویژوالایزر صوتی هنگام توقف موسیقی و فعال‌سازی مکانیزم Zero-load در پس‌زمینه.
+            - 📡 **اسکنر هوشمند و رادار هولوگرافیک بازی‌ها (Automated System Game Scanner):**
+              - اسکن خودکار و همه‌جانبه سیستم برای کشف بازی‌های نصب‌شده از استیم، اپیک گیمز، GOG، EA، یوبی‌سافت، بتل‌نت، آمازون و ایکس‌باکس (PC Game Pass).
+              - رابط کاربری فوق‌العاده با رادار هولوگرافیک سه‌بعدی و انیمیشن‌های رادیال در لحظه اسکن.
+              - امکان انتخاب دسته‌جمعی یا تکی بازی‌ها و افزودن سریع آن‌ها به لایبرری بدون نیاز به مشخص کردن دستی آدرس فایل‌ها.
 
-            - ⚡ **بهبود بوست اجرای بازی و حذف تایم‌اوت (Uncapped Boost Launch):**
-              - حذف محدودیت زمانی (تایم‌اوت ۱۲ ثانیه‌ای) پروسه بوست جهت اجرای روان و مطمئن بازی‌های سنگین و لانچرهای جانبی (Steam, Epic Games, EA App).
-              - افزایش سقف تایم‌اوت اتصال استیم به ۹۰ ثانیه جهت جلوگیری از خطاهای نابهنگام در سیستم‌های تحت بار سنگین.
+            - 🐧 **پشتیبانی رسمی از لینوکس و آرچ (Native Linux & Arch Linux Support):**
+              - عرضه رسمی پکیج همه‌منظوره **AppImage** (سازگار ۱۰۰٪ با تمام توزیع‌های مبتنی بر آرچ نظیر Arch Linux، Manjaro، EndeavourOS، SteamOS و فدورا/اوبونتو).
+              - بسته نصبی **Debian/Ubuntu (.deb)** و **RedHat/Fedora (.rpm)**.
+              - بدون نیاز به وابستگی‌های سنگین کرومیوم و با همان مصرف رم شگفت‌انگیز ~۶۰ مگابایت در لینوکس.
 
-            - 🪟 **مدیریت هوشمند وضعیت پنجره هنگام اجرای بازی (Game Launch Window Action):**
-              - اضافه شدن گزینه انتخابی به تنظیمات عملکرد (Performance Settings) جهت کنترل رفتار پنجره نکسوس پس از اجرای بازی:
-                - پنهان‌سازی پنجره به System Tray (پیش‌فرض)
-                - کوچک‌سازی پنجره (Minimize)
-                - باز نگه داشتن پنجره (Keep open)
+            - 💎 **ارتقای گاوصندوق خاطرات و سیوها (Memory Vault & Save Guardian):**
+              - بازطراحی پاپ‌آپ حذف خاطرات مطابق با طراحی زیبا و امن لایبرری و ویش‌لیست به همراه دیالوگ‌های تایید چندمرحله‌ای.
+              - بهبود پایداری بکاپ‌گیری اتمیک سیوها و هماهنگی سریع‌تر در پس‌زمینه.
 
-            - 🎯 **فیلترینگ همزمان چندتایی در گیم هاب (Multi-Tag Conjunction Filtering):**
-              - امکان انتخاب همزمان چندین ژانر با منطق اشتراک (AND): بازی‌های نمایش‌داده‌شده حتماً تمام فیلترهای انتخابی را دارا خواهند بود.
-              - رفع باگ عدم امکان انتخاب مستقیم ژانرهای Action و Role-playing در صفحه اصلی گیم هاب.
-
-            - 🔄 **به‌روزرسانی خودکار درون‌برنامه‌ای (Seamless In-App Auto-Update):**
-              - تشخیص و دریافت خودکار پکیج‌های به‌روزرسانی از طریق سرور امن GitHub Releases بدون نیاز به دانلود دستی مجدد.
-              - اعتبارسنجی یکپارچه امضای رمزنگاری Minisign (Ed25519) و نصب بدون وقفه در حالت پیش‌زمینه/پس‌زمینه (Passive NSIS).
-              - حفظ ۱۰۰٪ داده‌ها، تنظیمات و پایگاه‌داده کاربر در حین به‌روزرسانی.
+            - ⏱️ **توازن زمان بازی و بهبودهای بصری (Playtime Balancer & Polish):**
+              - رهگیری دقیق‌تر سشن‌های بازی و توقف بدون وقفه پس از خروج از بازی.
+              - ارتقای افکت‌های صوتی و ترنزیشن‌های مورفیک نرم بین بخش‌های مختلف.
 
             ---
 
-            ### 📦 راهنمای نصب و به‌روزرسانی
-            - **کاربران فعلی:** در صورت باز بودن لانچر، به‌روزرسانی خودکار فعال شده و کادر ارتقا به نسخه ۰.۲.۰ نمایش داده می‌شود.
-            - **نصب مستقیم:** فایل نصبی ویندوز `Nexus_0.2.0_x64-setup.exe` را از لیست **Assets** زیر دانلود کرده و با یک کلیک نصب نمایید.
+            ### 📦 راهنمای دانلود و نصب (Download & Installation)
+
+            - 🪟 **ویندوز (Windows 10/11 x64):**
+              - فایل نصبی `Nexus_0.3.0_x64-setup.exe` را دانلود کرده و با یک کلیک اجرا کنید.
+              - کاربران فعلی در صورت باز بودن برنامه، اعلان به‌روزرسانی خودکار درون‌برنامه‌ای را دریافت خواهند کرد.
+
+            - 🐧 **لینوکس (آرچ، مانجارو، استیم‌دک و تمام توزیع‌ها):**
+              - فایل `Nexus_0.3.0_amd64.AppImage` را دانلود کرده و دسترسی اجرا دهید:
+                ```bash
+                chmod +x Nexus_0.3.0_amd64.AppImage
+                ./Nexus_0.3.0_amd64.AppImage
+                ```
+              - برای اوبونتو و دبیان: پکیج `nexus_0.3.0_amd64.deb` را دریافت و با دستور `sudo dpkg -i nexus_0.3.0_amd64.deb` نصب کنید.
           releaseDraft: false
           prerelease: false

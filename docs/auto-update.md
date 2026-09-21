@@ -10,7 +10,7 @@
 
 ```
 [توسعه‌دهنده]
-      │  git push origin v0.2.0
+      │  git push origin v0.3.0
       ▼
 [GitHub Actions (release.yml)]
       │  1. اعتبارسنجی نسخه و اجرای تست‌ها (Clippy, Vitest, TSC, Lint, Build)
@@ -65,18 +65,18 @@
 برای انتشار یک نسخه جدید از Nexus، تنها کافی است ۴ مرحله ساده زیر را انجام دهید:
 
 ```bash
-# ۱. همگام‌سازی شماره نسخه در package.json و src-tauri/tauri.conf.json (مثلاً 0.2.0)
+# ۱. همگام‌سازی شماره نسخه در package.json و src-tauri/tauri.conf.json (مثلاً 0.3.0)
 
 # ۲. ثبت تغییرات
 git add package.json src-tauri/tauri.conf.json
-git commit -m "chore(release): bump version to 0.2.0"
+git commit -m "chore(release): bump version to 0.3.0"
 
 # ۳. ایجاد تگ نسخه
-git tag v0.2.0
+git tag v0.3.0
 
 # ۴. ارسال به گیت‌هاب همراه با تگ
 git push origin main
-git push origin v0.2.0
+git push origin v0.3.0
 ```
 
 بلافاصله پایپ‌لاین گیت‌هاب اجرا شده و پس از اعتبارسنجی و ساخت، ریلیز رسمی به همراه فایل `latest.json` در بخش Releases منتشر خواهد شد.

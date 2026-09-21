@@ -859,6 +859,13 @@ pub async fn open_save_folder(path: String) -> Result<(), String> {
         }
     }
 
+    #[cfg(not(windows))]
+    {
+        let _ = std::process::Command::new("xdg-open")
+            .arg(&target_dir)
+            .spawn();
+    }
+
     Ok(())
 }
 

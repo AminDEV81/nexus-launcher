@@ -4,16 +4,21 @@
  */
 
 const CONFIG = {
-  defaultVersion: 'v0.2.0',
+  defaultVersion: 'v0.3.0',
   defaultDownloadUrl:
-    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.2.0_x64-setup.exe',
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.0_x64-setup.exe',
+  defaultAppImageUrl:
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.0_amd64.AppImage',
+  defaultDebUrl:
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.3.0_amd64.deb',
   githubApiUrl: 'https://api.github.com/repos/AminDEV81/nexus-launcher/releases/latest',
   githubRepoUrl: 'https://github.com/AminDEV81/nexus-launcher',
 }
 
 const TRANSLATIONS = {
   fa: {
-    top_bar_msg: 'نسخه ۰.۲.۰ لانچر نکسوس منتشر شد — مجهز به پلیر موسیقی متن و محافظت اتمیک سیوها!',
+    top_bar_msg:
+      'نسخه ۰.۳.۰ لانچر نکسوس منتشر شد — مجهز به اسکنر خودکار سیستم و پشتیبانی بومی از لینوکس و آرچ!',
     top_bar_cta: 'دانلود مستقیم رایگان ←',
     nav_showcase: 'نمای زنده برنامه',
     nav_features: 'ویژگی‌های کلیدی',
@@ -24,15 +29,17 @@ const TRANSLATIONS = {
     nav_download_btn: 'دانلود رایگان',
 
     hero_title_1: 'لانچر بومی، رعدآسا و هوشمند',
-    hero_title_2: 'برای تمام بازی‌های شما در ویندوز',
+    hero_title_2: 'برای تمام بازی‌های شما در ویندوز و لینوکس',
     hero_subtitle:
-      'توسعه یافته بر پایه معماری بومی Rust و Tauri 2. فقط ۶۰ مگابایت مصرف رم، همراه با بوستر خودکار، پلیر موسیقی بازی‌ها و گاوصندوق اتمیک سیوها بدون ذره‌ای تبلیغات یا جاسوس‌افزار.',
-    hero_download_btn: 'دانلود مستقیم نسخه رسمی v0.2.0',
+      'توسعه یافته بر پایه معماری بومی Rust و Tauri 2. فقط ۶۰ مگابایت مصرف رم، همراه با اسکنر خودکار سیستم، بوستر سخت‌افزاری و پشتیبانی رسمی از لینوکس و آرچ بدون ذره‌ای تبلیغات.',
+    hero_download_btn: 'دانلود نسخه رسمی ویندوز v0.3.0',
+    hero_download_linux: 'دانلود لینوکس (AppImage / Arch)',
+    hero_download_deb: 'پکیج دبیان و اوبونتو (.deb)',
     hero_source_btn: 'مشاهده پروژه در گیت‌هاب',
 
     badge_free: '۱۰۰٪ رایگان و بدون پرداخت',
     badge_offline: 'کاملاً آفلاین بدون نیاز به لاگین',
-    badge_win: 'سازگار با ویندوز ۱۰ و ۱۱ (x64)',
+    badge_win: 'سازگار با ویندوز ۱۰/۱۱ و لینوکس (Arch, SteamOS, Ubuntu)',
 
     stat_ram_num: '~۶۰ MB',
     stat_ram_lbl: 'مصرف رم در حالت بیکار',
@@ -153,15 +160,16 @@ const TRANSLATIONS = {
 
     cta_heading: 'همین حالا Nexus Launcher را تجربه کنید',
     cta_subheading:
-      'لذت مدیریت یکپارچه بازی‌ها با نهایت سرعت، بدون کرومیوم و با کمترین مصرف رم در تاریخ لانچرهای ویندوز.',
-    cta_btn_download: 'دانلود رایگان (فایل نصبی x64)',
+      'لذت مدیریت یکپارچه بازی‌ها با نهایت سرعت، بدون کرومیوم و با کمترین مصرف رم در ویندوز و لینوکس.',
+    cta_btn_download: 'دانلود نسخه ویندوز (x64)',
+    cta_btn_linux: 'دانلود نسخه لینوکس (AppImage)',
     cta_btn_all_releases: 'سایر نسخه‌ها در گیت‌هاب',
     footer_license: 'منتشر شده تحت مجوز رسمی و آزاد MIT',
     footer_author: 'طراحی و توسعه توسط',
   },
   en: {
     top_bar_msg:
-      'Nexus Launcher v0.2.0 released — featuring Game Soundtrack Studio & Atomic Save Guardian!',
+      'Nexus Launcher v0.3.0 released — featuring System Game Scanner & Native Linux/Arch Support!',
     top_bar_cta: 'Download Free Direct &rarr;',
     nav_showcase: 'Live Showcase',
     nav_features: 'Features',
@@ -172,15 +180,17 @@ const TRANSLATIONS = {
     nav_download_btn: 'Download Free',
 
     hero_title_1: 'The Native, Blazing Fast',
-    hero_title_2: 'Game Launcher for Windows',
+    hero_title_2: 'Game Launcher for Windows & Linux',
     hero_subtitle:
-      'Built natively with Rust and Tauri 2. Ultra-light ~60MB RAM footprint, automated hardware Game Booster, original soundtrack player, and atomic ACID save backups with zero ads or telemetry.',
-    hero_download_btn: 'Download Official Setup v0.2.0',
+      'Built natively with Rust and Tauri 2. Ultra-light ~60MB RAM footprint, automated System Game Scanner, hardware Game Booster, and official Arch/Linux support with zero ads or telemetry.',
+    hero_download_btn: 'Download Official Windows v0.3.0',
+    hero_download_linux: 'Download Linux (AppImage / Arch)',
+    hero_download_deb: 'Debian / Ubuntu Package (.deb)',
     hero_source_btn: 'View Project on GitHub',
 
     badge_free: '100% Free & Open Source',
     badge_offline: 'Fully Offline (No Login Required)',
-    badge_win: 'Windows 10 & 11 (64-bit)',
+    badge_win: 'Windows 10/11 & Linux (Arch, SteamOS, Ubuntu)',
 
     stat_ram_num: '~60 MB',
     stat_ram_lbl: 'Idle RAM Footprint',
@@ -305,8 +315,9 @@ const TRANSLATIONS = {
 
     cta_heading: 'Experience Nexus Launcher Today',
     cta_subheading:
-      'Take control of your gaming library with unprecedented speed and native Rust efficiency.',
-    cta_btn_download: 'Download Free (x64 Setup)',
+      'Take control of your gaming library with unprecedented speed and native Rust efficiency on Windows and Linux.',
+    cta_btn_download: 'Download for Windows (x64)',
+    cta_btn_linux: 'Download for Linux (AppImage)',
     cta_btn_all_releases: 'All Releases on GitHub',
     footer_license: 'Released under the official MIT License',
     footer_author: 'Designed & developed by',
@@ -319,7 +330,11 @@ class WebsiteEngine {
     this.releaseData = {
       version: CONFIG.defaultVersion,
       downloadUrl: CONFIG.defaultDownloadUrl,
+      appImageUrl: CONFIG.defaultAppImageUrl,
+      debUrl: CONFIG.defaultDebUrl,
       sizeFormatted: '~7.2 MB',
+      appImageSizeFormatted: '~75 MB',
+      debSizeFormatted: '~65 MB',
     }
 
     this.init()
@@ -484,6 +499,22 @@ class WebsiteEngine {
         }
       }
 
+      const appImageAsset = assets.find((a) => a.name && a.name.endsWith('.AppImage'))
+      if (appImageAsset) {
+        this.releaseData.appImageUrl = appImageAsset.browser_download_url
+        if (appImageAsset.size) {
+          this.releaseData.appImageSizeFormatted = `${(appImageAsset.size / (1024 * 1024)).toFixed(1)} MB`
+        }
+      }
+
+      const debAsset = assets.find((a) => a.name && a.name.endsWith('.deb'))
+      if (debAsset) {
+        this.releaseData.debUrl = debAsset.browser_download_url
+        if (debAsset.size) {
+          this.releaseData.debSizeFormatted = `${(debAsset.size / (1024 * 1024)).toFixed(1)} MB`
+        }
+      }
+
       this.updateDownloadLinks()
     } catch (err) {
       console.warn('[Nexus] Fallback release used:', err)
@@ -495,8 +526,23 @@ class WebsiteEngine {
     document.querySelectorAll('[data-role="download-btn"]').forEach((btn) => {
       btn.href = this.releaseData.downloadUrl
     })
+    document.querySelectorAll('[data-role="download-btn-appimage"]').forEach((btn) => {
+      btn.href = this.releaseData.appImageUrl
+    })
+    document.querySelectorAll('[data-role="download-btn-deb"]').forEach((btn) => {
+      btn.href = this.releaseData.debUrl
+    })
     document.querySelectorAll('[data-role="download-size"]').forEach((el) => {
       el.textContent = this.releaseData.sizeFormatted
+    })
+    document.querySelectorAll('[data-role="download-size-appimage"]').forEach((el) => {
+      el.textContent = this.releaseData.appImageSizeFormatted
+    })
+    document.querySelectorAll('[data-role="download-size-deb"]').forEach((el) => {
+      el.textContent = this.releaseData.debSizeFormatted
+    })
+    document.querySelectorAll('[data-role="release-version"]').forEach((el) => {
+      el.textContent = this.releaseData.version
     })
   }
 
