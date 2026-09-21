@@ -11,6 +11,8 @@ const CONFIG = {
     'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.0_amd64.AppImage',
   defaultDebUrl:
     'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.3.0_amd64.deb',
+  defaultRpmUrl:
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus-0.3.0-1.x86_64.rpm',
   githubApiUrl: 'https://api.github.com/repos/AminDEV81/nexus-launcher/releases/latest',
   githubRepoUrl: 'https://github.com/AminDEV81/nexus-launcher',
 }
@@ -19,7 +21,7 @@ const TRANSLATIONS = {
   fa: {
     top_bar_msg:
       'نسخه ۰.۳.۰ لانچر نکسوس منتشر شد — مجهز به اسکنر خودکار سیستم و پشتیبانی بومی از لینوکس و آرچ!',
-    top_bar_cta: 'دانلود مستقیم رایگان ←',
+    top_bar_cta: 'دانلود نسخه ۰.۳.۰ ←',
     nav_showcase: 'نمای زنده برنامه',
     nav_features: 'ویژگی‌های کلیدی',
     nav_booster: 'بوستر رم',
@@ -33,7 +35,7 @@ const TRANSLATIONS = {
     hero_subtitle:
       'توسعه یافته بر پایه معماری بومی Rust و Tauri 2. فقط ۶۰ مگابایت مصرف رم، همراه با اسکنر خودکار سیستم، بوستر سخت‌افزاری و پشتیبانی رسمی از لینوکس و آرچ بدون ذره‌ای تبلیغات.',
     hero_download_btn: 'دانلود نسخه رسمی ویندوز v0.3.0',
-    hero_download_linux: 'دانلود لینوکس (AppImage / Arch)',
+    hero_download_linux: 'دانلود نسخه لینوکس',
     hero_download_deb: 'پکیج دبیان و اوبونتو (.deb)',
     hero_source_btn: 'مشاهده پروژه در گیت‌هاب',
 
@@ -182,16 +184,31 @@ const TRANSLATIONS = {
     cta_heading: 'همین حالا Nexus Launcher را تجربه کنید',
     cta_subheading:
       'لذت مدیریت یکپارچه بازی‌ها با نهایت سرعت، بدون کرومیوم و با کمترین مصرف رم در ویندوز و لینوکس.',
-    cta_btn_download: 'دانلود نسخه ویندوز (x64)',
-    cta_btn_linux: 'دانلود نسخه لینوکس (AppImage)',
+    cta_btn_download: 'دانلود نسخه رسمی ویندوز v0.3.0',
+    cta_btn_linux: 'دانلود نسخه لینوکس',
     cta_btn_all_releases: 'سایر نسخه‌ها در گیت‌هاب',
+    linux_select_format: 'انتخاب فرمت',
+    linux_modal_title: 'دانلود لانچر نکسوس نسخه ۰.۳.۰ برای لینوکس',
+    linux_modal_subtitle: 'فرمت متناسب با توزیع سیستم‌عامل خود را انتخاب و دانلود نمایید:',
+    linux_tab_appimage_title: 'بسته همه‌منظوره AppImage (پیشنهادی)',
+    linux_tab_appimage_desc:
+      'مناسب برای تمام توزیع‌ها بدون نیاز به نصب: Arch Linux, Manjaro, SteamOS, Fedora, Ubuntu',
+    linux_btn_appimage: 'دانلود مستقیم AppImage',
+    linux_tab_deb_title: 'بسته نصبی دبیان و اوبونتو (.deb)',
+    linux_tab_deb_desc: 'مناسب برای توزیع‌های مبتنی بر دبیان: Ubuntu, Debian, Linux Mint, Pop!_OS',
+    linux_btn_deb: 'دانلود مستقیم بسته deb.',
+    linux_tab_rpm_title: 'بسته نصبی فدورا و ردهت (.rpm)',
+    linux_tab_rpm_desc: 'مناسب برای توزیع‌های مبتنی بر ردهت: Fedora, RHEL, openSUSE, CentOS',
+    linux_btn_rpm: 'دانلود مستقیم بسته rpm.',
+    linux_steamos_tip:
+      '🎮 کاربران کنسول دستی استیم‌دک (Steam Deck): فایل AppImage را دانلود کرده و در حالت Desktop به عنوان یک Non-Steam Game به کتابخانه استیم خود اضافه کنید تا مستقیماً در Gaming Mode اجرا شود.',
     footer_license: 'منتشر شده تحت مجوز رسمی و آزاد MIT',
     footer_author: 'طراحی و توسعه توسط',
   },
   en: {
     top_bar_msg:
       'Nexus Launcher v0.3.0 released — featuring System Game Scanner & Native Linux/Arch Support!',
-    top_bar_cta: 'Download Free Direct &rarr;',
+    top_bar_cta: 'Download v0.3.0 &rarr;',
     nav_showcase: 'Live Showcase',
     nav_features: 'Features',
     nav_booster: 'RAM Booster',
@@ -205,7 +222,7 @@ const TRANSLATIONS = {
     hero_subtitle:
       'Built natively with Rust and Tauri 2. Ultra-light ~60MB RAM footprint, automated System Game Scanner, hardware Game Booster, and official Arch/Linux support with zero ads or telemetry.',
     hero_download_btn: 'Download Official Windows v0.3.0',
-    hero_download_linux: 'Download Linux (AppImage / Arch)',
+    hero_download_linux: 'Download for Linux',
     hero_download_deb: 'Debian / Ubuntu Package (.deb)',
     hero_source_btn: 'View Project on GitHub',
 
@@ -358,9 +375,24 @@ const TRANSLATIONS = {
     cta_heading: 'Experience Nexus Launcher Today',
     cta_subheading:
       'Take control of your gaming library with unprecedented speed and native Rust efficiency on Windows and Linux.',
-    cta_btn_download: 'Download for Windows (x64)',
-    cta_btn_linux: 'Download for Linux (AppImage)',
+    cta_btn_download: 'Download Official Windows v0.3.0',
+    cta_btn_linux: 'Download for Linux',
     cta_btn_all_releases: 'All Releases on GitHub',
+    linux_select_format: 'Select Format',
+    linux_modal_title: 'Download Nexus Launcher v0.3.0 for Linux',
+    linux_modal_subtitle: 'Choose the package format matching your Linux distribution:',
+    linux_tab_appimage_title: 'Universal AppImage Package (Recommended)',
+    linux_tab_appimage_desc:
+      'Portable single executable for Arch Linux, Manjaro, SteamOS, Fedora, Ubuntu',
+    linux_btn_appimage: 'Download AppImage',
+    linux_tab_deb_title: 'Debian / Ubuntu Package (.deb)',
+    linux_tab_deb_desc: 'Native package for Ubuntu, Debian, Linux Mint, Pop!_OS',
+    linux_btn_deb: 'Download .deb Package',
+    linux_tab_rpm_title: 'Fedora / RedHat Package (.rpm)',
+    linux_tab_rpm_desc: 'Native package for Fedora, RHEL, openSUSE, CentOS',
+    linux_btn_rpm: 'Download .rpm Package',
+    linux_steamos_tip:
+      '🎮 Steam Deck users: Download the AppImage and add it as a Non-Steam Game in Desktop Mode.',
     footer_license: 'Released under the official MIT License',
     footer_author: 'Designed & developed by',
   },
@@ -374,9 +406,11 @@ class WebsiteEngine {
       downloadUrl: CONFIG.defaultDownloadUrl,
       appImageUrl: CONFIG.defaultAppImageUrl,
       debUrl: CONFIG.defaultDebUrl,
+      rpmUrl: CONFIG.defaultRpmUrl,
       sizeFormatted: '~7.2 MB',
       appImageSizeFormatted: '~75 MB',
       debSizeFormatted: '~65 MB',
+      rpmSizeFormatted: '~65 MB',
     }
 
     this.init()
@@ -557,6 +591,14 @@ class WebsiteEngine {
         }
       }
 
+      const rpmAsset = assets.find((a) => a.name && a.name.endsWith('.rpm'))
+      if (rpmAsset) {
+        this.releaseData.rpmUrl = rpmAsset.browser_download_url
+        if (rpmAsset.size) {
+          this.releaseData.rpmSizeFormatted = `${(rpmAsset.size / (1024 * 1024)).toFixed(1)} MB`
+        }
+      }
+
       this.updateDownloadLinks()
     } catch (err) {
       console.warn('[Nexus] Fallback release used:', err)
@@ -574,6 +616,9 @@ class WebsiteEngine {
     document.querySelectorAll('[data-role="download-btn-deb"]').forEach((btn) => {
       btn.href = this.releaseData.debUrl
     })
+    document.querySelectorAll('[data-role="download-btn-rpm"]').forEach((btn) => {
+      btn.href = this.releaseData.rpmUrl
+    })
     document.querySelectorAll('[data-role="download-size"]').forEach((el) => {
       el.textContent = this.releaseData.sizeFormatted
     })
@@ -582,6 +627,9 @@ class WebsiteEngine {
     })
     document.querySelectorAll('[data-role="download-size-deb"]').forEach((el) => {
       el.textContent = this.releaseData.debSizeFormatted
+    })
+    document.querySelectorAll('[data-role="download-size-rpm"]').forEach((el) => {
+      el.textContent = this.releaseData.rpmSizeFormatted
     })
     document.querySelectorAll('[data-role="release-version"]').forEach((el) => {
       el.textContent = this.releaseData.version
@@ -871,6 +919,52 @@ window.updateCalculator = function (gamesCount) {
     ramSaved.textContent = `~${savedMb} MB`
   }
 }
+
+window.openLinuxModal = function () {
+  const modal = document.getElementById('linux-download-modal')
+  if (modal) {
+    modal.classList.remove('hidden')
+    modal.classList.add('flex')
+    document.body.style.overflow = 'hidden'
+  }
+}
+
+window.closeLinuxModal = function () {
+  const modal = document.getElementById('linux-download-modal')
+  if (modal) {
+    modal.classList.add('hidden')
+    modal.classList.remove('flex')
+    document.body.style.overflow = ''
+  }
+}
+
+window.copyCommand = function (text, btnId) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        const btn = document.getElementById(btnId)
+        if (btn) {
+          const orig = btn.innerHTML
+          btn.innerHTML = '✓ کپی شد!'
+          setTimeout(() => (btn.innerHTML = orig), 2000)
+        }
+      })
+      .catch(() => {
+        const btn = document.getElementById(btnId)
+        if (btn) btn.innerHTML = '✓ کپی شد!'
+      })
+  } else {
+    const btn = document.getElementById(btnId)
+    if (btn) btn.innerHTML = '✓ کپی شد!'
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    window.closeLinuxModal()
+  }
+})
 
 document.addEventListener('DOMContentLoaded', () => {
   window.nexusEngine = new WebsiteEngine()
