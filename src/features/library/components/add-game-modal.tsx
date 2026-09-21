@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { open as openFileDialog } from '@tauri-apps/plugin-dialog'
 import {
   ArrowLeft,
   Check,
+  CheckCircle2,
   ChevronRight,
   ChevronDown,
   FileCode2,
@@ -11,6 +13,9 @@ import {
   HardDrive,
   Link2,
   Loader2,
+  Radar,
+  RotateCw,
+  Search,
   Sparkles,
   Terminal,
   SlidersHorizontal,
@@ -25,10 +30,14 @@ import { useAddGameModalStore } from '../store/add-game-modal-store'
 import { useCreateGame } from '../hooks/use-games'
 import { resolveShortcut, scanFolderForExecutables, computePathSize } from '@/services/import'
 import type { ExecutableCandidate } from '@/services/import'
+import { scanAllStores, importScannedGames } from '@/services/scan'
+import type { ScanResult } from '@/services/scan'
 import { guessNameFromPath, getParentPath, formatBytes } from '../utils/guess-name'
+import { storeLabel, storeColors } from '../utils/store-labels'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
+import { playButtonClick } from '@/lib/sound-engine'
 
-type Step = 'choose' | 'review'
+type Step = 'choose' | 'review' | 'system-scan'
 
 interface DraftGame {
   name: string
@@ -229,11 +238,19 @@ export function AddGameModal() {
                   <span>IMPORT ENGINE</span>
                   <span className="size-1 rounded-full bg-accent animate-ping" />
                   <span className="text-muted font-normal">
-                    {step === 'choose' ? 'STAGE 01 // SOURCE' : 'STAGE 02 // STAGING'}
+                    {step === 'choose'
+                      ? 'STAGE 01 // SOURCE'
+                      : step === 'system-scan'
+                        ? 'STAGE 02 // AUTO-SCAN'
+                        : 'STAGE 02 // STAGING'}
                   </span>
                 </div>
                 <h2 className="text-xl font-black tracking-tight text-text">
-                  {step === 'choose' ? 'Add Game to Library' : 'Configure Game Details'}
+                  {step === 'choose'
+                    ? 'Add Game to Library'
+                    : step === 'system-scan'
+                      ? 'System Game Scanner'
+                      : 'Configure Game Details'}
                 </h2>
               </div>
             </div>
@@ -254,12 +271,14 @@ export function AddGameModal() {
                 <span
                   className={cn(
                     'size-2 rounded-full transition-colors',
-                    step === 'review'
+                    step !== 'choose'
                       ? 'bg-accent shadow-[0_0_6px_var(--nx-accent)]'
                       : 'bg-muted/40',
                   )}
                 />
-                <span className={step === 'review' ? 'text-accent' : 'text-muted'}>02 Config</span>
+                <span className={step !== 'choose' ? 'text-accent' : 'text-muted'}>
+                  {step === 'system-scan' ? '02 Auto-Scan' : '02 Config'}
+                </span>
               </div>
 
               <ModalCloseButton onClick={close} />
@@ -279,10 +298,30 @@ export function AddGameModal() {
                 transition={{ duration: 0.2 * speed }}
               >
                 <ChooseStep
+                  onAutoScan={() => {
+                    playButtonClick()
+                    setStep('system-scan')
+                  }}
                   onExecutable={pickExecutable}
                   onShortcut={pickShortcut}
                   onFolder={pickFolder}
                   onManualEntry={startManualEntry}
+                />
+              </motion.div>
+            ) : step === 'system-scan' ? (
+              <motion.div
+                key="system-scan"
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 10 }}
+                transition={{ duration: 0.2 * speed }}
+              >
+                <SystemScanStep
+                  onBack={() => {
+                    playButtonClick()
+                    setStep('choose')
+                  }}
+                  onComplete={close}
                 />
               </motion.div>
             ) : (
@@ -337,16 +376,61 @@ export function AddGameModal() {
 // ══════════════════════════════════════════════════════════════════════════════
 
 interface ChooseStepProps {
+  onAutoScan: () => void
   onExecutable: () => void
   onShortcut: () => void
   onFolder: () => void
   onManualEntry: () => void
 }
 
-function ChooseStep({ onExecutable, onShortcut, onFolder, onManualEntry }: ChooseStepProps) {
+function ChooseStep({
+  onAutoScan,
+  onExecutable,
+  onShortcut,
+  onFolder,
+  onManualEntry,
+}: ChooseStepProps) {
   return (
-    <div className="flex flex-col gap-5">
-      {/* 1. Quick Dropzone Banner */}
+    <div className="flex flex-col gap-4">
+      {/* 1. Hero Auto-Scan Card with Cybernetic Radar Pulse */}
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        whileTap={{ scale: 0.99 }}
+        onClick={onAutoScan}
+        className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/15 via-surface-raised/90 to-cyan-500/10 p-4.5 cursor-pointer shadow-[0_0_24px_rgba(124,92,255,0.12)] hover:border-accent hover:shadow-[0_0_32px_rgba(124,92,255,0.25)] transition-all overflow-hidden"
+      >
+        <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-cyan-400/10 blur-2xl group-hover:bg-cyan-400/20 transition-colors" />
+
+        <div className="flex items-center gap-3.5 relative z-10">
+          <div className="relative flex size-12 shrink-0 items-center justify-center rounded-2xl bg-accent text-white shadow-[0_0_16px_var(--nx-accent)]/30 ring-2 ring-accent/30 group-hover:scale-105 transition-transform">
+            <Radar className="size-6" />
+            <span className="absolute -top-1 -right-1 size-3 rounded-full bg-cyan-400 animate-ping" />
+            <span className="absolute -top-1 -right-1 size-3 rounded-full bg-cyan-400" />
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-black tracking-tight text-text group-hover:text-accent transition-colors">
+                Scan System for Installed Games
+              </h3>
+              <span className="rounded-full border border-accent/40 bg-accent/20 px-2 py-0.5 font-mono text-[9px] font-extrabold uppercase text-accent">
+                RECOMMENDED
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-muted leading-relaxed">
+              Automatically detect games from Steam, Epic, GOG, EA, Ubisoft, Battle.net, Xbox &
+              Amazon
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 font-bold text-xs text-accent group-hover:translate-x-1 transition-transform shrink-0 relative z-10">
+          <span>Start Auto-Scan</span>
+          <ChevronRight className="size-4" />
+        </div>
+      </motion.div>
+
+      {/* 2. Quick Dropzone Banner */}
       <div
         onClick={onExecutable}
         className="group relative flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-border/90 bg-surface-raised/40 p-5 text-center transition-all cursor-pointer hover:border-accent hover:bg-accent/5 shadow-2xs"
@@ -368,7 +452,7 @@ function ChooseStep({ onExecutable, onShortcut, onFolder, onManualEntry }: Choos
         </span>
       </div>
 
-      {/* 2. Source Cards Grid */}
+      {/* 3. Source Cards Grid */}
       <div className="grid gap-3.5 sm:grid-cols-3">
         <SourceCard
           icon={FileCode2}
@@ -394,7 +478,7 @@ function ChooseStep({ onExecutable, onShortcut, onFolder, onManualEntry }: Choos
         />
       </div>
 
-      {/* 3. Manual Entry & Telemetry Footer */}
+      {/* 4. Manual Entry & Telemetry Footer */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-border/70 bg-surface-raised/30 px-4 py-3 text-xs text-muted">
         <div className="flex items-center gap-2">
           <HardDrive className="size-4 text-accent shrink-0" />
@@ -409,6 +493,474 @@ function ChooseStep({ onExecutable, onShortcut, onFolder, onManualEntry }: Choos
           <ChevronRight className="size-3.5" />
         </button>
       </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STEP 1.5: SYSTEM GAME SCANNER
+// ══════════════════════════════════════════════════════════════════════════════
+
+interface SystemScanStepProps {
+  onBack: () => void
+  onComplete: () => void
+}
+
+function SystemScanStep({ onBack, onComplete }: SystemScanStepProps) {
+  const queryClient = useQueryClient()
+  const speed = useAnimationSpeed()
+
+  const [result, setResult] = useState<ScanResult | null>(null)
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [search, setSearch] = useState('')
+  const [activeStore, setActiveStore] = useState<string>('all')
+
+  const scanMutation = useMutation({
+    mutationFn: scanAllStores,
+    onSuccess: (data) => {
+      setResult(data)
+      setSelected(new Set(data.games.map((_, idx) => idx)))
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Failed to scan system for games.')
+    },
+  })
+
+  const importMutation = useMutation({
+    mutationFn: importScannedGames,
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['games'] })
+      toast.success(`Added ${count} game${count === 1 ? '' : 's'} to your library!`)
+      onComplete()
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Failed to import games.')
+    },
+  })
+
+  useEffect(() => {
+    scanMutation.mutate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const stores = useMemo(() => {
+    if (!result) return []
+    const storeMap = new Map<string, number>()
+    result.games.forEach((g) => {
+      storeMap.set(g.source, (storeMap.get(g.source) ?? 0) + 1)
+    })
+    return Array.from(storeMap.entries()).map(([source, count]) => ({ source, count }))
+  }, [result])
+
+  const filteredGames = useMemo(() => {
+    if (!result) return []
+    return result.games
+      .map((game, originalIndex) => ({ game, originalIndex }))
+      .filter(({ game }) => {
+        const matchesStore =
+          activeStore === 'all' || game.source.toLowerCase() === activeStore.toLowerCase()
+        const matchesSearch =
+          !search.trim() || game.name.toLowerCase().includes(search.toLowerCase().trim())
+        return matchesStore && matchesSearch
+      })
+  }, [result, activeStore, search])
+
+  function toggleGame(index: number) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+  }
+
+  function toggleAllVisible() {
+    const visibleIndices = filteredGames.map((item) => item.originalIndex)
+    const allSelected = visibleIndices.every((idx) => selected.has(idx))
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allSelected) {
+        visibleIndices.forEach((idx) => next.delete(idx))
+      } else {
+        visibleIndices.forEach((idx) => next.add(idx))
+      }
+      return next
+    })
+  }
+
+  function handleImport() {
+    if (!result) return
+    const chosen = result.games.filter((_, idx) => selected.has(idx))
+    if (chosen.length === 0) return
+    playButtonClick()
+    importMutation.mutate(chosen)
+  }
+
+  return (
+    <div className="flex flex-col min-h-[380px]">
+      <AnimatePresence mode="wait">
+        {scanMutation.isPending && (
+          <motion.div
+            key="scanning-radar"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.3 * speed }}
+            className="flex min-h-[360px] flex-col items-center justify-center text-center p-4"
+          >
+            {/* Holographic Circular Radar HUD */}
+            <div className="relative flex size-44 items-center justify-center">
+              {/* Concentric rings */}
+              <div className="absolute inset-0 rounded-full border border-accent/20 [border-style:dashed]" />
+              <div className="absolute inset-4 rounded-full border border-cyan-500/20" />
+              <div className="absolute inset-10 rounded-full border border-accent/30" />
+              <div className="absolute inset-16 rounded-full border border-cyan-400/40" />
+
+              {/* Crosshairs */}
+              <div className="absolute h-full w-px bg-gradient-to-b from-transparent via-accent/30 to-transparent" />
+              <div className="absolute w-full h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent" />
+
+              {/* Rotating Radar Sweep Beam */}
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 2.5 / speed, ease: 'linear' }}
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background:
+                    'conic-gradient(from 0deg, rgba(124, 92, 255, 0.45) 0deg, rgba(0, 240, 255, 0.15) 45deg, transparent 90deg, transparent 360deg)',
+                }}
+              />
+
+              {/* Center Radar Core */}
+              <div className="relative z-10 flex size-12 items-center justify-center rounded-2xl bg-surface border border-accent/50 shadow-[0_0_20px_var(--nx-accent)]/40 text-accent">
+                <Radar className="size-6 animate-pulse" />
+              </div>
+
+              {/* Orbiting blips */}
+              <motion.div
+                animate={{ scale: [1, 1.4, 1], opacity: [0.4, 1, 0.4] }}
+                transition={{ repeat: Infinity, duration: 1.8 / speed, ease: 'easeInOut' }}
+                className="absolute top-8 right-10 size-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff]"
+              />
+              <motion.div
+                animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0.9, 0.3] }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 2.2 / speed,
+                  delay: 0.5,
+                  ease: 'easeInOut',
+                }}
+                className="absolute bottom-9 left-11 size-2.5 rounded-full bg-accent shadow-[0_0_8px_var(--nx-accent)]"
+              />
+            </div>
+
+            {/* Scan Status & Telemetry */}
+            <div className="mt-5 space-y-1">
+              <div className="flex items-center justify-center gap-2 font-mono text-xs font-bold uppercase tracking-wider text-accent">
+                <span className="size-2 rounded-full bg-cyan-400 animate-ping" />
+                <span>Deep Scanning Installed Stores & Registries</span>
+              </div>
+              <p className="text-xs text-muted max-w-md mx-auto">
+                Querying Steam, Epic Games, GOG, EA App, Ubisoft Connect, Battle.net, Xbox & Amazon
+                Games...
+              </p>
+            </div>
+
+            {/* Active Platform Indicators */}
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-2 max-w-lg">
+              {[
+                { name: 'Steam', color: 'border-sky-500/30 text-sky-400 bg-sky-500/10' },
+                { name: 'Epic Games', color: 'border-zinc-500/30 text-zinc-300 bg-zinc-500/10' },
+                {
+                  name: 'GOG Galaxy',
+                  color: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
+                },
+                { name: 'EA App', color: 'border-orange-500/30 text-orange-400 bg-orange-500/10' },
+                { name: 'Ubisoft', color: 'border-blue-500/30 text-blue-400 bg-blue-500/10' },
+                { name: 'Battle.net', color: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10' },
+                { name: 'Xbox', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
+                { name: 'Amazon', color: 'border-amber-500/30 text-amber-400 bg-amber-500/10' },
+              ].map((p, idx) => (
+                <span
+                  key={p.name}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold font-mono transition-all',
+                    p.color,
+                  )}
+                >
+                  <span
+                    className="size-1.5 rounded-full bg-current animate-pulse"
+                    style={{ animationDelay: `${idx * 150}ms` }}
+                  />
+                  {p.name}
+                </span>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {result && !scanMutation.isPending && (
+          <motion.div
+            key="scan-results"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25 * speed }}
+            className="flex flex-col gap-3.5"
+          >
+            {result.games.length === 0 ? (
+              <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center">
+                <div className="mb-3.5 flex size-14 items-center justify-center rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-inner">
+                  <CheckCircle2 className="size-7" />
+                </div>
+                <h3 className="text-base font-bold text-text">Library Fully Synchronized</h3>
+                <p className="mt-1 max-w-sm text-xs text-muted leading-relaxed">
+                  All games detected across your installed stores (Steam, Epic, GOG, EA, Ubisoft,
+                  Battle.net, Xbox & Amazon) are already in your Nexus library.
+                </p>
+                <div className="mt-5 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playButtonClick()
+                      scanMutation.mutate()
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-4 py-2 text-xs font-bold text-text hover:bg-surface transition-colors cursor-pointer"
+                  >
+                    <RotateCw className="size-3.5" />
+                    <span>Rescan</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white hover:bg-accent-hover transition-colors cursor-pointer"
+                  >
+                    Choose Other Source
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Discovered Games Controls & Filters */}
+                <div className="flex flex-col gap-2.5">
+                  {/* Top Status & Search Bar */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-7 items-center justify-center rounded-lg bg-accent/15 text-accent">
+                        <Radar className="size-4" />
+                      </span>
+                      <div>
+                        <span className="text-xs font-bold text-text">
+                          Discovered {result.games.length} New Game
+                          {result.games.length === 1 ? '' : 's'}
+                        </span>
+                        <span className="text-[11px] text-muted ml-2">
+                          ({selected.size} selected)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {/* Search input */}
+                      <div className="relative w-44 sm:w-52">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-subtle" />
+                        <input
+                          type="text"
+                          placeholder="Filter scanned..."
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          className="h-8 w-full rounded-lg border border-border/80 bg-surface pl-8 pr-3 text-xs text-text placeholder:text-muted/60 focus:border-accent focus:outline-none"
+                        />
+                        {search && (
+                          <button
+                            type="button"
+                            onClick={() => setSearch('')}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-subtle hover:text-text cursor-pointer p-0.5"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Toggle all */}
+                      <button
+                        type="button"
+                        onClick={toggleAllVisible}
+                        className="h-8 rounded-lg border border-border/80 bg-surface-raised px-2.5 text-[11px] font-bold text-subtle hover:text-text hover:bg-surface transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        {filteredGames.every((g) => selected.has(g.originalIndex))
+                          ? 'Deselect All'
+                          : 'Select All'}
+                      </button>
+
+                      {/* Rescan button */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playButtonClick()
+                          scanMutation.mutate()
+                        }}
+                        disabled={scanMutation.isPending}
+                        title="Rescan System"
+                        className="flex size-8 items-center justify-center rounded-lg border border-border/80 bg-surface-raised text-subtle hover:text-text hover:bg-surface transition-colors cursor-pointer"
+                      >
+                        <RotateCw className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Store Filter Pills */}
+                  {stores.length > 1 && (
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setActiveStore('all')}
+                        className={cn(
+                          'rounded-full px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer border',
+                          activeStore === 'all'
+                            ? 'border-accent bg-accent text-white shadow-xs'
+                            : 'border-border/70 bg-surface text-subtle hover:text-text hover:bg-surface-raised',
+                        )}
+                      >
+                        All ({result.games.length})
+                      </button>
+                      {stores.map(({ source, count }) => {
+                        const colors = storeColors(source)
+                        const isCurrent = activeStore === source.toLowerCase()
+                        return (
+                          <button
+                            key={source}
+                            type="button"
+                            onClick={() => setActiveStore(source.toLowerCase())}
+                            className={cn(
+                              'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer border',
+                              isCurrent
+                                ? 'border-accent bg-accent text-white shadow-xs'
+                                : `${colors.border} ${colors.bg} ${colors.text} hover:opacity-90`,
+                            )}
+                          >
+                            <span>{storeLabel(source)}</span>
+                            <span className="font-mono text-[10px] opacity-80">({count})</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Scrollable Game Rows */}
+                <div className="flex max-h-[260px] flex-col gap-1.5 overflow-y-auto pr-1 scrollbar-thin rounded-xl border border-border/70 bg-surface/40 p-1.5">
+                  {filteredGames.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-muted">
+                      No games match your search query.
+                    </div>
+                  ) : (
+                    filteredGames.map(({ game, originalIndex }) => {
+                      const isChecked = selected.has(originalIndex)
+                      const colors = storeColors(game.source)
+                      return (
+                        <button
+                          key={`${game.source}-${game.executable_path ?? game.install_path ?? game.name}-${originalIndex}`}
+                          type="button"
+                          onClick={() => toggleGame(originalIndex)}
+                          className={cn(
+                            'group flex items-center gap-3 rounded-xl border p-2.5 text-left transition-all cursor-pointer select-none',
+                            isChecked
+                              ? 'border-accent/40 bg-accent/5 shadow-2xs'
+                              : 'border-border/60 bg-surface/80 hover:bg-surface-raised/80 hover:border-border',
+                          )}
+                        >
+                          {/* Custom Checkbox */}
+                          <span
+                            className={cn(
+                              'flex size-5 shrink-0 items-center justify-center rounded-lg border transition-all',
+                              isChecked
+                                ? 'border-accent bg-accent text-white shadow-xs'
+                                : 'border-border/80 bg-surface group-hover:border-accent/50',
+                            )}
+                          >
+                            {isChecked && <Check className="size-3.5" strokeWidth={3} />}
+                          </span>
+
+                          {/* Game Details */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-text truncate">
+                                {game.name}
+                              </span>
+                              <span
+                                className={cn(
+                                  'shrink-0 rounded-md border px-1.5 py-0.2 font-mono text-[9px] font-bold uppercase',
+                                  colors.bg,
+                                  colors.text,
+                                  colors.border,
+                                )}
+                              >
+                                {storeLabel(game.source)}
+                              </span>
+                            </div>
+                            <div
+                              className="truncate text-[10px] font-mono text-subtle mt-0.5"
+                              title={game.install_path ?? game.executable_path ?? undefined}
+                            >
+                              {game.install_path ?? game.executable_path}
+                            </div>
+                          </div>
+
+                          {/* Size footprint if available */}
+                          {game.install_size_bytes ? (
+                            <span className="shrink-0 font-mono text-[10px] font-semibold text-muted">
+                              {formatBytes(game.install_size_bytes)}
+                            </span>
+                          ) : null}
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+
+                {/* Footer Actions */}
+                <div className="mt-1 flex items-center justify-between border-t border-border/70 pt-3.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playButtonClick()
+                      onBack()
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-muted hover:text-text hover:bg-surface-raised transition-colors cursor-pointer"
+                  >
+                    <ArrowLeft className="size-3.5" />
+                    <span>Back to Sources</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleImport}
+                    disabled={selected.size === 0 || importMutation.isPending}
+                    className={cn(
+                      'flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold transition-all cursor-pointer shadow-xs select-none',
+                      selected.size > 0 && !importMutation.isPending
+                        ? 'bg-accent text-white shadow-[0_0_16px_var(--nx-accent)]/25 hover:bg-accent-hover hover:scale-102 active:scale-98'
+                        : 'bg-surface-raised text-muted border border-border/80 cursor-not-allowed opacity-60',
+                    )}
+                  >
+                    {importMutation.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Check className="size-4" />
+                    )}
+                    <span>
+                      {importMutation.isPending
+                        ? 'Adding to Library…'
+                        : `Add ${selected.size} Game${selected.size === 1 ? '' : 's'} to Library`}
+                    </span>
+                  </button>
+                </div>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
