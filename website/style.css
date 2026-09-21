@@ -253,6 +253,69 @@ html[dir='ltr'] .font-heading {
   box-shadow: 0 18px 40px -5px rgba(124, 92, 255, 0.35);
 }
 
+/* Ensure hero buttons fit gracefully on all viewports without clipping */
+.btn-hero-download,
+.btn-hero-linux,
+.btn-hero-github {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  max-width: 100% !important;
+}
+
+/* Ensure flex containers wrap naturally instead of pushing offscreen */
+div:has(> .btn-hero-download) {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  max-width: 72rem !important;
+  width: 100% !important;
+  overflow: visible !important;
+}
+
+/* Ensure size badge inside download button never squishes or clips */
+.btn-hero-download [data-role='download-size'] {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+  display: inline-flex !important;
+  align-items: center !important;
+}
+
+/* Redesigned 'Select Format' badge with smooth Persian typography */
+button[onclick*='openLinuxModal'] span:has(> [data-i18n='linux_select_format']) {
+  font-family:
+    'Vazirmatn',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif !important;
+  background: rgba(0, 0, 0, 0.38) !important;
+  border: 1px solid rgba(252, 211, 77, 0.45) !important;
+  color: #fef3c7 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  border-radius: 0.75rem !important;
+  font-weight: 700 !important;
+}
+
+@media (min-width: 640px) and (max-width: 1240px) {
+  .btn-hero-download,
+  .btn-hero-linux,
+  .btn-hero-github {
+    padding-left: 1.15rem !important;
+    padding-right: 1.15rem !important;
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    font-size: 0.875rem !important; /* 14px */
+    gap: 0.55rem !important;
+  }
+  .btn-hero-download svg,
+  .btn-hero-linux svg,
+  .btn-hero-github svg {
+    width: 1.15rem !important;
+    height: 1.15rem !important;
+  }
+}
+
 /* Generic primary button */
 .btn-nexus-primary {
   background: linear-gradient(135deg, #7c5cff 0%, #6817ea 50%, #00d4ff 100%);

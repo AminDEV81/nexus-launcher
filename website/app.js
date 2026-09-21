@@ -429,6 +429,7 @@ class WebsiteEngine {
   }
 
   init() {
+    this.ensureResponsiveButtonsLayout()
     this.setupCursorSpotlight()
     this.setupThreeBackground()
     this.setupLanguage()
@@ -436,6 +437,22 @@ class WebsiteEngine {
     this.setupMockupInteractions()
     this.setupTiltCards()
     this.fetchLatestRelease()
+  }
+
+  ensureResponsiveButtonsLayout() {
+    const buttons = document.querySelectorAll(
+      '.btn-hero-download, button[onclick*="openLinuxModal"], .btn-hero-github',
+    )
+    buttons.forEach((btn) => {
+      btn.classList.remove('px-6', 'sm:px-8', 'py-3.5', 'sm:py-4', 'lg:text-lg')
+      btn.classList.add('shrink-0', 'px-4', 'sm:px-5', 'lg:px-6', 'py-3', 'sm:py-3.5')
+      const parent = btn.parentElement
+      if (parent) {
+        parent.classList.add('flex-wrap')
+        parent.classList.remove('max-w-5xl')
+        parent.classList.add('max-w-6xl')
+      }
+    })
   }
 
   setupCursorSpotlight() {
