@@ -65,7 +65,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <!-- Custom Stylesheet with Cache Buster -->
-    <link rel="stylesheet" href="style.css?v=0.3.0.3" />
+    <link rel="stylesheet" href="style.css?v=0.3.0.5" />
   </head>
   <body
     class="bg-[#06070c] text-slate-100 antialiased overflow-x-hidden selection:bg-purple-600/30 selection:text-cyan-300"
@@ -372,13 +372,13 @@
 
         <!-- THICK, SUBSTANTIAL HERO ACTION BUTTONS -->
         <div
-          class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3.5 sm:gap-4 mb-5 max-w-4xl mx-auto w-full px-2 sm:px-0"
+          class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3.5 sm:gap-4 mb-5 max-w-5xl mx-auto w-full px-2 sm:px-0"
         >
-          <!-- Windows Setup Download -->
+          <!-- 1. Windows Setup Download -->
           <a
             href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.0_x64-setup.exe"
             data-role="download-btn"
-            class="btn-hero-download w-full sm:w-auto px-5 sm:px-6 py-3 rounded-2xl text-white inline-flex items-center justify-between sm:justify-start gap-3.5 shadow-2xl group cursor-pointer select-none"
+            class="btn-hero-download flex-1 w-full sm:w-auto px-5 sm:px-6 py-3 rounded-2xl text-white inline-flex items-center justify-between sm:justify-start gap-3.5 shadow-2xl group cursor-pointer select-none"
           >
             <div
               class="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0 p-2 group-hover:scale-105 transition-transform shadow-inner"
@@ -407,11 +407,11 @@
             >
           </a>
 
-          <!-- Linux Universal Download Button (Opens Selector Modal) -->
+          <!-- 2. Linux Universal Download Button (Opens Selector Modal) -->
           <button
             type="button"
             onclick="openLinuxModal()"
-            class="btn-hero-linux w-full sm:w-auto px-5 sm:px-6 py-3 rounded-2xl text-white inline-flex items-center justify-between sm:justify-start gap-3.5 shadow-xl group cursor-pointer select-none"
+            class="btn-hero-linux flex-1 w-full sm:w-auto px-5 sm:px-6 py-3 rounded-2xl text-white inline-flex items-center justify-between sm:justify-start gap-3.5 shadow-xl group cursor-pointer select-none"
           >
             <div
               class="w-10 h-10 rounded-xl bg-black/25 border border-amber-400/30 flex items-center justify-center shrink-0 p-2 group-hover:scale-105 transition-transform shadow-inner"
@@ -441,21 +441,41 @@
             </span>
           </button>
 
-          <!-- GitHub Source -->
+          <!-- 3. GitHub Source -->
           <a
             href="https://github.com/AminDEV81/nexus-launcher"
             target="_blank"
             rel="noopener noreferrer"
-            class="btn-hero-github w-full sm:w-auto px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl font-bold text-xs sm:text-sm text-slate-200 hover:text-white inline-flex items-center justify-center gap-2 self-stretch sm:self-auto min-h-[62px]"
+            class="btn-hero-github flex-1 w-full sm:w-auto px-5 sm:px-6 py-3 rounded-2xl text-white inline-flex items-center justify-between sm:justify-start gap-3.5 shadow-xl group cursor-pointer select-none"
           >
-            <svg class="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
-              <path
-                fill-rule="evenodd"
-                clip-rule="evenodd"
-                d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-              />
-            </svg>
-            <span data-i18n="hero_source_btn">گیت‌هاب</span>
+            <div
+              class="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 p-2 group-hover:scale-105 transition-transform shadow-inner"
+            >
+              <svg class="w-full h-full fill-white" viewBox="0 0 24 24">
+                <path
+                  fill-rule="evenodd"
+                  clip-rule="evenodd"
+                  d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                />
+              </svg>
+            </div>
+            <div class="flex flex-col text-start">
+              <span
+                class="text-[10px] text-purple-200 font-mono font-bold tracking-wider uppercase leading-none mb-1"
+                >Open Source / MIT</span
+              >
+              <span
+                class="text-sm sm:text-base font-black text-white leading-tight whitespace-nowrap"
+                data-i18n="hero_source_btn"
+                >مشاهده پروژه در گیت‌هاب</span
+              >
+            </div>
+            <span
+              class="text-[11px] px-2.5 py-1 rounded-lg bg-black/35 border border-white/20 font-mono font-bold shrink-0 text-purple-300 flex items-center gap-1 ms-auto sm:ms-2"
+            >
+              <span class="text-amber-400 text-xs">★</span>
+              <span data-i18n="hero_github_badge">سورس‌کد</span>
+            </span>
           </a>
         </div>
 
@@ -2081,13 +2101,13 @@
           </p>
 
           <div
-            class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3.5 sm:gap-4 mb-6 sm:mb-8 max-w-4xl mx-auto w-full px-2 sm:px-0"
+            class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3.5 sm:gap-4 mb-6 sm:mb-8 max-w-5xl mx-auto w-full px-2 sm:px-0"
           >
             <!-- Windows Setup Download -->
             <a
               href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.0_x64-setup.exe"
               data-role="download-btn"
-              class="btn-hero-download w-full sm:w-auto px-5 sm:px-6 py-3 rounded-2xl text-white inline-flex items-center justify-between sm:justify-start gap-3.5 shadow-2xl group cursor-pointer select-none"
+              class="btn-hero-download flex-1 w-full sm:w-auto px-5 sm:px-6 py-3 rounded-2xl text-white inline-flex items-center justify-between sm:justify-start gap-3.5 shadow-2xl group cursor-pointer select-none"
             >
               <div
                 class="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0 p-2 group-hover:scale-105 transition-transform shadow-inner"
@@ -2120,7 +2140,7 @@
             <button
               type="button"
               onclick="openLinuxModal()"
-              class="btn-hero-linux w-full sm:w-auto px-5 sm:px-6 py-3 rounded-2xl text-white inline-flex items-center justify-between sm:justify-start gap-3.5 shadow-xl group cursor-pointer select-none"
+              class="btn-hero-linux flex-1 w-full sm:w-auto px-5 sm:px-6 py-3 rounded-2xl text-white inline-flex items-center justify-between sm:justify-start gap-3.5 shadow-xl group cursor-pointer select-none"
             >
               <div
                 class="w-10 h-10 rounded-xl bg-black/25 border border-amber-400/30 flex items-center justify-center shrink-0 p-2 group-hover:scale-105 transition-transform shadow-inner"
@@ -2155,17 +2175,36 @@
               href="https://github.com/AminDEV81/nexus-launcher/releases/latest"
               target="_blank"
               rel="noopener noreferrer"
-              class="btn-hero-github w-full sm:w-auto px-5 sm:px-6 py-3.5 sm:py-4 rounded-2xl font-bold text-xs sm:text-sm text-slate-200 hover:text-white inline-flex items-center justify-center gap-2 self-stretch sm:self-auto min-h-[62px]"
-              data-i18n="cta_btn_all_releases"
+              class="btn-hero-github flex-1 w-full sm:w-auto px-5 sm:px-6 py-3 rounded-2xl text-white inline-flex items-center justify-between sm:justify-start gap-3.5 shadow-xl group cursor-pointer select-none"
             >
-              <svg class="w-5 h-5 fill-current shrink-0" viewBox="0 0 24 24">
-                <path
-                  fill-rule="evenodd"
-                  clip-rule="evenodd"
-                  d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                />
-              </svg>
-              <span>سایر نسخه‌ها در گیت‌هاب</span>
+              <div
+                class="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center shrink-0 p-2 group-hover:scale-105 transition-transform shadow-inner"
+              >
+                <svg class="w-full h-full fill-white" viewBox="0 0 24 24">
+                  <path
+                    fill-rule="evenodd"
+                    clip-rule="evenodd"
+                    d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                  />
+                </svg>
+              </div>
+              <div class="flex flex-col text-start">
+                <span
+                  class="text-[10px] text-purple-200 font-mono font-bold tracking-wider uppercase leading-none mb-1"
+                  >GitHub Releases</span
+                >
+                <span
+                  class="text-sm sm:text-base font-black text-white leading-tight whitespace-nowrap"
+                  data-i18n="cta_btn_all_releases"
+                  >سایر نسخه‌ها در گیت‌هاب</span
+                >
+              </div>
+              <span
+                class="text-[11px] px-2.5 py-1 rounded-lg bg-black/35 border border-white/20 font-mono font-bold shrink-0 text-purple-300 flex items-center gap-1 ms-auto sm:ms-2"
+              >
+                <span data-i18n="cta_github_badge">مخزن</span>
+                <span class="text-[9px]">↗</span>
+              </span>
             </a>
           </div>
 
@@ -2536,6 +2575,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=0.3.0.3"></script>
+    <script src="app.js?v=0.3.0.5"></script>
   </body>
 </html>

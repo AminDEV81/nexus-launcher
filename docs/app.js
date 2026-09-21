@@ -38,6 +38,7 @@ const TRANSLATIONS = {
     hero_download_linux: 'دانلود نسخه لینوکس',
     hero_download_deb: 'پکیج دبیان و اوبونتو (.deb)',
     hero_source_btn: 'مشاهده پروژه در گیت‌هاب',
+    hero_github_badge: 'سورس‌کد',
 
     badge_free: '۱۰۰٪ رایگان و بدون پرداخت',
     badge_offline: 'کاملاً آفلاین بدون نیاز به لاگین',
@@ -187,6 +188,7 @@ const TRANSLATIONS = {
     cta_btn_download: 'دانلود نسخه رسمی ویندوز v0.3.0',
     cta_btn_linux: 'دانلود نسخه لینوکس',
     cta_btn_all_releases: 'سایر نسخه‌ها در گیت‌هاب',
+    cta_github_badge: 'مخزن',
     linux_select_format: 'انتخاب فرمت',
     linux_modal_title: 'دانلود لانچر نکسوس نسخه ۰.۳.۰ برای لینوکس',
     linux_modal_subtitle: 'فرمت متناسب با توزیع سیستم‌عامل خود را انتخاب و دانلود نمایید:',
@@ -225,6 +227,7 @@ const TRANSLATIONS = {
     hero_download_linux: 'Download for Linux',
     hero_download_deb: 'Debian / Ubuntu Package (.deb)',
     hero_source_btn: 'View Project on GitHub',
+    hero_github_badge: 'Source',
 
     badge_free: '100% Free & Open Source',
     badge_offline: 'Fully Offline (No Login Required)',
@@ -378,6 +381,7 @@ const TRANSLATIONS = {
     cta_btn_download: 'Download Official Windows v0.3.0',
     cta_btn_linux: 'Download for Linux',
     cta_btn_all_releases: 'All Releases on GitHub',
+    cta_github_badge: 'Repo',
     linux_select_format: 'Select Format',
     linux_modal_title: 'Download Nexus Launcher v0.3.0 for Linux',
     linux_modal_subtitle: 'Choose the package format matching your Linux distribution:',
