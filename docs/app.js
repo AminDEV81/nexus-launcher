@@ -205,6 +205,7 @@ const TRANSLATIONS = {
     linux_tab_aur_title: 'مخزن رسمی کاربران آرچ لینوکس (AUR)',
     linux_tab_aur_desc:
       'مناسب برای توزیع‌های مبتنی بر آرچ: Arch Linux, Manjaro, Omarchy, EndeavourOS',
+    linux_btn_aur: 'مشاهده مخزن پکیج',
     linux_steamos_tip:
       '🎮 کاربران کنسول دستی استیم‌دک (Steam Deck): فایل AppImage را دانلود کرده و در حالت Desktop به عنوان یک Non-Steam Game به کتابخانه استیم خود اضافه کنید تا مستقیماً در Gaming Mode اجرا شود.',
     linux_wayland_tip:
@@ -402,6 +403,7 @@ const TRANSLATIONS = {
     linux_btn_rpm: 'Download .rpm Package',
     linux_tab_aur_title: 'Arch User Repository (AUR)',
     linux_tab_aur_desc: 'For Arch-based distributions: Arch Linux, Manjaro, Omarchy, EndeavourOS',
+    linux_btn_aur: 'View AUR Package',
     linux_steamos_tip:
       '🎮 Steam Deck users: Download the AppImage and add it as a Non-Steam Game in Desktop Mode.',
     linux_wayland_tip:
