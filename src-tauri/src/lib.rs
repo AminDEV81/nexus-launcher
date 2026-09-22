@@ -19,6 +19,15 @@ pub fn run() {
         if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
             std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
         }
+
+        // Fix AppImage forced GDK_BACKEND=x11 on pure Wayland compositors (Hyprland, Sway):
+        if std::env::var_os("WAYLAND_DISPLAY").is_some() {
+            if let Ok(backend) = std::env::var("GDK_BACKEND") {
+                if backend == "x11" {
+                    std::env::set_var("GDK_BACKEND", "wayland,x11");
+                }
+            }
+        }
     }
 
     tauri::Builder::default()

@@ -2479,13 +2479,11 @@
               <div
                 class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
               >
-                <span class="truncate dir-ltr text-left"
-                  >sudo apt install ./nexus_0.3.0_amd64.deb</span
-                >
+                <span class="truncate dir-ltr text-left">sudo dpkg -i Nexus_0.3.0_amd64.deb</span>
                 <button
                   type="button"
                   id="copy-deb-cmd"
-                  onclick="copyCommand('sudo apt install ./nexus_0.3.0_amd64.deb', 'copy-deb-cmd')"
+                  onclick="copyCommand('sudo dpkg -i Nexus_0.3.0_amd64.deb', 'copy-deb-cmd')"
                   class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
                 >
                   کپی دستور
@@ -2635,6 +2633,13 @@
                   کپی دستور
                 </button>
               </div>
+              <div class="mt-2 text-[10px] text-slate-400 leading-relaxed">
+                یا ساخت مستقیم پکیج:
+                <code class="px-1 py-0.5 rounded bg-black/40 font-mono text-cyan-300 select-all"
+                  >git clone https://github.com/AminDEV81/nexus-launcher.git &amp;&amp; cd
+                  nexus-launcher/packaging/aur &amp;&amp; makepkg -si</code
+                >
+              </div>
             </div>
           </div>
 
@@ -2656,18 +2661,20 @@
           >
             <span class="shrink-0 text-base">🐧</span>
             <span data-i18n="linux_wayland_tip">
-              کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت مشاهده هرگونه مشکل گرافیکی
-              در AppImage، برنامه را با فلگ
-              <code class="px-1.5 py-0.5 rounded bg-black/40 font-mono text-[11px] text-cyan-300"
-                >WEBKIT_DISABLE_DMABUF_RENDERER=1</code
+              کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت باز نشدن پنجره AppImage،
+              برنامه را در ترمینال با دستور
+              <code
+                class="px-1.5 py-0.5 rounded bg-black/40 font-mono text-[11px] text-cyan-300 select-all"
+                >GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1
+                ./Nexus_0.3.0_amd64.AppImage</code
               >
-              اجرا کرده یا پکیج AUR را نصب فرمایید.
+              اجرا فرمایید.
             </span>
           </div>
         </div>
       </div>
     </div>
 
-    <script src="app.js?v=0.3.0.9"></script>
+    <script src="app.js?v=0.3.0.10"></script>
   </body>
 </html>

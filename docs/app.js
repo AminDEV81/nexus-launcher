@@ -209,7 +209,7 @@ const TRANSLATIONS = {
     linux_steamos_tip:
       '🎮 کاربران کنسول دستی استیم‌دک (Steam Deck): فایل AppImage را دانلود کرده و در حالت Desktop به عنوان یک Non-Steam Game به کتابخانه استیم خود اضافه کنید تا مستقیماً در Gaming Mode اجرا شود.',
     linux_wayland_tip:
-      '🐧 کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت مشاهده هرگونه مشکل گرافیکی در AppImage، برنامه را با فلگ WEBKIT_DISABLE_DMABUF_RENDERER=1 اجرا کرده یا پکیج AUR را نصب فرمایید.',
+      '🐧 کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت باز نشدن پنجره AppImage، برنامه را در ترمینال با دستور GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Nexus_0.3.0_amd64.AppImage اجرا فرمایید.',
     footer_license: 'منتشر شده تحت مجوز رسمی و آزاد MIT',
     footer_author: 'طراحی و توسعه توسط',
   },
@@ -407,7 +407,7 @@ const TRANSLATIONS = {
     linux_steamos_tip:
       '🎮 Steam Deck users: Download the AppImage and add it as a Non-Steam Game in Desktop Mode.',
     linux_wayland_tip:
-      '🐧 Wayland & Hyprland users (e.g. Omarchy): If encountering any graphics glitch with AppImage, launch with WEBKIT_DISABLE_DMABUF_RENDERER=1 or install via AUR.',
+      '🐧 Wayland & Hyprland users (e.g. Omarchy): If the AppImage window does not appear, launch via terminal with GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Nexus_0.3.0_amd64.AppImage.',
     footer_license: 'Released under the official MIT License',
     footer_author: 'Designed & developed by',
   },
