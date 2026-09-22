@@ -2443,11 +2443,13 @@
             <div
               class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
             >
-              <span class="truncate dir-ltr text-left">sudo dpkg -i nexus_0.3.0_amd64.deb</span>
+              <span class="truncate dir-ltr text-left"
+                >sudo apt install ./nexus_0.3.0_amd64.deb</span
+              >
               <button
                 type="button"
                 id="copy-deb-cmd"
-                onclick="copyCommand('sudo dpkg -i nexus_0.3.0_amd64.deb', 'copy-deb-cmd')"
+                onclick="copyCommand('sudo apt install ./nexus_0.3.0_amd64.deb', 'copy-deb-cmd')"
                 class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
               >
                 کپی دستور
@@ -2510,11 +2512,67 @@
             <div
               class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
             >
-              <span class="truncate dir-ltr text-left">sudo rpm -i Nexus-0.3.0-1.x86_64.rpm</span>
+              <span class="truncate dir-ltr text-left"
+                >sudo dnf install ./Nexus-0.3.0-1.x86_64.rpm</span
+              >
               <button
                 type="button"
                 id="copy-rpm-cmd"
-                onclick="copyCommand('sudo rpm -i Nexus-0.3.0-1.x86_64.rpm', 'copy-rpm-cmd')"
+                onclick="copyCommand('sudo dnf install ./Nexus-0.3.0-1.x86_64.rpm', 'copy-rpm-cmd')"
+                class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
+              >
+                کپی دستور
+              </button>
+            </div>
+          </div>
+
+          <!-- 4. Arch Linux / AUR -->
+          <div
+            class="rounded-2xl p-4 sm:p-5 bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all"
+          >
+            <div
+              class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3"
+            >
+              <div class="flex items-start gap-3">
+                <div
+                  class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0 text-xl shadow-inner text-cyan-400 font-bold font-mono"
+                >
+                  aur
+                </div>
+                <div>
+                  <h4
+                    class="text-sm sm:text-base font-black text-white"
+                    data-i18n="linux_tab_aur_title"
+                  >
+                    مخزن رسمی کاربران آرچ لینوکس (AUR)
+                  </h4>
+                  <p
+                    class="text-xs text-slate-300 mt-1 leading-relaxed"
+                    data-i18n="linux_tab_aur_desc"
+                  >
+                    مناسب برای توزیع‌های مبتنی بر آرچ: Arch Linux, Manjaro, Omarchy, EndeavourOS
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <span
+                  class="text-[11px] px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-400/30 text-cyan-300 font-mono font-bold"
+                >
+                  nexus-launcher-bin
+                </span>
+              </div>
+            </div>
+
+            <!-- Quick Run Snippet -->
+            <div
+              class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
+            >
+              <span class="truncate dir-ltr text-left">yay -S nexus-launcher-bin</span>
+              <button
+                type="button"
+                id="copy-aur-cmd"
+                onclick="copyCommand('yay -S nexus-launcher-bin', 'copy-aur-cmd')"
                 class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
               >
                 کپی دستور
@@ -2532,6 +2590,21 @@
             کاربران کنسول دستی استیم‌دک (Steam Deck): فایل AppImage را دانلود کرده و در حالت Desktop
             به عنوان یک Non-Steam Game به کتابخانه استیم خود اضافه کنید تا مستقیماً در Gaming Mode
             اجرا شود.
+          </span>
+        </div>
+
+        <!-- Wayland / Hyprland / Omarchy Tip -->
+        <div
+          class="mt-2.5 p-3.5 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 text-xs text-cyan-200 leading-relaxed flex items-start gap-2.5"
+        >
+          <span class="shrink-0 text-base">🐧</span>
+          <span data-i18n="linux_wayland_tip">
+            کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت مشاهده هرگونه مشکل گرافیکی در
+            AppImage، برنامه را با فلگ
+            <code class="px-1.5 py-0.5 rounded bg-black/40 font-mono text-[11px] text-cyan-300"
+              >WEBKIT_DISABLE_DMABUF_RENDERER=1</code
+            >
+            اجرا کرده یا پکیج AUR را نصب فرمایید.
           </span>
         </div>
       </div>

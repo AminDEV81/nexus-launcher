@@ -202,8 +202,13 @@ const TRANSLATIONS = {
     linux_tab_rpm_title: 'بسته نصبی فدورا و ردهت (.rpm)',
     linux_tab_rpm_desc: 'مناسب برای توزیع‌های مبتنی بر ردهت: Fedora, RHEL, openSUSE, CentOS',
     linux_btn_rpm: 'دانلود مستقیم بسته rpm.',
+    linux_tab_aur_title: 'مخزن رسمی کاربران آرچ لینوکس (AUR)',
+    linux_tab_aur_desc:
+      'مناسب برای توزیع‌های مبتنی بر آرچ: Arch Linux, Manjaro, Omarchy, EndeavourOS',
     linux_steamos_tip:
       '🎮 کاربران کنسول دستی استیم‌دک (Steam Deck): فایل AppImage را دانلود کرده و در حالت Desktop به عنوان یک Non-Steam Game به کتابخانه استیم خود اضافه کنید تا مستقیماً در Gaming Mode اجرا شود.',
+    linux_wayland_tip:
+      '🐧 کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت مشاهده هرگونه مشکل گرافیکی در AppImage، برنامه را با فلگ WEBKIT_DISABLE_DMABUF_RENDERER=1 اجرا کرده یا پکیج AUR را نصب فرمایید.',
     footer_license: 'منتشر شده تحت مجوز رسمی و آزاد MIT',
     footer_author: 'طراحی و توسعه توسط',
   },
@@ -395,8 +400,12 @@ const TRANSLATIONS = {
     linux_tab_rpm_title: 'Fedora / RedHat Package (.rpm)',
     linux_tab_rpm_desc: 'Native package for Fedora, RHEL, openSUSE, CentOS',
     linux_btn_rpm: 'Download .rpm Package',
+    linux_tab_aur_title: 'Arch User Repository (AUR)',
+    linux_tab_aur_desc: 'For Arch-based distributions: Arch Linux, Manjaro, Omarchy, EndeavourOS',
     linux_steamos_tip:
       '🎮 Steam Deck users: Download the AppImage and add it as a Non-Steam Game in Desktop Mode.',
+    linux_wayland_tip:
+      '🐧 Wayland & Hyprland users (e.g. Omarchy): If encountering any graphics glitch with AppImage, launch with WEBKIT_DISABLE_DMABUF_RENDERER=1 or install via AUR.',
     footer_license: 'Released under the official MIT License',
     footer_author: 'Designed & developed by',
   },

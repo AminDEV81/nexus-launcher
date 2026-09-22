@@ -1,0 +1,30 @@
+# Maintainer: AminDEV81 <https://github.com/AminDEV81/nexus-launcher>
+
+pkgname=nexus-launcher-bin
+pkgver=0.3.0
+pkgrel=1
+pkgdesc="Modern, high-performance game launcher for Windows and Linux built with Tauri, Rust, and React"
+arch=('x86_64')
+url="https://nexuslauncher.ir"
+license=('MIT')
+depends=(
+    'webkit2gtk-4.1'
+    'gtk3'
+    'libayatana-appindicator'
+    'openssl'
+    'libxdo'
+    'librsvg'
+)
+optdepends=(
+    'steam: Steam library integration'
+    'mangohud: In-game FPS & hardware overlay'
+    'gamemode: Feral GameMode optimization support'
+)
+provides=('nexus-launcher')
+conflicts=('nexus-launcher')
+source=("${pkgname}-${pkgver}.deb::https://github.com/AminDEV81/nexus-launcher/releases/download/v${pkgver}/nexus_${pkgver}_amd64.deb")
+sha256sums=('SKIP')
+
+package() {
+    bsdtar -xf data.tar.* -C "${pkgdir}"
+}

@@ -13,6 +13,14 @@ use tauri::{
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    {
+        // Fix WebKitGTK DMA-BUF rendering glitch on Wayland compositors (Hyprland, Sway, GNOME Wayland with Nvidia, etc.)
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+
     tauri::Builder::default()
         // Second launch of the installed exe must not spawn a second
         // window: focus the existing one instead. Must be the FIRST
