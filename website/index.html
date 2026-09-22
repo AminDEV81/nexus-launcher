@@ -32,7 +32,7 @@
     <script>
       // Anti-stale cache detector: automatically ensures updated assets are loaded
       ;(function () {
-        var BUILD = '0.3.0.7'
+        var BUILD = '0.3.0.8'
         try {
           var last = localStorage.getItem('nexus_build_ver')
           if (last && last !== BUILD) {
@@ -40,9 +40,25 @@
             if (!sessionStorage.getItem('reloaded_v_' + BUILD)) {
               sessionStorage.setItem('reloaded_v_' + BUILD, '1')
               window.location.reload(true)
+              return
             }
           } else {
             localStorage.setItem('nexus_build_ver', BUILD)
+          }
+
+          // Background auto-updater: checks version.json without cache
+          if (window.fetch) {
+            fetch('version.json?_=' + Date.now(), { cache: 'no-store' })
+              .then(function (res) {
+                return res.json()
+              })
+              .then(function (data) {
+                if (data && data.version && data.version !== BUILD) {
+                  localStorage.setItem('nexus_build_ver', data.version)
+                  window.location.reload(true)
+                }
+              })
+              .catch(function () {})
           }
         } catch (e) {}
       })()
@@ -83,7 +99,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <!-- Custom Stylesheet with Cache Buster -->
-    <link rel="stylesheet" href="style.css?v=0.3.0.7" />
+    <link rel="stylesheet" href="style.css?v=0.3.0.8" />
   </head>
   <body
     class="bg-[#06070c] text-slate-100 antialiased overflow-x-hidden selection:bg-purple-600/30 selection:text-cyan-300"
@@ -2610,6 +2626,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=0.3.0.7"></script>
+    <script src="app.js?v=0.3.0.8"></script>
   </body>
 </html>
