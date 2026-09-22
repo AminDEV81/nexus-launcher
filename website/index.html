@@ -31,17 +31,20 @@
     <meta http-equiv="Expires" content="0" />
     <script>
       ;(function () {
-        var BUILD = '0.3.0.9'
+        var BUILD = '0.3.0.10'
+        var currentUrl = new URL(window.location.href)
+        var urlV = currentUrl.searchParams.get('v')
 
-        // Clean up ?v= from URL bar if already on latest build
-        try {
-          var url = new URL(window.location.href)
-          if (url.searchParams.has('v') && url.searchParams.get('v') === BUILD) {
-            url.searchParams.delete('v')
-            var cleanPath = url.pathname + (url.search ? url.search : '') + url.hash
+        // Clean up ?v= from URL bar after load so address bar stays clean
+        if (urlV) {
+          try {
+            sessionStorage.setItem('nexus_loaded_v', urlV)
+            currentUrl.searchParams.delete('v')
+            var cleanPath =
+              currentUrl.pathname + (currentUrl.search ? currentUrl.search : '') + currentUrl.hash
             window.history.replaceState(null, '', cleanPath)
-          }
-        } catch (e) {}
+          } catch (e) {}
+        }
 
         // Check for latest version against version.json with cache-busting timestamp
         if (window.fetch) {
@@ -50,19 +53,42 @@
               return res.json()
             })
             .then(function (data) {
-              if (data && data.version && data.version !== BUILD) {
-                if ('caches' in window) {
-                  caches.keys().then(function (names) {
-                    names.forEach(function (name) {
-                      caches.delete(name)
-                    })
+              if (!data || !data.version) return
+              var remoteVer = data.version
+
+              // If the page is already running this build, do nothing!
+              if (remoteVer === BUILD) return
+
+              // Triple-layer loop protection:
+              try {
+                // 1. If this exact version was passed in the URL when loaded:
+                if (urlV === remoteVer) return
+                // 2. If this session has already refreshed for this version:
+                if (sessionStorage.getItem('nexus_reloaded_' + remoteVer)) return
+                // 3. Minimum 30 seconds interval between any automatic reloads:
+                var lastReload = parseInt(
+                  sessionStorage.getItem('nexus_last_reload_time') || '0',
+                  10,
+                )
+                if (Date.now() - lastReload < 30000) return
+
+                sessionStorage.setItem('nexus_reloaded_' + remoteVer, '1')
+                sessionStorage.setItem('nexus_last_reload_time', Date.now().toString())
+              } catch (e) {}
+
+              // Clear CacheStorage API if available
+              if ('caches' in window) {
+                caches.keys().then(function (names) {
+                  names.forEach(function (name) {
+                    caches.delete(name)
                   })
-                }
-                localStorage.setItem('nexus_build_ver', data.version)
-                var nextUrl = new URL(window.location.href)
-                nextUrl.searchParams.set('v', data.version)
-                window.location.replace(nextUrl.toString())
+                })
               }
+
+              // One-time safe reload with version parameter
+              var nextUrl = new URL(window.location.href)
+              nextUrl.searchParams.set('v', remoteVer)
+              window.location.replace(nextUrl.toString())
             })
             .catch(function () {})
         }
@@ -104,7 +130,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <!-- Custom Stylesheet with Cache Buster -->
-    <link rel="stylesheet" href="style.css?v=0.3.0.9" />
+    <link rel="stylesheet" href="style.css?v=0.3.0.10" />
   </head>
   <body
     class="bg-[#06070c] text-slate-100 antialiased overflow-x-hidden selection:bg-purple-600/30 selection:text-cyan-300"
