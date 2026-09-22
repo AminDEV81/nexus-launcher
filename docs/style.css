@@ -500,3 +500,29 @@ details[open] summary .faq-icon {
     min-height: 52px;
   }
 }
+
+/* Custom Sleek Scrollbar for Modal and Overlays */
+.modal-custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 240, 255, 0.4) transparent;
+}
+
+.modal-custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.modal-custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 16px 0; /* Inset keeps scrollbar away from top and bottom rounded corners */
+}
+
+.modal-custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.35);
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 240, 255, 0.15);
+}
+
+.modal-custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.7);
+}

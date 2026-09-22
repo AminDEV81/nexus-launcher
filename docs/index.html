@@ -31,7 +31,7 @@
     <meta http-equiv="Expires" content="0" />
     <script>
       ;(function () {
-        var BUILD = '0.3.0.8'
+        var BUILD = '0.3.0.9'
 
         // Clean up ?v= from URL bar if already on latest build
         try {
@@ -104,7 +104,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <!-- Custom Stylesheet with Cache Buster -->
-    <link rel="stylesheet" href="style.css?v=0.3.0.8" />
+    <link rel="stylesheet" href="style.css?v=0.3.0.9" />
   </head>
   <body
     class="bg-[#06070c] text-slate-100 antialiased overflow-x-hidden selection:bg-purple-600/30 selection:text-cyan-300"
@@ -2273,9 +2273,10 @@
         onclick="closeLinuxModal()"
       ></div>
 
-      <!-- Modal Card -->
+      <!-- Modal Card Shell -->
       <div
-        class="relative z-10 w-full max-w-2xl bg-[#0b0e17] border border-cyan-500/30 rounded-3xl p-5 sm:p-8 shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+        class="relative z-10 w-full max-w-2xl bg-[#0b0e17] border border-cyan-500/40 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        style="transform: translateZ(0); isolation: isolate"
       >
         <!-- Background Ambient Glow -->
         <div
@@ -2285,361 +2286,388 @@
           class="absolute -bottom-20 -left-20 w-56 h-56 bg-cyan-500/15 blur-[80px] rounded-full pointer-events-none"
         ></div>
 
-        <!-- Header -->
-        <div class="flex items-start justify-between gap-4 mb-6 relative">
-          <div>
-            <div class="flex items-center gap-2 mb-2">
-              <span
-                class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono inline-flex items-center gap-1.5"
+        <!-- Scrollable Inner Content -->
+        <div
+          class="relative z-10 overflow-y-auto p-5 sm:p-8 modal-custom-scrollbar overscroll-contain"
+        >
+          <!-- Header -->
+          <div class="flex items-start justify-between gap-4 mb-6 relative">
+            <div>
+              <div class="flex items-center gap-2 mb-2">
+                <span
+                  class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono inline-flex items-center gap-1.5"
+                >
+                  <span>🐧</span>
+                  <span>v0.3.0 Linux Release</span>
+                </span>
+              </div>
+              <h3
+                id="linux-modal-heading"
+                class="text-lg sm:text-2xl font-black text-white"
+                data-i18n="linux_modal_title"
               >
-                <span>🐧</span>
-                <span>v0.3.0 Linux Release</span>
-              </span>
+                دانلود لانچر نکسوس نسخه ۰.۳.۰ برای لینوکس
+              </h3>
+              <p class="text-xs sm:text-sm text-slate-300 mt-1" data-i18n="linux_modal_subtitle">
+                فرمت متناسب با توزیع سیستم‌عامل خود را انتخاب و دانلود نمایید:
+              </p>
             </div>
-            <h3
-              id="linux-modal-heading"
-              class="text-lg sm:text-2xl font-black text-white"
-              data-i18n="linux_modal_title"
+
+            <!-- Close Button -->
+            <button
+              type="button"
+              onclick="closeLinuxModal()"
+              class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shrink-0 focus:outline-none"
+              aria-label="بستن"
             >
-              دانلود لانچر نکسوس نسخه ۰.۳.۰ برای لینوکس
-            </h3>
-            <p class="text-xs sm:text-sm text-slate-300 mt-1" data-i18n="linux_modal_subtitle">
-              فرمت متناسب با توزیع سیستم‌عامل خود را انتخاب و دانلود نمایید:
-            </p>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
           </div>
 
-          <!-- Close Button -->
-          <button
-            type="button"
-            onclick="closeLinuxModal()"
-            class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all shrink-0 focus:outline-none"
-            aria-label="بستن"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        <!-- Package Options List -->
-        <div class="space-y-3.5 sm:space-y-4">
-          <!-- 1. Universal AppImage (Recommended) -->
-          <div
-            class="relative rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-cyan-500/10 border-2 border-amber-500/40 shadow-lg shadow-amber-500/5 transition-all hover:border-amber-400"
-          >
+          <!-- Package Options List -->
+          <div class="space-y-3.5 sm:space-y-4">
+            <!-- 1. Universal AppImage (Recommended) -->
             <div
-              class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3"
+              class="relative rounded-2xl p-4 sm:p-5 bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-cyan-500/10 border-2 border-amber-500/40 shadow-lg shadow-amber-500/5 transition-all hover:border-amber-400"
             >
-              <div class="flex items-start gap-3">
-                <div
-                  class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 text-xl shadow-inner"
-                >
-                  🚀
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0 text-xl shadow-inner"
+                  >
+                    🚀
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <h4
+                        class="text-sm sm:text-base font-black text-white"
+                        data-i18n="linux_tab_appimage_title"
+                      >
+                        بسته همه‌منظوره AppImage (پیشنهادی)
+                      </h4>
+                      <span
+                        class="px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-400/20 text-amber-300 border border-amber-400/40 font-mono"
+                        >Arch / SteamOS / All</span
+                      >
+                    </div>
+                    <p
+                      class="text-xs text-slate-300 mt-1 leading-relaxed"
+                      data-i18n="linux_tab_appimage_desc"
+                    >
+                      مناسب برای تمام توزیع‌ها بدون نیاز به نصب: Arch Linux, Manjaro, SteamOS,
+                      Fedora, Ubuntu
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <div class="flex items-center gap-2 flex-wrap">
+
+                <a
+                  href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.0_amd64.AppImage"
+                  data-role="download-btn-appimage"
+                  class="btn-nexus-primary w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white inline-flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-purple-500/30"
+                >
+                  <svg
+                    class="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                  <span data-i18n="linux_btn_appimage">دانلود مستقیم AppImage</span>
+                  <span
+                    class="text-[11px] px-1.5 py-0.5 rounded bg-black/30 font-mono font-normal"
+                    data-role="download-size-appimage"
+                    >~75 MB</span
+                  >
+                </a>
+              </div>
+
+              <!-- Quick Run Snippet -->
+              <div
+                class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
+              >
+                <span class="truncate dir-ltr text-left"
+                  >chmod +x Nexus_0.3.0_amd64.AppImage && ./Nexus_0.3.0_amd64.AppImage</span
+                >
+                <button
+                  type="button"
+                  id="copy-appimage-cmd"
+                  onclick="
+                    copyCommand(
+                      'chmod +x Nexus_0.3.0_amd64.AppImage && ./Nexus_0.3.0_amd64.AppImage',
+                      'copy-appimage-cmd',
+                    )
+                  "
+                  class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
+                >
+                  کپی دستور
+                </button>
+              </div>
+            </div>
+
+            <!-- 2. Debian / Ubuntu Package (.deb) -->
+            <div
+              class="rounded-2xl p-4 sm:p-5 bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all"
+            >
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center shrink-0 text-xl shadow-inner text-red-400 font-bold font-mono"
+                  >
+                    deb
+                  </div>
+                  <div>
                     <h4
                       class="text-sm sm:text-base font-black text-white"
-                      data-i18n="linux_tab_appimage_title"
+                      data-i18n="linux_tab_deb_title"
                     >
-                      بسته همه‌منظوره AppImage (پیشنهادی)
+                      بسته نصبی دبیان و اوبونتو (.deb)
                     </h4>
-                    <span
-                      class="px-2 py-0.5 rounded-md text-[10px] font-black bg-amber-400/20 text-amber-300 border border-amber-400/40 font-mono"
-                      >Arch / SteamOS / All</span
+                    <p
+                      class="text-xs text-slate-300 mt-1 leading-relaxed"
+                      data-i18n="linux_tab_deb_desc"
                     >
+                      مناسب برای توزیع‌های مبتنی بر دبیان: Ubuntu, Debian, Linux Mint, Pop!_OS
+                    </p>
                   </div>
-                  <p
-                    class="text-xs text-slate-300 mt-1 leading-relaxed"
-                    data-i18n="linux_tab_appimage_desc"
-                  >
-                    مناسب برای تمام توزیع‌ها بدون نیاز به نصب: Arch Linux, Manjaro, SteamOS, Fedora,
-                    Ubuntu
-                  </p>
                 </div>
+
+                <a
+                  href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.3.0_amd64.deb"
+                  data-role="download-btn-deb"
+                  class="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-white/10 hover:bg-white/20 border border-white/20 inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
+                >
+                  <svg
+                    class="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                  <span data-i18n="linux_btn_deb">دانلود مستقیم بسته deb.</span>
+                  <span
+                    class="text-[11px] px-1.5 py-0.5 rounded bg-black/30 font-mono font-normal"
+                    data-role="download-size-deb"
+                    >~65 MB</span
+                  >
+                </a>
               </div>
 
-              <a
-                href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.0_amd64.AppImage"
-                data-role="download-btn-appimage"
-                class="btn-nexus-primary w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white inline-flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-purple-500/30"
+              <!-- Quick Run Snippet -->
+              <div
+                class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
               >
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-                <span data-i18n="linux_btn_appimage">دانلود مستقیم AppImage</span>
-                <span
-                  class="text-[11px] px-1.5 py-0.5 rounded bg-black/30 font-mono font-normal"
-                  data-role="download-size-appimage"
-                  >~75 MB</span
+                <span class="truncate dir-ltr text-left"
+                  >sudo apt install ./nexus_0.3.0_amd64.deb</span
                 >
-              </a>
+                <button
+                  type="button"
+                  id="copy-deb-cmd"
+                  onclick="copyCommand('sudo apt install ./nexus_0.3.0_amd64.deb', 'copy-deb-cmd')"
+                  class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
+                >
+                  کپی دستور
+                </button>
+              </div>
             </div>
 
-            <!-- Quick Run Snippet -->
+            <!-- 3. Fedora / RedHat Package (.rpm) -->
             <div
-              class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
+              class="rounded-2xl p-4 sm:p-5 bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all"
             >
-              <span class="truncate dir-ltr text-left"
-                >chmod +x Nexus_0.3.0_amd64.AppImage && ./Nexus_0.3.0_amd64.AppImage</span
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3"
               >
-              <button
-                type="button"
-                id="copy-appimage-cmd"
-                onclick="
-                  copyCommand(
-                    'chmod +x Nexus_0.3.0_amd64.AppImage && ./Nexus_0.3.0_amd64.AppImage',
-                    'copy-appimage-cmd',
-                  )
-                "
-                class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
+                <div class="flex items-start gap-3">
+                  <div
+                    class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center shrink-0 text-xl shadow-inner text-blue-400 font-bold font-mono"
+                  >
+                    rpm
+                  </div>
+                  <div>
+                    <h4
+                      class="text-sm sm:text-base font-black text-white"
+                      data-i18n="linux_tab_rpm_title"
+                    >
+                      بسته نصبی فدورا و ردهت (.rpm)
+                    </h4>
+                    <p
+                      class="text-xs text-slate-300 mt-1 leading-relaxed"
+                      data-i18n="linux_tab_rpm_desc"
+                    >
+                      مناسب برای توزیع‌های مبتنی بر ردهت: Fedora, RHEL, openSUSE, CentOS
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus-0.3.0-1.x86_64.rpm"
+                  data-role="download-btn-rpm"
+                  class="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-white/10 hover:bg-white/20 border border-white/20 inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
+                >
+                  <svg
+                    class="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                  <span data-i18n="linux_btn_rpm">دانلود مستقیم بسته rpm.</span>
+                  <span
+                    class="text-[11px] px-1.5 py-0.5 rounded bg-black/30 font-mono font-normal"
+                    data-role="download-size-rpm"
+                    >~65 MB</span
+                  >
+                </a>
+              </div>
+
+              <!-- Quick Run Snippet -->
+              <div
+                class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
               >
-                کپی دستور
-              </button>
+                <span class="truncate dir-ltr text-left"
+                  >sudo dnf install ./Nexus-0.3.0-1.x86_64.rpm</span
+                >
+                <button
+                  type="button"
+                  id="copy-rpm-cmd"
+                  onclick="
+                    copyCommand('sudo dnf install ./Nexus-0.3.0-1.x86_64.rpm', 'copy-rpm-cmd')
+                  "
+                  class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
+                >
+                  کپی دستور
+                </button>
+              </div>
+            </div>
+
+            <!-- 4. Arch Linux / AUR -->
+            <div
+              class="rounded-2xl p-4 sm:p-5 bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all"
+            >
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3"
+              >
+                <div class="flex items-start gap-3">
+                  <div
+                    class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0 text-xl shadow-inner text-cyan-400 font-bold font-mono"
+                  >
+                    aur
+                  </div>
+                  <div>
+                    <h4
+                      class="text-sm sm:text-base font-black text-white"
+                      data-i18n="linux_tab_aur_title"
+                    >
+                      مخزن رسمی کاربران آرچ لینوکس (AUR)
+                    </h4>
+                    <p
+                      class="text-xs text-slate-300 mt-1 leading-relaxed"
+                      data-i18n="linux_tab_aur_desc"
+                    >
+                      مناسب برای توزیع‌های مبتنی بر آرچ: Arch Linux, Manjaro, Omarchy, EndeavourOS
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href="https://github.com/AminDEV81/nexus-launcher/tree/main/packaging/aur"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-white/10 hover:bg-white/20 border border-white/20 inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
+                >
+                  <svg
+                    class="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                  <span data-i18n="linux_btn_aur">مشاهده مخزن پکیج</span>
+                </a>
+              </div>
+
+              <!-- Quick Run Snippet -->
+              <div
+                class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
+              >
+                <span class="truncate dir-ltr text-left">yay -S nexus-launcher-bin</span>
+                <button
+                  type="button"
+                  id="copy-aur-cmd"
+                  onclick="copyCommand('yay -S nexus-launcher-bin', 'copy-aur-cmd')"
+                  class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
+                >
+                  کپی دستور
+                </button>
+              </div>
             </div>
           </div>
 
-          <!-- 2. Debian / Ubuntu Package (.deb) -->
+          <!-- Steam Deck Gamer Tip -->
           <div
-            class="rounded-2xl p-4 sm:p-5 bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all"
+            class="mt-4 p-3.5 rounded-2xl bg-purple-950/40 border border-purple-500/30 text-xs text-purple-200 leading-relaxed flex items-start gap-2.5"
           >
-            <div
-              class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3"
-            >
-              <div class="flex items-start gap-3">
-                <div
-                  class="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center shrink-0 text-xl shadow-inner text-red-400 font-bold font-mono"
-                >
-                  deb
-                </div>
-                <div>
-                  <h4
-                    class="text-sm sm:text-base font-black text-white"
-                    data-i18n="linux_tab_deb_title"
-                  >
-                    بسته نصبی دبیان و اوبونتو (.deb)
-                  </h4>
-                  <p
-                    class="text-xs text-slate-300 mt-1 leading-relaxed"
-                    data-i18n="linux_tab_deb_desc"
-                  >
-                    مناسب برای توزیع‌های مبتنی بر دبیان: Ubuntu, Debian, Linux Mint, Pop!_OS
-                  </p>
-                </div>
-              </div>
-
-              <a
-                href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.3.0_amd64.deb"
-                data-role="download-btn-deb"
-                class="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-white/10 hover:bg-white/20 border border-white/20 inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
-              >
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-                <span data-i18n="linux_btn_deb">دانلود مستقیم بسته deb.</span>
-                <span
-                  class="text-[11px] px-1.5 py-0.5 rounded bg-black/30 font-mono font-normal"
-                  data-role="download-size-deb"
-                  >~65 MB</span
-                >
-              </a>
-            </div>
-
-            <!-- Quick Run Snippet -->
-            <div
-              class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
-            >
-              <span class="truncate dir-ltr text-left"
-                >sudo apt install ./nexus_0.3.0_amd64.deb</span
-              >
-              <button
-                type="button"
-                id="copy-deb-cmd"
-                onclick="copyCommand('sudo apt install ./nexus_0.3.0_amd64.deb', 'copy-deb-cmd')"
-                class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
-              >
-                کپی دستور
-              </button>
-            </div>
+            <span class="shrink-0 text-base">🎮</span>
+            <span data-i18n="linux_steamos_tip">
+              کاربران کنسول دستی استیم‌دک (Steam Deck): فایل AppImage را دانلود کرده و در حالت
+              Desktop به عنوان یک Non-Steam Game به کتابخانه استیم خود اضافه کنید تا مستقیماً در
+              Gaming Mode اجرا شود.
+            </span>
           </div>
 
-          <!-- 3. Fedora / RedHat Package (.rpm) -->
+          <!-- Wayland / Hyprland / Omarchy Tip -->
           <div
-            class="rounded-2xl p-4 sm:p-5 bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all"
+            class="mt-2.5 p-3.5 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 text-xs text-cyan-200 leading-relaxed flex items-start gap-2.5"
           >
-            <div
-              class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3"
-            >
-              <div class="flex items-start gap-3">
-                <div
-                  class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center shrink-0 text-xl shadow-inner text-blue-400 font-bold font-mono"
-                >
-                  rpm
-                </div>
-                <div>
-                  <h4
-                    class="text-sm sm:text-base font-black text-white"
-                    data-i18n="linux_tab_rpm_title"
-                  >
-                    بسته نصبی فدورا و ردهت (.rpm)
-                  </h4>
-                  <p
-                    class="text-xs text-slate-300 mt-1 leading-relaxed"
-                    data-i18n="linux_tab_rpm_desc"
-                  >
-                    مناسب برای توزیع‌های مبتنی بر ردهت: Fedora, RHEL, openSUSE, CentOS
-                  </p>
-                </div>
-              </div>
-
-              <a
-                href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus-0.3.0-1.x86_64.rpm"
-                data-role="download-btn-rpm"
-                class="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-white/10 hover:bg-white/20 border border-white/20 inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
+            <span class="shrink-0 text-base">🐧</span>
+            <span data-i18n="linux_wayland_tip">
+              کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت مشاهده هرگونه مشکل گرافیکی
+              در AppImage، برنامه را با فلگ
+              <code class="px-1.5 py-0.5 rounded bg-black/40 font-mono text-[11px] text-cyan-300"
+                >WEBKIT_DISABLE_DMABUF_RENDERER=1</code
               >
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                  />
-                </svg>
-                <span data-i18n="linux_btn_rpm">دانلود مستقیم بسته rpm.</span>
-                <span
-                  class="text-[11px] px-1.5 py-0.5 rounded bg-black/30 font-mono font-normal"
-                  data-role="download-size-rpm"
-                  >~65 MB</span
-                >
-              </a>
-            </div>
-
-            <!-- Quick Run Snippet -->
-            <div
-              class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
-            >
-              <span class="truncate dir-ltr text-left"
-                >sudo dnf install ./Nexus-0.3.0-1.x86_64.rpm</span
-              >
-              <button
-                type="button"
-                id="copy-rpm-cmd"
-                onclick="copyCommand('sudo dnf install ./Nexus-0.3.0-1.x86_64.rpm', 'copy-rpm-cmd')"
-                class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
-              >
-                کپی دستور
-              </button>
-            </div>
+              اجرا کرده یا پکیج AUR را نصب فرمایید.
+            </span>
           </div>
-
-          <!-- 4. Arch Linux / AUR -->
-          <div
-            class="rounded-2xl p-4 sm:p-5 bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all"
-          >
-            <div
-              class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3"
-            >
-              <div class="flex items-start gap-3">
-                <div
-                  class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center shrink-0 text-xl shadow-inner text-cyan-400 font-bold font-mono"
-                >
-                  aur
-                </div>
-                <div>
-                  <h4
-                    class="text-sm sm:text-base font-black text-white"
-                    data-i18n="linux_tab_aur_title"
-                  >
-                    مخزن رسمی کاربران آرچ لینوکس (AUR)
-                  </h4>
-                  <p
-                    class="text-xs text-slate-300 mt-1 leading-relaxed"
-                    data-i18n="linux_tab_aur_desc"
-                  >
-                    مناسب برای توزیع‌های مبتنی بر آرچ: Arch Linux, Manjaro, Omarchy, EndeavourOS
-                  </p>
-                </div>
-              </div>
-
-              <a
-                href="https://github.com/AminDEV81/nexus-launcher/tree/main/packaging/aur"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-white/10 hover:bg-white/20 border border-white/20 inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
-              >
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-                <span data-i18n="linux_btn_aur">مشاهده مخزن پکیج</span>
-              </a>
-            </div>
-
-            <!-- Quick Run Snippet -->
-            <div
-              class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
-            >
-              <span class="truncate dir-ltr text-left">yay -S nexus-launcher-bin</span>
-              <button
-                type="button"
-                id="copy-aur-cmd"
-                onclick="copyCommand('yay -S nexus-launcher-bin', 'copy-aur-cmd')"
-                class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
-              >
-                کپی دستور
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Steam Deck Gamer Tip -->
-        <div
-          class="mt-4 p-3.5 rounded-2xl bg-purple-950/40 border border-purple-500/30 text-xs text-purple-200 leading-relaxed flex items-start gap-2.5"
-        >
-          <span class="shrink-0 text-base">🎮</span>
-          <span data-i18n="linux_steamos_tip">
-            کاربران کنسول دستی استیم‌دک (Steam Deck): فایل AppImage را دانلود کرده و در حالت Desktop
-            به عنوان یک Non-Steam Game به کتابخانه استیم خود اضافه کنید تا مستقیماً در Gaming Mode
-            اجرا شود.
-          </span>
-        </div>
-
-        <!-- Wayland / Hyprland / Omarchy Tip -->
-        <div
-          class="mt-2.5 p-3.5 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 text-xs text-cyan-200 leading-relaxed flex items-start gap-2.5"
-        >
-          <span class="shrink-0 text-base">🐧</span>
-          <span data-i18n="linux_wayland_tip">
-            کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت مشاهده هرگونه مشکل گرافیکی در
-            AppImage، برنامه را با فلگ
-            <code class="px-1.5 py-0.5 rounded bg-black/40 font-mono text-[11px] text-cyan-300"
-              >WEBKIT_DISABLE_DMABUF_RENDERER=1</code
-            >
-            اجرا کرده یا پکیج AUR را نصب فرمایید.
-          </span>
         </div>
       </div>
     </div>
 
-    <script src="app.js?v=0.3.0.8"></script>
+    <script src="app.js?v=0.3.0.9"></script>
   </body>
 </html>
