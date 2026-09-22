@@ -25,42 +25,47 @@
     </script>
     <link rel="canonical" href="https://nexuslauncher.ir/" />
 
-    <!-- Cache Control & Anti-Stale Revalidation -->
+    <!-- Cache Control & Anti-Stale Auto-Update Engine -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-      // Anti-stale cache detector: automatically ensures updated assets are loaded
       ;(function () {
         var BUILD = '0.3.0.8'
-        try {
-          var last = localStorage.getItem('nexus_build_ver')
-          if (last && last !== BUILD) {
-            localStorage.setItem('nexus_build_ver', BUILD)
-            if (!sessionStorage.getItem('reloaded_v_' + BUILD)) {
-              sessionStorage.setItem('reloaded_v_' + BUILD, '1')
-              window.location.reload(true)
-              return
-            }
-          } else {
-            localStorage.setItem('nexus_build_ver', BUILD)
-          }
 
-          // Background auto-updater: checks version.json without cache
-          if (window.fetch) {
-            fetch('version.json?_=' + Date.now(), { cache: 'no-store' })
-              .then(function (res) {
-                return res.json()
-              })
-              .then(function (data) {
-                if (data && data.version && data.version !== BUILD) {
-                  localStorage.setItem('nexus_build_ver', data.version)
-                  window.location.reload(true)
-                }
-              })
-              .catch(function () {})
+        // Clean up ?v= from URL bar if already on latest build
+        try {
+          var url = new URL(window.location.href)
+          if (url.searchParams.has('v') && url.searchParams.get('v') === BUILD) {
+            url.searchParams.delete('v')
+            var cleanPath = url.pathname + (url.search ? url.search : '') + url.hash
+            window.history.replaceState(null, '', cleanPath)
           }
         } catch (e) {}
+
+        // Check for latest version against version.json with cache-busting timestamp
+        if (window.fetch) {
+          fetch('version.json?_=' + Date.now(), { cache: 'no-store' })
+            .then(function (res) {
+              return res.json()
+            })
+            .then(function (data) {
+              if (data && data.version && data.version !== BUILD) {
+                if ('caches' in window) {
+                  caches.keys().then(function (names) {
+                    names.forEach(function (name) {
+                      caches.delete(name)
+                    })
+                  })
+                }
+                localStorage.setItem('nexus_build_ver', data.version)
+                var nextUrl = new URL(window.location.href)
+                nextUrl.searchParams.set('v', data.version)
+                window.location.replace(nextUrl.toString())
+              }
+            })
+            .catch(function () {})
+        }
       })()
     </script>
 
