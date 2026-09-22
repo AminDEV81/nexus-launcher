@@ -22,6 +22,7 @@ import {
   Check,
   Zap,
   Play,
+  FolderArchive,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { openUrl } from '@tauri-apps/plugin-opener'
@@ -31,6 +32,7 @@ import { isMissingIgdbKeys } from '@/features/hub/utils/is-missing-keys'
 import { ModalCloseButton } from '@/components/ui/modal'
 import { MissingKeysPanel } from '@/features/hub/components/missing-keys-panel'
 import { useSettings, useSetSetting } from '@/features/settings/hooks/use-settings'
+import { Switch } from '@/features/settings/components/appearance-panel'
 import { useGames, useLaunchGame } from '@/features/library/hooks/use-games'
 import { findLibraryEntry } from '@/features/hub/utils/in-library'
 import {
@@ -71,8 +73,15 @@ export function StartDownloadModal() {
   const [rawMode, setRawMode] = useState(false)
   const [url, setUrl] = useState('')
   const [savePath, setSavePath] = useState('')
+  const [autoExtract, setAutoExtract] = useState(true)
 
   const { data: settings } = useSettings()
+
+  useEffect(() => {
+    if (settings?.download_auto_extract !== undefined) {
+      setAutoExtract(settings.download_auto_extract !== 'false')
+    }
+  }, [settings?.download_auto_extract])
 
   useEffect(() => {
     if (open) return
@@ -126,13 +135,20 @@ export function StartDownloadModal() {
           urls,
           savePath: savePath.trim(),
           sequential: isSequential,
+          autoExtract,
         },
         done,
       )
     } else if (game && game.igdb_id > 0) {
-      startGame.mutate({ igdbId: game.igdb_id, url: urls[0], savePath: savePath.trim() }, done)
+      startGame.mutate(
+        { igdbId: game.igdb_id, url: urls[0], savePath: savePath.trim(), autoExtract },
+        done,
+      )
     } else {
-      startRaw.mutate({ url: urls[0], savePath: savePath.trim(), gameId: prefill?.gameId }, done)
+      startRaw.mutate(
+        { url: urls[0], savePath: savePath.trim(), gameId: prefill?.gameId, autoExtract },
+        done,
+      )
     }
   }
 
@@ -228,6 +244,7 @@ export function StartDownloadModal() {
                   hasPrefill={prefill !== null}
                   url={url}
                   savePath={savePath}
+                  autoExtract={autoExtract}
                   pending={pending}
                   canSubmit={canSubmit}
                   onBack={() => {
@@ -239,6 +256,7 @@ export function StartDownloadModal() {
                   }}
                   onUrl={setUrl}
                   onSavePath={setSavePath}
+                  onAutoExtract={setAutoExtract}
                   onSubmit={handleSubmit}
                 />
               ) : (
@@ -482,22 +500,26 @@ function UrlStep({
   hasPrefill,
   url,
   savePath,
+  autoExtract,
   pending,
   canSubmit,
   onBack,
   onUrl,
   onSavePath,
+  onAutoExtract,
   onSubmit,
 }: {
   game: HubGame | null
   hasPrefill: boolean
   url: string
   savePath: string
+  autoExtract: boolean
   pending: boolean
   canSubmit: boolean
   onBack: () => void
   onUrl: (value: string) => void
   onSavePath: (value: string) => void
+  onAutoExtract: (value: boolean) => void
   onSubmit: () => void
 }) {
   const [pasteSuccess, setPasteSuccess] = useState(false)
@@ -1061,6 +1083,75 @@ function UrlStep({
             <FolderOpen className="size-4" />
             <span>Browse</span>
           </button>
+        </div>
+      </div>
+
+      {/* Auto-Extract Archives Option */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => {
+          const next = !autoExtract
+          onAutoExtract(next)
+          setSetting.mutate({ key: 'download_auto_extract', value: String(next) })
+        }}
+        onKeyDown={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault()
+            const next = !autoExtract
+            onAutoExtract(next)
+            setSetting.mutate({ key: 'download_auto_extract', value: String(next) })
+          }
+        }}
+        className={cn(
+          'group relative flex cursor-pointer items-center justify-between gap-3.5 rounded-2xl border p-3.5 shadow-xs transition-all backdrop-blur-sm select-none',
+          autoExtract
+            ? 'border-accent/40 bg-accent/5 hover:border-accent/60 hover:bg-accent/10'
+            : 'border-border/80 bg-surface-raised/50 hover:border-border hover:bg-surface-raised/80',
+        )}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className={cn(
+              'flex size-9 shrink-0 items-center justify-center rounded-xl ring-1 transition-all',
+              autoExtract
+                ? 'bg-accent/15 text-accent ring-accent/30 shadow-xs'
+                : 'bg-surface text-muted ring-border/80',
+            )}
+          >
+            <FolderArchive className="size-4.5" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold text-text">Auto-Extract Archives</span>
+              <span
+                className={cn(
+                  'rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold transition-all',
+                  autoExtract
+                    ? 'border border-accent/30 bg-accent/10 text-accent'
+                    : 'border border-border bg-surface text-muted',
+                )}
+              >
+                {autoExtract ? 'Enabled' : 'Raw Archives Only'}
+              </span>
+            </div>
+            <p className="text-[11px] text-muted leading-tight mt-0.5 truncate">
+              {autoExtract
+                ? 'Automatically uncompresses .zip, .rar, and multi-part archives upon completion.'
+                : 'Skips extraction; original downloaded compressed files will be kept intact.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+          <Switch
+            checked={autoExtract}
+            onChange={(checked) => {
+              onAutoExtract(checked)
+              setSetting.mutate({ key: 'download_auto_extract', value: String(checked) })
+            }}
+            ariaLabel="Auto-Extract Archives"
+          />
         </div>
       </div>
 

@@ -71,6 +71,7 @@ pub struct DownloadInfo {
     pub speed_bps: u64,
     pub created_at: String,
     pub updated_at: String,
+    pub auto_extract: bool,
 }
 
 /// Progress payload, both the `download-updated` event and the
@@ -1390,6 +1391,42 @@ fn has_active_siblings(app: &AppHandle, id: &str, game_id: &Option<String>, save
     count > 0
 }
 
+fn should_auto_extract(app: &AppHandle, id: &str, game_id: &Option<String>, save_path: &str) -> bool {
+    let db = app.state::<Database>();
+    let Ok(conn) = db.connection.lock() else { return true; };
+
+    // 1. Check the specific download row
+    if let Ok(val) = conn.query_row(
+        "SELECT auto_extract FROM downloads WHERE id = ?1",
+        [id],
+        |row| row.get::<_, i64>(0),
+    ) {
+        return val != 0;
+    }
+
+    // 2. Fallback: check any sibling row for the same game
+    if let Some(gid) = game_id {
+        if let Ok(val) = conn.query_row(
+            "SELECT auto_extract FROM downloads WHERE game_id = ?1 LIMIT 1",
+            [gid],
+            |row| row.get::<_, i64>(0),
+        ) {
+            return val != 0;
+        }
+    }
+
+    // 3. Fallback: check any row for the same save_path
+    if let Ok(val) = conn.query_row(
+        "SELECT auto_extract FROM downloads WHERE save_path = ?1 LIMIT 1",
+        [save_path],
+        |row| row.get::<_, i64>(0),
+    ) {
+        return val != 0;
+    }
+
+    true
+}
+
 fn find_extractable_master(app: &AppHandle, game_id: &Option<String>, save_path: &str) -> Option<(String, String)> {
     let db = app.state::<Database>();
     let conn = db.connection.lock().ok()?;
@@ -1564,74 +1601,110 @@ async fn run_download(
                 let siblings_active = has_active_siblings(&app, &id, &game_id, &save_path);
 
                 if !siblings_active {
-                if let Some((master_id, master_file)) = find_extractable_master(&app, &game_id, &save_path) {
-                    persist_progress_with_extract(&app, &master_id, 0, 100, 0, "extracting", None, Some(0));
-                    let fp = master_file.clone();
-                    let sp = save_path.clone();
-                    let lower = fp.to_lowercase();
-                    let is_7z = lower.ends_with(".7z");
-                    let is_rar = lower.ends_with(".rar");
-                    let app_clone = app.clone();
-                    let m_id = master_id.clone();
+                    let auto_extract = should_auto_extract(&app, &id, &game_id, &save_path);
+                    if auto_extract {
+                        if let Some((master_id, master_file)) = find_extractable_master(&app, &game_id, &save_path) {
+                            persist_progress_with_extract(&app, &master_id, 0, 100, 0, "extracting", None, Some(0));
+                            let fp = master_file.clone();
+                            let sp = save_path.clone();
+                            let lower = fp.to_lowercase();
+                            let is_7z = lower.ends_with(".7z");
+                            let is_rar = lower.ends_with(".rar");
+                            let app_clone = app.clone();
+                            let m_id = master_id.clone();
 
-                    let extracted = tokio::task::spawn_blocking(move || {
-                        if is_7z {
-                            extract_7z(&app_clone, &m_id, &fp, &sp)
-                        } else if is_rar {
-                            extract_rar(&app_clone, &m_id, &fp, &sp)
+                            let extracted = tokio::task::spawn_blocking(move || {
+                                if is_7z {
+                                    extract_7z(&app_clone, &m_id, &fp, &sp)
+                                } else if is_rar {
+                                    extract_rar(&app_clone, &m_id, &fp, &sp)
+                                } else {
+                                    extract_zip(&app_clone, &m_id, &fp, &sp)
+                                }
+                            })
+                            .await
+                            .map_err(|e| e.to_string())
+                            .and_then(|r| r);
+
+                            if let Err(msg) = extracted {
+                                mark_failed(&app, &master_id, &msg, total, downloaded);
+                                cleanup_active(&app, &id);
+                                return;
+                            }
+
+                            let auto_cleanup: bool = {
+                                let db = app.state::<Database>();
+                                let conn = db.connection.lock().expect("db mutex poisoned");
+                                conn.query_row(
+                                    "SELECT value FROM settings WHERE key = 'download_auto_cleanup'",
+                                    [],
+                                    |row| row.get(0),
+                                )
+                                .map(|v: String| v == "true" || v == "1")
+                                .unwrap_or(false)
+                            };
+
+                            if auto_cleanup {
+                                cleanup_bundle_archives(&app, &game_id, &save_path);
+                            }
+
+                            if let Some(gid) = &game_id {
+                                let app2 = app.clone();
+                                let gid = gid.clone();
+                                let sp = save_path.clone();
+                                let _ = tokio::task::spawn_blocking(move || {
+                                    link_game_install(&app2, &gid, &sp);
+                                })
+                                .await;
+                            }
+
+                            mark_completed(&app, &master_id, total, downloaded);
+                            if game_id.is_some() {
+                                app.emit(
+                                    "download-completed",
+                                    DownloadCompleted {
+                                        download_id: master_id,
+                                        game_id: game_id.clone(),
+                                    },
+                                )
+                                .ok();
+                            }
                         } else {
-                            extract_zip(&app_clone, &m_id, &fp, &sp)
+                            // Non-archive file (e.g. standalone executable or setup installer)
+                            if let Some(gid) = &game_id {
+                                let app2 = app.clone();
+                                let gid = gid.clone();
+                                let sp = save_path.clone();
+                                let _ = tokio::task::spawn_blocking(move || {
+                                    link_game_install(&app2, &gid, &sp);
+                                })
+                                .await;
+                            }
+                            if game_id.is_some() {
+                                app.emit(
+                                    "download-completed",
+                                    DownloadCompleted {
+                                        download_id: id.clone(),
+                                        game_id: game_id.clone(),
+                                    },
+                                )
+                                .ok();
+                            }
                         }
-                    })
-                    .await
-                    .map_err(|e| e.to_string())
-                    .and_then(|r| r);
-
-                    if let Err(msg) = extracted {
-                        mark_failed(&app, &master_id, &msg, total, downloaded);
-                        cleanup_active(&app, &id);
-                        return;
-                    }
-
-                    let auto_cleanup: bool = {
-                        let db = app.state::<Database>();
-                        let conn = db.connection.lock().expect("db mutex poisoned");
-                        conn.query_row(
-                            "SELECT value FROM settings WHERE key = 'download_auto_cleanup'",
-                            [],
-                            |row| row.get(0),
-                        )
-                        .map(|v: String| v == "true" || v == "1")
-                        .unwrap_or(false)
-                    };
-
-                    if auto_cleanup {
-                        cleanup_bundle_archives(&app, &game_id, &save_path);
-                    }
-
-                    if let Some(gid) = &game_id {
-                        let app2 = app.clone();
-                        let gid = gid.clone();
-                        let sp = save_path.clone();
-                        let _ = tokio::task::spawn_blocking(move || {
-                            link_game_install(&app2, &gid, &sp);
-                        })
-                        .await;
-                    }
-
-                    mark_completed(&app, &master_id, total, downloaded);
-                    if game_id.is_some() {
-                        app.emit(
-                            "download-completed",
-                            DownloadCompleted {
-                                download_id: master_id,
-                                game_id: game_id.clone(),
-                            },
-                        )
-                        .ok();
+                    } else {
+                        // auto_extract is FALSE: Keep compressed archives untouched, skip cleanup & skip linking
+                        if game_id.is_some() {
+                            app.emit(
+                                "download-completed",
+                                DownloadCompleted {
+                                    download_id: id.clone(),
+                                    game_id: game_id.clone(),
+                                },
+                            )
+                            .ok();
+                        }
                     }
                 }
-            }
         }
     }
     EngineOutcome::Failed => {}
@@ -1657,12 +1730,13 @@ fn insert_download_row(
     url: &str,
     save_path: &str,
     file_path: &str,
+    auto_extract: bool,
 ) -> AppResult<()> {
     let db = app.state::<Database>();
     let conn = db.connection.lock().expect("db mutex poisoned");
     conn.execute(
-        "INSERT INTO downloads (id, game_id, url, save_path, file_path, status) VALUES (?1,?2,?3,?4,?5,'downloading')",
-        rusqlite::params![id, game_id, url, save_path, file_path],
+        "INSERT INTO downloads (id, game_id, url, save_path, file_path, status, auto_extract) VALUES (?1,?2,?3,?4,?5,'downloading',?6)",
+        rusqlite::params![id, game_id, url, save_path, file_path, if auto_extract { 1 } else { 0 }],
     )?;
     Ok(())
 }
@@ -1735,6 +1809,7 @@ pub async fn start_download(
     game_id: String,
     url: String,
     save_path: String,
+    auto_extract: Option<bool>,
 ) -> AppResult<String> {
     validate_download_url(&url)?;
 
@@ -1767,6 +1842,7 @@ pub async fn start_download(
     let file_path = format!("{resolved_save_path}/{}", file_name_from_url(&url));
     let _ = std::fs::create_dir_all(&resolved_save_path);
     reject_duplicate_file(&app, &file_path)?;
+    let extract = auto_extract.unwrap_or(true);
     insert_download_row(
         &app,
         &id,
@@ -1774,6 +1850,7 @@ pub async fn start_download(
         &url,
         &resolved_save_path,
         &file_path,
+        extract,
     )?;
     begin_download(
         &app,
@@ -1807,6 +1884,7 @@ pub async fn start_game_download(
     igdb_id: i64,
     url: String,
     save_path: String,
+    auto_extract: Option<bool>,
 ) -> AppResult<StartedDownload> {
     validate_download_url(&url)?;
 
@@ -1829,6 +1907,7 @@ pub async fn start_game_download(
     let file_path = format!("{resolved_save_path}/{}", file_name_from_url(&url));
     let _ = std::fs::create_dir_all(&resolved_save_path);
     reject_duplicate_file(&app, &file_path)?;
+    let extract = auto_extract.unwrap_or(true);
     insert_download_row(
         &app,
         &id,
@@ -1836,6 +1915,7 @@ pub async fn start_game_download(
         &url,
         &resolved_save_path,
         &file_path,
+        extract,
     )?;
     begin_download(
         &app,
@@ -1866,6 +1946,7 @@ pub async fn start_batch_downloads(
     game_id: Option<String>,
     igdb_id: Option<u64>,
     sequential: bool,
+    auto_extract: Option<bool>,
 ) -> AppResult<Vec<String>> {
     if urls.is_empty() {
         return Err(AppError::Invalid("no download urls provided".into()));
@@ -1911,6 +1992,7 @@ pub async fn start_batch_downloads(
     let _ = std::fs::create_dir_all(&resolved_save_path);
 
     let mut created_ids = Vec::new();
+    let extract_flag = if auto_extract.unwrap_or(true) { 1 } else { 0 };
 
     for (idx, single_url) in urls.into_iter().enumerate() {
         let id = uuid::Uuid::new_v4().to_string();
@@ -1931,14 +2013,15 @@ pub async fn start_batch_downloads(
         {
             let conn = db.connection.lock().expect("db mutex poisoned");
             conn.execute(
-                "INSERT INTO downloads (id, game_id, url, save_path, file_path, status) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                "INSERT INTO downloads (id, game_id, url, save_path, file_path, status, auto_extract) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 rusqlite::params![
                     id,
                     resolved_game_id.as_deref().unwrap_or(""),
                     single_url,
                     resolved_save_path,
                     file_path,
-                    initial_status
+                    initial_status,
+                    extract_flag
                 ],
             )?;
         }
@@ -2302,7 +2385,7 @@ pub async fn delete_download(
 pub fn get_downloads(db: State<'_, Database>) -> AppResult<Vec<DownloadInfo>> {
     let conn = db.connection.lock().expect("db mutex poisoned");
     let mut stmt = conn.prepare(
-        "SELECT id, game_id, url, save_path, COALESCE(file_path,''), total_bytes, downloaded_bytes, status, error_message, speed_bps, created_at, updated_at FROM downloads ORDER BY created_at DESC",
+        "SELECT id, game_id, url, save_path, COALESCE(file_path,''), total_bytes, downloaded_bytes, status, error_message, speed_bps, created_at, updated_at, COALESCE(auto_extract, 1) FROM downloads ORDER BY created_at DESC",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(DownloadInfo {
@@ -2318,6 +2401,7 @@ pub fn get_downloads(db: State<'_, Database>) -> AppResult<Vec<DownloadInfo>> {
             speed_bps: row.get::<_, i64>(9)? as u64,
             created_at: row.get(10)?,
             updated_at: row.get(11)?,
+            auto_extract: row.get::<_, i64>(12)? != 0,
         })
     })?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)

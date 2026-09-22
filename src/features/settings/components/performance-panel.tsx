@@ -12,6 +12,7 @@ import {
   EyeOff,
   Minimize2,
   AppWindow,
+  FolderArchive,
 } from 'lucide-react'
 import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
 import { useSettings, useSetSetting } from '../hooks/use-settings'
@@ -79,6 +80,7 @@ export function PerformancePanel() {
 
   const speedLimit = settings?.download_speed_limit || '0'
   const isGamingMode = settings?.download_gaming_mode !== 'false'
+  const autoExtract = settings?.download_auto_extract !== 'false'
   const autoCleanup = settings?.download_auto_cleanup === 'true'
   const windowAction = settings?.game_launch_window_action || 'hide'
 
@@ -179,6 +181,31 @@ export function PerformancePanel() {
               setSetting.mutate({ key: 'download_gaming_mode', value: String(checked) })
             }
             ariaLabel="Gaming Mode Auto-Pause"
+          />
+        </div>
+
+        <div className="border-t border-border/40" />
+
+        {/* Auto-Extract Archives Post-Download */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-surface-raised text-accent shadow-xs">
+              <FolderArchive className="size-4.5" />
+            </span>
+            <div>
+              <div className="text-sm font-bold text-text">Auto-Extract Archives</div>
+              <div className="text-xs text-subtle">
+                Automatically unpacks .zip, .rar &amp; .7z archives when download completes.
+              </div>
+            </div>
+          </div>
+
+          <Switch
+            checked={autoExtract}
+            onChange={(checked) =>
+              setSetting.mutate({ key: 'download_auto_extract', value: String(checked) })
+            }
+            ariaLabel="Auto-Extract Archives"
           />
         </div>
 

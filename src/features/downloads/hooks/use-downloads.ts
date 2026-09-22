@@ -88,8 +88,17 @@ export function useDownloadCompletedListener() {
 export function useStartGameDownload() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ igdbId, url, savePath }: { igdbId: number; url: string; savePath: string }) =>
-      service.startGameDownload(igdbId, url, savePath),
+    mutationFn: ({
+      igdbId,
+      url,
+      savePath,
+      autoExtract,
+    }: {
+      igdbId: number
+      url: string
+      savePath: string
+      autoExtract?: boolean
+    }) => service.startGameDownload(igdbId, url, savePath, autoExtract),
     onSuccess: ({ game }) => {
       void queryClient.invalidateQueries({ queryKey: downloadsKey, refetchType: 'all' })
       void queryClient.refetchQueries({ queryKey: downloadsKey })
@@ -103,8 +112,17 @@ export function useStartGameDownload() {
 export function useStartRawDownload() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ url, savePath, gameId }: { url: string; savePath: string; gameId?: string }) =>
-      service.startDownload(gameId ?? 'new-download', url, savePath),
+    mutationFn: ({
+      url,
+      savePath,
+      gameId,
+      autoExtract,
+    }: {
+      url: string
+      savePath: string
+      gameId?: string
+      autoExtract?: boolean
+    }) => service.startDownload(gameId ?? 'new-download', url, savePath, autoExtract),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: downloadsKey, refetchType: 'all' })
       void queryClient.refetchQueries({ queryKey: downloadsKey })
@@ -123,6 +141,7 @@ export function useStartBatchDownloads() {
       urls: string[]
       savePath: string
       sequential: boolean
+      autoExtract?: boolean
     }) => service.startBatchDownloads(params),
     onSuccess: (_ids, vars) => {
       void queryClient.invalidateQueries({ queryKey: downloadsKey, refetchType: 'all' })

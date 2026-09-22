@@ -15,6 +15,7 @@ export interface DownloadInfo {
   status: DownloadStatus
   error_message: string | null
   speed_bps: number
+  auto_extract?: boolean
   chunks?: number[]
   extract_percent?: number
   created_at: string
@@ -42,12 +43,22 @@ export interface StartedGameDownload {
   game: Game
 }
 
-export function startDownload(gameId: string, url: string, savePath: string) {
-  return call<string>('start_download', { gameId, url, savePath })
+export function startDownload(
+  gameId: string,
+  url: string,
+  savePath: string,
+  autoExtract: boolean = true,
+) {
+  return call<string>('start_download', { gameId, url, savePath, autoExtract })
 }
 
-export function startGameDownload(igdbId: number, url: string, savePath: string) {
-  return call<StartedGameDownload>('start_game_download', { igdbId, url, savePath })
+export function startGameDownload(
+  igdbId: number,
+  url: string,
+  savePath: string,
+  autoExtract: boolean = true,
+) {
+  return call<StartedGameDownload>('start_game_download', { igdbId, url, savePath, autoExtract })
 }
 
 export function startBatchDownloads(params: {
@@ -56,6 +67,7 @@ export function startBatchDownloads(params: {
   urls: string[]
   savePath: string
   sequential: boolean
+  autoExtract?: boolean
 }) {
   return call<string[]>('start_batch_downloads', {
     gameId: params.gameId ?? null,
@@ -63,6 +75,7 @@ export function startBatchDownloads(params: {
     urls: params.urls,
     savePath: params.savePath,
     sequential: params.sequential,
+    autoExtract: params.autoExtract ?? true,
   })
 }
 
