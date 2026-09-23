@@ -1,10 +1,13 @@
 import { motion } from 'framer-motion'
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { useUpdaterStore } from '@/store/updater-store'
 import type { NavItem } from './nav-items'
 
 export function SidebarNavItem({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const Icon = item.icon
+  const isUpdateAvailable = useUpdaterStore((s) => s.status === 'available')
+  const showUpdateBadge = item.path === '/settings' && isUpdateAvailable
 
   return (
     <NavLink
@@ -32,7 +35,17 @@ export function SidebarNavItem({ item, collapsed }: { item: NavItem; collapsed: 
             <Icon className="size-[18px]" strokeWidth={isActive ? 2.25 : 2} />
           </span>
           {!collapsed && <span className="relative z-[1] truncate">{item.label}</span>}
-          {isActive && !collapsed && (
+          {showUpdateBadge && (
+            <span
+              className={cn(
+                'relative z-[1] flex size-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff]',
+                !collapsed && 'ml-auto mr-1',
+                collapsed && 'absolute top-1.5 right-1.5',
+              )}
+              title="New update available"
+            />
+          )}
+          {isActive && !collapsed && !showUpdateBadge && (
             <motion.span
               layoutId="sidebar-active-dot"
               className="relative z-[1] ml-auto size-1.5 rounded-full bg-accent shadow-[0_0_10px_var(--nx-accent)]"

@@ -115,14 +115,34 @@ export function AppShell() {
 
   // Auto-Update system initialization, launch health registration, and background check
   useEffect(() => {
+    let intervalId: number | null = null
+    let startupTimer: number | null = null
+
     const initUpdater = async () => {
       await useUpdaterStore.getState().init()
       const ver = useUpdaterStore.getState().currentVersion
       await markLaunchSuccessful(ver)
-      // Non-blocking check for updates on startup
-      void useUpdaterStore.getState().checkUpdates(false)
+
+      // Check on startup with slight delay (1.8s) so splash/shell mounts smoothly
+      startupTimer = window.setTimeout(() => {
+        void useUpdaterStore.getState().checkUpdates(false, true)
+      }, 1800)
+
+      // Periodic background check every 2 hours while launcher is running
+      intervalId = window.setInterval(
+        () => {
+          void useUpdaterStore.getState().checkUpdates(false, false)
+        },
+        2 * 60 * 60 * 1000,
+      )
     }
+
     void initUpdater()
+
+    return () => {
+      if (startupTimer !== null) window.clearTimeout(startupTimer)
+      if (intervalId !== null) window.clearInterval(intervalId)
+    }
   }, [])
 
   return (

@@ -46,7 +46,7 @@ interface UpdaterState {
 
   // Actions
   init: () => Promise<void>
-  checkUpdates: (manual?: boolean) => Promise<void>
+  checkUpdates: (manual?: boolean, isStartup?: boolean) => Promise<void>
   startDownload: () => Promise<void>
   installAndRestart: () => Promise<void>
   dismissUpdate: () => Promise<void>
@@ -59,7 +59,8 @@ interface UpdaterState {
 const SETTING_AUTO_CHECK = 'updater_auto_check_enabled'
 const SETTING_LAST_CHECK = 'updater_last_check_timestamp'
 const SETTING_DISMISSED = 'updater_dismissed_version'
-const AUTO_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000 // 4 hours
+const STARTUP_DEBOUNCE_MS = 30 * 1000 // 30 seconds debounce for rapid app relaunches
+const BACKGROUND_POLL_INTERVAL_MS = 2 * 60 * 60 * 1000 // 2 hours for periodic checks
 
 export const useUpdaterStore = create<UpdaterState>((set, get) => {
   let progressSamples: ProgressSample[] = []
@@ -105,7 +106,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => {
       }
     },
 
-    checkUpdates: async (manual = false) => {
+    checkUpdates: async (manual = false, isStartup = false) => {
       const state = get()
       if (state.isLocked || state.status === 'downloading' || state.status === 'installing') {
         return
@@ -116,10 +117,8 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => {
         if (!state.isAutoCheckEnabled) {
           return
         }
-        if (
-          state.lastCheckedTimestamp &&
-          Date.now() - state.lastCheckedTimestamp < AUTO_CHECK_INTERVAL_MS
-        ) {
+        const minCooldown = isStartup ? STARTUP_DEBOUNCE_MS : BACKGROUND_POLL_INTERVAL_MS
+        if (state.lastCheckedTimestamp && Date.now() - state.lastCheckedTimestamp < minCooldown) {
           return
         }
       }

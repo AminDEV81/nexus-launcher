@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { Minus, Square, Copy, X } from 'lucide-react'
+import { Minus, Square, Copy, X, Sparkles } from 'lucide-react'
 import { LogoMark } from '@/components/brand/logo-mark'
 import { ProfileBadgeButton } from './profile-badge-button'
+import { useUpdaterStore } from '@/store/updater-store'
 import { cn } from '@/lib/utils'
 
 const appWindow =
@@ -21,6 +22,9 @@ const appWindow =
  */
 export function TitleBar() {
   const [isMaximized, setIsMaximized] = useState(false)
+  const status = useUpdaterStore((s) => s.status)
+  const update = useUpdaterStore((s) => s.update)
+  const openModal = useUpdaterStore((s) => s.openModal)
 
   useEffect(() => {
     const syncMaximized = () => {
@@ -56,6 +60,17 @@ export function TitleBar() {
 
       <div data-tauri-drag-region="false" className="flex h-full shrink-0 items-center">
         <div data-tauri-drag-region="false" className="mr-2 flex items-center gap-2">
+          {status === 'available' && update && (
+            <button
+              type="button"
+              onClick={() => openModal()}
+              className="flex items-center gap-1.5 rounded-full bg-accent/20 px-2.5 py-0.5 text-[11px] font-bold text-accent border border-accent/40 hover:bg-accent/30 transition-all shadow-[0_0_12px_rgba(var(--nx-accent-rgb),0.3)] animate-pulse cursor-pointer"
+              title={`Update v${update.version} is available! Click to update`}
+            >
+              <Sparkles className="size-3" />
+              <span>Update v{update.version}</span>
+            </button>
+          )}
           <ProfileBadgeButton />
         </div>
         <TitleBarButton label="Minimize" onClick={() => void appWindow.minimize()}>
