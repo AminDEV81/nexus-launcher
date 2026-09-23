@@ -6,7 +6,6 @@ import {
   Trash2,
   Star,
   Image as ImageIcon,
-  Pencil,
   Sparkles,
   BarChart3,
   Calendar,
@@ -14,6 +13,7 @@ import {
   Award,
   ChevronRight,
   X,
+  PencilLine,
 } from 'lucide-react'
 import { assetUrl } from '@/lib/asset-url'
 import { CoverMedia } from '@/components/ui/cover-media'
@@ -28,6 +28,7 @@ interface MemoryCardProps {
   game: Game
   onChangeCover: (game: Game) => void
   onEditPlaytime: (game: Game) => void
+  onEditName?: (game: Game) => void
   onRestore: (game: Game) => void
   onDelete: (game: Game) => void
   isRestoring?: boolean
@@ -84,6 +85,7 @@ export function MemoryCard({
   game,
   onChangeCover,
   onEditPlaytime,
+  onEditName,
   onRestore,
   onDelete,
   isRestoring = false,
@@ -268,8 +270,24 @@ export function MemoryCard({
                       title="Edit Playtime"
                       className="flex size-7 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-all hover:bg-white/20 hover:scale-105 active:scale-95 cursor-pointer"
                     >
-                      <Pencil className="size-3.5" />
+                      <Clock className="size-3.5" />
                     </button>
+
+                    {/* Edit Name Button */}
+                    {onEditName && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          playButtonClick()
+                          onEditName(game)
+                        }}
+                        title="Rename Game"
+                        className="flex size-7 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-all hover:bg-white/20 hover:scale-105 active:scale-95 cursor-pointer"
+                      >
+                        <PencilLine className="size-3.5" />
+                      </button>
+                    )}
 
                     {/* Delete Permanently Button */}
                     <button
@@ -443,11 +461,27 @@ export function MemoryCard({
       <div className="flex flex-col gap-2 border-t border-border/80 bg-slate-50/90 p-3.5 transition-colors group-hover:bg-slate-50 dark:border-white/10 dark:bg-[#15151c]/95 dark:group-hover:bg-[#181820]">
         {/* Title & Release Year Row */}
         <div className="flex items-start justify-between gap-1.5">
-          <div
-            className="truncate text-xs font-black tracking-tight text-text transition-colors group-hover:text-amber-600 dark:group-hover:text-amber-400"
-            title={game.name}
-          >
-            {game.name}
+          <div className="flex min-w-0 items-center gap-1.5 flex-1">
+            <span
+              className="truncate text-xs font-black tracking-tight text-text transition-colors group-hover:text-amber-600 dark:group-hover:text-amber-400"
+              title={game.name}
+            >
+              {game.name}
+            </span>
+            {onEditName && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  playButtonClick()
+                  onEditName(game)
+                }}
+                title="Rename Game"
+                className="opacity-0 group-hover:opacity-100 text-muted hover:text-amber-400 transition-opacity p-0.5 rounded shrink-0 cursor-pointer"
+              >
+                <PencilLine className="size-3" />
+              </button>
+            )}
           </div>
           {releaseYear && (
             <span className="shrink-0 rounded-md border border-border/80 bg-surface px-1.5 py-0.5 font-mono text-[10px] font-bold text-muted shadow-2xs dark:border-white/10 dark:bg-white/5 dark:text-subtle">

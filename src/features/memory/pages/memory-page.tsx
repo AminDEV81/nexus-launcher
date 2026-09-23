@@ -7,6 +7,7 @@ import {
 } from '@/features/library/hooks/use-games'
 import { CoverPickerModal } from '@/features/library/components/cover-picker-modal'
 import { PlaytimeEditorModal } from '@/features/library/components/playtime-editor-modal'
+import { EditGameNameModal } from '@/components/modals/edit-game-name-modal'
 import { MemoryCard } from '../components/memory-card'
 import { DeleteConfirmModal } from '../components/delete-confirm-modal'
 import { useUiStore } from '@/store/ui-store'
@@ -23,6 +24,7 @@ export function MemoryPage() {
   const [coverPickerGameId, setCoverPickerGameId] = useState<string | null>(null)
   const [playtimeEditorGame, setPlaytimeEditorGame] = useState<Game | null>(null)
   const [deletePendingGame, setDeletePendingGame] = useState<Game | null>(null)
+  const [editNameGame, setEditNameGame] = useState<Game | null>(null)
 
   const restoreMutation = useRestoreGameFromMemory()
   const permanentlyDeleteMutation = usePermanentlyDeleteGame()
@@ -163,6 +165,7 @@ export function MemoryPage() {
                 game={game}
                 onChangeCover={(g) => setCoverPickerGameId(g.id)}
                 onEditPlaytime={(g) => setPlaytimeEditorGame(g)}
+                onEditName={(g) => setEditNameGame(g)}
                 onRestore={(g) => restoreMutation.mutate(g.id)}
                 onDelete={(g) => setDeletePendingGame(g)}
                 isRestoring={restoreMutation.isPending}
@@ -183,6 +186,12 @@ export function MemoryPage() {
         game={playtimeEditorGame}
         open={Boolean(playtimeEditorGame)}
         onClose={() => setPlaytimeEditorGame(null)}
+      />
+
+      <EditGameNameModal
+        game={editNameGame}
+        open={Boolean(editNameGame)}
+        onClose={() => setEditNameGame(null)}
       />
 
       <DeleteConfirmModal

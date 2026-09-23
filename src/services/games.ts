@@ -37,6 +37,10 @@ export function updateGameFlags(id: string, input: UpdateGameFlagsInput) {
   return call<Game>('update_game_flags', { id, input })
 }
 
+export function updateGameName(id: string, name: string) {
+  return call<Game>('update_game_name', { id, name })
+}
+
 export function updateGameInstallation(id: string, input: UpdateGameInstallationInput) {
   return call<Game>('update_game_installation', { id, input })
 }

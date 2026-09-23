@@ -15,6 +15,7 @@ import {
   Loader2,
   Radar,
   RotateCw,
+  RotateCcw,
   Search,
   Sparkles,
   Terminal,
@@ -27,7 +28,10 @@ import { Modal } from '@/components/ui/modal'
 import { ModalCloseButton } from '@/components/ui/modal-close-button'
 import { cn } from '@/lib/utils'
 import { useAddGameModalStore } from '../store/add-game-modal-store'
-import { useCreateGame } from '../hooks/use-games'
+import { useCreateGame, useGames, useRestoreGameFromMemory } from '../hooks/use-games'
+import { RestoreFromMemoryModal } from '@/features/memory/components/restore-from-memory-modal'
+import * as gamesService from '@/services/games'
+import type { Game } from '@/types/models'
 import { resolveShortcut, scanFolderForExecutables, computePathSize } from '@/services/import'
 import type { ExecutableCandidate } from '@/services/import'
 import { scanAllStores, importScannedGames } from '@/services/scan'
@@ -60,6 +64,9 @@ const EMPTY_DRAFT: DraftGame = {
 export function AddGameModal() {
   const { isOpen, prefill, close } = useAddGameModalStore()
   const createGame = useCreateGame()
+  const { data: allGames } = useGames()
+  const restoreMutation = useRestoreGameFromMemory()
+  const queryClient = useQueryClient()
   const speed = useAnimationSpeed()
 
   const [step, setStep] = useState<Step>('choose')
@@ -67,11 +74,46 @@ export function AddGameModal() {
   const [draft, setDraft] = useState<DraftGame>(EMPTY_DRAFT)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
+  const [memoryGameToRestore, setMemoryGameToRestore] = useState<Game | null>(null)
+  const [restoreModalOpen, setRestoreModalOpen] = useState(false)
+
+  const matchedMemoryGame = useMemo(() => {
+    if (!allGames || !allGames.length) return null
+    const memoryGames = allGames.filter((g) => g.is_memory)
+    if (!memoryGames.length) return null
+
+    if (draft.executablePath?.trim()) {
+      const normExe = draft.executablePath.trim().toLowerCase().replace(/\\/g, '/')
+      const found = memoryGames.find(
+        (g) => g.executable_path?.trim().toLowerCase().replace(/\\/g, '/') === normExe,
+      )
+      if (found) return found
+    }
+
+    if (draft.installPath?.trim()) {
+      const normInstall = draft.installPath.trim().toLowerCase().replace(/\\/g, '/')
+      const found = memoryGames.find(
+        (g) => g.install_path?.trim().toLowerCase().replace(/\\/g, '/') === normInstall,
+      )
+      if (found) return found
+    }
+
+    if (draft.name.trim()) {
+      const normName = draft.name.trim().toLowerCase()
+      const found = memoryGames.find((g) => g.name.trim().toLowerCase() === normName)
+      if (found) return found
+    }
+
+    return null
+  }, [allGames, draft.executablePath, draft.installPath, draft.name])
+
   useEffect(() => {
     if (!isOpen) return
     setStep('choose')
     setDraft(EMPTY_DRAFT)
     setShowAdvanced(false)
+    setMemoryGameToRestore(null)
+    setRestoreModalOpen(false)
 
     if (prefill?.kind === 'executable') void processExecutable(prefill.path)
     else if (prefill?.kind === 'shortcut') void processShortcut(prefill.path)
@@ -195,8 +237,36 @@ export function AddGameModal() {
     setShowAdvanced(true)
   }
 
+  async function handleRestoreFromMemory(game: Game) {
+    try {
+      await restoreMutation.mutateAsync(game.id)
+      if (
+        draft.executablePath?.trim() &&
+        draft.executablePath.trim() !== game.executable_path?.trim()
+      ) {
+        await gamesService.updateGameInstallation(game.id, {
+          executable_path: draft.executablePath.trim(),
+          install_path: draft.installPath?.trim() || null,
+          install_size_bytes: draft.installSizeBytes,
+        })
+        queryClient.invalidateQueries({ queryKey: ['games'] })
+      }
+      setRestoreModalOpen(false)
+      close()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not restore game from memory.')
+    }
+  }
+
   function confirm() {
     if (!draft.executablePath?.trim() || !draft.name.trim()) return
+
+    if (matchedMemoryGame) {
+      setMemoryGameToRestore(matchedMemoryGame)
+      setRestoreModalOpen(true)
+      return
+    }
+
     createGame.mutate(
       {
         name: draft.name.trim(),
@@ -210,164 +280,193 @@ export function AddGameModal() {
           toast.success(`${game.name} has been added to your library!`)
           close()
         },
+        onError: (err) => {
+          const msg = err instanceof Error ? err.message : String(err)
+          if (msg.startsWith('GAME_IN_MEMORY:')) {
+            const parts = msg.split(':')
+            const memId = parts[1]
+            const found = allGames?.find((g) => g.id === memId)
+            if (found) {
+              setMemoryGameToRestore(found)
+              setRestoreModalOpen(true)
+            }
+          }
+        },
       },
     )
   }
 
   return (
-    <Modal open={isOpen} onClose={close} hideCloseButton widthClassName="max-w-2xl">
-      <div className="relative overflow-hidden bg-surface">
-        {/* ── Holographic Mecha Header ──────────────────────────────────────── */}
-        <div className="relative border-b border-border/80 bg-gradient-to-br from-accent/15 via-surface-raised/60 to-surface px-6 sm:px-8 py-5">
-          {/* Volumetric Ambient Glow */}
-          <div
-            className="pointer-events-none absolute -right-12 -top-16 size-48 rounded-full blur-3xl opacity-30"
-            style={{ backgroundColor: 'var(--nx-accent)' }}
-          />
+    <>
+      <Modal open={isOpen} onClose={close} hideCloseButton widthClassName="max-w-2xl">
+        <div className="relative overflow-hidden bg-surface">
+          {/* ── Holographic Mecha Header ──────────────────────────────────────── */}
+          <div className="relative border-b border-border/80 bg-gradient-to-br from-accent/15 via-surface-raised/60 to-surface px-6 sm:px-8 py-5">
+            {/* Volumetric Ambient Glow */}
+            <div
+              className="pointer-events-none absolute -right-12 -top-16 size-48 rounded-full blur-3xl opacity-30"
+              style={{ backgroundColor: 'var(--nx-accent)' }}
+            />
 
-          {/* Micro Matrix Grid Overlay */}
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:14px_14px] opacity-40" />
+            {/* Micro Matrix Grid Overlay */}
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:14px_14px] opacity-40" />
 
-          <div className="relative flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <span className="relative flex size-11 items-center justify-center rounded-2xl bg-accent text-white shadow-[0_0_16px_var(--nx-accent)]/30 ring-2 ring-accent/30">
-                <Sparkles className="size-5" />
-              </span>
-              <div>
-                <div className="flex items-center gap-2 font-mono text-[9.5px] font-bold uppercase tracking-widest text-accent">
-                  <span>IMPORT ENGINE</span>
-                  <span className="size-1 rounded-full bg-accent animate-ping" />
-                  <span className="text-muted font-normal">
+            <div className="relative flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <span className="relative flex size-11 items-center justify-center rounded-2xl bg-accent text-white shadow-[0_0_16px_var(--nx-accent)]/30 ring-2 ring-accent/30">
+                  <Sparkles className="size-5" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2 font-mono text-[9.5px] font-bold uppercase tracking-widest text-accent">
+                    <span>IMPORT ENGINE</span>
+                    <span className="size-1 rounded-full bg-accent animate-ping" />
+                    <span className="text-muted font-normal">
+                      {step === 'choose'
+                        ? 'STAGE 01 // SOURCE'
+                        : step === 'system-scan'
+                          ? 'STAGE 02 // AUTO-SCAN'
+                          : 'STAGE 02 // STAGING'}
+                    </span>
+                  </div>
+                  <h2 className="text-xl font-black tracking-tight text-text">
                     {step === 'choose'
-                      ? 'STAGE 01 // SOURCE'
+                      ? 'Add Game to Library'
                       : step === 'system-scan'
-                        ? 'STAGE 02 // AUTO-SCAN'
-                        : 'STAGE 02 // STAGING'}
+                        ? 'System Game Scanner'
+                        : 'Configure Game Details'}
+                  </h2>
+                </div>
+              </div>
+
+              {/* Stepper Dots & Close Button */}
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/80 px-3 py-1 font-mono text-[10px] font-bold shadow-2xs">
+                  <span
+                    className={cn(
+                      'size-2 rounded-full transition-colors',
+                      step === 'choose'
+                        ? 'bg-accent shadow-[0_0_6px_var(--nx-accent)]'
+                        : 'bg-emerald-500',
+                    )}
+                  />
+                  <span className={step === 'choose' ? 'text-accent' : 'text-text'}>01 Source</span>
+                  <span className="h-px w-3 bg-border mx-0.5" />
+                  <span
+                    className={cn(
+                      'size-2 rounded-full transition-colors',
+                      step !== 'choose'
+                        ? 'bg-accent shadow-[0_0_6px_var(--nx-accent)]'
+                        : 'bg-muted/40',
+                    )}
+                  />
+                  <span className={step !== 'choose' ? 'text-accent' : 'text-muted'}>
+                    {step === 'system-scan' ? '02 Auto-Scan' : '02 Config'}
                   </span>
                 </div>
-                <h2 className="text-xl font-black tracking-tight text-text">
-                  {step === 'choose'
-                    ? 'Add Game to Library'
-                    : step === 'system-scan'
-                      ? 'System Game Scanner'
-                      : 'Configure Game Details'}
-                </h2>
-              </div>
-            </div>
 
-            {/* Stepper Dots & Close Button */}
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-border/70 bg-surface/80 px-3 py-1 font-mono text-[10px] font-bold shadow-2xs">
-                <span
-                  className={cn(
-                    'size-2 rounded-full transition-colors',
-                    step === 'choose'
-                      ? 'bg-accent shadow-[0_0_6px_var(--nx-accent)]'
-                      : 'bg-emerald-500',
-                  )}
-                />
-                <span className={step === 'choose' ? 'text-accent' : 'text-text'}>01 Source</span>
-                <span className="h-px w-3 bg-border mx-0.5" />
-                <span
-                  className={cn(
-                    'size-2 rounded-full transition-colors',
-                    step !== 'choose'
-                      ? 'bg-accent shadow-[0_0_6px_var(--nx-accent)]'
-                      : 'bg-muted/40',
-                  )}
-                />
-                <span className={step !== 'choose' ? 'text-accent' : 'text-muted'}>
-                  {step === 'system-scan' ? '02 Auto-Scan' : '02 Config'}
-                </span>
+                <ModalCloseButton onClick={close} />
               </div>
-
-              <ModalCloseButton onClick={close} />
             </div>
           </div>
-        </div>
 
-        {/* ── Main Body ──────────────────────────────────────────────────────── */}
-        <div className="min-h-[380px] p-6 sm:p-7">
-          <AnimatePresence mode="wait">
-            {step === 'choose' ? (
-              <motion.div
-                key="choose"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                transition={{ duration: 0.2 * speed }}
-              >
-                <ChooseStep
-                  onAutoScan={() => {
-                    playButtonClick()
-                    setStep('system-scan')
-                  }}
-                  onExecutable={pickExecutable}
-                  onShortcut={pickShortcut}
-                  onFolder={pickFolder}
-                  onManualEntry={startManualEntry}
-                />
-              </motion.div>
-            ) : step === 'system-scan' ? (
-              <motion.div
-                key="system-scan"
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                transition={{ duration: 0.2 * speed }}
-              >
-                <SystemScanStep
-                  onBack={() => {
-                    playButtonClick()
-                    setStep('choose')
-                  }}
-                  onComplete={close}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="review"
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                transition={{ duration: 0.2 * speed }}
-              >
-                <ReviewStep
-                  draft={draft}
-                  isResolving={isResolving}
-                  isSaving={createGame.isPending}
-                  showAdvanced={showAdvanced}
-                  setShowAdvanced={setShowAdvanced}
-                  onNameChange={(name) => setDraft((current) => ({ ...current, name }))}
-                  onExecutableChange={(executablePath) =>
-                    setDraft((current) => ({ ...current, executablePath }))
-                  }
-                  onInstallPathChange={(installPath) =>
-                    setDraft((current) => ({ ...current, installPath }))
-                  }
-                  onArgsChange={(launchArguments) =>
-                    setDraft((current) => ({ ...current, launchArguments }))
-                  }
-                  onPickCandidate={(candidate) =>
-                    setDraft((current) => ({
-                      ...current,
-                      executablePath: candidate.path,
-                      candidates: [],
-                    }))
-                  }
-                  onChangeExecutable={pickExecutable}
-                  onBack={() => {
-                    setStep('choose')
-                    setDraft(EMPTY_DRAFT)
-                  }}
-                  onConfirm={confirm}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* ── Main Body ──────────────────────────────────────────────────────── */}
+          <div className="min-h-[380px] p-6 sm:p-7">
+            <AnimatePresence mode="wait">
+              {step === 'choose' ? (
+                <motion.div
+                  key="choose"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.2 * speed }}
+                >
+                  <ChooseStep
+                    onAutoScan={() => {
+                      playButtonClick()
+                      setStep('system-scan')
+                    }}
+                    onExecutable={pickExecutable}
+                    onShortcut={pickShortcut}
+                    onFolder={pickFolder}
+                    onManualEntry={startManualEntry}
+                  />
+                </motion.div>
+              ) : step === 'system-scan' ? (
+                <motion.div
+                  key="system-scan"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.2 * speed }}
+                >
+                  <SystemScanStep
+                    onBack={() => {
+                      playButtonClick()
+                      setStep('choose')
+                    }}
+                    onComplete={close}
+                  />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="review"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.2 * speed }}
+                >
+                  <ReviewStep
+                    draft={draft}
+                    isResolving={isResolving}
+                    isSaving={createGame.isPending}
+                    showAdvanced={showAdvanced}
+                    setShowAdvanced={setShowAdvanced}
+                    matchedMemoryGame={matchedMemoryGame}
+                    onOpenRestoreModal={() => {
+                      if (matchedMemoryGame) {
+                        setMemoryGameToRestore(matchedMemoryGame)
+                        setRestoreModalOpen(true)
+                      }
+                    }}
+                    onNameChange={(name) => setDraft((current) => ({ ...current, name }))}
+                    onExecutableChange={(executablePath) =>
+                      setDraft((current) => ({ ...current, executablePath }))
+                    }
+                    onInstallPathChange={(installPath) =>
+                      setDraft((current) => ({ ...current, installPath }))
+                    }
+                    onArgsChange={(launchArguments) =>
+                      setDraft((current) => ({ ...current, launchArguments }))
+                    }
+                    onPickCandidate={(candidate) =>
+                      setDraft((current) => ({
+                        ...current,
+                        executablePath: candidate.path,
+                        candidates: [],
+                      }))
+                    }
+                    onChangeExecutable={pickExecutable}
+                    onBack={() => {
+                      setStep('choose')
+                      setDraft(EMPTY_DRAFT)
+                    }}
+                    onConfirm={confirm}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-      </div>
-    </Modal>
+      </Modal>
+
+      <RestoreFromMemoryModal
+        open={restoreModalOpen}
+        game={memoryGameToRestore}
+        onClose={() => setRestoreModalOpen(false)}
+        onRestore={handleRestoreFromMemory}
+        isPending={restoreMutation.isPending}
+      />
+    </>
   )
 }
 
@@ -1028,6 +1127,8 @@ interface ReviewStepProps {
   isSaving: boolean
   showAdvanced: boolean
   setShowAdvanced: (val: boolean | ((prev: boolean) => boolean)) => void
+  matchedMemoryGame?: Game | null
+  onOpenRestoreModal?: () => void
   onNameChange: (name: string) => void
   onExecutableChange: (path: string) => void
   onInstallPathChange: (path: string) => void
@@ -1044,6 +1145,8 @@ function ReviewStep({
   isSaving,
   showAdvanced,
   setShowAdvanced,
+  matchedMemoryGame,
+  onOpenRestoreModal,
   onNameChange,
   onExecutableChange,
   onInstallPathChange,
@@ -1075,6 +1178,46 @@ function ReviewStep({
 
   return (
     <div className="flex flex-col gap-4.5">
+      {/* 0. Memory Vault Alert Callout */}
+      {matchedMemoryGame && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 overflow-hidden rounded-2xl border border-amber-500/35 bg-gradient-to-r from-amber-500/15 via-surface-raised/90 to-surface p-4 shadow-sm"
+        >
+          <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-amber-500/20 blur-xl" />
+          <div className="flex items-center gap-3 relative z-10">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-amber-400/40 bg-amber-500/20 text-amber-400 shadow-sm shadow-amber-500/10">
+              <Sparkles className="size-5" />
+            </span>
+            <div>
+              <div className="flex items-center gap-2 font-mono text-[9px] font-black uppercase tracking-wider text-amber-400">
+                <span>ARCHIVED IN MEMORY VAULT</span>
+              </div>
+              <div className="text-xs font-bold text-text">
+                Found historical data for{' '}
+                <span className="text-amber-300">"{matchedMemoryGame.name}"</span>
+              </div>
+              <p className="text-[11px] text-muted">
+                {(matchedMemoryGame.total_playtime_seconds / 3600).toFixed(1)} hrs playtime and play
+                stats are preserved.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              playButtonClick()
+              onOpenRestoreModal?.()
+            }}
+            className="flex items-center justify-center gap-1.5 shrink-0 rounded-xl border border-amber-400/40 bg-gradient-to-r from-amber-500/30 to-amber-600/30 px-3.5 py-2 text-xs font-bold text-amber-300 shadow-xs hover:border-amber-400 hover:from-amber-500/40 hover:to-amber-600/40 active:scale-95 transition-all cursor-pointer relative z-10"
+          >
+            <RotateCcw className="size-3.5" />
+            <span>Restore from Memory</span>
+          </button>
+        </motion.div>
+      )}
+
       {/* 1. Game Title Input */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">

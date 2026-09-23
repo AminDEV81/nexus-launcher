@@ -87,6 +87,7 @@ import { ArtworkEditorModal } from './artwork-editor-modal'
 import { InstallationEditorModal } from './installation-editor-modal'
 import { TagEditorModal } from './tag-editor-modal'
 import { PlaytimeEditorModal } from './playtime-editor-modal'
+import { EditGameNameModal } from '@/components/modals/edit-game-name-modal'
 import { GameSaveCard } from './game-save-card'
 import { SidebarSoundtrackWidget } from '@/features/soundtrack/components/sidebar/sidebar-soundtrack-widget'
 import type { Game } from '@/types/models'
@@ -154,6 +155,7 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
   const [lightbox, setLightbox] = useState<number | null>(null)
   const [coverPickerOpen, setCoverPickerOpen] = useState(false)
   const [bannerPickerOpen, setBannerPickerOpen] = useState(false)
+  const [renameModalOpen, setRenameModalOpen] = useState(false)
   const [logoPickerOpen, setLogoPickerOpen] = useState(false)
   const [logoEditorOpen, setLogoEditorOpen] = useState(false)
   const [backgroundEditorOpen, setBackgroundEditorOpen] = useState(false)
@@ -260,17 +262,31 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
 
           {/* Game Title / Logo & Genre Badges at the bottom */}
           <div className="absolute inset-x-5 bottom-4 z-10 flex flex-col gap-2">
-            {logoSrc ? (
-              <img
-                src={logoSrc}
-                alt={game.name}
-                className="max-h-16 max-w-[85%] object-contain object-left drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
-              />
-            ) : (
-              <h1 className="text-2xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
-                {game.name}
-              </h1>
-            )}
+            <div className="flex items-center gap-2">
+              {logoSrc ? (
+                <img
+                  src={logoSrc}
+                  alt={game.name}
+                  className="max-h-16 max-w-[85%] object-contain object-left drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
+                />
+              ) : (
+                <h1 className="text-2xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                  {game.name}
+                </h1>
+              )}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  playButtonClick()
+                  setRenameModalOpen(true)
+                }}
+                title="Rename Game"
+                className="rounded-xl border border-white/20 bg-black/60 p-1.5 text-white/70 hover:text-white hover:bg-black/80 hover:scale-105 active:scale-95 transition-all shadow-md backdrop-blur-md cursor-pointer"
+              >
+                <Pencil className="size-3.5" />
+              </button>
+            </div>
 
             {game.genres.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5">
@@ -380,6 +396,19 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
               className="flex size-8 items-center justify-center rounded-xl border border-white/20 bg-black/75 text-white/90 shadow-md transition-all hover:bg-black/90 hover:scale-105 active:scale-95"
             >
               <Images className="size-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                playButtonClick()
+                setRenameModalOpen(true)
+              }}
+              aria-label="Rename game"
+              title="Rename game"
+              className="flex size-8 items-center justify-center rounded-xl border border-white/20 bg-black/75 text-white/90 shadow-md transition-all hover:bg-black/90 hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              <Pencil className="size-4" />
             </button>
 
             <ModalCloseButton
@@ -1265,6 +1294,12 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
         gameId={game.id}
         open={coverPickerOpen}
         onClose={() => setCoverPickerOpen(false)}
+      />
+
+      <EditGameNameModal
+        game={game}
+        open={renameModalOpen}
+        onClose={() => setRenameModalOpen(false)}
       />
 
       <BannerPickerModal

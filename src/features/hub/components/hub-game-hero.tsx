@@ -13,6 +13,7 @@ import {
   Loader2,
   Play,
   Plus,
+  RotateCcw,
   Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -23,6 +24,7 @@ import { formatReleaseDate } from '@/features/library/utils/format'
 import { useStartDownloadModalStore } from '@/features/downloads/store/start-download-modal-store'
 import { useUiStore } from '@/store/ui-store'
 import { useAddGameFromHub, useAddGameToWishlist } from '../hooks/use-hub'
+import { useRestoreGameFromMemory } from '@/features/library/hooks/use-games'
 import { useGameAffinity } from '../hooks/use-personalization'
 import { getGameTypeInfo } from '../utils/game-type'
 import { HubScoreBadge } from './hub-score-badge'
@@ -35,6 +37,7 @@ interface HubGameHeroProps {
   inLibrary: boolean
   inWishlist: boolean
   isInstalled: boolean
+  isMemory?: boolean
   isReleased: boolean
   allVideos: HubVideo[]
   onOpenTrailer: (index: number) => void
@@ -62,6 +65,7 @@ export function HubGameHero({
   inLibrary,
   inWishlist,
   isInstalled,
+  isMemory,
   isReleased,
   allVideos,
   onOpenTrailer,
@@ -73,8 +77,10 @@ export function HubGameHero({
   const openDownloadModal = useStartDownloadModalStore((s) => s.open)
   const addGame = useAddGameFromHub()
   const addToWishlist = useAddGameToWishlist()
+  const restoreMutation = useRestoreGameFromMemory()
   const affinity = useGameAffinity(game)
 
+  const inMem = Boolean(isMemory || libraryEntry?.is_memory)
   const backdrop = game.backdrop_url ?? game.screenshot_urls[0] ?? game.cover_url
   const typeInfo = getGameTypeInfo(game.game_type)
 
@@ -120,7 +126,11 @@ export function HubGameHero({
             {/* Cover Top Badges */}
             <div className="pointer-events-none absolute inset-x-2 top-2 flex items-center justify-between">
               <div className="flex flex-wrap items-center gap-1">
-                {isInstalled ? (
+                {inMem ? (
+                  <span className="rounded-md bg-amber-500/90 border border-amber-400/40 px-2 py-0.5 text-[9px] font-bold tracking-wider text-black uppercase shadow-sm">
+                    In Memory
+                  </span>
+                ) : isInstalled ? (
                   <span className="rounded-md bg-emerald-600 px-2 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase shadow-sm">
                     Installed
                   </span>
@@ -307,8 +317,22 @@ export function HubGameHero({
                 </button>
               )}
 
-              {/* In Library / Play Button */}
-              {inLibrary ? (
+              {/* In Memory Restore / In Library / Play Button */}
+              {inMem && libraryEntry ? (
+                <button
+                  type="button"
+                  disabled={restoreMutation.isPending}
+                  onClick={() => restoreMutation.mutate(libraryEntry.id)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-400/50 bg-gradient-to-r from-amber-500/30 to-amber-600/30 px-5 py-2.5 text-sm font-bold text-amber-200 shadow-lg shadow-amber-500/20 transition-all hover:bg-amber-500/50 hover:text-white hover:scale-105 active:scale-95 cursor-pointer"
+                >
+                  {restoreMutation.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RotateCcw className="size-4" />
+                  )}
+                  <span>Restore to Library</span>
+                </button>
+              ) : inLibrary ? (
                 <button
                   type="button"
                   onClick={() => {

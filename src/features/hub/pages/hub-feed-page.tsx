@@ -14,6 +14,7 @@ import {
   buildHubLibraryMatcher,
   buildHubWishlistMatcher,
   buildHubInstalledMatcher,
+  buildHubMemoryMatcher,
 } from '../utils/in-library'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 
@@ -33,6 +34,7 @@ export function HubFeedPage() {
   const inLibrary = buildHubLibraryMatcher(games)
   const inWishlist = buildHubWishlistMatcher(games)
   const isInstalled = buildHubInstalledMatcher(games)
+  const inMemory = buildHubMemoryMatcher(games)
   const speed = useAnimationSpeed()
 
   const results = browse.data?.pages.flat() ?? []
@@ -114,6 +116,7 @@ export function HubFeedPage() {
                   inLibrary={inLibrary(game)}
                   inWishlist={inWishlist(game)}
                   isInstalled={isInstalled(game)}
+                  inMemory={inMemory(game)}
                   className="h-full"
                 />
               ))}

@@ -181,6 +181,7 @@ pub fn run() {
             commands::games::create_game,
             commands::games::update_game_installation,
             commands::games::update_game_flags,
+            commands::games::update_game_name,
             commands::games::delete_game,
             commands::games::restore_game_from_memory,
             commands::games::permanently_delete_game,

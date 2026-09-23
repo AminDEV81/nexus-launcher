@@ -323,6 +323,21 @@ fn split_launch_arguments(args: &str) -> Vec<String> {
     parts
 }
 
+#[cfg(target_os = "linux")]
+fn find_linux_runner(candidates: &[&str]) -> Option<String> {
+    if let Ok(path_var) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            for &candidate in candidates {
+                let p = dir.join(candidate);
+                if p.is_file() {
+                    return Some(candidate.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
 fn launch_directly(target: &LaunchTarget) -> AppResult<LaunchedProcess> {
     let executable_path = target
         .executable_path
@@ -344,7 +359,54 @@ fn launch_directly(target: &LaunchTarget) -> AppResult<LaunchedProcess> {
         let mut cmd = StdCommand::new("powershell.exe");
         cmd.args(["-ExecutionPolicy", "Bypass", "-File", executable_path]);
         cmd
+    } else if cfg!(target_os = "linux") && ext == "sh" {
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = std::fs::metadata(executable_path) {
+                let mut perms = meta.permissions();
+                let mode = perms.mode();
+                if mode & 0o111 == 0 {
+                    perms.set_mode(mode | 0o755);
+                    let _ = std::fs::set_permissions(executable_path, perms);
+                }
+            }
+        }
+        let mut cmd = StdCommand::new("sh");
+        cmd.arg(executable_path);
+        cmd
+    } else if cfg!(target_os = "linux") && ext == "exe" {
+        #[cfg(target_os = "linux")]
+        {
+            let runner = find_linux_runner(&["wine", "proton", "umu-run"]);
+            if let Some(r) = runner {
+                let mut cmd = StdCommand::new(r);
+                cmd.arg(executable_path);
+                cmd
+            } else {
+                return Err(AppError::Other(
+                    "Running Windows games (.exe) on Linux requires Wine or Proton. Please install wine or proton."
+                        .into(),
+                ));
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            StdCommand::new(executable_path)
+        }
     } else {
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = std::fs::metadata(executable_path) {
+                let mut perms = meta.permissions();
+                let mode = perms.mode();
+                if mode & 0o111 == 0 {
+                    perms.set_mode(mode | 0o755);
+                    let _ = std::fs::set_permissions(executable_path, perms);
+                }
+            }
+        }
         StdCommand::new(executable_path)
     };
 

@@ -28,6 +28,6 @@ This directory contains the packaging files for the Arch User Repository (AUR).
 4. **Commit and push to AUR:**
    ```bash
    git add PKGBUILD .SRCINFO
-   git commit -m "Update to v0.3.0"
+   git commit -m "Update to v0.3.5"
    git push origin master
    ```

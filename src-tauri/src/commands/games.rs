@@ -76,15 +76,24 @@ pub fn create_game(
     }
 
     if let Some(exe_path) = &input.executable_path {
-        let already_exists: bool = conn.query_row(
-            "SELECT EXISTS(SELECT 1 FROM games WHERE executable_path = ?1)",
-            [exe_path],
-            |row| row.get(0),
-        )?;
-        if already_exists {
-            return Err(AppError::Invalid(
-                "this game is already in your library".into(),
-            ));
+        let existing: Option<(String, String, bool)> = conn
+            .query_row(
+                "SELECT id, name, is_memory FROM games WHERE executable_path = ?1",
+                [exe_path],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .optional()?;
+
+        if let Some((existing_id, existing_name, is_mem)) = existing {
+            if is_mem {
+                return Err(AppError::Invalid(format!(
+                    "GAME_IN_MEMORY:{existing_id}:{existing_name}"
+                )));
+            } else {
+                return Err(AppError::Invalid(
+                    "this game is already in your library".into(),
+                ));
+            }
         }
     }
 
@@ -249,6 +258,32 @@ pub fn update_game_flags(
             &input.animated_cover_enabled,
             &id,
         ],
+    )?;
+
+    if changed == 0 {
+        return Err(AppError::NotFound(format!("no game with id {id}")));
+    }
+
+    let sql = format!("SELECT {} FROM games WHERE id = ?1", Game::SELECT_COLUMNS);
+    let game = conn.query_row(&sql, [&id], Game::from_row)?;
+    Ok(game)
+}
+
+#[tauri::command]
+pub fn update_game_name(
+    db: State<'_, Database>,
+    id: String,
+    name: String,
+) -> AppResult<Game> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::Invalid("game name cannot be empty".into()));
+    }
+
+    let conn = db.connection.lock().expect("db mutex poisoned");
+    let changed = conn.execute(
+        "UPDATE games SET name = ?1 WHERE id = ?2",
+        rusqlite::params![trimmed, &id],
     )?;
 
     if changed == 0 {

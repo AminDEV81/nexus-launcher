@@ -3,6 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      ;(function () {
+        try {
+          var saved = localStorage.getItem('nexus_theme')
+          var prefersDark =
+            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+          if (saved === 'light' || (!saved && !prefersDark)) {
+            document.documentElement.classList.remove('dark')
+            document.documentElement.classList.add('light')
+          } else {
+            document.documentElement.classList.add('dark')
+            document.documentElement.classList.remove('light')
+          }
+        } catch (e) {}
+      })()
+    </script>
     <title>Nexus Launcher — لانچر بازی بومی، سبک و پرسرعت برای ویندوز و لینوکس</title>
     <meta
       name="description"
@@ -31,7 +47,7 @@
     <meta http-equiv="Expires" content="0" />
     <script>
       ;(function () {
-        var BUILD = '0.3.0.10'
+        var BUILD = '0.3.5'
         var currentUrl = new URL(window.location.href)
         var urlV = currentUrl.searchParams.get('v')
 
@@ -101,7 +117,7 @@
     <meta property="og:title" content="Nexus Launcher — لانچر بومی بازی‌ها برای ویندوز و لینوکس" />
     <meta
       property="og:description"
-      content="نسخه ۰.۳.۰ منتشر شد. مجهز به اسکنر خودکار سیستم، بوستر سخت‌افزاری و پشتیبانی رسمی از لینوکس و آرچ بدون تبلیغات."
+      content="نسخه ۰.۳.۵ منتشر شد. مجهز به اسکنر خودکار سیستم، قابلیت اکسترکت اختیاری، بازیابی خاطرات و پشتیبانی رسمی از لینوکس و آرچ بدون تبلیغات."
     />
     <meta property="og:image" content="assets/brand-mark.svg" />
 
@@ -130,44 +146,44 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <!-- Custom Stylesheet with Cache Buster -->
-    <link rel="stylesheet" href="style.css?v=0.3.0.10" />
+    <link rel="stylesheet" href="style.css?v=0.3.5" />
   </head>
   <body
-    class="bg-[#06070c] text-slate-100 antialiased overflow-x-hidden selection:bg-purple-600/30 selection:text-cyan-300"
+    class="bg-slate-50 dark:bg-[#06070c] text-slate-800 dark:text-slate-100 antialiased overflow-x-hidden selection:bg-purple-600/30 selection:text-cyan-400 dark:selection:text-cyan-300 transition-colors duration-300"
   >
     <div id="cursor-spotlight"></div>
     <canvas id="bg-3d-canvas"></canvas>
 
     <div
-      class="fixed top-[-100px] left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-purple-600/10 blur-[130px] rounded-full pointer-events-none -z-10"
+      class="fixed top-[-100px] left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-purple-400/15 dark:bg-purple-600/10 blur-[130px] rounded-full pointer-events-none -z-10"
     ></div>
     <div
-      class="fixed top-[40%] right-[-150px] w-[500px] h-[500px] bg-cyan-500/10 blur-[140px] rounded-full pointer-events-none -z-10"
+      class="fixed top-[40%] right-[-150px] w-[500px] h-[500px] bg-cyan-400/15 dark:bg-cyan-500/10 blur-[140px] rounded-full pointer-events-none -z-10"
     ></div>
 
     <!-- Announcement Bar -->
     <div
-      class="relative z-50 bg-gradient-to-r from-purple-950/80 via-indigo-950/80 to-purple-950/80 border-b border-purple-500/30 py-2 sm:py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium text-center backdrop-blur-md"
+      class="relative z-50 bg-gradient-to-r from-purple-100/90 via-indigo-50/90 to-purple-100/90 dark:from-purple-950/80 dark:via-indigo-950/80 dark:to-purple-950/80 border-b border-purple-200 dark:border-purple-500/30 py-2 sm:py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium text-center backdrop-blur-md"
     >
       <div
         class="max-w-7xl mx-auto flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap text-center"
       >
         <span
-          class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-500/25 text-cyan-300 border border-purple-500/40 font-mono shadow-sm"
+          class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-purple-200/80 dark:bg-purple-500/25 text-purple-900 dark:text-cyan-300 border border-purple-300 dark:border-purple-500/40 font-mono shadow-sm"
         >
           <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse ml-1 mr-0.5"></span>
-          NEW v0.3.0
+          NEW v0.3.5
         </span>
-        <span data-i18n="top_bar_msg" class="font-bold text-white"
-          >نسخه ۰.۳.۰ لانچر نکسوس منتشر شد — مجهز به اسکنر خودکار سیستم و پشتیبانی بومی از لینوکس و
-          آرچ!</span
+        <span data-i18n="top_bar_msg" class="font-bold text-slate-900 dark:text-white"
+          >نسخه ۰.۳.۵ لانچر نکسوس منتشر شد — مجهز به اسکنر خودکار سیستم، قابلیت اکسترکت اختیاری،
+          بازیابی خاطرات و پشتیبانی لینوکس!</span
         >
         <a
           href="#download"
           data-i18n="top_bar_cta"
-          class="text-cyan-300 font-black hover:text-cyan-200 underline underline-offset-4 decoration-cyan-400/50 transition-colors ml-1 sm:ml-2 whitespace-nowrap"
+          class="text-purple-700 dark:text-cyan-300 font-black hover:text-purple-900 dark:hover:text-cyan-200 underline underline-offset-4 decoration-purple-400/50 dark:decoration-cyan-400/50 transition-colors ml-1 sm:ml-2 whitespace-nowrap"
         >
-          دانلود نسخه ۰.۳.۰ &larr;
+          دانلود نسخه ۰.۳.۵ &larr;
         </a>
       </div>
     </div>
@@ -175,7 +191,7 @@
     <!-- Floating Navigation Bar with Real App Brand Gem -->
     <header class="sticky top-2 sm:top-4 z-40 px-3 sm:px-6 max-w-7xl mx-auto">
       <nav
-        class="glass-panel px-3 sm:px-6 py-2.5 sm:py-3.5 flex items-center justify-between border border-white/10 shadow-2xl shadow-black/50"
+        class="glass-panel px-3 sm:px-6 py-2.5 sm:py-3.5 flex items-center justify-between border border-slate-200/80 dark:border-white/10 shadow-xl shadow-slate-900/5 dark:shadow-2xl dark:shadow-black/50"
       >
         <!-- Brand Logo using Official brand-mark.svg -->
         <a href="#" class="flex items-center gap-2.5 sm:gap-3 group shrink-0">
@@ -194,72 +210,127 @@
           <div class="flex flex-col text-right">
             <div class="flex items-center gap-1.5">
               <span
-                class="font-extrabold text-lg sm:text-xl tracking-tight text-white group-hover:text-cyan-400 transition-colors"
+                class="font-extrabold text-lg sm:text-xl tracking-tight text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-cyan-400 transition-colors"
                 >NEXUS</span
               >
               <span
-                class="px-1.5 py-0.5 text-[9px] font-black rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono"
-                >v0.3.0</span
+                class="px-1.5 py-0.5 text-[9px] font-black rounded-md bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-500/40 font-mono"
+                >v0.3.5</span
               >
             </div>
-            <span class="text-[9px] sm:text-[10px] text-slate-400 tracking-wide font-medium"
+            <span
+              class="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 tracking-wide font-medium"
               >LAUNCHER</span
             >
           </div>
         </a>
 
         <!-- Desktop Navigation Links -->
-        <div class="hidden lg:flex items-center gap-6 xl:gap-7 text-sm font-medium text-slate-300">
-          <a href="#mockup" data-i18n="nav_showcase" class="hover:text-cyan-400 transition-colors"
+        <div
+          class="hidden lg:flex items-center gap-6 xl:gap-7 text-sm font-medium text-slate-600 dark:text-slate-300"
+        >
+          <a
+            href="#mockup"
+            data-i18n="nav_showcase"
+            class="hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >نمای زنده برنامه</a
           >
-          <a href="#features" data-i18n="nav_features" class="hover:text-cyan-400 transition-colors"
+          <a
+            href="#features"
+            data-i18n="nav_features"
+            class="hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >ویژگی‌های کلیدی</a
           >
           <a
             href="#booster-demo"
             data-i18n="nav_booster"
-            class="hover:text-cyan-400 transition-colors"
+            class="hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >بوستر رم</a
           >
           <a
             href="#comparison"
             data-i18n="nav_comparison"
-            class="hover:text-cyan-400 transition-colors"
+            class="hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >چرا نکسوس؟</a
           >
-          <a href="#specs" data-i18n="nav_specs" class="hover:text-cyan-400 transition-colors"
+          <a
+            href="#specs"
+            data-i18n="nav_specs"
+            class="hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >مشخصات فنی</a
           >
-          <a href="#faq" data-i18n="nav_faq" class="hover:text-cyan-400 transition-colors"
+          <a
+            href="#faq"
+            data-i18n="nav_faq"
+            class="hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >سوالات</a
           >
         </div>
 
         <!-- Action Buttons & Mobile Hamburger -->
-        <div class="flex items-center gap-2 sm:gap-3">
+        <div class="flex items-center gap-2 sm:gap-2.5">
+          <!-- Theme Toggle Button (Desktop & Tablet) -->
+          <button
+            id="theme-toggle-btn"
+            class="theme-toggle-btn"
+            title="تغییر تم (روشن / تاریک) | Toggle Theme"
+            aria-label="Toggle Theme"
+          >
+            <svg
+              class="sun-icon text-amber-500 fill-amber-500"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2"></path>
+              <path d="M12 20v2"></path>
+              <path d="m4.93 4.93 1.41 1.41"></path>
+              <path d="m17.66 17.66 1.41 1.41"></path>
+              <path d="M2 12h2"></path>
+              <path d="M20 12h2"></path>
+              <path d="m6.34 17.66-1.41 1.41"></path>
+              <path d="m19.07 4.93-1.41 1.41"></path>
+            </svg>
+            <svg
+              class="moon-icon text-cyan-400 fill-cyan-400/20"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+            </svg>
+          </button>
+
+          <!-- Language Switcher -->
           <button
             id="lang-toggle-btn"
-            class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-white/10 hover:border-purple-400/40 bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-200 transition-all flex items-center gap-1.5"
+            class="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-slate-300/80 dark:border-white/10 hover:border-purple-400/50 bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/10 text-xs font-bold text-slate-700 dark:text-slate-200 transition-all flex items-center gap-1.5"
             title="تغییر زبان / Switch Language"
           >
             <span>🌐</span>
             <span class="hidden sm:inline">English (EN)</span>
             <span class="sm:hidden font-mono">EN</span>
           </button>
+
           <a
             href="https://github.com/AminDEV81/nexus-launcher"
             target="_blank"
             rel="noopener noreferrer"
-            class="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-white/10 hover:border-white/30 bg-white/5 hover:bg-white/10 text-xs font-semibold text-slate-300 hover:text-white transition-all"
+            class="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-300/80 dark:border-white/10 hover:border-slate-400 dark:hover:border-white/30 bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/10 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all"
           >
-            <svg class="w-4 h-4 text-amber-400 fill-amber-400" viewBox="0 0 24 24">
+            <svg class="w-4 h-4 text-amber-500 fill-amber-500" viewBox="0 0 24 24">
               <path
                 d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
               />
             </svg>
             <span>GitHub</span>
           </a>
+
           <a
             href="#download"
             class="hidden sm:flex btn-nexus-primary px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white items-center gap-2 shadow-lg shadow-purple-500/25"
@@ -283,7 +354,7 @@
           <!-- Mobile Hamburger Toggle -->
           <button
             id="mobile-menu-toggle"
-            class="flex lg:hidden p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all items-center justify-center focus:outline-none"
+            class="flex lg:hidden p-2 rounded-xl bg-slate-100/80 dark:bg-white/5 hover:bg-slate-200/80 dark:hover:bg-white/10 border border-slate-300/80 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all items-center justify-center focus:outline-none"
             aria-label="Toggle Navigation"
           >
             <svg
@@ -323,45 +394,87 @@
         id="mobile-menu"
         class="hidden lg:hidden mt-2 p-4 sm:p-5 glass-panel border border-purple-500/30 shadow-2xl backdrop-blur-2xl animate-menu-slide flex-col gap-3 text-center"
       >
-        <div class="flex flex-col space-y-1.5 text-center text-sm font-semibold text-slate-200">
+        <div
+          class="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-white/10"
+        >
+          <span class="text-xs font-bold text-slate-600 dark:text-slate-300">تم و تنظیمات:</span>
+          <button
+            id="mobile-theme-toggle-btn"
+            class="theme-toggle-btn"
+            title="تغییر تم | Toggle Theme"
+            aria-label="Toggle Theme"
+          >
+            <svg
+              class="sun-icon text-amber-500 fill-amber-500"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="4"></circle>
+              <path d="M12 2v2"></path>
+              <path d="M12 20v2"></path>
+              <path d="m4.93 4.93 1.41 1.41"></path>
+              <path d="m17.66 17.66 1.41 1.41"></path>
+              <path d="M2 12h2"></path>
+              <path d="M20 12h2"></path>
+              <path d="m6.34 17.66-1.41 1.41"></path>
+              <path d="m19.07 4.93-1.41 1.41"></path>
+            </svg>
+            <svg
+              class="moon-icon text-cyan-400 fill-cyan-400/20"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+            </svg>
+          </button>
+        </div>
+        <div
+          class="flex flex-col space-y-1.5 text-center text-sm font-semibold text-slate-700 dark:text-slate-200"
+        >
           <a
             href="#mockup"
             data-i18n="nav_showcase"
-            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-white/5 hover:text-cyan-400 transition-colors"
+            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >نمای زنده برنامه</a
           >
           <a
             href="#features"
             data-i18n="nav_features"
-            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-white/5 hover:text-cyan-400 transition-colors"
+            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >ویژگی‌های کلیدی</a
           >
           <a
             href="#booster-demo"
             data-i18n="nav_booster"
-            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-white/5 hover:text-cyan-400 transition-colors"
+            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >بوستر رم</a
           >
           <a
             href="#comparison"
             data-i18n="nav_comparison"
-            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-white/5 hover:text-cyan-400 transition-colors"
+            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >چرا نکسوس؟</a
           >
           <a
             href="#specs"
             data-i18n="nav_specs"
-            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-white/5 hover:text-cyan-400 transition-colors"
+            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >مشخصات فنی</a
           >
           <a
             href="#faq"
             data-i18n="nav_faq"
-            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-white/5 hover:text-cyan-400 transition-colors"
+            class="mobile-nav-link py-2.5 px-4 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 hover:text-purple-600 dark:hover:text-cyan-400 transition-colors"
             >پرسش‌های متداول</a
           >
         </div>
-        <div class="pt-3 border-t border-white/10 flex flex-col gap-2">
+        <div class="pt-3 border-t border-slate-200/80 dark:border-white/10 flex flex-col gap-2">
           <a
             href="#download"
             class="mobile-nav-link btn-hero-download py-3 rounded-xl text-center text-xs font-bold text-white flex items-center justify-center gap-2"
@@ -372,7 +485,7 @@
             href="https://github.com/AminDEV81/nexus-launcher"
             target="_blank"
             rel="noopener noreferrer"
-            class="py-2.5 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 text-center text-xs font-bold text-slate-200 flex items-center justify-center gap-2"
+            class="py-2.5 rounded-xl border border-slate-300/80 dark:border-white/10 hover:border-slate-400 dark:hover:border-white/20 bg-slate-100/80 dark:bg-white/5 text-center text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2"
           >
             <span>GitHub Repository</span>
           </a>
@@ -403,20 +516,20 @@
               />
             </div>
             <div
-              class="absolute -bottom-3 left-1/2 -translate-x-1/2 px-3 sm:px-3.5 py-0.5 sm:py-1 rounded-full bg-[#06070c] border border-cyan-400/60 shadow-lg text-[10px] sm:text-[11px] font-black text-cyan-300 font-mono flex items-center gap-1.5 whitespace-nowrap"
+              class="absolute -bottom-3 left-1/2 -translate-x-1/2 px-3 sm:px-3.5 py-0.5 sm:py-1 rounded-full bg-slate-900/90 dark:bg-[#06070c] border border-cyan-400/60 shadow-lg text-[10px] sm:text-[11px] font-black text-cyan-300 font-mono flex items-center gap-1.5 whitespace-nowrap"
             >
               <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
-              NEXUS v0.3.0
+              NEXUS v0.3.5
             </div>
           </div>
         </div>
 
         <h1
-          class="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-white max-w-5xl mx-auto leading-[1.25] sm:leading-[1.15] mb-5 sm:mb-6 text-center"
+          class="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-slate-900 dark:text-white max-w-5xl mx-auto leading-[1.25] sm:leading-[1.15] mb-5 sm:mb-6 text-center"
         >
           <span data-i18n="hero_title_1">لانچر بومی، رعدآسا و هوشمند</span><br />
           <span
-            class="bg-gradient-to-r from-cyan-300 via-purple-400 to-pink-500 bg-clip-text text-transparent glow-text-purple"
+            class="bg-gradient-to-r from-cyan-400 via-purple-500 to-pink-500 dark:from-cyan-300 dark:via-purple-400 dark:to-pink-500 bg-clip-text text-transparent glow-text-purple"
             data-i18n="hero_title_2"
           >
             برای تمام بازی‌های شما در ویندوز و لینوکس
@@ -424,12 +537,14 @@
         </h1>
 
         <p
-          class="text-sm sm:text-lg lg:text-xl text-slate-300 max-w-3xl mx-auto mb-8 sm:mb-10 leading-relaxed font-normal text-center"
+          class="text-sm sm:text-lg lg:text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto mb-8 sm:mb-10 leading-relaxed font-normal text-center"
           data-i18n="hero_subtitle"
         >
-          توسعه یافته بر پایه معماری بومی <span class="text-purple-300 font-bold">Rust</span> و
-          <span class="text-cyan-300 font-bold">Tauri 2</span>. فقط
-          <span class="text-white font-bold underline decoration-cyan-400 decoration-2"
+          توسعه یافته بر پایه معماری بومی
+          <span class="text-purple-600 dark:text-purple-300 font-bold">Rust</span> و
+          <span class="text-cyan-600 dark:text-cyan-300 font-bold">Tauri 2</span>. فقط
+          <span
+            class="text-slate-900 dark:text-white font-bold underline decoration-cyan-500 dark:decoration-cyan-400 decoration-2"
             >۶۰ مگابایت مصرف رم</span
           >، همراه با اسکنر خودکار سیستم، بوستر سخت‌افزاری و پشتیبانی رسمی از لینوکس و آرچ بدون
           ذره‌ای تبلیغات.
@@ -441,7 +556,7 @@
         >
           <!-- 1. Windows Setup Download -->
           <a
-            href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.0_x64-setup.exe"
+            href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.5_x64-setup.exe"
             data-role="download-btn"
             class="btn-hero-download w-full sm:w-auto shrink-0 px-4 sm:px-5 lg:px-6 py-3 sm:py-3.5 rounded-2xl font-black text-xs sm:text-sm lg:text-base text-white border border-cyan-400/40 flex items-center justify-center gap-2 sm:gap-2.5 shadow-2xl transition-all hover:scale-[1.02] select-none cursor-pointer"
           >
@@ -451,7 +566,7 @@
               />
             </svg>
             <span class="whitespace-nowrap" data-i18n="hero_download_btn"
-              >دانلود نسخه رسمی ویندوز v0.3.0</span
+              >دانلود نسخه رسمی ویندوز v0.3.5</span
             >
             <span
               class="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-black/35 border border-cyan-300/40 text-cyan-200 shadow-sm text-[11px] sm:text-xs font-mono font-bold shrink-0 ms-1 sm:ms-2 inline-flex items-center"
@@ -496,7 +611,7 @@
             href="https://github.com/AminDEV81/nexus-launcher"
             target="_blank"
             rel="noopener noreferrer"
-            class="btn-hero-github w-full sm:w-auto shrink-0 px-4 sm:px-5 lg:px-6 py-3 sm:py-3.5 rounded-2xl font-black text-xs sm:text-sm lg:text-base text-white border border-white/20 flex items-center justify-center gap-2 sm:gap-2.5 shadow-xl transition-all hover:scale-[1.02] select-none cursor-pointer"
+            class="btn-hero-github w-full sm:w-auto shrink-0 px-4 sm:px-5 lg:px-6 py-3 sm:py-3.5 rounded-2xl font-black text-xs sm:text-sm lg:text-base border border-slate-300/80 dark:border-white/20 flex items-center justify-center gap-2 sm:gap-2.5 shadow-xl transition-all hover:scale-[1.02] select-none cursor-pointer"
           >
             <svg class="w-4 h-4 sm:w-5 sm:h-5 fill-current shrink-0" viewBox="0 0 24 24">
               <path
@@ -519,29 +634,29 @@
 
         <!-- Arch Linux Note / Fast Terminal Command -->
         <div
-          class="mb-8 text-center text-xs text-slate-400 font-mono flex items-center justify-center gap-2 flex-wrap"
+          class="mb-8 text-center text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center justify-center gap-2 flex-wrap"
         >
-          <span class="text-cyan-300 font-bold">Arch Linux / SteamOS:</span>
+          <span class="text-cyan-600 dark:text-cyan-300 font-bold">Arch Linux / SteamOS:</span>
           <code
-            class="bg-black/60 border border-white/10 px-2.5 py-1 rounded text-cyan-200 select-all"
-            >chmod +x Nexus_0.3.0_amd64.AppImage &amp;&amp; ./Nexus_0.3.0_amd64.AppImage</code
+            class="bg-slate-900/90 dark:bg-black/60 border border-slate-700/50 dark:border-white/10 px-2.5 py-1 rounded text-cyan-300 dark:text-cyan-200 select-all"
+            >chmod +x Nexus_0.3.5_amd64.AppImage &amp;&amp; ./Nexus_0.3.5_amd64.AppImage</code
           >
           <span>•</span>
           <a
-            href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.3.0_amd64.deb"
+            href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.3.5_amd64.deb"
             data-role="download-btn-deb"
-            class="text-slate-300 hover:text-white underline"
+            class="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white underline"
             >پکیج دبیان/اوبونتو (.deb)</a
           >
         </div>
 
         <!-- Trust Badges Centered -->
         <div
-          class="flex items-center justify-center gap-3 sm:gap-6 text-xs sm:text-sm text-slate-400 flex-wrap text-center max-w-2xl mx-auto"
+          class="flex items-center justify-center gap-3 sm:gap-6 text-xs sm:text-sm text-slate-600 dark:text-slate-400 flex-wrap text-center max-w-2xl mx-auto"
         >
           <span class="flex items-center gap-1.5">
             <svg
-              class="w-4 h-4 text-emerald-400"
+              class="w-4 h-4 text-emerald-500"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -557,7 +672,7 @@
           </span>
           <span class="flex items-center gap-1.5">
             <svg
-              class="w-4 h-4 text-emerald-400"
+              class="w-4 h-4 text-emerald-500"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -573,7 +688,7 @@
           </span>
           <span class="flex items-center gap-1.5">
             <svg
-              class="w-4 h-4 text-emerald-400"
+              class="w-4 h-4 text-emerald-500"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -712,7 +827,7 @@
                 <span class="text-xs font-bold text-slate-200 tracking-wide">Nexus Launcher</span>
                 <span
                   class="text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono"
-                  >v0.3.0 (Official)</span
+                  >v0.3.5 (Official)</span
                 >
               </div>
 
@@ -842,11 +957,11 @@
                     </div>
                     <span
                       class="text-xs text-cyan-300 bg-cyan-500/10 px-2.5 py-1 rounded-lg border border-cyan-500/30 font-mono"
-                      >v0.3.0 Ready</span
+                      >v0.3.5 Ready</span
                     >
                   </div>
 
-                  <!-- Interactive System Radar Scanner Banner (New v0.3.0) -->
+                  <!-- Interactive System Radar Scanner Banner (New v0.3.5) -->
                   <div
                     class="p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-purple-950/40 via-[#0e1424] to-cyan-950/40 border border-cyan-500/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-right"
                   >
@@ -865,7 +980,7 @@
                           <span
                             class="text-xs sm:text-sm font-black text-white"
                             data-i18n="mockup_scanner_banner_title"
-                            >رادار اسکنر خودکار سیستم (جدید v0.3.0)</span
+                            >رادار اسکنر خودکار سیستم (جدید v0.3.5)</span
                           >
                           <span
                             class="px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-mono font-bold"
@@ -1526,7 +1641,7 @@
             </div>
           </div>
 
-          <!-- Bento 6: Automated System Game Scanner & 3D Holographic Radar (New v0.3.0) -->
+          <!-- Bento 6: Automated System Game Scanner & 3D Holographic Radar (New v0.3.5) -->
           <div
             class="glass-panel tilt-card md:col-span-2 lg:col-span-2 p-5 sm:p-8 flex flex-col justify-between relative overflow-hidden text-center"
           >
@@ -1541,7 +1656,7 @@
                 class="text-xl sm:text-2xl font-black text-white mb-2 sm:mb-3 text-center"
                 data-i18n="bento_scanner_title"
               >
-                اسکنر هوشمند و رادار هولوگرافیک بازی‌ها (جدید v0.3.0)
+                اسکنر هوشمند و رادار هولوگرافیک بازی‌ها (جدید v0.3.5)
               </h3>
               <p
                 class="text-slate-300 text-xs sm:text-sm leading-relaxed mb-5 sm:mb-6 text-center max-w-xl mx-auto"
@@ -1557,7 +1672,7 @@
                 class="text-[11px] text-cyan-300 font-mono mb-2 flex items-center justify-center gap-1.5 font-bold"
               >
                 <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-                ۸ پلتفرم تحت پشتیبانی بومی در نسخه ۰.۳.۰
+                ۸ پلتفرم تحت پشتیبانی بومی در نسخه ۰.۳.۵
               </div>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-mono">
                 <div
@@ -1604,7 +1719,7 @@
             </div>
           </div>
 
-          <!-- Bento 7: Native Linux & Arch Linux Support (New v0.3.0) -->
+          <!-- Bento 7: Native Linux & Arch Linux Support (New v0.3.5) -->
           <div
             class="glass-panel tilt-card p-5 sm:p-8 flex flex-col justify-between relative overflow-hidden text-center"
           >
@@ -1619,7 +1734,7 @@
                 class="text-lg sm:text-xl font-black text-white mb-2 text-center"
                 data-i18n="bento_linux_title"
               >
-                پشتیبانی رسمی از لینوکس و آرچ (جدید v0.3.0)
+                پشتیبانی رسمی از لینوکس و آرچ (جدید v0.3.5)
               </h3>
               <p
                 class="text-slate-300 text-xs leading-relaxed mb-4 text-center"
@@ -1652,12 +1767,12 @@
               <div
                 class="p-2.5 rounded-xl bg-black/50 border border-white/10 font-mono text-[11px] text-cyan-300 select-all"
               >
-                chmod +x Nexus_0.3.0_amd64.AppImage
+                chmod +x Nexus_0.3.5_amd64.AppImage
               </div>
             </div>
           </div>
 
-          <!-- Bento 8: Memory Vault & Enhanced Safety (New v0.3.0) -->
+          <!-- Bento 8: Memory Vault & Enhanced Safety (New v0.3.5) -->
           <div
             class="glass-panel tilt-card md:col-span-2 lg:col-span-3 p-5 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden text-right"
           >
@@ -1679,7 +1794,7 @@
                 class="text-xl sm:text-2xl font-black text-white mb-2 text-center md:text-right"
                 data-i18n="bento_memories_title"
               >
-                گاوصندوق خاطرات و ایمنی پیشرفته (جدید v0.3.0)
+                گاوصندوق خاطرات و ایمنی پیشرفته (جدید v0.3.5)
               </h3>
               <p
                 class="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-2xl text-center md:text-right"
@@ -2143,7 +2258,7 @@
           >
             <!-- Windows Setup Download -->
             <a
-              href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.0_x64-setup.exe"
+              href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.5_x64-setup.exe"
               data-role="download-btn"
               class="btn-hero-download w-full sm:w-auto shrink-0 px-4 sm:px-5 lg:px-6 py-3 sm:py-3.5 rounded-2xl font-black text-xs sm:text-sm lg:text-base text-white border border-cyan-400/40 flex items-center justify-center gap-2 sm:gap-2.5 shadow-2xl transition-all hover:scale-[1.02] select-none cursor-pointer"
             >
@@ -2153,7 +2268,7 @@
                 />
               </svg>
               <span class="whitespace-nowrap" data-i18n="cta_btn_download"
-                >دانلود نسخه رسمی ویندوز v0.3.0</span
+                >دانلود نسخه رسمی ویندوز v0.3.5</span
               >
               <span
                 class="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl bg-black/35 border border-cyan-300/40 text-cyan-200 shadow-sm text-[11px] sm:text-xs font-mono font-bold shrink-0 ms-1 sm:ms-2 inline-flex items-center"
@@ -2220,13 +2335,13 @@
           <div
             class="text-[11px] sm:text-xs text-slate-400 flex items-center justify-center gap-2.5 sm:gap-4 flex-wrap text-center font-mono"
           >
-            <span>Nexus_0.3.0_x64-setup.exe (~7.2 MB)</span>
+            <span>Nexus_0.3.5_x64-setup.exe (~7.2 MB)</span>
             <span>•</span>
-            <span>Nexus_0.3.0_amd64.AppImage (~75 MB)</span>
+            <span>Nexus_0.3.5_amd64.AppImage (~75 MB)</span>
             <span>•</span>
-            <span>nexus_0.3.0_amd64.deb (~65 MB)</span>
+            <span>nexus_0.3.5_amd64.deb (~65 MB)</span>
             <span>•</span>
-            <span>Nexus-0.3.0-1.x86_64.rpm (~65 MB)</span>
+            <span>Nexus-0.3.5-1.x86_64.rpm (~65 MB)</span>
             <span>•</span>
             <span class="font-sans">Ed25519 Minisign Signature Verified</span>
           </div>
@@ -2324,7 +2439,7 @@
                   class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono inline-flex items-center gap-1.5"
                 >
                   <span>🐧</span>
-                  <span>v0.3.0 Linux Release</span>
+                  <span>v0.3.5 Linux Release</span>
                 </span>
               </div>
               <h3
@@ -2332,7 +2447,7 @@
                 class="text-lg sm:text-2xl font-black text-white"
                 data-i18n="linux_modal_title"
               >
-                دانلود لانچر نکسوس نسخه ۰.۳.۰ برای لینوکس
+                دانلود لانچر نکسوس نسخه ۰.۳.۵ برای لینوکس
               </h3>
               <p class="text-xs sm:text-sm text-slate-300 mt-1" data-i18n="linux_modal_subtitle">
                 فرمت متناسب با توزیع سیستم‌عامل خود را انتخاب و دانلود نمایید:
@@ -2396,7 +2511,7 @@
                 </div>
 
                 <a
-                  href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.0_amd64.AppImage"
+                  href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.5_amd64.AppImage"
                   data-role="download-btn-appimage"
                   class="btn-nexus-primary w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white inline-flex items-center justify-center gap-2 shrink-0 shadow-lg shadow-purple-500/30"
                 >
@@ -2427,14 +2542,14 @@
                 class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
               >
                 <span class="truncate dir-ltr text-left"
-                  >chmod +x Nexus_0.3.0_amd64.AppImage && ./Nexus_0.3.0_amd64.AppImage</span
+                  >chmod +x Nexus_0.3.5_amd64.AppImage && ./Nexus_0.3.5_amd64.AppImage</span
                 >
                 <button
                   type="button"
                   id="copy-appimage-cmd"
                   onclick="
                     copyCommand(
-                      'chmod +x Nexus_0.3.0_amd64.AppImage && ./Nexus_0.3.0_amd64.AppImage',
+                      'chmod +x Nexus_0.3.5_amd64.AppImage && ./Nexus_0.3.5_amd64.AppImage',
                       'copy-appimage-cmd',
                     )
                   "
@@ -2475,7 +2590,7 @@
                 </div>
 
                 <a
-                  href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.3.0_amd64.deb"
+                  href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.3.5_amd64.deb"
                   data-role="download-btn-deb"
                   class="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-white/10 hover:bg-white/20 border border-white/20 inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
                 >
@@ -2505,11 +2620,11 @@
               <div
                 class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
               >
-                <span class="truncate dir-ltr text-left">sudo dpkg -i Nexus_0.3.0_amd64.deb</span>
+                <span class="truncate dir-ltr text-left">sudo dpkg -i Nexus_0.3.5_amd64.deb</span>
                 <button
                   type="button"
                   id="copy-deb-cmd"
-                  onclick="copyCommand('sudo dpkg -i Nexus_0.3.0_amd64.deb', 'copy-deb-cmd')"
+                  onclick="copyCommand('sudo dpkg -i Nexus_0.3.5_amd64.deb', 'copy-deb-cmd')"
                   class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
                 >
                   کپی دستور
@@ -2547,7 +2662,7 @@
                 </div>
 
                 <a
-                  href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus-0.3.0-1.x86_64.rpm"
+                  href="https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus-0.3.5-1.x86_64.rpm"
                   data-role="download-btn-rpm"
                   class="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-white/10 hover:bg-white/20 border border-white/20 inline-flex items-center justify-center gap-2 shrink-0 transition-colors"
                 >
@@ -2578,13 +2693,13 @@
                 class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/50 border border-white/10 text-[11px] font-mono text-slate-300"
               >
                 <span class="truncate dir-ltr text-left"
-                  >sudo dnf install ./Nexus-0.3.0-1.x86_64.rpm</span
+                  >sudo dnf install ./Nexus-0.3.5-1.x86_64.rpm</span
                 >
                 <button
                   type="button"
                   id="copy-rpm-cmd"
                   onclick="
-                    copyCommand('sudo dnf install ./Nexus-0.3.0-1.x86_64.rpm', 'copy-rpm-cmd')
+                    copyCommand('sudo dnf install ./Nexus-0.3.5-1.x86_64.rpm', 'copy-rpm-cmd')
                   "
                   class="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white transition-colors shrink-0 text-[10px] font-sans font-bold"
                 >
@@ -2692,7 +2807,7 @@
               <code
                 class="px-1.5 py-0.5 rounded bg-black/40 font-mono text-[11px] text-cyan-300 select-all"
                 >GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1
-                ./Nexus_0.3.0_amd64.AppImage</code
+                ./Nexus_0.3.5_amd64.AppImage</code
               >
               اجرا فرمایید.
             </span>
@@ -2701,6 +2816,6 @@
       </div>
     </div>
 
-    <script src="app.js?v=0.3.0.10"></script>
+    <script src="app.js?v=0.3.5"></script>
   </body>
 </html>

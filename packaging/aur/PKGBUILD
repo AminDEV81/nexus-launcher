@@ -1,7 +1,7 @@
 # Maintainer: AminDEV81 <https://github.com/AminDEV81/nexus-launcher>
 
 pkgname=nexus-launcher-bin
-pkgver=0.3.0
+pkgver=0.3.5
 pkgrel=1
 pkgdesc="Modern, high-performance game launcher for Windows and Linux built with Tauri, Rust, and React"
 arch=('x86_64')

@@ -43,7 +43,10 @@ export function useCreateGame() {
       queryClient.invalidateQueries({ queryKey: gamesKey })
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Could not add that game.')
+      const msg = error instanceof Error ? error.message : 'Could not add that game.'
+      if (!msg.startsWith('GAME_IN_MEMORY:')) {
+        toast.error(msg)
+      }
     },
   })
 }
@@ -76,6 +79,30 @@ export function useUpdateGameFlags() {
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : 'Could not update that game.')
+    },
+  })
+}
+
+export function useUpdateGameName() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      gamesService.updateGameName(id, name),
+    onSuccess: (updatedGame) => {
+      queryClient.setQueriesData<Game[]>({ queryKey: gamesKey }, (games) =>
+        Array.isArray(games)
+          ? games.map((game) => (game.id === updatedGame.id ? updatedGame : game))
+          : games,
+      )
+      queryClient.setQueriesData<Game>({ queryKey: gamesKey }, (old) =>
+        old && !Array.isArray(old) && old.id === updatedGame.id ? updatedGame : old,
+      )
+      queryClient.invalidateQueries({ queryKey: gamesKey })
+      toast.success(`Renamed to "${updatedGame.name}"`)
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : 'Could not rename game.')
     },
   })
 }

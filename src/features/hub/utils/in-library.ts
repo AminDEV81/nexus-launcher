@@ -20,13 +20,13 @@ export function normalizeGameName(name: string): string {
 
 export type HubLibraryMatcher = (game: HubGame) => boolean
 
-/** Wishlist games are deliberately NOT "in the library" — a wishlisted
- *  entry shows its own badge and button state on hub pages. */
+/** Wishlist and Memory games are deliberately NOT "in the active library" —
+ *  they show their own badges and button states on hub pages. */
 export function buildHubLibraryMatcher(games: Game[] | undefined): HubLibraryMatcher {
   const ids = new Set<number>()
   const names = new Set<string>()
   for (const game of games ?? []) {
-    if (game.is_wishlist) continue
+    if (game.is_wishlist || game.is_memory) continue
     if (game.igdb_id !== null && game.igdb_id > 0) ids.add(game.igdb_id)
     names.add(normalizeGameName(game.name))
   }
@@ -39,7 +39,7 @@ export function buildHubWishlistMatcher(games: Game[] | undefined): HubLibraryMa
   const ids = new Set<number>()
   const names = new Set<string>()
   for (const game of games ?? []) {
-    if (!game.is_wishlist) continue
+    if (!game.is_wishlist || game.is_memory) continue
     if (game.igdb_id !== null && game.igdb_id > 0) ids.add(game.igdb_id)
     names.add(normalizeGameName(game.name))
   }
@@ -52,7 +52,20 @@ export function buildHubInstalledMatcher(games: Game[] | undefined): HubLibraryM
   const ids = new Set<number>()
   const names = new Set<string>()
   for (const game of games ?? []) {
-    if (!game.is_installed) continue
+    if (!game.is_installed || game.is_memory) continue
+    if (game.igdb_id !== null && game.igdb_id > 0) ids.add(game.igdb_id)
+    names.add(normalizeGameName(game.name))
+  }
+
+  return (hubGame) =>
+    (hubGame.igdb_id > 0 && ids.has(hubGame.igdb_id)) || names.has(normalizeGameName(hubGame.name))
+}
+
+export function buildHubMemoryMatcher(games: Game[] | undefined): HubLibraryMatcher {
+  const ids = new Set<number>()
+  const names = new Set<string>()
+  for (const game of games ?? []) {
+    if (!game.is_memory) continue
     if (game.igdb_id !== null && game.igdb_id > 0) ids.add(game.igdb_id)
     names.add(normalizeGameName(game.name))
   }

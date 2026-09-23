@@ -45,9 +45,11 @@ export function HubGamePage() {
     () => findLibraryEntry(games, game ?? { igdb_id: igdbId, name: '' }),
     [games, game, igdbId],
   )
-  const inLibrary = libraryEntry !== undefined && !libraryEntry.is_wishlist
-  const inWishlist = libraryEntry?.is_wishlist ?? false
-  const isInstalled = Boolean(libraryEntry && libraryEntry.is_installed)
+  const isMemory = Boolean(libraryEntry?.is_memory)
+  const inLibrary =
+    libraryEntry !== undefined && !libraryEntry.is_wishlist && !libraryEntry.is_memory
+  const inWishlist = (libraryEntry?.is_wishlist ?? false) && !libraryEntry?.is_memory
+  const isInstalled = Boolean(libraryEntry && libraryEntry.is_installed && !libraryEntry.is_memory)
   const isReleased = !game?.release_date || game.release_date <= localDateKey()
 
   // Aggregate all available videos (both from `game.videos` and fallback `game.trailer_url`)
@@ -121,6 +123,7 @@ export function HubGamePage() {
           inLibrary={inLibrary}
           inWishlist={inWishlist}
           isInstalled={isInstalled}
+          isMemory={isMemory}
           isReleased={isReleased}
           allVideos={allVideos}
           onOpenTrailer={handleOpenTrailer}

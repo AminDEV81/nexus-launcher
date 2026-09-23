@@ -14,6 +14,7 @@ import {
   Pause,
   Play,
   Plus,
+  RotateCcw,
   Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -36,6 +37,7 @@ export interface HubFeaturedHeroProps {
   inLibrary: HubLibraryMatcher
   inWishlist: HubLibraryMatcher
   isInstalled?: HubLibraryMatcher
+  inMemory?: HubLibraryMatcher
 }
 
 export function HubFeaturedHero({
@@ -43,6 +45,7 @@ export function HubFeaturedHero({
   inLibrary,
   inWishlist,
   isInstalled,
+  inMemory,
 }: HubFeaturedHeroProps) {
   const [index, setIndex] = useState(0)
   const [hovering, setHovering] = useState(false)
@@ -73,9 +76,10 @@ export function HubFeaturedHero({
   const backdrop = game.backdrop_url ?? game.cover_url
   const isUnreleased = Boolean(game.release_date && game.release_date > localDateKey())
   const typeInfo = getGameTypeInfo(game.game_type)
-  const installed = Boolean(isInstalled && isInstalled(game))
-  const inLib = inLibrary(game)
-  const inWish = inWishlist(game)
+  const inMem = Boolean(inMemory && inMemory(game))
+  const installed = Boolean(!inMem && isInstalled && isInstalled(game))
+  const inLib = Boolean(!inMem && inLibrary(game))
+  const inWish = Boolean(!inMem && inWishlist(game))
 
   return (
     <section
@@ -259,7 +263,16 @@ export function HubFeaturedHero({
                   )}
 
                   {/* Library / Wishlist / Installed Action */}
-                  {installed ? (
+                  {inMem ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/hub/${game.igdb_id}`)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/20 px-3 py-2 text-xs font-bold text-amber-300 backdrop-blur-md transition-colors hover:bg-amber-500/30 cursor-pointer"
+                    >
+                      <RotateCcw className="size-3.5 text-amber-400" />
+                      <span>In Memory</span>
+                    </button>
+                  ) : installed ? (
                     <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-600/30 px-3 py-2 text-xs font-bold text-white backdrop-blur-md">
                       <Check className="size-3.5 text-emerald-400" strokeWidth={3} />
                       <span>Installed</span>

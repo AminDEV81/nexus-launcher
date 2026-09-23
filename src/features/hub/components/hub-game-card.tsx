@@ -10,13 +10,14 @@ import {
   Gamepad2,
   Loader2,
   Plus,
+  RotateCcw,
   Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useStartDownloadModalStore } from '@/features/downloads/store/start-download-modal-store'
 import { useAddGameFromHub, useAddGameToWishlist } from '../hooks/use-hub'
-import { useGames } from '@/features/library/hooks/use-games'
+import { useGames, useRestoreGameFromMemory } from '@/features/library/hooks/use-games'
 import { findLibraryEntry } from '../utils/in-library'
 import { useUiStore } from '@/store/ui-store'
 import { localDateKey } from '@/features/library/utils/format'
@@ -31,6 +32,7 @@ export interface HubGameCardProps {
   inLibrary: boolean
   inWishlist?: boolean
   isInstalled?: boolean
+  inMemory?: boolean
   nexusMatch?: number
   matchReason?: string
   similarityReason?: string
@@ -44,6 +46,7 @@ export function HubGameCard({
   inLibrary,
   inWishlist,
   isInstalled,
+  inMemory,
   nexusMatch,
   matchReason,
   similarityReason,
@@ -56,12 +59,16 @@ export function HubGameCard({
   const openDownloadModal = useStartDownloadModalStore((s) => s.open)
   const addGame = useAddGameFromHub()
   const addToWishlist = useAddGameToWishlist()
+  const restoreGame = useRestoreGameFromMemory()
 
   const isUnreleased = Boolean(game.release_date && game.release_date > localDateKey())
   const typeInfo = getGameTypeInfo(game.game_type)
 
   const libraryEntry = useMemo(() => findLibraryEntry(games, game), [games, game])
-  const installed = Boolean(isInstalled || (libraryEntry && libraryEntry.is_installed))
+  const isMem = Boolean(inMemory || (libraryEntry && libraryEntry.is_memory))
+  const installed = Boolean(!isMem && (isInstalled || (libraryEntry && libraryEntry.is_installed)))
+  const inLib = Boolean(!isMem && inLibrary)
+  const inWish = Boolean(!isMem && inWishlist)
 
   return (
     <div
@@ -98,12 +105,17 @@ export function HubGameCard({
                 <Check className="size-3" strokeWidth={3} />
                 <span>Installed</span>
               </span>
-            ) : inLibrary ? (
+            ) : isMem ? (
+              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-600/90 border border-amber-400/40 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                <RotateCcw className="size-2.5" />
+                <span>In Memory</span>
+              </span>
+            ) : inLib ? (
               <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-700/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
                 <Check className="size-3" strokeWidth={3} />
                 <span>In Library</span>
               </span>
-            ) : inWishlist ? (
+            ) : inWish ? (
               <span className="inline-flex items-center gap-1 rounded-lg bg-accent px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
                 <Bookmark className="size-3" />
                 <span>Wishlist</span>
@@ -150,8 +162,27 @@ export function HubGameCard({
         {/* Quick Action Overlay (Reveals smoothly on hover) */}
         <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black/95 via-black/50 to-transparent p-3 opacity-0 transition-opacity duration-200 group-hover/card:opacity-100">
           <div className="flex items-center gap-1.5">
-            {/* If Installed: Direct Play / Open in Library */}
-            {installed ? (
+            {/* If In Memory: Direct Restore */}
+            {isMem && libraryEntry ? (
+              <button
+                type="button"
+                title="Restore to Library"
+                aria-label={`Restore ${game.name} from Memory`}
+                disabled={restoreGame.isPending}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  restoreGame.mutate(libraryEntry.id)
+                }}
+                className="flex size-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-600 text-white shadow-md transition-all hover:bg-amber-500 hover:border-amber-300 hover:scale-105 active:scale-95 cursor-pointer backdrop-blur-md"
+              >
+                {restoreGame.isPending ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="size-3.5" />
+                )}
+                <span className="text-xs font-bold truncate">Restore</span>
+              </button>
+            ) : installed ? (
               <button
                 type="button"
                 title="Installed — Open in Library"
@@ -189,7 +220,7 @@ export function HubGameCard({
             )}
 
             {/* Wishlist Status Button (already in wishlist) */}
-            {!inLibrary && !installed && inWishlist && (
+            {!isMem && !inLib && !installed && inWish && (
               <button
                 type="button"
                 title="View in Wishlist"
@@ -205,8 +236,8 @@ export function HubGameCard({
               </button>
             )}
 
-            {/* Library / Wishlist Button (hidden if installed or already in wishlist) */}
-            {!inLibrary && !installed && !inWishlist && (
+            {/* Library / Wishlist Button (hidden if installed, in memory, or already in wishlist) */}
+            {!isMem && !inLib && !installed && !inWish && (
               <button
                 type="button"
                 title={isUnreleased ? 'Add to Wishlist' : 'Add to Library'}

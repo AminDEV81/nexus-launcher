@@ -8,6 +8,7 @@ import {
   buildHubLibraryMatcher,
   buildHubWishlistMatcher,
   buildHubInstalledMatcher,
+  buildHubMemoryMatcher,
 } from '../utils/in-library'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
@@ -27,6 +28,7 @@ export function HubSimilarGames({ targetGame }: HubSimilarGamesProps) {
   const inLibrary = buildHubLibraryMatcher(games)
   const inWishlist = buildHubWishlistMatcher(games)
   const isInstalled = buildHubInstalledMatcher(games)
+  const inMemory = buildHubMemoryMatcher(games)
 
   function scroll(direction: 'left' | 'right') {
     if (!scrollContainerRef.current) return
@@ -127,6 +129,7 @@ export function HubSimilarGames({ targetGame }: HubSimilarGamesProps) {
               inLibrary={inLibrary(game)}
               inWishlist={inWishlist ? inWishlist(game) : false}
               isInstalled={isInstalled ? isInstalled(game) : false}
+              inMemory={inMemory ? inMemory(game) : false}
               nexusMatch={game.nexusMatch}
               matchReason={game.matchReason}
               similarityReason={game.similarityReason}

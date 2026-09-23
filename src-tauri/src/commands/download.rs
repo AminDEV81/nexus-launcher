@@ -1297,11 +1297,17 @@ fn find_best_exe(dir: &std::path::Path, game_name: &str) -> Option<String> {
             continue;
         }
         let path = entry.path();
-        let is_exe = path
+        let ext = path
             .extension()
             .and_then(|e| e.to_str())
-            .is_some_and(|e| e.eq_ignore_ascii_case("exe"));
-        if !is_exe {
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let is_runnable = if cfg!(target_os = "linux") {
+            ext == "exe" || ext == "sh" || ext == "x86_64" || ext == "bin" || ext == "appimage"
+        } else {
+            ext == "exe"
+        };
+        if !is_runnable {
             continue;
         }
         let stem = path
@@ -1365,6 +1371,19 @@ fn link_game_install(app: &AppHandle, game_id: &str, save_path: &str) {
         "UPDATE games SET is_installed=1, install_path=?2, executable_path=COALESCE(?3, executable_path), install_size_bytes=?4 WHERE id=?1",
         rusqlite::params![game_id, install_dir, exe, size],
     );
+
+    #[cfg(target_os = "linux")]
+    if let Some(ref exe_path) = exe {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(metadata) = std::fs::metadata(exe_path) {
+            let mut permissions = metadata.permissions();
+            let mode = permissions.mode();
+            if mode & 0o111 == 0 {
+                permissions.set_mode(mode | 0o755);
+                let _ = std::fs::set_permissions(exe_path, permissions);
+            }
+        }
+    }
 }
 
 fn has_active_siblings(app: &AppHandle, id: &str, game_id: &Option<String>, save_path: &str) -> bool {

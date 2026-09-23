@@ -21,6 +21,7 @@ import {
   Gamepad2,
   Calendar,
   RefreshCw,
+  Pencil,
 } from 'lucide-react'
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from '@/components/ui/context-menu'
 import { Modal } from '@/components/ui/modal'
@@ -38,6 +39,7 @@ import { searchMetadataCandidates } from '@/services/metadata'
 import { useLaunchStore } from '@/store/launch-store'
 import { CoverPickerModal } from './cover-picker-modal'
 import { TagEditorModal } from './tag-editor-modal'
+import { EditGameNameModal } from '@/components/modals/edit-game-name-modal'
 import { AddToCollectionModal } from '@/features/collections/components/add-to-collection-modal'
 import { openGameFolder, copyGamePath } from '../utils/game-actions'
 import { isGameUnreleased, formatReleaseDate } from '../utils/format'
@@ -70,6 +72,7 @@ export function GameContextMenu({ game, position, onClose }: GameContextMenuProp
   )
   const [confirmingRemove, setConfirmingRemove] = useState(false)
   const [coverPickerOpen, setCoverPickerOpen] = useState(false)
+  const [renameModalOpen, setRenameModalOpen] = useState(false)
   const [tagsEditorOpen, setTagsEditorOpen] = useState(false)
   const [addToCollectionOpen, setAddToCollectionOpen] = useState(false)
 
@@ -216,6 +219,11 @@ export function GameContextMenu({ game, position, onClose }: GameContextMenuProp
           label="Change Cover"
           onClick={() => setCoverPickerOpen(true)}
         />
+        <ContextMenuItem
+          icon={Pencil}
+          label="Rename Game"
+          onClick={() => setRenameModalOpen(true)}
+        />
         {activeGame.cover_is_animated && (
           <ContextMenuItem
             icon={Sparkles}
@@ -233,6 +241,15 @@ export function GameContextMenu({ game, position, onClose }: GameContextMenuProp
           onClick={() => setConfirmingRemove(true)}
         />
       </ContextMenu>
+
+      <EditGameNameModal
+        game={activeGame}
+        open={renameModalOpen}
+        onClose={() => {
+          setRenameModalOpen(false)
+          onClose()
+        }}
+      />
 
       <CoverPickerModal
         gameId={activeGame.id}

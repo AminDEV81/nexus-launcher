@@ -39,6 +39,7 @@ import {
   buildHubLibraryMatcher,
   buildHubWishlistMatcher,
   buildHubInstalledMatcher,
+  buildHubMemoryMatcher,
   type HubLibraryMatcher,
 } from '../utils/in-library'
 import { useHubSearchStore } from '../store/hub-search-store'
@@ -250,6 +251,7 @@ export function HubPage() {
   const inLibrary = buildHubLibraryMatcher(games)
   const inWishlist = buildHubWishlistMatcher(games)
   const isInstalled = buildHubInstalledMatcher(games)
+  const inMemory = buildHubMemoryMatcher(games)
   const isPending =
     newReleases.isPending || comingSoon.isPending || topRated.isPending || gamesPending
 
@@ -789,6 +791,7 @@ export function HubPage() {
             inLibrary={inLibrary}
             inWishlist={inWishlist}
             isInstalled={isInstalled}
+            inMemory={inMemory}
             selectedGenres={selectedGenres}
             selectedPlatforms={selectedPlatforms}
             minRating={minRating}
@@ -807,6 +810,7 @@ export function HubPage() {
                 inLibrary={inLibrary}
                 inWishlist={inWishlist}
                 isInstalled={isInstalled}
+                inMemory={inMemory}
               />
             )}
 
@@ -818,6 +822,7 @@ export function HubPage() {
               inLibrary={inLibrary}
               inWishlist={inWishlist}
               isInstalled={isInstalled}
+              inMemory={inMemory}
             />
             <HubRow
               feed="new-releases"
@@ -825,6 +830,7 @@ export function HubPage() {
               inLibrary={inLibrary}
               inWishlist={inWishlist}
               isInstalled={isInstalled}
+              inMemory={inMemory}
             />
             <HubRow
               feed="coming-soon"
@@ -832,6 +838,7 @@ export function HubPage() {
               inLibrary={inLibrary}
               inWishlist={inWishlist}
               isInstalled={isInstalled}
+              inMemory={inMemory}
             />
             <HubRow
               feed="top-rated"
@@ -839,6 +846,7 @@ export function HubPage() {
               inLibrary={inLibrary}
               inWishlist={inWishlist}
               isInstalled={isInstalled}
+              inMemory={inMemory}
             />
           </>
         )}
@@ -854,6 +862,7 @@ function SearchResults({
   inLibrary,
   inWishlist,
   isInstalled,
+  inMemory,
   selectedGenres = [],
   selectedPlatforms = [],
   minRating = null,
@@ -876,6 +885,7 @@ function SearchResults({
   inLibrary: HubLibraryMatcher
   inWishlist?: HubLibraryMatcher
   isInstalled?: HubLibraryMatcher
+  inMemory?: HubLibraryMatcher
   selectedGenres?: { id: number; name: string }[]
   selectedPlatforms?: { id: number; name: string; abbreviation?: string }[]
   minRating?: number | null
@@ -1017,6 +1027,7 @@ function SearchResults({
             inLibrary={inLibrary(game)}
             inWishlist={inWishlist ? inWishlist(game) : false}
             isInstalled={isInstalled ? isInstalled(game) : false}
+            inMemory={inMemory ? inMemory(game) : false}
             className="h-full"
           />
         ))}
@@ -1047,6 +1058,7 @@ function HubRow({
   inLibrary,
   inWishlist,
   isInstalled,
+  inMemory,
 }: {
   feed: HubFeedId
   query: { data?: HubGame[]; isPending: boolean }
@@ -1054,6 +1066,7 @@ function HubRow({
   inLibrary: HubLibraryMatcher
   inWishlist?: HubLibraryMatcher
   isInstalled?: HubLibraryMatcher
+  inMemory?: HubLibraryMatcher
 }) {
   const navigate = useNavigate()
   const speed = useAnimationSpeed()
@@ -1136,6 +1149,7 @@ function HubRow({
                 inLibrary={inLibrary(game)}
                 inWishlist={inWishlist ? inWishlist(game) : false}
                 isInstalled={isInstalled ? isInstalled(game) : false}
+                inMemory={inMemory ? inMemory(game) : false}
                 nexusMatch={affinity?.matchPercentage}
                 matchReason={affinity?.reason}
                 breakdownChips={affinity?.breakdown?.highlightChips}
