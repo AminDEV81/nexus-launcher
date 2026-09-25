@@ -47,6 +47,13 @@ impl CircuitBreaker {
         self.last_failure_time
             .store(chrono::Utc::now().timestamp(), Ordering::Relaxed);
     }
+
+    pub fn trip_immediately(&self) {
+        self.consecutive_failures
+            .store(Self::FAILURE_THRESHOLD, Ordering::Relaxed);
+        self.last_failure_time
+            .store(chrono::Utc::now().timestamp(), Ordering::Relaxed);
+    }
 }
 
 pub struct MetadataProviderResolver {
@@ -132,6 +139,18 @@ impl MetadataProviderResolver {
                 }
             }
         }
+        if self.circuit_breaker.is_open() {
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
+                if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
+                    return Ok(games);
+                }
+            }
+            return Err(AppError::Other(
+                "Network connection offline. Serving cached data.".into(),
+            ));
+        }
+
         let result = match config.mode {
             ProviderMode::Public => {
                 let cloud = NexusCloudProvider::new(self.http.clone(), config.public_proxy_url);
@@ -169,7 +188,16 @@ impl MetadataProviderResolver {
                 Ok(games)
             }
             Err(err) => {
-                self.circuit_breaker.record_failure();
+                let err_str = err.to_string();
+                if err_str.contains("disconnect")
+                    || err_str.contains("unreachable")
+                    || err_str.contains("timed out")
+                    || err_str.contains("Network")
+                {
+                    self.circuit_breaker.trip_immediately();
+                } else {
+                    self.circuit_breaker.record_failure();
+                }
                 // Graceful fallback to stale local cache if available!
                 let conn = db.connection.lock().expect("db mutex poisoned");
                 if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
@@ -187,8 +215,7 @@ impl MetadataProviderResolver {
         db: &Database,
         query: &str,
         offset: i64,
-        genre_ids: &[i64],
-        platform_ids: &[i64],
+        filters: &crate::commands::hub::HubSearchFilters,
     ) -> AppResult<Vec<HubGame>> {
         let config = self.get_config(db);
         let mode_str = match config.mode {
@@ -196,18 +223,30 @@ impl MetadataProviderResolver {
             ProviderMode::Custom => "custom",
         };
         let clean_q = query.trim().to_lowercase();
-        let g_str = genre_ids
+        let g_str = filters
+            .genre_ids
+            .as_deref()
+            .unwrap_or(&[])
             .iter()
             .map(|id| id.to_string())
             .collect::<Vec<_>>()
             .join(",");
-        let p_str = platform_ids
+        let p_str = filters
+            .platform_ids
+            .as_deref()
+            .unwrap_or(&[])
             .iter()
             .map(|id| id.to_string())
             .collect::<Vec<_>>()
             .join(",");
+        let rel_str = filters.release.as_deref().unwrap_or("");
+        let rating_str = filters
+            .min_rating
+            .map(|r| r.to_string())
+            .unwrap_or_default();
+        let sort_str = filters.sort.as_deref().unwrap_or("");
         let cache_key = format!(
-            "search:v5:{mode_str}:{clean_q}:{offset}:{g_str}:{p_str}"
+            "search:v6:{mode_str}:{clean_q}:{offset}:{g_str}:{p_str}:{rel_str}:{rating_str}:{sort_str}"
         );
 
         {
@@ -220,12 +259,23 @@ impl MetadataProviderResolver {
                 }
             }
         }
+
+        if self.circuit_breaker.is_open() {
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
+                if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
+                    return Ok(games);
+                }
+            }
+            return Err(AppError::Other(
+                "Network connection offline. Serving cached data.".into(),
+            ));
+        }
+
         let result = match config.mode {
             ProviderMode::Public => {
                 let cloud = NexusCloudProvider::new(self.http.clone(), config.public_proxy_url);
-                cloud
-                    .search_games(query, offset, genre_ids, platform_ids)
-                    .await
+                cloud.search_games(query, offset, filters).await
             }
             ProviderMode::Custom => {
                 let (Some(cid), Some(sec)) = (config.igdb_client_id, config.igdb_client_secret)
@@ -240,14 +290,13 @@ impl MetadataProviderResolver {
                     cid,
                     sec,
                 );
-                direct
-                    .search_games(query, offset, genre_ids, platform_ids)
-                    .await
+                direct.search_games(query, offset, filters).await
             }
         };
 
         match result {
             Ok(games) => {
+                self.circuit_breaker.record_success();
                 if let Ok(json) = serde_json::to_string(&games) {
                     let conn = db.connection.lock().expect("db mutex poisoned");
                     let _ = MetadataCache::set(&conn, &cache_key, "search", &json, 4 * 3600);
@@ -255,6 +304,16 @@ impl MetadataProviderResolver {
                 Ok(games)
             }
             Err(err) => {
+                let err_str = err.to_string();
+                if err_str.contains("disconnect")
+                    || err_str.contains("unreachable")
+                    || err_str.contains("timed out")
+                    || err_str.contains("Network")
+                {
+                    self.circuit_breaker.trip_immediately();
+                } else {
+                    self.circuit_breaker.record_failure();
+                }
                 let conn = db.connection.lock().expect("db mutex poisoned");
                 if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
                     if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
@@ -284,6 +343,18 @@ impl MetadataProviderResolver {
             }
         }
 
+        if self.circuit_breaker.is_open() {
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
+                if let Ok(details) = serde_json::from_str::<HubGameDetails>(&payload) {
+                    return Ok(Some(details));
+                }
+            }
+            return Err(AppError::Other(
+                "Network connection offline. Serving cached data.".into(),
+            ));
+        }
+
         let config = self.get_config(db);
         let result = match config.mode {
             ProviderMode::Public => {
@@ -307,14 +378,36 @@ impl MetadataProviderResolver {
             }
         };
 
-        if let Ok(Some(ref details)) = result {
-            if let Ok(json) = serde_json::to_string(details) {
+        match result {
+            Ok(Some(ref details)) => {
+                self.circuit_breaker.record_success();
+                if let Ok(json) = serde_json::to_string(details) {
+                    let conn = db.connection.lock().expect("db mutex poisoned");
+                    let _ = MetadataCache::set(&conn, &cache_key, "details", &json, 3 * 86_400);
+                }
+                Ok(Some(details.clone()))
+            }
+            Ok(None) => Ok(None),
+            Err(err) => {
+                let err_str = err.to_string();
+                if err_str.contains("disconnect")
+                    || err_str.contains("unreachable")
+                    || err_str.contains("timed out")
+                    || err_str.contains("Network")
+                {
+                    self.circuit_breaker.trip_immediately();
+                } else {
+                    self.circuit_breaker.record_failure();
+                }
                 let conn = db.connection.lock().expect("db mutex poisoned");
-                let _ = MetadataCache::set(&conn, &cache_key, "details", &json, 3 * 86_400);
+                if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
+                    if let Ok(details) = serde_json::from_str::<HubGameDetails>(&payload) {
+                        return Ok(Some(details));
+                    }
+                }
+                Err(err)
             }
         }
-
-        result
     }
 
     pub async fn get_similar_games(
@@ -333,6 +426,18 @@ impl MetadataProviderResolver {
                     }
                 }
             }
+        }
+
+        if self.circuit_breaker.is_open() {
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
+                if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
+                    return Ok(games);
+                }
+            }
+            return Err(AppError::Other(
+                "Network connection offline. Serving cached data.".into(),
+            ));
         }
 
         let config = self.get_config(db);
@@ -358,14 +463,35 @@ impl MetadataProviderResolver {
             }
         };
 
-        if let Ok(ref games) = result {
-            if let Ok(json) = serde_json::to_string(games) {
+        match result {
+            Ok(games) => {
+                self.circuit_breaker.record_success();
+                if let Ok(json) = serde_json::to_string(&games) {
+                    let conn = db.connection.lock().expect("db mutex poisoned");
+                    let _ = MetadataCache::set(&conn, &cache_key, "similar", &json, 86_400);
+                }
+                Ok(games)
+            }
+            Err(err) => {
+                let err_str = err.to_string();
+                if err_str.contains("disconnect")
+                    || err_str.contains("unreachable")
+                    || err_str.contains("timed out")
+                    || err_str.contains("Network")
+                {
+                    self.circuit_breaker.trip_immediately();
+                } else {
+                    self.circuit_breaker.record_failure();
+                }
                 let conn = db.connection.lock().expect("db mutex poisoned");
-                let _ = MetadataCache::set(&conn, &cache_key, "similar", &json, 86_400);
+                if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
+                    if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
+                        return Ok(games);
+                    }
+                }
+                Err(err)
             }
         }
-
-        result
     }
 
     pub async fn list_genres(&self, db: &Database) -> AppResult<Vec<NameIdItem>> {

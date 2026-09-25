@@ -88,40 +88,83 @@ impl MetadataProvider for DirectIgdbProvider {
         &self,
         query: &str,
         offset: i64,
-        genre_ids: &[i64],
-        platform_ids: &[i64],
+        filters: &crate::commands::hub::HubSearchFilters,
     ) -> AppResult<Vec<HubGame>> {
         let token = self.get_token().await?;
         let clean_q = query.replace(['"', '\\'], "");
 
-        let query_body = if !genre_ids.is_empty() || !platform_ids.is_empty() {
-            let mut conditions = vec![format!("game_type = {STANDALONE_GAME_TYPES}")];
-            if !clean_q.is_empty() {
-                conditions.push(format!("name ~ *\"{clean_q}\"*"));
+        let mut genre_ids = Vec::new();
+        if let Some(ids) = &filters.genre_ids {
+            genre_ids.extend(ids.iter().copied().filter(|&id| id > 0));
+        } else if let Some(id) = filters.genre_id {
+            if id > 0 {
+                genre_ids.push(id);
             }
-            if !genre_ids.is_empty() {
-                let list = genre_ids
-                    .iter()
-                    .map(|id| id.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",");
-                conditions.push(format!("genres = [{list}]"));
+        }
+
+        let mut platform_ids = Vec::new();
+        if let Some(ids) = &filters.platform_ids {
+            platform_ids.extend(ids.iter().copied().filter(|&id| id > 0));
+        } else if let Some(id) = filters.platform_id {
+            if id > 0 {
+                platform_ids.push(id);
             }
-            if !platform_ids.is_empty() {
-                let list = platform_ids
-                    .iter()
-                    .map(|id| id.to_string())
-                    .collect::<Vec<_>>()
-                    .join(",");
-                conditions.push(format!("platforms = ({list})"));
+        }
+
+        let mut conditions = vec![
+            format!("game_type = {STANDALONE_GAME_TYPES}"),
+            "cover != null".to_string(),
+        ];
+        if !clean_q.is_empty() {
+            conditions.push(format!("name ~ *\"{clean_q}\"*"));
+        }
+        if !genre_ids.is_empty() {
+            let list = genre_ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            conditions.push(format!("genres = [{list}]"));
+        }
+        if !platform_ids.is_empty() {
+            let list = platform_ids
+                .iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            conditions.push(format!("platforms = ({list})"));
+        }
+        if let Some(min_r) = filters.min_rating {
+            conditions.push(format!("aggregated_rating >= {min_r}"));
+        }
+        if let Some(rel) = &filters.release {
+            let now = chrono::Utc::now().timestamp();
+            if rel == "upcoming" {
+                conditions.push(format!("first_release_date > {now}"));
+            } else if rel == "new" {
+                conditions.push(format!(
+                    "first_release_date < {now} & first_release_date > {}",
+                    now - 90 * 86_400
+                ));
             }
+        }
+
+        let sort_order = match filters.sort.as_deref() {
+            Some("rating") => "aggregated_rating desc",
+            Some("newest") => "first_release_date desc",
+            Some("oldest") => "first_release_date asc",
+            Some("name") => "name asc",
+            _ => "total_rating_count desc",
+        };
+
+        let query_body = if conditions.len() > 2 || !clean_q.is_empty() {
             format!(
-                "{LIST_FIELDS};\nwhere {};\nsort total_rating_count desc;\nlimit 24;\noffset {offset};",
+                "{LIST_FIELDS};\nwhere {};\nsort {sort_order};\nlimit 24;\noffset {offset};",
                 conditions.join(" & ")
             )
         } else {
             format!(
-                "search \"{clean_q}\";\n{LIST_FIELDS};\nwhere game_type = {STANDALONE_GAME_TYPES};\nlimit 24;\noffset {offset};"
+                "{LIST_FIELDS};\nwhere game_type = {STANDALONE_GAME_TYPES} & cover != null;\nsort {sort_order};\nlimit 24;\noffset {offset};"
             )
         };
 

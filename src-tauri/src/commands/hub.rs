@@ -10,6 +10,7 @@ use crate::commands::metadata::{igdb, HttpClient, IgdbTokenCache};
 use crate::db::models::Game;
 use crate::db::Database;
 use crate::error::{AppError, AppResult};
+use crate::services::cache::MetadataCache;
 use crate::services::metadata::{MetadataProviderResolver, ProviderMode};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -363,8 +364,75 @@ pub async fn get_hub_coming_soon(
     fetch_feed(&db, &http.0, &token_cache, &resolver, "coming-soon", 14, 0).await
 }
 
+fn rotate_games_deterministic(mut games: Vec<HubGame>, epoch: i64, limit: usize) -> Vec<HubGame> {
+    if games.len() <= limit {
+        return games;
+    }
+    let mut state = (epoch as u64).wrapping_mul(0x9E3779B97F4A7C15);
+    for i in (1..games.len()).rev() {
+        state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        let j = ((state >> 32) as usize) % (i + 1);
+        games.swap(i, j);
+    }
+    games.truncate(limit);
+    games
+}
+
+async fn fetch_shelf_feed_rotated(
+    db: &Database,
+    http: &reqwest::Client,
+    token_cache: &IgdbTokenCache,
+    resolver: &MetadataProviderResolver,
+    feed: &str,
+    limit: usize,
+    rotation_hours: i64,
+) -> AppResult<Vec<HubGame>> {
+    let epoch = Utc::now().timestamp() / (rotation_hours * 3600);
+    let config = resolver.get_config(db);
+    let mode_str = match config.mode {
+        ProviderMode::Public => "public",
+        ProviderMode::Custom => "custom",
+    };
+    let cache_key = format!("shelf_rot:v2:{mode_str}:{feed}:{epoch}");
+
+    {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
+            if !is_stale {
+                if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
+                    return Ok(games);
+                }
+            }
+        }
+    }
+
+    let pool = match fetch_feed(db, http, token_cache, resolver, feed, 36, 0).await {
+        Ok(games) if !games.is_empty() => games,
+        Err(err) => {
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
+                if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
+                    return Ok(games);
+                }
+            }
+            return Err(err);
+        }
+        Ok(empty) => empty,
+    };
+
+    let rotated = rotate_games_deterministic(pool, epoch, limit);
+
+    if let Ok(json) = serde_json::to_string(&rotated) {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        let ttl = rotation_hours * 3600;
+        let _ = MetadataCache::set(&conn, &cache_key, "shelf_rotation", &json, ttl);
+    }
+
+    Ok(rotated)
+}
+
 /// The most-voted well-received games of the last three years — the
-/// "everyone played this" shelf.
+/// "everyone played this" shelf. Rotates deterministically every 48 hours.
 #[tauri::command]
 pub async fn get_hub_top_rated(
     db: State<'_, Database>,
@@ -372,12 +440,11 @@ pub async fn get_hub_top_rated(
     token_cache: State<'_, IgdbTokenCache>,
     resolver: State<'_, Arc<MetadataProviderResolver>>,
 ) -> AppResult<Vec<HubGame>> {
-    fetch_feed(&db, &http.0, &token_cache, &resolver, "top-rated", 14, 0).await
+    fetch_shelf_feed_rotated(&db, &http.0, &token_cache, &resolver, "top-rated", 14, 48).await
 }
 
 /// Personalized row: highly-rated games from the user's most-played
-/// genres. Empty when the user has no tagged playtime yet — the
-/// frontend simply hides the row.
+/// genres. Rotates deterministically every 24 hours.
 #[tauri::command]
 pub async fn get_hub_recommended(
     db: State<'_, Database>,
@@ -385,7 +452,7 @@ pub async fn get_hub_recommended(
     token_cache: State<'_, IgdbTokenCache>,
     resolver: State<'_, Arc<MetadataProviderResolver>>,
 ) -> AppResult<Vec<HubGame>> {
-    fetch_feed(&db, &http.0, &token_cache, &resolver, "recommended", 14, 0).await
+    fetch_shelf_feed_rotated(&db, &http.0, &token_cache, &resolver, "recommended", 14, 24).await
 }
 
 /// Full paginated listing behind a shelf's "More" button — same feed
@@ -629,7 +696,7 @@ fn release_clause(filter: Option<&str>, now: i64) -> AppResult<Option<String>> {
 /// The hub's catalog filters, all optional and combinable — travels as
 /// one IPC payload (`filters: { genreIds, ... }`) so adding a filter
 /// never grows the command's argument list.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HubSearchFilters {
     pub genre_id: Option<i64>,
@@ -730,7 +797,7 @@ pub async fn search_hub_games(
     let config = resolver.get_config(&db);
     if config.mode == ProviderMode::Public {
         return resolver
-            .search_games(&db, trimmed, offset, &genre_ids, &platform_ids)
+            .search_games(&db, trimmed, offset, &filters)
             .await;
     }
 

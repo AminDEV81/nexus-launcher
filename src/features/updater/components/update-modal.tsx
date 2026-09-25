@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Sparkles,
@@ -11,8 +12,13 @@ import {
   HardDrive,
   WifiOff,
   RefreshCw,
+  ExternalLink,
+  Copy,
+  Check,
   X,
 } from 'lucide-react'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { toast } from 'sonner'
 import { useUpdaterStore } from '@/store/updater-store'
 import { cn } from '@/lib/utils'
 
@@ -61,6 +67,15 @@ export function UpdateModal() {
     checkUpdates,
     resetError,
   } = useUpdaterStore()
+
+  const [copied, setCopied] = useState(false)
+
+  const copyCommand = (cmd: string) => {
+    navigator.clipboard.writeText(cmd)
+    setCopied(true)
+    toast.success('Command copied to clipboard')
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   if (!isModalOpen) return null
 
@@ -128,7 +143,9 @@ export function UpdateModal() {
                         : isUpToDate
                           ? 'Nexus is Up to Date'
                           : isError
-                            ? 'Update Check Failed'
+                            ? error?.type === 'INSTALL_FAILED'
+                              ? 'Manual Installation Required'
+                              : 'Update Check Failed'
                             : 'Nexus Update Available'}
                 </h2>
                 <div className="flex items-center gap-2 text-xs text-muted">
@@ -285,22 +302,64 @@ export function UpdateModal() {
             {/* Case: Error or Offline */}
             {isError && (
               <div className="space-y-3 py-2">
-                <div className="flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-rose-200">
-                  {status === 'offline' ? (
-                    <WifiOff className="mt-0.5 size-5 shrink-0 text-amber-400" />
-                  ) : (
-                    <AlertCircle className="mt-0.5 size-5 shrink-0 text-rose-400" />
-                  )}
-                  <div>
-                    <p className="font-semibold text-rose-300">
-                      {status === 'offline' ? 'Offline Mode' : 'Update Check Error'}
-                    </p>
-                    <p className="mt-1 text-xs text-rose-200/90 leading-relaxed">
-                      {error?.message ||
-                        'Could not connect to GitHub Releases or retrieve update metadata.'}
-                    </p>
+                {error?.type === 'INSTALL_FAILED' ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-amber-200">
+                      <AlertCircle className="mt-0.5 size-5 shrink-0 text-amber-400" />
+                      <div>
+                        <p className="font-semibold text-amber-300">
+                          Manual Update Required on Linux (.deb)
+                        </p>
+                        <p className="mt-1 text-xs text-amber-200/90 leading-relaxed">
+                          Automatic background installation is restricted for Debian/Ubuntu packages
+                          because root permissions are required. Please download the latest release
+                          and install it via terminal:
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-bg/80 p-3">
+                      <div className="flex items-center justify-between text-xs text-subtle mb-1.5">
+                        <span>Terminal Command</span>
+                        <button
+                          type="button"
+                          onClick={() => copyCommand('sudo apt install ./nexus-launcher.deb')}
+                          className="flex items-center gap-1 text-[11px] text-accent hover:underline"
+                        >
+                          {copied ? (
+                            <>
+                              <Check className="size-3" /> Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3" /> Copy command
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <code className="block rounded bg-surface p-2 text-xs font-mono text-text select-all">
+                        sudo apt install ./nexus-launcher.deb
+                      </code>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-rose-200">
+                    {status === 'offline' ? (
+                      <WifiOff className="mt-0.5 size-5 shrink-0 text-amber-400" />
+                    ) : (
+                      <AlertCircle className="mt-0.5 size-5 shrink-0 text-rose-400" />
+                    )}
+                    <div>
+                      <p className="font-semibold text-rose-300">
+                        {status === 'offline' ? 'Offline Mode' : 'Update Check Error'}
+                      </p>
+                      <p className="mt-1 text-xs text-rose-200/90 leading-relaxed">
+                        {error?.message ||
+                          'Could not connect to GitHub Releases or retrieve update metadata.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -358,13 +417,26 @@ export function UpdateModal() {
                 >
                   Close
                 </button>
-                <button
-                  onClick={() => checkUpdates(true)}
-                  disabled={isChecking}
-                  className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-bg transition hover:opacity-90 disabled:opacity-50"
-                >
-                  <RefreshCw className={cn('size-3.5', isChecking && 'animate-spin')} /> Try Again
-                </button>
+                {error?.type === 'INSTALL_FAILED' ? (
+                  <button
+                    onClick={() => {
+                      openUrl('https://github.com/AminDEV81/nexus-launcher/releases/latest').catch(
+                        console.error,
+                      )
+                    }}
+                    className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-bg transition hover:opacity-90 shadow-[0_0_15px_rgba(var(--nx-accent-rgb),0.4)]"
+                  >
+                    <ExternalLink className="size-3.5" /> Download on GitHub
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => checkUpdates(true)}
+                    disabled={isChecking}
+                    className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-bg transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    <RefreshCw className={cn('size-3.5', isChecking && 'animate-spin')} /> Try Again
+                  </button>
+                )}
               </>
             )}
 

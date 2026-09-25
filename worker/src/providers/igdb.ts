@@ -124,23 +124,105 @@ export async function fetchFeed(
   return raw.map(normalizeGame)
 }
 
+export interface SearchGamesOptions {
+  queryText: string
+  offset?: number
+  genreIds?: number[]
+  platformIds?: number[]
+  release?: string
+  minRating?: number
+  sort?: string
+  env: Env
+}
+
 export async function searchGames(
-  queryText: string,
-  offset = 0,
-  genreId?: number,
-  platformId?: number,
-  env?: Env,
+  queryOrOptions: string | SearchGamesOptions,
+  offsetArg = 0,
+  genreIdArg?: number,
+  platformIdArg?: number,
+  envArg?: Env,
 ): Promise<HubGame[]> {
+  let opts: SearchGamesOptions
+  if (typeof queryOrOptions === 'object') {
+    opts = queryOrOptions
+  } else {
+    opts = {
+      queryText: queryOrOptions,
+      offset: offsetArg,
+      genreIds: genreIdArg ? [genreIdArg] : undefined,
+      platformIds: platformIdArg ? [platformIdArg] : undefined,
+      env: envArg!,
+    }
+  }
+
+  const { queryText, offset = 0, genreIds, platformIds, release, minRating, sort, env } = opts
   if (!env) throw new Error('ENV_MISSING')
   const cleanQ = queryText.replace(/["\\]/g, '').trim()
+  const now = Math.floor(Date.now() / 1000)
 
-  if (genreId || platformId) {
+  const hasFilters = Boolean(
+    (genreIds && genreIds.length > 0) ||
+    (platformIds && platformIds.length > 0) ||
+    release ||
+    minRating != null ||
+    sort,
+  )
+
+  if (hasFilters) {
     const conditions = [`game_type = ${STANDALONE_TYPES}`, 'cover != null']
     if (cleanQ) conditions.push(`name ~ *"${cleanQ}"*`)
-    if (genreId) conditions.push(`genres = [${genreId}]`)
-    if (platformId) conditions.push(`platforms = [${platformId}]`)
+    if (genreIds && genreIds.length > 0) {
+      conditions.push(`genres = [${genreIds.join(',')}]`)
+    }
+    if (platformIds && platformIds.length > 0) {
+      conditions.push(`platforms = (${platformIds.join(',')})`)
+    }
+    if (minRating != null) {
+      conditions.push(`aggregated_rating >= ${minRating}`)
+    }
+    if (release) {
+      if (release === 'upcoming') {
+        conditions.push(`first_release_date > ${now}`)
+      } else if (release === 'new') {
+        conditions.push(`first_release_date < ${now} & first_release_date > ${now - 90 * 86400}`)
+      } else if (release === 'last-year') {
+        conditions.push(`first_release_date < ${now} & first_release_date > ${now - 365 * 86400}`)
+      } else if (release === 'last-3-years') {
+        conditions.push(
+          `first_release_date < ${now} & first_release_date > ${now - 3 * 365 * 86400}`,
+        )
+      } else if (release.includes('-')) {
+        const parts = release.split('-')
+        const from = parseInt(parts[0], 10)
+        const to = parseInt(parts[1], 10)
+        if (!isNaN(from) && !isNaN(to)) {
+          const startTs = Math.floor(new Date(`${from}-01-01T00:00:00Z`).getTime() / 1000)
+          const endTs = Math.floor(new Date(`${to + 1}-01-01T00:00:00Z`).getTime() / 1000)
+          conditions.push(`first_release_date >= ${startTs} & first_release_date < ${endTs}`)
+        }
+      } else if (release.endsWith('+')) {
+        const from = parseInt(release.replace('+', ''), 10)
+        if (!isNaN(from)) {
+          const startTs = Math.floor(new Date(`${from}-01-01T00:00:00Z`).getTime() / 1000)
+          conditions.push(`first_release_date >= ${startTs}`)
+        }
+      } else {
+        const year = parseInt(release, 10)
+        if (!isNaN(year)) {
+          const startTs = Math.floor(new Date(`${year}-01-01T00:00:00Z`).getTime() / 1000)
+          const endTs = Math.floor(new Date(`${year + 1}-01-01T00:00:00Z`).getTime() / 1000)
+          conditions.push(`first_release_date >= ${startTs} & first_release_date < ${endTs}`)
+        }
+      }
+    }
 
-    const query = `${FIELDS_LIST}; where ${conditions.join(' & ')}; sort total_rating_count desc; limit 24; offset ${offset};`
+    let sortOrder = 'total_rating_count desc'
+    if (sort === 'rating') sortOrder = 'aggregated_rating desc'
+    else if (sort === 'newest') sortOrder = 'first_release_date desc'
+    else if (sort === 'oldest') sortOrder = 'first_release_date asc'
+    else if (sort === 'name') sortOrder = 'name asc'
+
+    const query = `${FIELDS_LIST}; where ${conditions.join(' & ')}; sort ${sortOrder}; limit 24; offset ${offset};`
     const raw = await queryIgdb('games', query, env)
     return raw.map(normalizeGame)
   }

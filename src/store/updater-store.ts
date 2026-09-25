@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { toast } from 'sonner'
 import type { Update } from '@tauri-apps/plugin-updater'
 import {
   checkForUpdates,
@@ -145,6 +146,17 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => {
 
         if (update) {
           const isDismissed = !manual && state.dismissedVersion === update.version
+
+          if (!isDismissed) {
+            toast.info(`Nexus Launcher update available: v${update.version}`, {
+              description: 'A new version is ready. Click to view release details.',
+              action: {
+                label: 'View Update',
+                onClick: () => get().openModal(),
+              },
+              duration: 10000,
+            })
+          }
 
           set({
             isLocked: false,

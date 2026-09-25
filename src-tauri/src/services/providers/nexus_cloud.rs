@@ -1,6 +1,6 @@
 use super::models::{HubGameDetails, NameIdItem, UnifiedArtwork};
 use super::traits::{ArtworkProvider, MetadataProvider};
-use crate::commands::hub::HubGame;
+use crate::commands::hub::{HubGame, HubSearchFilters};
 use crate::error::{AppError, AppResult};
 use serde::Deserialize;
 
@@ -92,18 +92,79 @@ impl MetadataProvider for NexusCloudProvider {
         &self,
         query: &str,
         offset: i64,
-        genre_ids: &[i64],
-        platform_ids: &[i64],
+        filters: &HubSearchFilters,
     ) -> AppResult<Vec<HubGame>> {
-        let encoded_q = urlencoding_light(query);
+        let clean_q = query.trim();
+        let encoded_q = urlencoding_light(clean_q);
         let mut path = format!("/api/v1/games/search?q={encoded_q}&offset={offset}");
-        for gid in genre_ids {
+
+        let mut genre_ids = Vec::new();
+        if let Some(ids) = &filters.genre_ids {
+            genre_ids.extend(ids.iter().copied().filter(|&id| id > 0));
+        } else if let Some(id) = filters.genre_id {
+            if id > 0 {
+                genre_ids.push(id);
+            }
+        }
+        for gid in &genre_ids {
             path.push_str(&format!("&genre={gid}"));
         }
-        for pid in platform_ids {
+
+        let mut platform_ids = Vec::new();
+        if let Some(ids) = &filters.platform_ids {
+            platform_ids.extend(ids.iter().copied().filter(|&id| id > 0));
+        } else if let Some(id) = filters.platform_id {
+            if id > 0 {
+                platform_ids.push(id);
+            }
+        }
+        for pid in &platform_ids {
             path.push_str(&format!("&platform={pid}"));
         }
-        self.get_json(&path).await
+
+        let effective_release = match (&filters.release, filters.year_from, filters.year_to) {
+            (Some(r), _, _) if !r.trim().is_empty() => Some(r.trim().to_string()),
+            (_, Some(from), Some(to)) => Some(format!("{from}-{to}")),
+            (_, Some(from), None) => Some(format!("{from}+")),
+            (_, None, Some(to)) => Some(format!("-{to}")),
+            _ => None,
+        };
+        if let Some(rel) = &effective_release {
+            path.push_str(&format!("&release={rel}"));
+        }
+
+        if let Some(mr) = filters.min_rating {
+            path.push_str(&format!("&min_rating={mr}"));
+        }
+
+        if let Some(s) = &filters.sort {
+            path.push_str(&format!("&sort={s}"));
+        }
+
+        let res = self.get_json::<Vec<HubGame>>(&path).await;
+        match res {
+            Ok(games) if !games.is_empty() => Ok(games),
+            _ => {
+                // Smart fallback for filters when query text is empty
+                if clean_q.is_empty() {
+                    if effective_release.as_deref() == Some("upcoming") {
+                        return self.fetch_feed("coming_soon", offset).await;
+                    }
+                    if filters.min_rating.unwrap_or(0) >= 80 || filters.sort.as_deref() == Some("rating") {
+                        if let Ok(mut top) = self.fetch_feed("top_rated", offset).await {
+                            if let Some(min_r) = filters.min_rating {
+                                top.retain(|g| g.rating.unwrap_or(0) >= min_r);
+                            }
+                            return Ok(top);
+                        }
+                    }
+                    if effective_release.as_deref() == Some("new") {
+                        return self.fetch_feed("new_releases", offset).await;
+                    }
+                }
+                res
+            }
+        }
     }
 
     async fn get_game_details(&self, igdb_id: i64) -> AppResult<Option<HubGameDetails>> {

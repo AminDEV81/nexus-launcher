@@ -123,14 +123,30 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
       if (pathname === '/api/v1/games/search') {
         const q = canonicalizeQuery(url.searchParams.get('q'))
         const offset = parseInt(url.searchParams.get('offset') || '0', 10) || 0
-        const genre = url.searchParams.get('genre')
-          ? parseInt(url.searchParams.get('genre')!, 10)
+        const genres = url.searchParams
+          .getAll('genre')
+          .map((id) => parseInt(id, 10))
+          .filter((id) => !isNaN(id))
+        const platforms = url.searchParams
+          .getAll('platform')
+          .map((id) => parseInt(id, 10))
+          .filter((id) => !isNaN(id))
+        const release = url.searchParams.get('release') || undefined
+        const minRating = url.searchParams.get('min_rating')
+          ? parseInt(url.searchParams.get('min_rating')!, 10)
           : undefined
-        const platform = url.searchParams.get('platform')
-          ? parseInt(url.searchParams.get('platform')!, 10)
-          : undefined
+        const sort = url.searchParams.get('sort') || undefined
 
-        const games = await igdb.searchGames(q, offset, genre, platform, env)
+        const games = await igdb.searchGames({
+          queryText: q,
+          offset,
+          genreIds: genres.length > 0 ? genres : undefined,
+          platformIds: platforms.length > 0 ? platforms : undefined,
+          release,
+          minRating,
+          sort,
+          env,
+        })
         return createSuccessResponse(games, {
           provider: 'igdb',
           source: 'upstream',

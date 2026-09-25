@@ -15,8 +15,7 @@ pub trait MetadataProvider: Send + Sync {
         &self,
         query: &str,
         offset: i64,
-        genre_ids: &[i64],
-        platform_ids: &[i64],
+        filters: &crate::commands::hub::HubSearchFilters,
     ) -> impl std::future::Future<Output = AppResult<Vec<HubGame>>> + Send;
 
     fn get_game_details(

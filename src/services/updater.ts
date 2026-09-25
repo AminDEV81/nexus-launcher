@@ -2,7 +2,7 @@ import { getVersion } from '@tauri-apps/api/app'
 import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updater'
 
 export type UpdaterErrorType =
-  'NETWORK' | 'SIGNATURE' | 'METADATA' | 'DOWNLOAD' | 'OFFLINE' | 'UNKNOWN'
+  'NETWORK' | 'SIGNATURE' | 'METADATA' | 'DOWNLOAD' | 'OFFLINE' | 'INSTALL_FAILED' | 'UNKNOWN'
 
 export interface UpdaterErrorInfo {
   type: UpdaterErrorType
@@ -35,6 +35,22 @@ export async function getCurrentAppVersion(): Promise<string> {
 export function classifyUpdaterError(error: unknown): UpdaterErrorInfo {
   const message = error instanceof Error ? error.message : String(error)
   const lower = message.toLowerCase()
+
+  if (
+    lower.includes('failed to install package') ||
+    lower.includes('install') ||
+    lower.includes('dpkg') ||
+    lower.includes('apt') ||
+    lower.includes('permission denied') ||
+    lower.includes('elevation')
+  ) {
+    return {
+      type: 'INSTALL_FAILED',
+      message:
+        'Automatic in-place installation could not complete (common on Linux .deb packages without root privileges). You can download the latest package directly from GitHub Releases.',
+      originalError: error,
+    }
+  }
 
   if (
     lower.includes('offline') ||

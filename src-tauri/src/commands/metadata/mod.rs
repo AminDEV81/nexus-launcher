@@ -4,9 +4,12 @@ pub(crate) mod steam_store;
 pub(crate) mod steamgriddb;
 mod token_cache;
 
+use crate::commands::hub::{HubGameDetails, HubSearchFilters};
 use crate::db::models::Game;
 use crate::db::Database;
 use crate::error::{AppError, AppResult};
+use crate::services::metadata::{MetadataProviderResolver, ProviderMode};
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 pub use steamgriddb::GridOption;
@@ -19,16 +22,13 @@ pub struct HttpClient(pub reqwest::Client);
 
 impl Default for HttpClient {
     fn default() -> Self {
-        // Bounded by default: reqwest has *no* total timeout out of the
-        // box, so a stalled server would hang an IPC promise (and the
-        // serialized auto-fetch queue behind it) forever. Generous
-        // enough that a slow cover download on a bad connection still
-        // completes.
+        // Bounded by default: 4s connect timeout ensures offline stalls
+        // are detected immediately without freezing app startup.
         Self(
             reqwest::Client::builder()
                 .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
-                .connect_timeout(std::time::Duration::from_secs(15))
-                .timeout(std::time::Duration::from_secs(60))
+                .connect_timeout(std::time::Duration::from_secs(4))
+                .timeout(std::time::Duration::from_secs(15))
                 .build()
                 .unwrap_or_else(|_| reqwest::Client::new()),
         )
@@ -627,6 +627,102 @@ pub fn spawn_hub_artwork_fetch(
 // Commands
 // ---------------------------------------------------------------------
 
+pub(crate) async fn apply_hub_details_to_game(
+    app: &AppHandle,
+    db: &Database,
+    http: &reqwest::Client,
+    game_id: &str,
+    details: &HubGameDetails,
+) -> AppResult<()> {
+    let mut background_path = None;
+    let mut screenshot_paths: Vec<(i64, String, String)> = Vec::new();
+    for (ordinal, url) in details
+        .screenshot_urls
+        .iter()
+        .take(MAX_SCREENSHOTS)
+        .enumerate()
+    {
+        let file_stem = format!("screenshot-{ordinal}");
+        if let Ok(path) = artwork::download_artwork(http, app, game_id, &file_stem, url, false).await {
+            if ordinal == 0 {
+                background_path = Some(path.clone());
+            }
+            screenshot_paths.push((ordinal as i64, path, url.clone()));
+        }
+    }
+
+    let genres_json = serde_json::to_string(&details.game.genres).unwrap_or_else(|_| "[]".into());
+    let platforms_json = serde_json::to_string(&details.game.platforms).unwrap_or_else(|_| "[]".into());
+    let score = details.metacritic_score.or(details.game.rating);
+
+    {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        conn.execute(
+            "UPDATE games SET
+                description = COALESCE(?1, description),
+                developer = COALESCE(?2, developer),
+                publisher = COALESCE(?3, publisher),
+                release_date = COALESCE(?4, release_date),
+                genres = ?5,
+                platforms = ?6,
+                trailer_url = COALESCE(?7, trailer_url),
+                background_path = COALESCE(?8, background_path),
+                igdb_id = COALESCE(?9, igdb_id),
+                metacritic_score = COALESCE(?10, metacritic_score)
+             WHERE id = ?11",
+            rusqlite::params![
+                details.game.summary,
+                details.developer,
+                details.publisher,
+                details.game.release_date,
+                genres_json,
+                platforms_json,
+                details.trailer_url,
+                background_path,
+                details.game.igdb_id,
+                score,
+                game_id,
+            ],
+        )?;
+
+        for (ordinal, path, url) in screenshot_paths {
+            conn.execute(
+                "INSERT INTO artwork_cache (game_id, kind, ordinal, local_path, source_url, is_custom)
+                 VALUES (?1, 'screenshot', ?2, ?3, ?4, 0)
+                 ON CONFLICT (game_id, kind, ordinal)
+                 DO UPDATE SET local_path = excluded.local_path, source_url = excluded.source_url",
+                rusqlite::params![game_id, ordinal, path, url],
+            )?;
+        }
+    }
+
+    // Cover fallback if missing
+    let has_cover: Option<String> = {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        conn.query_row(
+            "SELECT cover_path FROM games WHERE id = ?1",
+            [game_id],
+            |row| row.get(0),
+        )
+        .ok()
+        .flatten()
+    };
+    if has_cover.is_none() {
+        if let Some(cover_url) = &details.game.cover_url {
+            if let Ok(path) = artwork::download_artwork(http, app, game_id, "cover", cover_url, false).await {
+                let conn = db.connection.lock().expect("db mutex poisoned");
+                conn.execute(
+                    "UPDATE games SET cover_path = ?1, cover_is_animated = 0 WHERE id = ?2",
+                    rusqlite::params![path, game_id],
+                ).ok();
+                artwork::record_artwork_cache(&conn, game_id, "cover", &path, Some(cover_url), false).ok();
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Manual search, for a future "fix wrong match" UI (Epic 8) — the
 /// automatic pipeline above always takes the top result itself.
 #[tauri::command]
@@ -634,8 +730,32 @@ pub async fn search_metadata_candidates(
     db: State<'_, Database>,
     http: State<'_, HttpClient>,
     token_cache: State<'_, IgdbTokenCache>,
+    resolver: State<'_, Arc<MetadataProviderResolver>>,
     query: String,
 ) -> AppResult<Vec<igdb::IgdbSearchResult>> {
+    let config = resolver.get_config(&db);
+    if config.mode == ProviderMode::Public {
+        let results = resolver
+            .search_games(&db, &query, 0, &HubSearchFilters::default())
+            .await?;
+        return Ok(results
+            .into_iter()
+            .map(|g| {
+                let release_year = g
+                    .release_date
+                    .as_deref()
+                    .and_then(|d| d.split('-').next())
+                    .and_then(|y| y.parse::<i32>().ok());
+                igdb::IgdbSearchResult {
+                    igdb_id: g.igdb_id,
+                    name: g.name,
+                    release_year,
+                    cover_url: g.cover_url,
+                }
+            })
+            .collect());
+    }
+
     let credentials = get_credentials(&db);
     let (Some(client_id), Some(client_secret)) =
         (credentials.igdb_client_id, credentials.igdb_client_secret)
@@ -657,10 +777,15 @@ pub async fn apply_metadata(
     db: State<'_, Database>,
     http: State<'_, HttpClient>,
     token_cache: State<'_, IgdbTokenCache>,
+    resolver: State<'_, Arc<MetadataProviderResolver>>,
     game_id: String,
     igdb_id: i64,
 ) -> AppResult<Game> {
-    apply_igdb_text_metadata(&app, &db, &http.0, &token_cache, &game_id, igdb_id).await?;
+    if let Ok(Some(details)) = resolver.get_game_details(&db, igdb_id).await {
+        apply_hub_details_to_game(&app, &db, &http.0, &game_id, &details).await?;
+    } else {
+        apply_igdb_text_metadata(&app, &db, &http.0, &token_cache, &game_id, igdb_id).await?;
+    }
 
     let conn = db.connection.lock().expect("db mutex poisoned");
     let sql = format!("SELECT {} FROM games WHERE id = ?1", Game::SELECT_COLUMNS);
@@ -669,14 +794,14 @@ pub async fn apply_metadata(
 }
 
 /// Fetches fresh metadata from IGDB for a specific game and updates the database.
-/// If `igdb_id` is already associated with the game, it queries that directly.
-/// Otherwise, it performs an IGDB search using the game's title to find the best match.
+/// Seamlessly works in both Nexus Cloud mode (no keys required) and Custom API mode.
 #[tauri::command]
 pub async fn sync_game_metadata(
     app: AppHandle,
     db: State<'_, Database>,
     http: State<'_, HttpClient>,
-    token_cache: State<'_, IgdbTokenCache>,
+    _token_cache: State<'_, IgdbTokenCache>,
+    resolver: State<'_, Arc<MetadataProviderResolver>>,
     game_id: String,
 ) -> AppResult<Game> {
     let (igdb_id_opt, name) = {
@@ -691,24 +816,22 @@ pub async fn sync_game_metadata(
     let resolved_igdb_id = match igdb_id_opt {
         Some(id) if id > 0 => id,
         _ => {
-            let credentials = get_credentials(&db);
-            let (Some(client_id), Some(client_secret)) =
-                (credentials.igdb_client_id, credentials.igdb_client_secret)
-            else {
-                return Err(AppError::Invalid(
-                    "IGDB Client ID/Secret are not configured in Settings.".into(),
-                ));
-            };
-            let token = igdb::get_access_token(&http.0, &token_cache, &client_id, &client_secret).await?;
-            let search_results = igdb::search(&http.0, &client_id, &token, &name).await?;
-            let best = search_results.into_iter().next().ok_or_else(|| {
-                AppError::NotFound(format!("No matching game found on IGDB for '{name}'"))
+            let candidates = resolver
+                .search_games(&db, &name, 0, &HubSearchFilters::default())
+                .await?;
+            let best = candidates.into_iter().next().ok_or_else(|| {
+                AppError::NotFound(format!("No matching game found for '{name}'"))
             })?;
             best.igdb_id
         }
     };
 
-    apply_igdb_text_metadata(&app, &db, &http.0, &token_cache, &game_id, resolved_igdb_id).await?;
+    let details = resolver
+        .get_game_details(&db, resolved_igdb_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("Details not found for game id {resolved_igdb_id}")))?;
+
+    apply_hub_details_to_game(&app, &db, &http.0, &game_id, &details).await?;
 
     let conn = db.connection.lock().expect("db mutex poisoned");
     let sql = format!("SELECT {} FROM games WHERE id = ?1", Game::SELECT_COLUMNS);
@@ -718,23 +841,15 @@ pub async fn sync_game_metadata(
 }
 
 /// Syncs all wishlist games with fresh IGDB metadata (release dates, genres, descriptions, scores).
-/// Useful when upcoming release dates change or are officially announced.
+/// Seamlessly works in both Nexus Cloud mode (no keys required) and Custom API mode.
 #[tauri::command]
 pub async fn sync_wishlist_metadata(
     app: AppHandle,
     db: State<'_, Database>,
     http: State<'_, HttpClient>,
-    token_cache: State<'_, IgdbTokenCache>,
+    _token_cache: State<'_, IgdbTokenCache>,
+    resolver: State<'_, Arc<MetadataProviderResolver>>,
 ) -> AppResult<Vec<Game>> {
-    let credentials = get_credentials(&db);
-    let (Some(client_id), Some(client_secret)) =
-        (credentials.igdb_client_id, credentials.igdb_client_secret)
-    else {
-        return Err(AppError::Invalid(
-            "IGDB Client ID/Secret are not configured in Settings.".into(),
-        ));
-    };
-
     let games_to_sync: Vec<(String, String, Option<i64>)> = {
         let conn = db.connection.lock().expect("db mutex poisoned");
         let mut stmt = conn.prepare(
@@ -755,14 +870,11 @@ pub async fn sync_wishlist_metadata(
         let resolved_id = match *igdb_id_opt {
             Some(id) if id > 0 => Some(id),
             _ => {
-                if let Ok(token) =
-                    igdb::get_access_token(&http.0, &token_cache, &client_id, &client_secret).await
+                if let Ok(results) = resolver
+                    .search_games(&db, name, 0, &HubSearchFilters::default())
+                    .await
                 {
-                    if let Ok(results) = igdb::search(&http.0, &client_id, &token, name).await {
-                        results.into_iter().next().map(|m| m.igdb_id)
-                    } else {
-                        None
-                    }
+                    results.into_iter().next().map(|m| m.igdb_id)
                 } else {
                     None
                 }
@@ -770,19 +882,12 @@ pub async fn sync_wishlist_metadata(
         };
 
         if let Some(igdb_id) = resolved_id {
-            let _ = apply_igdb_text_metadata(
-                &app,
-                &db,
-                &http.0,
-                &token_cache,
-                game_id,
-                igdb_id,
-            )
-            .await;
+            if let Ok(Some(details)) = resolver.get_game_details(&db, igdb_id).await {
+                let _ = apply_hub_details_to_game(&app, &db, &http.0, game_id, &details).await;
+            }
         }
 
-        // 250ms spacing between IGDB requests to stay comfortably within the 4 req/sec limit
-        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
 
     let conn = db.connection.lock().expect("db mutex poisoned");
