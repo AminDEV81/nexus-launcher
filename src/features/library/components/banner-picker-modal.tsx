@@ -32,6 +32,7 @@ interface BannerPickerModalProps {
 export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalProps) {
   const [visibleStatic, setVisibleStatic] = useState(PAGE_SIZE)
   const [visibleAnimated, setVisibleAnimated] = useState(PAGE_SIZE)
+  const [applyingUrl, setApplyingUrl] = useState<string | null>(null)
   const [pendingLargeOption, setPendingLargeOption] = useState<{
     option: CoverOption
     sizeBytes: number
@@ -47,19 +48,23 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
       setVisibleStatic(PAGE_SIZE)
       setVisibleAnimated(PAGE_SIZE)
       setPendingLargeOption(null)
+      setApplyingUrl(null)
     }
   }, [open, gameId])
 
   function handlePick(option: CoverOption, allowLarge = false) {
     if (!gameId) return
+    setApplyingUrl(option.url)
     applyBanner.mutate(
       { gameId, url: option.url, allowLarge },
       {
         onSuccess: () => {
+          setApplyingUrl(null)
           setPendingLargeOption(null)
           onClose()
         },
         onError: (err) => {
+          setApplyingUrl(null)
           const msg = err instanceof Error ? err.message : String(err)
           if (msg.includes('artwork_too_large:')) {
             const parts = msg.split('artwork_too_large:')
@@ -169,6 +174,7 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
                 visibleCount={visibleAnimated}
                 onShowMore={() => setVisibleAnimated((count) => count + PAGE_SIZE)}
                 disabled={isApplying}
+                applyingUrl={applyingUrl}
                 onPick={handlePick}
                 emptyMessage="No Live Banners found for this game."
               />
@@ -178,6 +184,7 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
                 visibleCount={visibleStatic}
                 onShowMore={() => setVisibleStatic((count) => count + PAGE_SIZE)}
                 disabled={isApplying}
+                applyingUrl={applyingUrl}
                 onPick={handlePick}
                 emptyMessage="No static banners found for this game."
               />
@@ -220,6 +227,7 @@ function BannerSection({
   visibleCount,
   onShowMore,
   disabled,
+  applyingUrl,
   onPick,
   emptyMessage,
 }: {
@@ -229,6 +237,7 @@ function BannerSection({
   visibleCount: number
   onShowMore: () => void
   disabled: boolean
+  applyingUrl: string | null
   onPick: (option: CoverOption) => void
   emptyMessage: string
 }) {
@@ -253,6 +262,7 @@ function BannerSection({
             key={option.id}
             option={option}
             disabled={disabled}
+            isApplying={applyingUrl === option.url}
             onClick={() => onPick(option)}
           />
         ))}
@@ -291,10 +301,12 @@ function SectionHeading({
 function BannerOptionThumb({
   option,
   disabled,
+  isApplying,
   onClick,
 }: {
   option: CoverOption
   disabled: boolean
+  isApplying: boolean
   onClick: () => void
 }) {
   const usingFullAsset = !option.thumbnail_url
@@ -308,7 +320,8 @@ function BannerOptionThumb({
       className={cn(
         'group relative aspect-video overflow-hidden rounded-xl border border-border/70 bg-surface shadow-xs transition-all duration-300 cursor-pointer select-none',
         'hover:-translate-y-1.5 hover:border-accent hover:shadow-[0_12px_24px_-8px_rgba(0,0,0,0.6),0_0_16px_-4px_var(--nx-accent)] hover:ring-2 hover:ring-accent/50',
-        disabled && 'cursor-not-allowed opacity-50',
+        disabled && !isApplying && 'cursor-not-allowed opacity-50',
+        isApplying && 'ring-2 ring-accent border-accent',
       )}
     >
       <CoverMedia
@@ -322,11 +335,17 @@ function BannerOptionThumb({
           LIVE
         </span>
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end justify-center p-2.5">
-        <span className="rounded-lg bg-accent/90 backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold text-white shadow-sm transition-transform duration-200 translate-y-1 group-hover:translate-y-0">
-          Apply Banner
-        </span>
-      </div>
+      {isApplying ? (
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center gap-2 text-accent">
+          <Loader2 className="size-6 animate-spin" />
+        </div>
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end justify-center p-2.5">
+          <span className="rounded-lg bg-accent/90 backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold text-white shadow-sm transition-transform duration-200 translate-y-1 group-hover:translate-y-0">
+            Apply Banner
+          </span>
+        </div>
+      )}
     </button>
   )
 }

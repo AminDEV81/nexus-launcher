@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   searchCoverOptions,
@@ -13,6 +14,19 @@ import {
   resetArtwork,
 } from '@/services/metadata'
 import type { ArtworkKind, CropRect } from '@/services/metadata'
+import type { Game } from '@/types/models'
+
+function syncGameInCache(queryClient: QueryClient, updatedGame: Game) {
+  queryClient.setQueriesData<Game[]>({ queryKey: ['games'] }, (games) =>
+    Array.isArray(games)
+      ? games.map((game) => (game.id === updatedGame.id ? updatedGame : game))
+      : games,
+  )
+  queryClient.setQueriesData<Game>({ queryKey: ['games'] }, (old) =>
+    old && !Array.isArray(old) && old.id === updatedGame.id ? updatedGame : old,
+  )
+  queryClient.invalidateQueries({ queryKey: ['games'] })
+}
 
 export function useCoverOptions(gameId: string | undefined, enabled: boolean) {
   return useQuery({
@@ -40,8 +54,7 @@ export function useApplyCover() {
       allowLarge?: boolean
     }) => applyCover(gameId, url, isAnimated, allowLarge),
     onSuccess: (game) => {
-      queryClient.invalidateQueries({ queryKey: ['games'] })
-      queryClient.setQueryData(['games', game.id], game)
+      syncGameInCache(queryClient, game)
       toast.success('Cover updated.')
     },
     onError: (error) => {
@@ -59,8 +72,7 @@ export function useApplyCustomCover() {
     mutationFn: ({ gameId, filePath }: { gameId: string; filePath: string }) =>
       applyCustomCover(gameId, filePath),
     onSuccess: (game) => {
-      queryClient.invalidateQueries({ queryKey: ['games'] })
-      queryClient.setQueryData(['games', game.id], game)
+      syncGameInCache(queryClient, game)
       toast.success('Cover updated.')
     },
     onError: (error) => {
@@ -102,8 +114,7 @@ export function useApplyLogo() {
       allowLarge?: boolean
     }) => applyLogo(gameId, url, allowLarge),
     onSuccess: (game) => {
-      queryClient.invalidateQueries({ queryKey: ['games'] })
-      queryClient.setQueryData(['games', game.id], game)
+      syncGameInCache(queryClient, game)
       toast.success('Logo updated.')
     },
     onError: (error) => {
@@ -128,8 +139,7 @@ export function useApplyBanner() {
       allowLarge?: boolean
     }) => applyBanner(gameId, url, allowLarge),
     onSuccess: (game) => {
-      queryClient.invalidateQueries({ queryKey: ['games'] })
-      queryClient.setQueryData(['games', game.id], game)
+      syncGameInCache(queryClient, game)
       toast.success('Banner updated.')
     },
     onError: (error) => {
@@ -147,8 +157,7 @@ export function useApplyCustomBanner() {
     mutationFn: ({ gameId, filePath }: { gameId: string; filePath: string }) =>
       applyCustomBanner(gameId, filePath),
     onSuccess: (game) => {
-      queryClient.invalidateQueries({ queryKey: ['games'] })
-      queryClient.setQueryData(['games', game.id], game)
+      syncGameInCache(queryClient, game)
       toast.success('Banner updated.')
     },
     onError: (error) => {
@@ -180,8 +189,7 @@ export function useCropAndSaveImage() {
       targetKind: ArtworkKind
     }) => cropAndSaveImage(gameId, sourcePath, rect, targetKind),
     onSuccess: (game, { targetKind }) => {
-      queryClient.invalidateQueries({ queryKey: ['games'] })
-      queryClient.setQueryData(['games', game.id], game)
+      syncGameInCache(queryClient, game)
       toast.success(`${ARTWORK_LABEL[targetKind]} updated.`)
     },
     onError: (error) => {
@@ -197,8 +205,7 @@ export function useResetArtwork() {
     mutationFn: ({ gameId, kind }: { gameId: string; kind: ArtworkKind }) =>
       resetArtwork(gameId, kind),
     onSuccess: (game, { kind }) => {
-      queryClient.invalidateQueries({ queryKey: ['games'] })
-      queryClient.setQueryData(['games', game.id], game)
+      syncGameInCache(queryClient, game)
       toast.success(`${ARTWORK_LABEL[kind]} reset to the downloaded original.`)
     },
     onError: (error) => {

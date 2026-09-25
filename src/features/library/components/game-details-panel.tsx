@@ -169,14 +169,14 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
   const { data: allTags } = useTags()
   const gameTags = (allTags ?? []).filter((tag) => game.tag_ids.includes(tag.id))
 
-  const backgroundSrc = assetUrl(game.background_path)
   const bannerSrc = assetUrl(game.banner_path)
+  const backgroundSrc = assetUrl(game.background_path)
   const coverSrc = assetUrl(game.cover_path)
-  const heroSrc = backgroundSrc ?? bannerSrc ?? coverSrc
+  const heroSrc = bannerSrc ?? backgroundSrc ?? coverSrc
   const heroIsCover = !game.banner_path && !game.background_path
   const logoSrc = assetUrl(game.logo_path)
 
-  const heroRawPath = game.background_path ?? game.banner_path ?? game.cover_path
+  const heroRawPath = game.banner_path ?? game.background_path ?? game.cover_path
   const galleryImages = [heroRawPath, ...screenshots].filter(
     (path): path is string => path !== null,
   )
