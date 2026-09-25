@@ -181,47 +181,47 @@ jobs:
           releaseBody: |
             # 🚀 Nexus Game Launcher ${{ github.ref_name }}
 
-            نسخه رسمی ۰.۳.۵ لانچر نکسوس با تم لایت وبسایت و ترنزیشن مورف، قابلیت اکسترکت هوشمند آرشیوها، امکان ویرایش نام بازی‌ها در لایبرری و مموری، و پاپ‌آپ جذاب بازیابی خاطرات منتشر شد!
-            Official release of **Nexus Game Launcher ${{ github.ref_name }}** featuring smart archive extraction toggle, in-library and memory game renaming, elegant memory recovery modal, and website light theme with circular morphing transition!
+            نسخه رسمی ۰.۴.۰ لانچر نکسوس با هماهنگ‌سازی ابری متادیتا بدون نیاز به کلید IGDB، موتور فیلتر پیشرفته گیم‌هاب، چرخش پویای ۲۴ و ۴۸ ساعته شلف‌ها، عملکرد آفلاین رعدآسا، و سیستم بهبودیافته آپدیتر لینوکس منتشر شد!
+            Official release of **Nexus Game Launcher ${{ github.ref_name }}** featuring keyless Nexus Cloud metadata sync, advanced Game Hub filters & smart search, 24h/48h deterministic shelf rotations, blazing-fast offline startup, and polished Linux deb package updater!
 
             ---
 
-            ### ⚡ ویژگی‌های برجسته نسخه ۰.۳.۵ (What's New in v0.3.5)
+            ### ⚡ ویژگی‌های برجسته نسخه ۰.۴.۰ (What's New in v0.4.0)
 
-            - 📦 **قابلیت استخراج اختیاری آرشیو در دانلود پاپ‌آپ (Smart Archive Extraction Toggle):**
-              - امکان فعال/غیرفعال کردن اکسترکت خودکار آرشیوهای RAR/ZIP/7z پس از اتمام دانلود.
-              - سازگاری کامل با اجرای اسکریپت‌های شِل (.sh) و پروتون (Proton) در محیط لینوکس.
+            - 🌐 **هماهنگ‌سازی متادیتای ابری بدون نیاز به کلید (Keyless Nexus Cloud Metadata Sync):**
+              - امکان سینک متادیتا، کاور، اسکرین‌شات‌ها و آرت‌ورک‌ها از سایدبار و صفحه ویش‌لیست مستقیماً از طریق Nexus Cloud بدون نیاز به ثبت کلید اختصاصی IGDB.
 
-            - ✏️ **ویرایش مستقیم نام بازی‌ها (Direct Game Renaming):**
-              - امکان تغییر نام بازی مستقیماً از داخل کتابخانه (Library) با کلیک یا منوی مدیریت.
-              - پشتیبانی کامل از ویرایش نام بازی در بخش خاطرات (Memory Vault) حتی پس از حذف بازی از لایبرری.
+            - 🔍 **موتور فیلتر و جستجوی پیشرفته گیم‌هاب (Hub Filter Engine & Dynamic Search):**
+              - فیلترهای نمره (90+ Score)، بازی‌های در راه (Coming Soon)، بازه‌های سال انتشار و مرتب‌سازی به صورت کامل و بلادرنگ هم در حالت مستقیم و هم در حالت Nexus Cloud فعال شدند.
 
-            - 🛡️ **پاپ‌آپ اختصاصی بازیابی خاطرات (Memory Recovery Modal):**
-              - در صورت حذف بازی از لایبرری و تلاش برای افزودن مجدد، پاپ‌آپ زیبا و جذاب همراه با کاور بازی ظاهر شده و امکان بازیابی مستقیم رکوردها، زمان بازی و اسکرین‌شات‌ها را فراهم می‌کند.
+            - 🔄 **چرخش پویا و هوشمند ردیف‌های بازی (Deterministic Shelf Rotations):**
+              - شلف **Picked for You** با الگوریتم تصادفی تاریخ‌محور هر ۲۴ ساعت بازی‌های جدیدی از ژانرهای محبوب شما پیشنهاد می‌دهد.
+              - شلف **Critically Acclaimed** هر ۴۸ ساعت یک‌بار عناوین شاهکار را نوسازی می‌کند.
 
-            - 🌓 **تم لایت مدرن با انیمیشن مورف دایره‌ای (Website Light Theme & Morphing):**
-              - طراحی تم لایت مینیمال و استاندارد برای وبسایت با افکت موجی View Transitions دایره‌ای.
-              - هماهنگی کامل المان‌های بصری، ذرات سه‌بعدی و کارت‌های شیشه‌ای با تم روشن.
+            - ⚡ **بهبود سرعت اجرای آفلاین (Blazing-Fast Offline Startup):**
+              - کاهش تایم‌اوت شبکه به ۴ ثانیه و بررسی وضعیت Circuit Breaker قبل از ریکوئست شبکه، جهت لود بلادرنگ و بدون معطلی کش آفلاین.
 
-            - 🐧 **بهبودهای لینوکس و توزیع‌های آرچ و هایپرلند (Linux & Hyprland Polish):**
-              - بهینه‌سازی رندرینگ در محیط‌های Wayland و Hyprland و رفع خطاهای اتصال آرچ/AUR.
-              - پایداری کامل بسته‌های AppImage، deb و rpm.
+            - 🐧 **راهنمای نصب خودکار در لینوکس و دبیان (Linux & Debian Updater):**
+              - شناسایی هوشمند محدودیت مجوز در پکیج‌های `.deb` لینوکس، ارائه دستور ترمینال قابل کپی و اتصال مستقیم به ریلیزهای گیت‌هاب.
+
+            - 🔔 **سیستم پاپ‌آپ و اعلان فوری آپدیت خودکار (Proactive Auto-Updater):**
+              - بررسی تضمینی به‌روزرسانی در لحظه راه‌اندازی برنامه و نمایش پاپ‌آپ کامل همراه با اعلان Toast.
 
             ---
 
             ### 📦 راهنمای دانلود و نصب (Download & Installation)
 
             - 🪟 **ویندوز (Windows 10/11 x64):**
-              - فایل نصبی `Nexus_0.3.5_x64-setup.exe` را دانلود کرده و با یک کلیک اجرا کنید.
+              - فایل نصبی `Nexus_0.4.0_x64-setup.exe` را دانلود کرده و با یک کلیک اجرا کنید.
               - کاربران فعلی در صورت باز بودن برنامه، اعلان به‌روزرسانی خودکار درون‌برنامه‌ای را دریافت خواهند کرد.
 
             - 🐧 **لینوکس (آرچ، مانجارو، استیم‌دک و تمام توزیع‌ها):**
-              - فایل `Nexus_0.3.5_amd64.AppImage` را دانلود کرده و دسترسی اجرا دهید:
+              - فایل `Nexus_0.4.0_amd64.AppImage` را دانلود کرده و دسترسی اجرا دهید:
                 ```bash
-                chmod +x Nexus_0.3.5_amd64.AppImage
-                ./Nexus_0.3.5_amd64.AppImage
+                chmod +x Nexus_0.4.0_amd64.AppImage
+                ./Nexus_0.4.0_amd64.AppImage
                 ```
-              - برای اوبونتو و دبیان: پکیج `nexus_0.3.5_amd64.deb` را دریافت و با دستور `sudo dpkg -i nexus_0.3.5_amd64.deb` نصب کنید.
-              - برای فدورا و ردهت: پکیج `Nexus-0.3.5-1.x86_64.rpm` را دریافت و با دستور `sudo dnf install ./Nexus-0.3.5-1.x86_64.rpm` نصب کنید.
+              - برای اوبونتو و دبیان: پکیج `nexus_0.4.0_amd64.deb` را دریافت و با دستور `sudo apt install ./nexus_0.4.0_amd64.deb` یا `sudo dpkg -i nexus_0.4.0_amd64.deb` نصب کنید.
+              - برای فدورا و ردهت: پکیج `Nexus-0.4.0-1.x86_64.rpm` را دریافت و با دستور `sudo dnf install ./Nexus-0.4.0-1.x86_64.rpm` نصب کنید.
           releaseDraft: false
           prerelease: false

@@ -4,15 +4,15 @@
  */
 
 const CONFIG = {
-  defaultVersion: 'v0.3.5',
+  defaultVersion: 'v0.4.0',
   defaultDownloadUrl:
-    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.5_x64-setup.exe',
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.4.0_x64-setup.exe',
   defaultAppImageUrl:
-    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.3.5_amd64.AppImage',
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.4.0_amd64.AppImage',
   defaultDebUrl:
-    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.3.5_amd64.deb',
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.4.0_amd64.deb',
   defaultRpmUrl:
-    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus-0.3.5-1.x86_64.rpm',
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus-0.4.0-1.x86_64.rpm',
   githubApiUrl: 'https://api.github.com/repos/AminDEV81/nexus-launcher/releases/latest',
   githubRepoUrl: 'https://github.com/AminDEV81/nexus-launcher',
 }
@@ -20,8 +20,8 @@ const CONFIG = {
 const TRANSLATIONS = {
   fa: {
     top_bar_msg:
-      'نسخه ۰.۳.۵ لانچر نکسوس منتشر شد — مجهز به اسکنر خودکار سیستم، قابلیت اکسترکت اختیاری، بازیابی خاطرات و پشتیبانی لینوکس!',
-    top_bar_cta: 'دانلود نسخه ۰.۳.۵ ←',
+      'نسخه ۰.۴.۰ لانچر نکسوس منتشر شد — هماهنگ‌سازی ابری متادیتا، سرچ پیشرفته گیم‌هاب، چرخش پویا، ارتقای لینوکس و عملکرد فوق‌سریع آفلاین!',
+    top_bar_cta: 'دانلود نسخه ۰.۴.۰ ←',
     nav_showcase: 'نمای زنده برنامه',
     nav_features: 'ویژگی‌های کلیدی',
     nav_booster: 'بوستر رم',
@@ -34,7 +34,7 @@ const TRANSLATIONS = {
     hero_title_2: 'برای تمام بازی‌های شما در ویندوز و لینوکس',
     hero_subtitle:
       'توسعه یافته بر پایه معماری بومی Rust و Tauri 2. فقط ۶۰ مگابایت مصرف رم، همراه با اسکنر خودکار سیستم، بوستر سخت‌افزاری و پشتیبانی رسمی از لینوکس و آرچ بدون ذره‌ای تبلیغات.',
-    hero_download_btn: 'دانلود نسخه رسمی ویندوز v0.3.5',
+    hero_download_btn: 'دانلود نسخه رسمی ویندوز v0.4.0',
     hero_download_linux: 'دانلود نسخه لینوکس',
     hero_download_deb: 'پکیج دبیان و اوبونتو (.deb)',
     hero_source_btn: 'مشاهده پروژه در گیت‌هاب',
@@ -69,7 +69,7 @@ const TRANSLATIONS = {
 
     mockup_modules_title: 'ماژول‌های هوشمند و پیشرفته لانچر',
     mockup_modules_desc: 'روی هر قابلیت کلیک کنید تا عملکرد بلادرنگ آن را تجربه نمایید',
-    mockup_scanner_banner_title: 'رادار اسکنر خودکار سیستم (نسخه ۰.۳.۵)',
+    mockup_scanner_banner_title: 'رادار اسکنر خودکار سیستم (نسخه ۰.۴.۰)',
     mockup_scanner_banner_desc:
       'اسکن فوری درایوهای ویندوز و لینوکس برای کشف بازی‌های ۸ پلتفرم (Steam, Epic, GOG, EA, Ubisoft, Battle.net, Amazon, Xbox)',
     mockup_btn_scan: '📡 شروع اسکن راداری',
@@ -105,13 +105,13 @@ const TRANSLATIONS = {
     bento_rust_title: 'معماری اصیل Rust و Tauri 2 بدون کرومیوم',
     bento_rust_desc:
       'برخلاف نرم‌افزارهای مبتنی بر الکترون که صدها مگابایت رم را صرف یک مرورگر مخفی می‌کنند، نکسوس لانچر مستقیماً به کتابخانه‌های محلی و بومی ویندوز کامپایل شده است. سرعت باز شدن زیر ۰.۴ ثانیه و مصرف رم تنها ۶۰ مگابایت!',
-    bento_scanner_title: 'اسکنر هوشمند و رادار هولوگرافیک بازی‌ها (نسخه ۰.۳.۵)',
+    bento_scanner_title: 'اسکنر هوشمند و رادار هولوگرافیک بازی‌ها (نسخه ۰.۴.۰)',
     bento_scanner_desc:
       'کشف خودکار و آنی تمام بازی‌های نصب شده روی ویندوز و لینوکس از ۸ فروشگاه بزرگ شامل Steam, Epic Games, GOG, EA App, Ubisoft, Battle.net, Amazon و Xbox با رادار هولوگرافیک سه‌بعدی و درون‌ریزی گروهی تنها با ۱ کلیک.',
-    bento_linux_title: 'پشتیبانی رسمی از لینوکس و آرچ (نسخه ۰.۳.۵)',
+    bento_linux_title: 'پشتیبانی رسمی از لینوکس و آرچ (نسخه ۰.۴.۰)',
     bento_linux_desc:
       'انتشار پکیج بدون وابستگی و قابل‌حمل AppImage برای جامعه پرشور Arch Linux، Manjaro، SteamOS (کنسول استیم‌دک)، Fedora و Ubuntu بدون نیاز به مفسرهای سنگین با نهایت پایداری.',
-    bento_memories_title: 'گاوصندوق خاطرات، بازیابی و ایمنی پیشرفته (نسخه ۰.۳.۵)',
+    bento_memories_title: 'گاوصندوق خاطرات، بازیابی و ایمنی پیشرفته (نسخه ۰.۴.۰)',
     bento_memories_desc:
       'ثبت اسکرین‌شات‌ها و یادداشت‌های گیمینگ با معماری ابسیدین و امبر به همراه امکان بازیابی خودکار بازی از مموری به کتابخانه و دیالوگ‌های تایید امنیتی چندمرحله‌ای.',
     bento_booster_title: 'بوستر خودکار و آزادسازی رم',
@@ -185,12 +185,12 @@ const TRANSLATIONS = {
     cta_heading: 'همین حالا Nexus Launcher را تجربه کنید',
     cta_subheading:
       'لذت مدیریت یکپارچه بازی‌ها با نهایت سرعت، بدون کرومیوم و با کمترین مصرف رم در ویندوز و لینوکس.',
-    cta_btn_download: 'دانلود نسخه رسمی ویندوز v0.3.5',
+    cta_btn_download: 'دانلود نسخه رسمی ویندوز v0.4.0',
     cta_btn_linux: 'دانلود نسخه لینوکس',
     cta_btn_all_releases: 'سایر نسخه‌ها در گیت‌هاب',
     cta_github_badge: 'مخزن',
     linux_select_format: 'انتخاب فرمت',
-    linux_modal_title: 'دانلود لانچر نکسوس نسخه ۰.۳.۵ برای لینوکس',
+    linux_modal_title: 'دانلود لانچر نکسوس نسخه ۰.۴.۰ برای لینوکس',
     linux_modal_subtitle: 'فرمت متناسب با توزیع سیستم‌عامل خود را انتخاب و دانلود نمایید:',
     linux_tab_appimage_title: 'بسته همه‌منظوره AppImage (پیشنهادی)',
     linux_tab_appimage_desc:
@@ -209,14 +209,14 @@ const TRANSLATIONS = {
     linux_steamos_tip:
       '🎮 کاربران کنسول دستی استیم‌دک (Steam Deck): فایل AppImage را دانلود کرده و در حالت Desktop به عنوان یک Non-Steam Game به کتابخانه استیم خود اضافه کنید تا مستقیماً در Gaming Mode اجرا شود.',
     linux_wayland_tip:
-      '🐧 کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت باز نشدن پنجره AppImage، برنامه را در ترمینال با دستور GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Nexus_0.3.5_amd64.AppImage اجرا فرمایید.',
+      '🐧 کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت باز نشدن پنجره AppImage، برنامه را در ترمینال با دستور GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Nexus_0.4.0_amd64.AppImage اجرا فرمایید.',
     footer_license: 'منتشر شده تحت مجوز رسمی و آزاد MIT',
     footer_author: 'طراحی و توسعه توسط',
   },
   en: {
     top_bar_msg:
-      'Nexus Launcher v0.3.5 released — featuring Archive Extraction Toggle, Memory Recovery & Linux Support!',
-    top_bar_cta: 'Download v0.3.5 &rarr;',
+      'Nexus Launcher v0.4.0 released — featuring Cloud Metadata Sync, Advanced Hub Search, Dynamic Shelf Rotations & Linux Polish!',
+    top_bar_cta: 'Download v0.4.0 &rarr;',
     nav_showcase: 'Live Showcase',
     nav_features: 'Features',
     nav_booster: 'RAM Booster',
@@ -229,7 +229,7 @@ const TRANSLATIONS = {
     hero_title_2: 'Game Launcher for Windows & Linux',
     hero_subtitle:
       'Built natively with Rust and Tauri 2. Ultra-light ~60MB RAM footprint, automated System Game Scanner, hardware Game Booster, and official Arch/Linux support with zero ads or telemetry.',
-    hero_download_btn: 'Download Official Windows v0.3.5',
+    hero_download_btn: 'Download Official Windows v0.4.0',
     hero_download_linux: 'Download for Linux',
     hero_download_deb: 'Debian / Ubuntu Package (.deb)',
     hero_source_btn: 'View Project on GitHub',
@@ -265,7 +265,7 @@ const TRANSLATIONS = {
     mockup_modules_title: 'Smart Launcher Modules',
     mockup_modules_desc:
       'Click each capability to experience real-time performance inside the simulator',
-    mockup_scanner_banner_title: 'Automated System Radar Scanner (New v0.3.5)',
+    mockup_scanner_banner_title: 'Automated System Radar Scanner (New v0.4.0)',
     mockup_scanner_banner_desc:
       'Instantly scan Windows & Linux drives to detect games across 8 platforms (Steam, Epic, GOG, EA, Ubisoft, Battle.net, Amazon, Xbox)',
     mockup_btn_scan: '📡 Engage Radar Scanner',
@@ -305,13 +305,13 @@ const TRANSLATIONS = {
     bento_rust_title: 'Pure Rust & Tauri 2 Architecture (No Chromium)',
     bento_rust_desc:
       'Unlike Electron clients that run a hidden browser consuming 600MB+ RAM, Nexus compiles straight to native Win32 APIs. Sub-0.4s boot time and ~60MB RAM footprint!',
-    bento_scanner_title: 'Smart Scanner & 3D Holographic Radar (New v0.3.5)',
+    bento_scanner_title: 'Smart Scanner & 3D Holographic Radar (New v0.4.0)',
     bento_scanner_desc:
       'Instantly discovers all installed games across 8 major stores: Steam, Epic Games, GOG, EA App, Ubisoft, Battle.net, Amazon, and Xbox with real-time 3D holographic radar and 1-click batch import.',
-    bento_linux_title: 'Official Linux & Arch Support (New v0.3.5)',
+    bento_linux_title: 'Official Linux & Arch Support (New v0.4.0)',
     bento_linux_desc:
       'Self-contained, portable AppImage package released for the passionate Arch Linux, Manjaro, SteamOS (Steam Deck), Fedora, and Ubuntu communities with maximum stability.',
-    bento_memories_title: 'Memory Vault & Recovery Guardian (New v0.3.5)',
+    bento_memories_title: 'Memory Vault & Recovery Guardian (New v0.4.0)',
     bento_memories_desc:
       'Capture gaming screenshots and notes in an Obsidian-and-Amber aesthetic, paired with instant game restoration from memory to library and multi-step safety confirmation dialogs.',
     bento_booster_title: 'Automated RAM & Hardware Booster',
@@ -374,7 +374,7 @@ const TRANSLATIONS = {
     faq_q4: 'Is my data or account sent to any server?',
     faq_a4:
       'Never. All data and game stats reside strictly inside your local SQLite database on your machine.',
-    faq_q5: 'How does Linux and Arch Linux support work in v0.3.5?',
+    faq_q5: 'How does Linux and Arch Linux support work in v0.4.0?',
     faq_a5:
       'Nexus Launcher now officially provides portable AppImage packages for Arch Linux (Manjaro, EndeavourOS), SteamOS (Steam Deck), plus Debian/Ubuntu .deb and Fedora .rpm packages. Just download and run (chmod +x).',
     faq_q6: 'What stores and games does the automated System Scanner detect?',
@@ -384,12 +384,12 @@ const TRANSLATIONS = {
     cta_heading: 'Experience Nexus Launcher Today',
     cta_subheading:
       'Take control of your gaming library with unprecedented speed and native Rust efficiency on Windows and Linux.',
-    cta_btn_download: 'Download Official Windows v0.3.5',
+    cta_btn_download: 'Download Official Windows v0.4.0',
     cta_btn_linux: 'Download for Linux',
     cta_btn_all_releases: 'All Releases on GitHub',
     cta_github_badge: 'Repo',
     linux_select_format: 'Select Format',
-    linux_modal_title: 'Download Nexus Launcher v0.3.5 for Linux',
+    linux_modal_title: 'Download Nexus Launcher v0.4.0 for Linux',
     linux_modal_subtitle: 'Choose the package format matching your Linux distribution:',
     linux_tab_appimage_title: 'Universal AppImage Package (Recommended)',
     linux_tab_appimage_desc:
@@ -407,7 +407,7 @@ const TRANSLATIONS = {
     linux_steamos_tip:
       '🎮 Steam Deck users: Download the AppImage and add it as a Non-Steam Game in Desktop Mode.',
     linux_wayland_tip:
-      '🐧 Wayland & Hyprland users (e.g. Omarchy): If the AppImage window does not appear, launch via terminal with GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Nexus_0.3.5_amd64.AppImage.',
+      '🐧 Wayland & Hyprland users (e.g. Omarchy): If the AppImage window does not appear, launch via terminal with GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Nexus_0.4.0_amd64.AppImage.',
     footer_license: 'Released under the official MIT License',
     footer_author: 'Designed & developed by',
   },
@@ -1000,8 +1000,8 @@ window.simulateMockupScanner = function () {
     }
     if (toast && toastText) {
       toastText.textContent = isFa
-        ? '📡 اسکنر راداری v0.3.5: ۲۴ بازی در سیستم با موفقیت شناسایی شدند!'
-        : '📡 System Scanner v0.3.5: 24 games discovered across 8 platforms!'
+        ? '📡 اسکنر راداری v0.4.0: ۲۴ بازی در سیستم با موفقیت شناسایی شدند!'
+        : '📡 System Scanner v0.4.0: 24 games discovered across 8 platforms!'
       toast.classList.remove('hidden')
       setTimeout(() => toast.classList.add('hidden'), 4000)
     }

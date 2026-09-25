@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Nexus",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "identifier": "com.nexus.launcher",
   "build": {
     "frontendDist": "../dist",

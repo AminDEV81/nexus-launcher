@@ -25,7 +25,7 @@ export async function getCurrentAppVersion(): Promise<string> {
     return await getVersion()
   } catch (error) {
     console.warn('[Updater] Failed to get app version from runtime, falling back:', error)
-    return '0.3.5'
+    return '0.4.0'
   }
 }
 

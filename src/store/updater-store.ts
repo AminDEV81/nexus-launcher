@@ -60,7 +60,6 @@ interface UpdaterState {
 const SETTING_AUTO_CHECK = 'updater_auto_check_enabled'
 const SETTING_LAST_CHECK = 'updater_last_check_timestamp'
 const SETTING_DISMISSED = 'updater_dismissed_version'
-const STARTUP_DEBOUNCE_MS = 30 * 1000 // 30 seconds debounce for rapid app relaunches
 const BACKGROUND_POLL_INTERVAL_MS = 2 * 60 * 60 * 1000 // 2 hours for periodic checks
 
 export const useUpdaterStore = create<UpdaterState>((set, get) => {
@@ -68,7 +67,7 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => {
 
   return {
     status: 'idle',
-    currentVersion: '0.3.5',
+    currentVersion: '0.4.0',
     update: null,
     error: null,
     totalBytes: 0,
@@ -113,13 +112,16 @@ export const useUpdaterStore = create<UpdaterState>((set, get) => {
         return
       }
 
-      // Check auto-check cooldown unless manually requested
+      // Check auto-check cooldown unless manually requested or during startup
       if (!manual) {
         if (!state.isAutoCheckEnabled) {
           return
         }
-        const minCooldown = isStartup ? STARTUP_DEBOUNCE_MS : BACKGROUND_POLL_INTERVAL_MS
-        if (state.lastCheckedTimestamp && Date.now() - state.lastCheckedTimestamp < minCooldown) {
+        if (
+          !isStartup &&
+          state.lastCheckedTimestamp &&
+          Date.now() - state.lastCheckedTimestamp < BACKGROUND_POLL_INTERVAL_MS
+        ) {
           return
         }
       }
