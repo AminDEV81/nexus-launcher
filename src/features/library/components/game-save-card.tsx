@@ -11,6 +11,8 @@ import {
   Copy,
   FileCheck,
   Database,
+  Archive,
+  Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Game, GameSaveDetails, DetectedSaveLocation } from '@/types/models'
@@ -20,6 +22,7 @@ import * as saveService from '@/services/save-manager'
 import { formatBytes } from '../utils/guess-name'
 import { formatRelativeDate, formatExactDateTime } from '../utils/format'
 import { cn } from '@/lib/utils'
+import { GameSaveBackupModal } from './game-save-backup-modal'
 
 interface GameSaveCardProps {
   game: Game
@@ -70,6 +73,13 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
   const [showAddCustom, setShowAddCustom] = useState(false)
   const [showCloneModal, setShowCloneModal] = useState(false)
   const [selectedCloneProfile, setSelectedCloneProfile] = useState<string>('')
+  const [showBackupModal, setShowBackupModal] = useState(false)
+  const [backupModalTab, setBackupModalTab] = useState<'backup' | 'restore'>('backup')
+
+  const handleOpenBackupModal = (tab: 'backup' | 'restore' = 'backup') => {
+    setBackupModalTab(tab)
+    setShowBackupModal(true)
+  }
 
   const loadData = useCallback(async () => {
     try {
@@ -260,6 +270,26 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
               className="flex size-8 items-center justify-center rounded-xl border border-border bg-surface text-muted transition-colors hover:text-text hover:bg-surface-raised cursor-pointer"
             >
               <RefreshCw className={cn('size-3.5', isLoading && 'animate-spin')} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleOpenBackupModal('backup')}
+              title="Backup game saves to compressed .zip archive"
+              className="flex items-center gap-1 rounded-xl border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent hover:text-white cursor-pointer"
+            >
+              <Archive className="size-3.5" />
+              <span>Backup</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleOpenBackupModal('restore')}
+              title="Restore saves from .zip archive"
+              className="flex items-center gap-1 rounded-xl border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-text transition-colors hover:bg-surface-raised hover:border-accent/40 cursor-pointer"
+            >
+              <Upload className="size-3.5" />
+              <span>Restore</span>
             </button>
 
             {details?.is_managed && (
@@ -547,31 +577,47 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
       </section>
 
       {/* ── Profile Save Actions ──────────────────────────────────────── */}
-      {details?.is_managed && (
-        <section className="rounded-2xl border border-border/80 bg-surface-raised/80 p-4 shadow-sm">
-          <span className="text-xs font-bold text-text mb-3 block">Profile Save Actions</span>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => void handleOpenFolder()}
-              className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-bold text-text transition-all hover:bg-surface-raised hover:border-accent/40"
-            >
-              <FolderOpen className="size-4 text-accent" />
-              <span>Open Save Folder</span>
-            </button>
+      <section className="rounded-2xl border border-border/80 bg-surface-raised/80 p-4 shadow-sm">
+        <span className="text-xs font-bold text-text mb-3 block">Profile Save Actions</span>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => void handleOpenFolder()}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-bold text-text transition-all hover:bg-surface-raised hover:border-accent/40 cursor-pointer"
+          >
+            <FolderOpen className="size-4 text-accent" />
+            <span>Open Folder</span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setShowCloneModal(true)}
-              disabled={otherProfiles.length === 0}
-              className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-bold text-text transition-all hover:bg-surface-raised hover:border-accent/40 disabled:opacity-50"
-            >
-              <Copy className="size-4 text-violet-400" />
-              <span>Copy from Profile</span>
-            </button>
-          </div>
-        </section>
-      )}
+          <button
+            type="button"
+            onClick={() => handleOpenBackupModal('backup')}
+            className="flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/10 p-2.5 text-xs font-bold text-accent transition-all hover:bg-accent hover:text-white cursor-pointer"
+          >
+            <Archive className="size-4" />
+            <span>Backup (.zip)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleOpenBackupModal('restore')}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-bold text-text transition-all hover:bg-surface-raised hover:border-accent/40 cursor-pointer"
+          >
+            <Upload className="size-4 text-emerald-400" />
+            <span>Restore (.zip)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowCloneModal(true)}
+            disabled={otherProfiles.length === 0}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-bold text-text transition-all hover:bg-surface-raised hover:border-accent/40 disabled:opacity-50 cursor-pointer"
+          >
+            <Copy className="size-4 text-violet-400" />
+            <span>Copy Profile</span>
+          </button>
+        </div>
+      </section>
 
       {/* Clone Save Modal */}
       {showCloneModal && (
@@ -623,6 +669,15 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
           </div>
         </div>
       )}
+
+      {/* Game Save Backup & Restore Modal (.zip) */}
+      <GameSaveBackupModal
+        game={game}
+        open={showBackupModal}
+        defaultTab={backupModalTab}
+        onClose={() => setShowBackupModal(false)}
+        onSuccess={() => void loadData()}
+      />
     </div>
   )
 }

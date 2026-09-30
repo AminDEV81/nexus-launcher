@@ -88,12 +88,23 @@ pub fn run() {
                 if let Err(err) = commands::save_manager::recovery::CrashRecoveryEngine::recover_interrupted_operations(&conn) {
                     log::error!("Failed to recover interrupted save operations: {}", err);
                 }
-                let configured = commands::save_manager::auto_configure_all_installed_games(&conn);
-                if configured > 0 {
-                    log::info!("Auto-configured save locations for {} games from save manifest database", configured);
-                }
             }
             app.manage(database);
+
+            // Run save location auto-configuration in the background after startup
+            // to avoid blocking window display and prevent disk I/O spikes at launch
+            let bg_app = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                let db = bg_app.state::<Database>();
+                let lock_res = db.connection.lock();
+                if let Ok(conn) = lock_res {
+                    let configured = commands::save_manager::auto_configure_all_installed_games(&conn);
+                    if configured > 0 {
+                        log::info!("Auto-configured save locations for {} games from save manifest database", configured);
+                    }
+                }
+            });
 
             app.manage(commands::save_manager::locks::SaveManagerLocks::default());
             app.manage(commands::save_manager::session::SessionManager::default());
@@ -115,6 +126,16 @@ pub fn run() {
             app.manage(commands::booster::BoosterState::default());
             app.manage(commands::download::DownloadState::default());
             app.manage(commands::soundtrack::SoundtrackDownloadState::default());
+            app.manage(commands::overlay::OverlayState::new());
+            // The hotkey manager lives in managed state so saving the
+            // overlay config can re-register a changed hotkey at runtime.
+            app.manage(commands::overlay::GlobalHotkeyManager::new());
+            let initial_hotkey =
+                commands::overlay::config::current_config(app.handle()).hotkey;
+            app.state::<commands::overlay::GlobalHotkeyManager>()
+                .start(app.handle().clone(), initial_hotkey);
+            let game_watcher = commands::overlay::AutoGameWatcher::new();
+            game_watcher.start(app.handle().clone());
             // Download tasks die with the process — orphaned mid-flight
             // rows become resumable paused entries (see download.rs).
             commands::download::recover_orphaned_downloads(app.handle());
@@ -241,6 +262,7 @@ pub fn run() {
             commands::scan::import_scanned_games,
             commands::backup::export_backup,
             commands::backup::import_backup,
+            commands::backup::get_backup_stats,
             commands::metadata::search_metadata_candidates,
             commands::metadata::apply_metadata,
             commands::metadata::sync_game_metadata,
@@ -293,6 +315,10 @@ pub fn run() {
             commands::save_manager::clone_profile_save,
             commands::save_manager::open_save_folder,
             commands::save_manager::list_save_operations,
+            commands::save_manager::export_game_save_zip,
+            commands::save_manager::inspect_game_save_zip,
+            commands::save_manager::restore_game_save_zip,
+            commands::save_manager::get_default_save_backup_path,
             commands::steam_price::get_steam_game_price,
             commands::steam_price::get_steam_regional_prices,
             commands::soundtrack::soundtrack_resolve_game,
@@ -314,6 +340,18 @@ pub fn run() {
             commands::soundtrack::soundtrack_get_local_files,
             commands::soundtrack::soundtrack_search_youtube,
             commands::soundtrack::soundtrack_http_get,
+            commands::overlay::get_overlay_config,
+            commands::overlay::save_overlay_config,
+            commands::overlay::get_overlay_metrics,
+            commands::overlay::start_overlay_telemetry,
+            commands::overlay::stop_overlay_telemetry,
+            commands::overlay::toggle_overlay_window,
+            commands::overlay::set_overlay_click_through,
+            commands::overlay::get_overlay_monitors,
+            commands::overlay::get_telemetry_status,
+            commands::overlay::is_overlay_visible,
+            commands::overlay::get_overlay_hotkey_status,
+            commands::overlay::push_overlay_notification,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

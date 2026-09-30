@@ -45,6 +45,13 @@
     background-color: var(--nx-bg);
   }
 
+  html[data-overlay-window='true'],
+  html[data-overlay-window='true'] body,
+  html[data-overlay-window='true'] #root {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
   body {
     @apply text-text antialiased;
     font-family: var(

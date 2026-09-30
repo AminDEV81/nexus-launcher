@@ -330,7 +330,7 @@ impl MetadataProviderResolver {
         db: &Database,
         igdb_id: i64,
     ) -> AppResult<Option<HubGameDetails>> {
-        let cache_key = format!("details:v2:{igdb_id}");
+        let cache_key = format!("details:v3:{igdb_id}");
 
         {
             let conn = db.connection.lock().expect("db mutex poisoned");

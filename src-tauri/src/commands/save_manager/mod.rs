@@ -1,3 +1,4 @@
+pub mod archive;
 pub mod detector;
 pub mod error;
 pub mod fs_ops;
@@ -8,6 +9,9 @@ pub mod session;
 pub mod snapshots;
 pub mod manifest;
 pub mod transaction;
+
+#[allow(unused_imports)]
+pub use archive::{ExportSaveResult, RestoreSaveResult, SaveArchiveManifest};
 
 use crate::commands::save_manager::detector::{DetectedSaveLocation, SaveDetector};
 use crate::commands::save_manager::error::SaveManagerError;
@@ -427,6 +431,7 @@ pub fn compute_live_game_save_stats(
 /// Throttled: this walks every profile's entire save tree on disk, so running it on
 /// every `list_profiles` call (startup, after each switch/create/delete) blocks the
 /// DB mutex for seconds with large libraries. 30s is plenty fresh for UI counters.
+#[allow(dead_code)]
 pub fn refresh_all_profiles_save_stats(conn: &Connection) {
     use std::sync::atomic::{AtomicU64, Ordering};
     static LAST_RUN_MS: AtomicU64 = AtomicU64::new(0);
@@ -534,8 +539,6 @@ pub fn auto_configure_all_installed_games(conn: &Connection) -> usize {
             }
         }
     }
-
-    refresh_all_profiles_save_stats(conn);
 
     configured_count
 }
@@ -915,3 +918,59 @@ pub async fn list_save_operations(
     }
     Ok(ops)
 }
+
+#[tauri::command]
+pub async fn get_default_save_backup_path(
+    db: State<'_, Database>,
+    game_id: String,
+    profile_id: Option<String>,
+) -> Result<String, String> {
+    let conn = db.connection.lock().map_err(|e| e.to_string())?;
+    let prof_id = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
+
+    let game_title: String = conn
+        .query_row("SELECT title FROM games WHERE id = ?1", params![game_id], |r| r.get(0))
+        .map_err(|_| format!("Game not found: {game_id}"))?;
+
+    let profile_name: String = conn
+        .query_row("SELECT name FROM profiles WHERE id = ?1", params![prof_id], |r| r.get(0))
+        .unwrap_or_else(|_| "Main Player".to_string());
+
+    let path = archive::compute_default_save_backup_path(&game_title, &profile_name);
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn export_game_save_zip(
+    db: State<'_, Database>,
+    game_id: String,
+    profile_id: Option<String>,
+    destination_path: String,
+) -> Result<archive::ExportSaveResult, String> {
+    let conn = db.connection.lock().map_err(|e| e.to_string())?;
+    let dest = std::path::Path::new(&destination_path);
+    archive::export_save_to_zip(&conn, &game_id, profile_id.as_deref(), dest)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn inspect_game_save_zip(
+    archive_path: String,
+) -> Result<archive::SaveArchiveManifest, String> {
+    let path = std::path::Path::new(&archive_path);
+    archive::inspect_save_zip(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn restore_game_save_zip(
+    db: State<'_, Database>,
+    game_id: String,
+    profile_id: Option<String>,
+    archive_path: String,
+) -> Result<archive::RestoreSaveResult, String> {
+    let conn = db.connection.lock().map_err(|e| e.to_string())?;
+    let path = std::path::Path::new(&archive_path);
+    archive::restore_save_from_zip(&conn, &game_id, profile_id.as_deref(), path)
+        .map_err(|e| e.to_string())
+}
+

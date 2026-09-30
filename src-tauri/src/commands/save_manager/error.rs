@@ -93,6 +93,12 @@ pub enum SaveManagerError {
 
     #[error("IO_ERROR: {0}")]
     IoError(String),
+
+    #[error("BACKUP_ERROR: {0}")]
+    BackupError(String),
+
+    #[error("SAVE_ERROR: {0}")]
+    Other(String),
 }
 
 impl SaveManagerError {
@@ -125,6 +131,8 @@ impl SaveManagerError {
             Self::SessionNotFound(_) => "SESSION_NOT_FOUND",
             Self::DatabaseError(_) => "DATABASE_ERROR",
             Self::IoError(_) => "IO_ERROR",
+            Self::BackupError(_) => "BACKUP_ERROR",
+            Self::Other(_) => "SAVE_ERROR",
         }
     }
 

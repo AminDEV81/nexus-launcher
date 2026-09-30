@@ -12,6 +12,7 @@ import { HubRegionalPriceModal } from '../components/hub-regional-price-modal'
 import { HubGameHero } from '../components/hub-game-hero'
 import { HubMediaShowcase } from '../components/hub-media-showcase'
 import { HubGameSpecs } from '../components/hub-game-specs'
+import { HubSystemRequirements } from '../components/hub-system-requirements'
 import { HubDetailsSkeleton } from '../components/hub-game-skeleton'
 import { HubSimilarGames } from '../components/hub-similar-games'
 import { HubSoundtrackSection } from '@/features/soundtrack/components/hub/hub-soundtrack-section'
@@ -202,10 +203,16 @@ export function HubGamePage() {
           />
         </div>
 
-        {/* ── 4. Cinematic Soundtrack Experience ────────────────────── */}
+        {/* ── 4. PC System Requirements (Minimum & Recommended) ───────── */}
+        <HubSystemRequirements
+          systemRequirements={game.system_requirements}
+          gameTitle={game.name}
+        />
+
+        {/* ── 5. Cinematic Soundtrack Experience ────────────────────── */}
         <HubSoundtrackSection game={game} />
 
-        {/* ── 5. You May Also Like / Similar Games (Personalized) ────── */}
+        {/* ── 6. You May Also Like / Similar Games (Personalized) ────── */}
         <HubSimilarGames targetGame={game} />
       </div>
 

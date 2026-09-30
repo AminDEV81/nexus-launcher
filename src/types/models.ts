@@ -142,6 +142,25 @@ export interface HubGameDetails extends HubGame {
    *  unavailable — the UI falls back to the IGDB aggregate in `rating`. */
   metacritic_score: number | null
   steam_app_id?: string | null
+  system_requirements?: SystemRequirements | null
+}
+
+export interface SystemRequirementDetail {
+  os?: string | null
+  processor?: string | null
+  memory?: string | null
+  graphics?: string | null
+  storage?: string | null
+  directx?: string | null
+  sound_card?: string | null
+  network?: string | null
+  additional_notes?: string | null
+  raw_html?: string | null
+}
+
+export interface SystemRequirements {
+  minimum?: SystemRequirementDetail | null
+  recommended?: SystemRequirementDetail | null
 }
 
 /** Mirrors `HubGenre` in `src-tauri/src/commands/hub.rs` — one of IGDB's
@@ -265,4 +284,38 @@ export interface SaveOperation {
   completed_at: string | null
   error_code: string | null
   error_message: string | null
+}
+
+export interface SaveArchiveLocationMeta {
+  location_id: string
+  raw_path: string
+  location_type: string
+  archive_dir: string
+}
+
+export interface SaveArchiveManifest {
+  version: number
+  game_id: string
+  game_name: string
+  profile_id: string
+  profile_name: string
+  created_at: string
+  app_version: string
+  file_count: number
+  total_uncompressed_bytes: number
+  locations: SaveArchiveLocationMeta[]
+}
+
+export interface ExportSaveResult {
+  output_path: string
+  file_count: number
+  total_bytes: number
+  archive_size_bytes: number
+}
+
+export interface RestoreSaveResult {
+  restored_files: number
+  restored_bytes: number
+  game_id: string
+  profile_id: string
 }

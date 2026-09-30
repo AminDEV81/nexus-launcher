@@ -21,5 +21,16 @@ fn main() {
         }
     }
 
+    #[cfg(target_os = "windows")]
+    {
+        // Limit WebView2 disk cache sizes to avoid unbounded disk writes and HDD thrashing
+        if std::env::var_os("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").is_none() {
+            std::env::set_var(
+                "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+                "--disk-cache-size=33554432 --media-cache-size=16777216",
+            );
+        }
+    }
+
     app_lib::run();
 }

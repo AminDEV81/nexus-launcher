@@ -13,6 +13,7 @@ dist-ssr
 *.local
 .wrangler
 worker/.wrangler
+*.wav
 
 # Rust / Tauri build artifacts (src-tauri/target alone is ~13 GB)
 src-tauri/target/

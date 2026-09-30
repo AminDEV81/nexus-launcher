@@ -7,6 +7,7 @@ pub mod hub;
 pub mod import;
 pub mod launch;
 pub mod metadata;
+pub mod overlay;
 pub mod profiles;
 pub mod save_manager;
 pub mod scan;

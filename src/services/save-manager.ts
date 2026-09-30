@@ -1,6 +1,9 @@
 import type {
   DetectedSaveLocation,
+  ExportSaveResult,
   GameSaveDetails,
+  RestoreSaveResult,
+  SaveArchiveManifest,
   SaveOperation,
   SaveSnapshot,
 } from '@/types/models'
@@ -107,5 +110,42 @@ export function listSaveOperations(gameId?: string, profileId?: string): Promise
   return call<SaveOperation[]>('list_save_operations', {
     gameId,
     profileId,
+  })
+}
+
+export function getDefaultSaveBackupPath(gameId: string, profileId?: string): Promise<string> {
+  return call<string>('get_default_save_backup_path', {
+    gameId,
+    profileId,
+  })
+}
+
+export function exportGameSaveZip(
+  gameId: string,
+  destinationPath: string,
+  profileId?: string,
+): Promise<ExportSaveResult> {
+  return call<ExportSaveResult>('export_game_save_zip', {
+    gameId,
+    profileId,
+    destinationPath,
+  })
+}
+
+export function inspectGameSaveZip(archivePath: string): Promise<SaveArchiveManifest> {
+  return call<SaveArchiveManifest>('inspect_game_save_zip', {
+    archivePath,
+  })
+}
+
+export function restoreGameSaveZip(
+  gameId: string,
+  archivePath: string,
+  profileId?: string,
+): Promise<RestoreSaveResult> {
+  return call<RestoreSaveResult>('restore_game_save_zip', {
+    gameId,
+    profileId,
+    archivePath,
   })
 }

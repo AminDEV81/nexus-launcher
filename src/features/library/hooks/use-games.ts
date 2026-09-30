@@ -286,22 +286,27 @@ export function useLaunchGame() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (gameId: string) => {
-      const cachedGames = queryClient.getQueryData<Game[]>(gamesKey)
-      const game = cachedGames?.find((g) => g.id === gameId)
-      if (game) {
-        useLaunchBoostStore.getState().open({
-          id: game.id,
-          name: game.name,
-          cover_path: game.cover_path,
-          developer: game.developer,
-          genres: game.genres,
-        })
-      } else {
-        useLaunchBoostStore.getState().open({
-          id: gameId,
-          name: 'Game',
-          cover_path: null,
-        })
+      const settings = queryClient.getQueryData<Record<string, string>>(['settings'])
+      const autoBoostEnabled = settings?.auto_boost_enabled === 'true'
+
+      if (autoBoostEnabled) {
+        const cachedGames = queryClient.getQueryData<Game[]>(gamesKey)
+        const game = cachedGames?.find((g) => g.id === gameId)
+        if (game) {
+          useLaunchBoostStore.getState().open({
+            id: game.id,
+            name: game.name,
+            cover_path: game.cover_path,
+            developer: game.developer,
+            genres: game.genres,
+          })
+        } else {
+          useLaunchBoostStore.getState().open({
+            id: gameId,
+            name: 'Game',
+            cover_path: null,
+          })
+        }
       }
       return gamesService.launchGame(gameId)
     },

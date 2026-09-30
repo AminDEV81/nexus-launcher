@@ -1,9 +1,10 @@
-import type { PropsWithChildren } from 'react'
+import { useEffect, type PropsWithChildren } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { MotionConfig } from 'framer-motion'
 import { Toaster } from 'sonner'
 import { queryClient } from './query-client'
 import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
+import { installOverlayToastBridge } from '@/features/overlay/lib/toast-bridge'
 
 /**
  * Every app-wide provider lives here so `main.tsx` stays a one-liner and
@@ -12,6 +13,11 @@ import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
  */
 export function AppProviders({ children }: PropsWithChildren) {
   const reduceMotion = useAppearanceSettingsStore((s) => s.reduceMotion)
+
+  // Launcher toasts (downloads, Gaming Mode, errors…) also show in-game.
+  useEffect(() => {
+    installOverlayToastBridge()
+  }, [])
 
   return (
     <QueryClientProvider client={queryClient}>

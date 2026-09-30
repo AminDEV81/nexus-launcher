@@ -237,10 +237,11 @@ fn fetch_launch_target(db: &Database, game_id: &str) -> AppResult<LaunchTarget> 
 
 /// Reads the `auto_boost_enabled` setting straight from the generic
 /// `settings` KV table (see `commands/settings.rs`) rather than taking
-/// it as a parameter — `launch_game` is also called from places that
-/// don't have a reason to know about boosting otherwise, and this way
-/// the setting has exactly one source of truth. Missing/unset
-/// values default to on (true).
+/// Reads the `auto_boost_enabled` setting straight from the generic
+/// `settings` table rather than taking it as a parameter — `launch_game`
+/// is also called from places that don't have a reason to know about boosting
+/// otherwise, and this way the setting has exactly one source of truth. Missing/unset
+/// values default to off (false).
 fn auto_boost_enabled(db: &Database) -> bool {
     let conn = db.connection.lock().expect("db mutex poisoned");
     conn.query_row(
@@ -248,8 +249,8 @@ fn auto_boost_enabled(db: &Database) -> bool {
         [],
         |row| row.get::<_, String>(0),
     )
-    .map(|value| value != "false")
-    .unwrap_or(true)
+    .map(|value| value == "true")
+    .unwrap_or(false)
 }
 
 /// Runs an arbitrary shell command fire-and-forget — used for the
@@ -452,27 +453,33 @@ pub async fn launch_game(
         return Err(AppError::Invalid("This game already has an active session.".into()));
     }
 
+    let should_boost = auto_boost_enabled(&db);
+
     let target = match fetch_launch_target(&db, &game_id) {
         Ok(target) => target,
         Err(err) => {
             tracker.finish(&game_id);
-            let _ = app.emit(
-                "launch-boost-failed",
-                serde_json::json!({
-                    "game_id": &game_id,
-                    "error": err.to_string(),
-                }),
-            );
+            if should_boost {
+                let _ = app.emit(
+                    "launch-boost-failed",
+                    serde_json::json!({
+                        "game_id": &game_id,
+                        "error": err.to_string(),
+                    }),
+                );
+            }
             return Err(err);
         }
     };
 
-    // Emit start event immediately so frontend popup opens with zero delay
-    let _ = app.emit("launch-boost-start", LaunchBoostStartPayload {
-        game_id: game_id.clone(),
-        game_name: target.name.clone(),
-        cover_path: target.cover_path.clone(),
-    });
+    if should_boost {
+        // Emit start event immediately so frontend popup opens with zero delay
+        let _ = app.emit("launch-boost-start", LaunchBoostStartPayload {
+            game_id: game_id.clone(),
+            game_name: target.name.clone(),
+            cover_path: target.cover_path.clone(),
+        });
+    }
 
     let active_profile_id = {
         let conn = db.connection.lock().expect("db mutex poisoned");
@@ -484,21 +491,23 @@ pub async fn launch_game(
         .unwrap_or_else(|_| "default".to_string())
     };
 
-    // Emit save prep progress step
-    let _ = app.emit(
-        "launch-boost-progress",
-        LaunchBoostStepPayload {
-            game_id: game_id.clone(),
-            step_index: 0,
-            total_steps: 10,
-            module_id: "saves".into(),
-            label: "Preparing save state".into(),
-            applied: true,
-            detail: "Game saves verified & locked for session.".into(),
-            metric: Some("Safe".into()),
-            percent: 10,
-        },
-    );
+    if should_boost {
+        // Emit save prep progress step
+        let _ = app.emit(
+            "launch-boost-progress",
+            LaunchBoostStepPayload {
+                game_id: game_id.clone(),
+                step_index: 0,
+                total_steps: 10,
+                module_id: "saves".into(),
+                label: "Preparing save state".into(),
+                applied: true,
+                detail: "Game saves verified & locked for session.".into(),
+                metric: Some("Safe".into()),
+                percent: 10,
+            },
+        );
+    }
 
     // Prepare save transaction before spawning game (lock is scoped strictly to save preparation + session registration)
     {
@@ -515,24 +524,28 @@ pub async fn launch_game(
         .await
         .map_err(|e| {
             tracker.finish(&game_id);
-            let _ = app.emit(
-                "launch-boost-failed",
-                serde_json::json!({
-                    "game_id": &game_id,
-                    "error": format!("Task execution failed: {}", e),
-                }),
-            );
+            if should_boost {
+                let _ = app.emit(
+                    "launch-boost-failed",
+                    serde_json::json!({
+                        "game_id": &game_id,
+                        "error": format!("Task execution failed: {}", e),
+                    }),
+                );
+            }
             AppError::Other(format!("Task execution failed: {}", e))
         })?
         .map_err(|err| {
             tracker.finish(&game_id);
-            let _ = app.emit(
-                "launch-boost-failed",
-                serde_json::json!({
-                    "game_id": &game_id,
-                    "error": format!("Failed to prepare game saves: {}", err),
-                }),
-            );
+            if should_boost {
+                let _ = app.emit(
+                    "launch-boost-failed",
+                    serde_json::json!({
+                        "game_id": &game_id,
+                        "error": format!("Failed to prepare game saves: {}", err),
+                    }),
+                );
+            }
             AppError::Other(format!("Failed to prepare game saves: {}", err))
         })?;
 
@@ -560,7 +573,7 @@ pub async fn launch_game(
     // triggers, synchronously, before anything is actually launched —
     // closing background apps and switching power plans after the game
     // has already started defeats the point.
-    if auto_boost_enabled(&db) {
+    if should_boost {
         let app_emit = app.clone();
         let gid = game_id.clone();
         let report = booster::perform_boost_with_progress(
@@ -602,21 +615,23 @@ pub async fn launch_game(
         run_hook(hook);
     }
 
-    // Emit final step before spawning process
-    let _ = app.emit(
-        "launch-boost-progress",
-        LaunchBoostStepPayload {
-            game_id: game_id.clone(),
-            step_index: 10,
-            total_steps: 10,
-            module_id: "spawn".into(),
-            label: "Spawning game executable".into(),
-            applied: true,
-            detail: "Allocating execution pipeline & launching game process.".into(),
-            metric: Some("Ready".into()),
-            percent: 92,
-        },
-    );
+    if should_boost {
+        // Emit final step before spawning process
+        let _ = app.emit(
+            "launch-boost-progress",
+            LaunchBoostStepPayload {
+                game_id: game_id.clone(),
+                step_index: 10,
+                total_steps: 10,
+                module_id: "spawn".into(),
+                label: "Spawning game executable".into(),
+                applied: true,
+                detail: "Allocating execution pipeline & launching game process.".into(),
+                metric: Some("Ready".into()),
+                percent: 92,
+            },
+        );
+    }
 
     // For the Steam hand-off, remember which same-named processes were
     // already running *before* we asked Steam to start the game — the
@@ -645,17 +660,36 @@ pub async fn launch_game(
         Err(err) => {
             session_mgr.remove_session(&game_id);
             tracker.finish(&game_id);
-            let _ = app.emit(
-                "launch-boost-failed",
-                serde_json::json!({
-                    "game_id": &game_id,
-                    "error": err.to_string(),
-                }),
-            );
+            if should_boost {
+                let _ = app.emit(
+                    "launch-boost-failed",
+                    serde_json::json!({
+                        "game_id": &game_id,
+                        "error": err.to_string(),
+                    }),
+                );
+            }
             return Err(err);
         }
     };
 
+
+    // Auto-launch Overlay HUD if enabled
+    let overlay_enabled = {
+        let conn = db.connection.lock().ok();
+        conn.map(|c| crate::commands::overlay::config::ConfigStore::get(&c).enabled)
+            .unwrap_or(true)
+    };
+
+    if overlay_enabled {
+        let app_overlay = app.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(tokio::time::Duration::from_millis(800)).await;
+            let _ =
+                crate::commands::overlay::toggle_overlay_window(app_overlay.clone(), Some(true))
+                    .await;
+        });
+    }
 
     tokio::spawn(track_session(
         app,
@@ -825,6 +859,14 @@ async fn track_session(
     booster::restore_power_plan(&app.state::<booster::BoosterState>());
 
     restore_launcher_window(&app);
+
+    // Auto-hide Overlay HUD when game exits
+    let app_overlay = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let _ =
+            crate::commands::overlay::toggle_overlay_window(app_overlay.clone(), Some(false))
+                .await;
+    });
     let _ = app.emit(
         "game-exited",
         GameExitedPayload {
@@ -992,4 +1034,64 @@ mod tests {
         assert_eq!(split_launch_arguments("    "), Vec::<String>::new());
         assert_eq!(split_launch_arguments("  -dx11  "), vec!["-dx11"]);
     }
+
+    #[test]
+    fn auto_boost_defaults_to_false_when_unset() {
+        use crate::db::Database;
+        use rusqlite::Connection;
+        use std::sync::Mutex;
+
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+            [],
+        )
+        .unwrap();
+        let db = Database {
+            connection: Mutex::new(conn),
+        };
+        assert!(!super::auto_boost_enabled(&db));
+    }
+
+    #[test]
+    fn auto_boost_respects_settings_value() {
+        use crate::db::Database;
+        use rusqlite::Connection;
+        use std::sync::Mutex;
+
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES ('auto_boost_enabled', 'true')",
+            [],
+        )
+        .unwrap();
+        let db = Database {
+            connection: Mutex::new(conn),
+        };
+        assert!(super::auto_boost_enabled(&db));
+
+        let conn2 = Connection::open_in_memory().unwrap();
+        conn2
+            .execute(
+                "CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+                [],
+            )
+            .unwrap();
+        conn2
+            .execute(
+                "INSERT INTO settings (key, value) VALUES ('auto_boost_enabled', 'false')",
+                [],
+            )
+            .unwrap();
+        let db2 = Database {
+            connection: Mutex::new(conn2),
+        };
+        assert!(!super::auto_boost_enabled(&db2));
+    }
 }
+

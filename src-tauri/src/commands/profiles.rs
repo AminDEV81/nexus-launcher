@@ -71,7 +71,6 @@ pub async fn list_profiles(
     db: State<'_, Database>,
 ) -> Result<Vec<Profile>, String> {
     let conn = db.connection.lock().map_err(|e| e.to_string())?;
-    crate::commands::save_manager::refresh_all_profiles_save_stats(&conn);
     let active_id = get_active_id(&conn);
 
     let mut stmt = conn
@@ -116,7 +115,6 @@ pub async fn get_active_profile(
     db: State<'_, Database>,
 ) -> Result<Profile, String> {
     let conn = db.connection.lock().map_err(|e| e.to_string())?;
-    crate::commands::save_manager::refresh_all_profiles_save_stats(&conn);
     let active_id = get_active_id(&conn);
 
     let mut profile: Profile = conn.query_row(

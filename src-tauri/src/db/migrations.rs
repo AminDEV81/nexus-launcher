@@ -34,6 +34,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (18, include_str!("./sql/0018_clear_old_metadata_cache.sql")),
     (19, include_str!("./sql/0019_game_memory.sql")),
     (20, include_str!("./sql/0020_download_auto_extract.sql")),
+    (21, include_str!("./sql/0021_overlay_config.sql")),
 ];
 
 pub fn run(conn: &mut Connection) -> AppResult<()> {

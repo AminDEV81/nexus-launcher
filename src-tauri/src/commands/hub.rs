@@ -7,6 +7,7 @@
 //! game.
 
 use crate::commands::metadata::{igdb, HttpClient, IgdbTokenCache};
+pub use crate::commands::metadata::steam_store::{SystemRequirementDetail, SystemRequirements};
 use crate::db::models::Game;
 use crate::db::Database;
 use crate::error::{AppError, AppResult};
@@ -937,6 +938,8 @@ pub struct HubGameDetails {
     pub metacritic_score: Option<i64>,
     #[serde(default)]
     pub steam_app_id: Option<String>,
+    #[serde(default)]
+    pub system_requirements: Option<SystemRequirements>,
 }
 
 #[tauri::command]
@@ -950,7 +953,32 @@ pub async fn get_hub_game_details(
     let config = resolver.get_config(&db);
     if config.mode == ProviderMode::Public {
         return match resolver.get_game_details(&db, igdb_id).await? {
-            Some(details) => Ok(details),
+            Some(mut details) => {
+                if details.system_requirements.is_none() {
+                    let app_id = match details.steam_app_id.as_deref() {
+                        Some(id) => Some(id.to_string()),
+                        None => {
+                            let steam_provider =
+                                crate::services::providers::SteamArtworkProvider::new(http.0.clone());
+                            steam_provider.resolve_app_id(&details.game.name).await
+                        }
+                    };
+                    if let Some(ref aid) = app_id {
+                        if details.steam_app_id.is_none() {
+                            details.steam_app_id = Some(aid.clone());
+                        }
+                        if let Ok(Some(steam)) =
+                            crate::commands::metadata::steam_store::get_app_details(&http.0, aid).await
+                        {
+                            if details.metacritic_score.is_none() {
+                                details.metacritic_score = steam.metacritic_score;
+                            }
+                            details.system_requirements = steam.system_requirements;
+                        }
+                    }
+                }
+                Ok(details)
+            }
             None => Err(AppError::NotFound("Game not found on IGDB".into())),
         };
     }
@@ -966,14 +994,22 @@ pub async fn get_hub_game_details(
         .await
         .ok()
         .flatten();
-    let metacritic_score = match steam_app_id.as_deref() {
+    let steam_app_id = match steam_app_id {
+        Some(id) => Some(id),
+        None => {
+            let steam_provider =
+                crate::services::providers::SteamArtworkProvider::new(http.0.clone());
+            steam_provider.resolve_app_id(&details.name).await
+        }
+    };
+    let (metacritic_score, system_requirements) = match steam_app_id.as_deref() {
         Some(app_id) => {
             match crate::commands::metadata::steam_store::get_app_details(&http.0, app_id).await {
-                Ok(Some(steam)) => steam.metacritic_score,
-                _ => None,
+                Ok(Some(steam)) => (steam.metacritic_score, steam.system_requirements),
+                _ => (None, None),
             }
         }
-        None => None,
+        None => (None, None),
     };
 
     let screenshot_urls: Vec<String> = details
@@ -1027,6 +1063,7 @@ pub async fn get_hub_game_details(
         screenshot_urls,
         metacritic_score,
         steam_app_id,
+        system_requirements,
     })
 }
 

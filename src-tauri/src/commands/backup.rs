@@ -43,7 +43,34 @@ const TABLES: &[&str] = &[
     "save_operations",
     "save_operation_locations",
     "settings",
+    "soundtrack_providers",
+    "soundtrack_albums",
+    "soundtrack_tracks",
+    "soundtrack_game_links",
+    "soundtrack_favorites",
+    "soundtrack_play_history",
+    "soundtrack_queue",
+    "soundtrack_downloads",
+    "soundtrack_local_files",
+    "metadata_cache",
 ];
+
+#[derive(Serialize)]
+pub struct BackupStats {
+    pub games: usize,
+    pub collections: usize,
+    pub tags: usize,
+    pub playtime_sessions: usize,
+    pub profiles: usize,
+    pub saves: usize,
+    pub settings: usize,
+    pub downloads: usize,
+    pub soundtrack_albums: usize,
+    pub soundtrack_tracks: usize,
+    pub soundtrack_favorites: usize,
+    pub artwork_cache: usize,
+    pub metadata_cache: usize,
+}
 
 #[derive(Serialize)]
 pub struct ImportSummary {
@@ -53,10 +80,42 @@ pub struct ImportSummary {
     pub playtime_sessions: usize,
 }
 
+#[tauri::command]
+pub fn get_backup_stats(db: State<'_, Database>) -> AppResult<BackupStats> {
+    let conn = db.connection.lock().expect("db mutex poisoned");
+    let count = |table: &str| -> usize {
+        conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get::<_, i64>(0))
+            .map(|n| n.max(0) as usize)
+            .unwrap_or(0)
+    };
+
+    Ok(BackupStats {
+        games: count("games"),
+        collections: count("collections"),
+        tags: count("tags"),
+        playtime_sessions: count("playtime_sessions"),
+        profiles: count("profiles"),
+        saves: count("profile_game_saves") + count("save_operations"),
+        settings: count("settings"),
+        downloads: count("downloads"),
+        soundtrack_albums: count("soundtrack_albums"),
+        soundtrack_tracks: count("soundtrack_tracks"),
+        soundtrack_favorites: count("soundtrack_favorites"),
+        artwork_cache: count("artwork_cache"),
+        metadata_cache: count("metadata_cache"),
+    })
+}
+
 fn read_table(conn: &rusqlite::Connection, table: &str) -> AppResult<Vec<Map<String, Value>>> {
-    let mut stmt = conn
-        .prepare(&format!("SELECT * FROM {table}"))
-        .map_err(AppError::Database)?;
+    let mut stmt = match conn.prepare(&format!("SELECT * FROM {table}")) {
+        Ok(stmt) => stmt,
+        Err(rusqlite::Error::SqliteFailure(err, _))
+            if err.extended_code == rusqlite::ffi::SQLITE_ERROR =>
+        {
+            return Ok(Vec::new());
+        }
+        Err(err) => return Err(AppError::Database(err)),
+    };
     let column_names: Vec<String> = stmt
         .column_names()
         .iter()
@@ -114,7 +173,11 @@ fn json_to_sql(value: &Value) -> AppResult<rusqlite::types::Value> {
 }
 
 #[tauri::command]
-pub fn export_backup(db: State<'_, Database>, file_path: String) -> AppResult<usize> {
+pub fn export_backup(
+    db: State<'_, Database>,
+    file_path: String,
+    tables: Option<Vec<String>>,
+) -> AppResult<usize> {
     let path = file_path.trim();
     if path.is_empty() {
         return Err(AppError::Invalid(
@@ -122,11 +185,28 @@ pub fn export_backup(db: State<'_, Database>, file_path: String) -> AppResult<us
         ));
     }
 
+    let target_tables: Vec<&'static str> = match &tables {
+        Some(selected) => {
+            let filtered: Vec<&'static str> = TABLES
+                .iter()
+                .copied()
+                .filter(|t| selected.iter().any(|s| s == *t))
+                .collect();
+            if filtered.is_empty() {
+                return Err(AppError::Invalid(
+                    "at least one category must be selected for export.".into(),
+                ));
+            }
+            filtered
+        }
+        None => TABLES.to_vec(),
+    };
+
     let conn = db.connection.lock().expect("db mutex poisoned");
     let mut backup = Map::new();
     backup.insert("version".into(), Value::Number(BACKUP_VERSION.into()));
     let mut total_rows = 0usize;
-    for table in TABLES {
+    for table in target_tables {
         let rows = read_table(&conn, table)?;
         total_rows += rows.len();
         backup.insert(
@@ -177,8 +257,7 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
         let entries = match root.get(*table) {
             Some(e) => e,
             None => {
-                // Older backups might omit newer tables like downloads or profiles
-                tables.push((*table, Vec::new()));
+                // Table not present in this backup file (selective backup or older version)
                 continue;
             }
         };
@@ -200,19 +279,22 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
         tables.push((*table, parsed_rows));
     }
 
-    // Minimal semantic check on the one table everything else hangs off.
-    let game_rows = tables
-        .iter()
-        .find(|(table, _)| *table == "games")
-        .map(|(_, rows)| rows)
-        .expect("games validated above");
-    for game in game_rows {
-        let has_identity = game.get("id").is_some_and(Value::is_string)
-            && game.get("name").is_some_and(Value::is_string);
-        if !has_identity {
-            return Err(AppError::Invalid(
-                "backup contains a game row without an id or name.".into(),
-            ));
+    if tables.is_empty() {
+        return Err(AppError::Invalid(
+            "backup file contains no recognized tables.".into(),
+        ));
+    }
+
+    // Semantic check on games only if games were included in the backup
+    if let Some((_, game_rows)) = tables.iter().find(|(table, _)| *table == "games") {
+        for game in game_rows {
+            let has_identity = game.get("id").is_some_and(Value::is_string)
+                && game.get("name").is_some_and(Value::is_string);
+            if !has_identity {
+                return Err(AppError::Invalid(
+                    "backup contains a game row without an id or name.".into(),
+                ));
+            }
         }
     }
 
@@ -322,7 +404,9 @@ pub fn import_backup(
     // Phase 3: artwork files weren't part of the JSON — re-download any
     // missing ones from their recorded source URLs in the background.
     // Custom user-picked artwork has no source URL and is skipped.
-    tauri::async_runtime::spawn(reimport_artwork(app.clone()));
+    if tables.iter().any(|(t, _)| *t == "artwork_cache") {
+        tauri::async_runtime::spawn(reimport_artwork(app.clone()));
+    }
 
     Ok(summary)
 }
@@ -411,6 +495,24 @@ mod tests {
         std::fs::write(&empty_ok, Value::Object(root).to_string()).unwrap();
         let tables = load_and_validate(empty_ok.to_str().unwrap()).unwrap();
         assert_eq!(tables.len(), TABLES.len());
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn validation_accepts_selective_backup() {
+        let dir = std::env::temp_dir().join("nexus-backup-test-selective");
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let selective = dir.join("selective.json");
+        let mut root = Map::new();
+        root.insert("version".into(), Value::Number(1.into()));
+        root.insert("settings".into(), Value::Array(vec![]));
+        std::fs::write(&selective, Value::Object(root).to_string()).unwrap();
+
+        let tables = load_and_validate(selective.to_str().unwrap()).unwrap();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].0, "settings");
 
         std::fs::remove_dir_all(&dir).ok();
     }

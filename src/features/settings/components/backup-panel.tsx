@@ -11,26 +11,42 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { open as openFileDialog, save as saveFileDialog } from '@tauri-apps/plugin-dialog'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Modal } from '@/components/ui/modal'
-import { exportBackup, importBackup, type ImportSummary } from '@/services/backup'
+import { exportBackup, getBackupStats, importBackup, type ImportSummary } from '@/services/backup'
 import { useGames } from '@/features/library/hooks/use-games'
+import { useCollections } from '@/features/collections/hooks/use-collections'
+import { useTags } from '@/features/library/hooks/use-tags'
+import { useProfileStore } from '@/store/profile-store'
 import { StorageCleanupCard } from './storage-cleanup-card'
+import { ExportBackupModal } from './export-backup-modal'
 
 const BACKUP_FILTER = [{ name: 'Nexus Backup', extensions: ['json'] }]
 
 export function BackupPanel() {
   const queryClient = useQueryClient()
   const { data: games } = useGames()
+  const { data: collections } = useCollections()
+  const { data: tags } = useTags()
+  const profiles = useProfileStore((state) => state.profiles)
+
+  const { data: backupStats } = useQuery({
+    queryKey: ['backup-stats'],
+    queryFn: getBackupStats,
+    staleTime: 10_000,
+  })
+
   const [pendingImport, setPendingImport] = useState<string | null>(null)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
 
   const totalGames = games?.length ?? 0
   const installedGames = games?.filter((g) => g.is_installed).length ?? 0
   const favoriteGames = games?.filter((g) => g.is_favorite).length ?? 0
 
   const exportMutation = useMutation({
-    mutationFn: exportBackup,
+    mutationFn: ({ filePath, tables }: { filePath: string; tables?: string[] }) =>
+      exportBackup(filePath, tables),
     onSuccess: (rows) => toast.success(`Backup saved — ${rows} records safely archived.`),
     onError: (error) => toast.error(error instanceof Error ? error.message : 'Export failed.'),
   })
@@ -40,8 +56,15 @@ export function BackupPanel() {
     onSuccess: (summary: ImportSummary) => {
       setPendingImport(null)
       queryClient.invalidateQueries()
+      const restoredItems: string[] = []
+      if (summary.games > 0) restoredItems.push(`${summary.games} games`)
+      if (summary.collections > 0) restoredItems.push(`${summary.collections} collections`)
+      if (summary.tags > 0) restoredItems.push(`${summary.tags} tags`)
+      if (summary.playtime_sessions > 0) restoredItems.push(`${summary.playtime_sessions} sessions`)
       toast.success(
-        `Restored ${summary.games} games, ${summary.collections} collections, and ${summary.playtime_sessions} sessions.`,
+        restoredItems.length > 0
+          ? `Restored ${restoredItems.join(', ')}.`
+          : 'Backup data restored successfully.',
       )
     },
     onError: (error) => {
@@ -50,14 +73,18 @@ export function BackupPanel() {
     },
   })
 
-  async function handleExport() {
+  async function handleExportStart(selectedTables: string[]) {
     try {
+      const today = new Date().toISOString().slice(0, 10)
       const path = await saveFileDialog({
         title: 'Save Nexus Backup',
         filters: BACKUP_FILTER,
-        defaultPath: 'nexus-backup.json',
+        defaultPath: `nexus-backup-${today}.json`,
       })
-      if (typeof path === 'string') exportMutation.mutate(path)
+      if (typeof path === 'string') {
+        setIsExportModalOpen(false)
+        exportMutation.mutate({ filePath: path, tables: selectedTables })
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not open save dialog.')
     }
@@ -128,16 +155,16 @@ export function BackupPanel() {
             <div className="flex size-10 items-center justify-center rounded-xl bg-accent/15 text-accent shadow-xs">
               <Download className="size-5" />
             </div>
-            <h3 className="mt-3.5 text-sm font-bold text-text">Export Library Archive</h3>
+            <h3 className="mt-3.5 text-sm font-bold text-text">Create Backup Archive</h3>
             <p className="mt-1 text-xs leading-relaxed text-muted">
-              Package your entire library, custom tags, collection folders, and play sessions into a
-              portable JSON file.
+              Select and package your games, save states, custom covers, soundtracks, tags, and
+              settings into a single portable backup file.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={handleExport}
+            onClick={() => setIsExportModalOpen(true)}
             disabled={exportMutation.isPending}
             className="mt-5 flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/10 py-2.5 text-xs font-bold text-accent shadow-xs transition-all hover:bg-accent hover:text-white active:scale-95 disabled:opacity-50"
           >
@@ -146,7 +173,7 @@ export function BackupPanel() {
             ) : (
               <Download className="size-4" />
             )}
-            <span>Export Backup File</span>
+            <span>Back Up Now...</span>
           </button>
         </div>
 
@@ -225,6 +252,21 @@ export function BackupPanel() {
           </div>
         </div>
       </Modal>
+
+      {/* Selective Export Modal */}
+      <ExportBackupModal
+        open={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        onConfirm={handleExportStart}
+        isExporting={exportMutation.isPending}
+        stats={backupStats}
+        counts={{
+          games: totalGames,
+          collections: collections?.length,
+          tags: tags?.length,
+          profiles: profiles.length,
+        }}
+      />
     </div>
   )
 }

@@ -255,6 +255,7 @@ impl MetadataProvider for DirectIgdbProvider {
             screenshot_urls,
             metacritic_score: None,
             steam_app_id: None,
+            system_requirements: None,
         }))
     }
 

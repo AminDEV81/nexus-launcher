@@ -8,9 +8,9 @@ import {
   Compass,
   Bookmark,
   BarChart3,
-  Settings,
   Download,
   Sparkles,
+  Activity,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -40,5 +40,5 @@ export const LIBRARY_NAV_ITEMS: NavItem[] = [
 /** Secondary items, rendered under a "Manage" divider. */
 export const MANAGE_NAV_ITEMS: NavItem[] = [
   { label: 'Stats', path: '/stats', icon: BarChart3 },
-  { label: 'Settings', path: '/settings', icon: Settings },
+  { label: 'Overlay HUD', path: '/overlay', icon: Activity },
 ]

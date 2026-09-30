@@ -27,9 +27,13 @@ impl Database {
         // Sensible defaults for a local desktop app: WAL improves
         // read/write concurrency between the UI thread and background
         // tasks (e.g. metadata downloads writing while the grid reads).
-        // synchronous=FULL is mandatory for transaction durability.
+        // synchronous=NORMAL in WAL mode ensures crash safety without forcing
+        // physical disk platter flushes (FlushFileBuffers) on every write, preventing 100% HDD spikes.
         connection.pragma_update(None, "journal_mode", "WAL")?;
-        connection.pragma_update(None, "synchronous", "FULL")?;
+        connection.pragma_update(None, "synchronous", "NORMAL")?;
+        connection.pragma_update(None, "temp_store", "MEMORY")?;
+        connection.pragma_update(None, "cache_size", "-32000")?;
+        connection.pragma_update(None, "wal_autocheckpoint", "1000")?;
         // Disable foreign keys during migration execution so table recreations
         // (RENAME -> CREATE -> INSERT -> DROP) run safely without constraint conflicts.
         connection.pragma_update(None, "foreign_keys", "OFF")?;

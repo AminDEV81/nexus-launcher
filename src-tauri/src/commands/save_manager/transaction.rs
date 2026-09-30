@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 pub struct SaveLocationConfig {
     pub id: String,
     pub game_id: String,
+    pub raw_path: String,
     pub os_path: PathBuf,
     pub location_type: String,
     pub is_enabled: bool,
@@ -47,6 +48,7 @@ impl TransactionCoordinator {
             Ok(SaveLocationConfig {
                 id,
                 game_id: gid,
+                raw_path: raw_path.clone(),
                 os_path: expand_save_path(&raw_path),
                 location_type,
                 is_enabled,

@@ -548,18 +548,24 @@ pub fn expand_save_path(raw: &str) -> PathBuf {
 }
 
 /// Scans a file or directory path and computes (file_count, total_size_bytes)
-/// without hashing full file contents, tracking seen canonical paths to avoid double-counting.
+/// without hashing full file contents, tracking seen normalized paths to avoid double-counting.
+/// Avoids `canonicalize()` which opens file handles to every file and thrashes HDDs on Windows.
 pub fn scan_path_file_stats(
     path: &Path,
-    seen_canonical: &mut HashSet<PathBuf>,
+    seen_paths: &mut HashSet<PathBuf>,
 ) -> (i64, i64) {
     if !path.exists() {
         return (0, 0);
     }
 
+    #[cfg(windows)]
+    let normalize = |p: &Path| PathBuf::from(p.to_string_lossy().to_lowercase());
+    #[cfg(not(windows))]
+    let normalize = |p: &Path| p.to_path_buf();
+
     if path.is_file() {
-        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-        if seen_canonical.insert(canonical) {
+        let norm = normalize(path);
+        if seen_paths.insert(norm) {
             if let Ok(meta) = fs::metadata(path) {
                 return (1, meta.len() as i64);
             }
@@ -578,8 +584,8 @@ pub fn scan_path_file_stats(
     for entry in walker.filter_map(|e| e.ok()) {
         if entry.file_type().is_file() {
             let entry_path = entry.path();
-            let canonical = entry_path.canonicalize().unwrap_or_else(|_| entry_path.to_path_buf());
-            if seen_canonical.insert(canonical) {
+            let norm = normalize(entry_path);
+            if seen_paths.insert(norm) {
                 count += 1;
                 if let Ok(meta) = entry.metadata() {
                     size += meta.len() as i64;

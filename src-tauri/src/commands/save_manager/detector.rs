@@ -102,65 +102,69 @@ impl SaveDetector {
         }
 
         // 2. Unity LocalLow Deep Scan (%USERPROFILE%\AppData\LocalLow\<Company>\<Title>\...)
-        if let Some(home) = dirs::home_dir() {
-            let local_low = home.join("AppData").join("LocalLow");
-            if local_low.is_dir() {
-                if let Ok(companies) = fs::read_dir(&local_low) {
-                    for company_entry in companies.flatten() {
-                        let company_path = company_entry.path();
-                        if !company_path.is_dir() {
-                            continue;
-                        }
-                        let company_name = company_entry.file_name().to_string_lossy().to_string();
+        // Heavy directory tree crawl: only run if no high-confidence candidate has been confirmed yet
+        let has_confirmed_loc = candidates.iter().any(|c| c.exists && c.confidence >= 90);
+        if !has_confirmed_loc {
+            if let Some(home) = dirs::home_dir() {
+                let local_low = home.join("AppData").join("LocalLow");
+                if local_low.is_dir() {
+                    if let Ok(companies) = fs::read_dir(&local_low) {
+                        for company_entry in companies.flatten() {
+                            let company_path = company_entry.path();
+                            if !company_path.is_dir() {
+                                continue;
+                            }
+                            let company_name = company_entry.file_name().to_string_lossy().to_string();
 
-                        if let Ok(products) = fs::read_dir(&company_path) {
-                            for prod_entry in products.flatten() {
-                                let prod_path = prod_entry.path();
-                                if !prod_path.is_dir() {
-                                    continue;
-                                }
+                            if let Ok(products) = fs::read_dir(&company_path) {
+                                for prod_entry in products.flatten() {
+                                    let prod_path = prod_entry.path();
+                                    if !prod_path.is_dir() {
+                                        continue;
+                                    }
 
-                                let prod_name = prod_entry.file_name().to_string_lossy().to_string();
-                                let prod_lower = prod_name.to_lowercase();
+                                    let prod_name = prod_entry.file_name().to_string_lossy().to_string();
+                                    let prod_lower = prod_name.to_lowercase();
 
-                                let matches = prod_lower == title_lower
-                                    || prod_lower == title_no_spaces_lower
-                                    || (title_lower.len() >= 3 && prod_lower.contains(&title_lower))
-                                    || (!title_no_spaces_lower.is_empty() && prod_lower.contains(&title_no_spaces_lower));
+                                    let matches = prod_lower == title_lower
+                                        || prod_lower == title_no_spaces_lower
+                                        || (title_lower.len() >= 3 && prod_lower.contains(&title_lower))
+                                        || (!title_no_spaces_lower.is_empty() && prod_lower.contains(&title_no_spaces_lower));
 
-                                if matches {
-                                    // Check for nested saves folder
-                                    let mut found_nested_save = false;
-                                    for sub in &["saves", "Save", "save", "SaveGames", "Saved"] {
-                                        let sub_path = prod_path.join(sub);
-                                        if sub_path.is_dir() {
-                                            found_nested_save = true;
-                                            let raw_path = format!(
-                                                "%USERPROFILE%\\AppData\\LocalLow\\{}\\{}\\{}",
-                                                company_name, prod_name, sub
+                                    if matches {
+                                        // Check for nested saves folder
+                                        let mut found_nested_save = false;
+                                        for sub in &["saves", "Save", "save", "SaveGames", "Saved"] {
+                                            let sub_path = prod_path.join(sub);
+                                            if sub_path.is_dir() {
+                                                found_nested_save = true;
+                                                let raw_path = format!(
+                                                    "%USERPROFILE%\\AppData\\LocalLow\\{}\\{}\\{}",
+                                                    company_name, prod_name, sub
+                                                );
+                                                let has_files = Self::dir_has_files(&sub_path);
+                                                candidates.push(DetectedSaveLocation {
+                                                    path: raw_path,
+                                                    location_type: "save".to_string(),
+                                                    confidence: if has_files { 99 } else { 90 },
+                                                    exists: true,
+                                                });
+                                            }
+                                        }
+
+                                        if !found_nested_save {
+                                            let raw_parent = format!(
+                                                "%USERPROFILE%\\AppData\\LocalLow\\{}\\{}",
+                                                company_name, prod_name
                                             );
-                                            let has_files = Self::dir_has_files(&sub_path);
+                                            let has_files = Self::is_actual_save_dir(&prod_path);
                                             candidates.push(DetectedSaveLocation {
-                                                path: raw_path,
+                                                path: raw_parent,
                                                 location_type: "save".to_string(),
-                                                confidence: if has_files { 99 } else { 90 },
+                                                confidence: if has_files { 95 } else { 80 },
                                                 exists: true,
                                             });
                                         }
-                                    }
-
-                                    if !found_nested_save {
-                                        let raw_parent = format!(
-                                            "%USERPROFILE%\\AppData\\LocalLow\\{}\\{}",
-                                            company_name, prod_name
-                                        );
-                                        let has_files = Self::is_actual_save_dir(&prod_path);
-                                        candidates.push(DetectedSaveLocation {
-                                            path: raw_parent,
-                                            location_type: "save".to_string(),
-                                            confidence: if has_files { 95 } else { 80 },
-                                            exists: true,
-                                        });
                                     }
                                 }
                             }
@@ -317,26 +321,30 @@ impl SaveDetector {
         // 1. Existing paths with actual save files on disk
         // 2. Existing empty directories
         // 3. Theoretical candidate paths by confidence descending
-        final_candidates.sort_by(|a, b| {
+        // Precompute has_saves once per candidate to avoid re-walking directories in sort comparisons
+        let mut with_has_saves: Vec<(DetectedSaveLocation, bool)> = final_candidates
+            .into_iter()
+            .map(|c| {
+                let has_saves = c.exists && Self::is_actual_save_dir(&expand_save_path(&c.path));
+                (c, has_saves)
+            })
+            .collect();
+
+        with_has_saves.sort_by(|(a, a_has_saves), (b, b_has_saves)| {
             let a_is_config = a.location_type == "config" || a.path.to_lowercase().contains("config");
             let b_is_config = b.location_type == "config" || b.path.to_lowercase().contains("config");
 
             a_is_config
                 .cmp(&b_is_config)
                 .then_with(|| {
-                    let a_expanded = expand_save_path(&a.path);
-                    let b_expanded = expand_save_path(&b.path);
-                    let a_has_saves = a.exists && Self::is_actual_save_dir(&a_expanded);
-                    let b_has_saves = b.exists && Self::is_actual_save_dir(&b_expanded);
-
                     b_has_saves
-                        .cmp(&a_has_saves)
+                        .cmp(a_has_saves)
                         .then_with(|| b.exists.cmp(&a.exists))
                         .then_with(|| b.confidence.cmp(&a.confidence))
                 })
         });
 
-        final_candidates
+        with_has_saves.into_iter().map(|(c, _)| c).collect()
     }
 
     pub fn is_generic_root_path(norm: &str) -> bool {

@@ -1,9 +1,20 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { PanelLeftClose, PanelLeftOpen, Plus, Search, Sun, Moon, Sparkles } from 'lucide-react'
+import {
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Search,
+  Sun,
+  Moon,
+  Sparkles,
+  Settings,
+} from 'lucide-react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { LogoMark } from '@/components/brand/logo-mark'
 import { cn } from '@/lib/utils'
 import { useUiStore } from '@/store/ui-store'
 import { useThemeStore } from '@/store/theme-store'
+import { useUpdaterStore } from '@/store/updater-store'
 import { useAddGameModalStore } from '@/features/library/store/add-game-modal-store'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { LIBRARY_NAV_ITEMS, MANAGE_NAV_ITEMS, DISCOVER_NAV_ITEMS } from './nav-items'
@@ -13,12 +24,17 @@ const WIDTH_EXPANDED = 252
 const WIDTH_COLLAPSED = 76
 
 export function Sidebar() {
+  const navigate = useNavigate()
+  const location = useLocation()
   const collapsed = useUiStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
   const openAddGameModal = useAddGameModalStore((s) => s.open)
   const mode = useThemeStore((s) => s.mode)
   const toggleMode = useThemeStore((s) => s.toggleMode)
+  const isUpdateAvailable = useUpdaterStore((s) => s.status === 'available')
   const speed = useAnimationSpeed()
+
+  const isSettingsActive = location.pathname.startsWith('/settings')
 
   return (
     <motion.aside
@@ -121,6 +137,26 @@ export function Sidebar() {
               <PanelLeftClose className="size-4" />
             )}
           </SidebarFooterButton>
+          <SidebarFooterButton
+            label="Settings"
+            onClick={() => navigate('/settings')}
+            collapsed={collapsed}
+            className={
+              isSettingsActive
+                ? 'text-accent bg-accent/15 ring-1 ring-accent/30 hover:bg-accent/20 hover:text-accent'
+                : undefined
+            }
+          >
+            <div className="relative flex items-center justify-center">
+              <Settings className="size-4" />
+              {isUpdateAvailable && (
+                <span
+                  className="absolute -top-1 -right-1 size-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff]"
+                  title="New update available"
+                />
+              )}
+            </div>
+          </SidebarFooterButton>
         </div>
       </div>
     </motion.aside>
@@ -172,11 +208,13 @@ function SidebarFooterButton({
   onClick,
   collapsed,
   children,
+  className,
 }: {
   label: string
   onClick: () => void
   collapsed: boolean
   children: React.ReactNode
+  className?: string
 }) {
   return (
     <motion.button
@@ -187,8 +225,9 @@ function SidebarFooterButton({
       whileHover={{ scale: 1.06 }}
       whileTap={{ scale: 0.94 }}
       className={cn(
-        'flex size-9 items-center justify-center rounded-xl text-subtle transition-colors hover:bg-surface-raised hover:text-text',
+        'flex size-9 items-center justify-center rounded-xl text-subtle transition-colors hover:bg-surface-raised hover:text-text cursor-pointer',
         !collapsed && 'flex-1',
+        className,
       )}
     >
       {children}

@@ -63,7 +63,7 @@ walkdir = "2"
 # and for Steam games handed off via `steam://`, where the only way to
 # find the resulting process is to watch for its executable name to
 # appear in the system's process list.
-sysinfo = { version = "0.32", default-features = false, features = ["system", "disk"] }
+sysinfo = { version = "0.32", default-features = false, features = ["system", "disk", "network", "component"] }
 
 
 # Cropping user-selected artwork to a target rect (Epic 10's cover/
@@ -111,4 +111,13 @@ windows-sys = { version = "0.61", features = [
     "Win32_System_JobObjects",
     "Win32_Storage_FileSystem",
     "Win32_System_LibraryLoader",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Power",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Gdi",
+    "Win32_System_Diagnostics_Etw",
+    "Win32_System_Memory",
+    "Win32_System_Performance",
+    "Win32_System_Time",
 ] }

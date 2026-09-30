@@ -1,4 +1,6 @@
-pub use crate::commands::hub::{HubGame, HubGameDetails, HubVideo};
+pub use crate::commands::hub::{
+    HubGame, HubGameDetails, HubVideo, SystemRequirementDetail, SystemRequirements,
+};
 use crate::commands::metadata::steamgriddb::GridOption;
 use serde::{Deserialize, Serialize};
 

@@ -261,3 +261,58 @@
 [data-window-active='false'] .nx-spin-fast {
   animation: none !important;
 }
+
+/* Overlay notification time-left bar (transform-only, see notification-stack.tsx). */
+@keyframes nx-toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.nx-toast-progress {
+  animation-name: nx-toast-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+/* Overlay HUD entrance + live-status ping (opacity/transform only). */
+@keyframes nx-hud-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.nx-hud-in {
+  animation: nx-hud-in 260ms ease-out both;
+}
+
+@keyframes nx-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  75%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.nx-ping {
+  animation: nx-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-hud-in,
+  .nx-ping {
+    animation: none;
+  }
+}
