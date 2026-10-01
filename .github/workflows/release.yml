@@ -179,32 +179,53 @@ jobs:
           retryAttempts: 3
           updaterJsonPreferNsis: true
           releaseBody: |
-            # 🚀 Nexus Game Launcher ${{ github.ref_name }}
+            # 🚀 Nexus Game Launcher ${{ github.ref_name }} — The Ultimate Gaming Overlay & Performance Release
 
-            نسخه رسمی **۰.۵.۰** لانچر نکسوس با ماژول پرچمدار **اورلی گیمینگ (In-Game Overlay HUD)**، تلمتری بلادرنگ سخت‌افزار بر پایه ETW، سنجش فوق‌دقیق FPS و Frametime، بازطراحی کامل تم لایت وب‌سایت و بسته‌های نصبی پایدار برای ویندوز و لینوکس منتشر شد!
-            Official release of **Nexus Game Launcher ${{ github.ref_name }}** featuring the brand-new flagship **Gaming Overlay HUD**, real-time ETW hardware telemetry & microsecond-accurate FPS/Frametime tracking, full light theme overhaul for the website, and rock-solid Windows & Linux production packages!
+            نسخه رسمی **۰.۵.۰** لانچر نکسوس با ماژول پرچمدار و انقلابی **اورلی گیمینگ (In-Game Overlay HUD)**، پایش عمیق تلمتری سخت‌افزار با ETW، سنجش فوق‌دقیق و بدون تاخیر FPS و Frametime، ۶ پوسته و چیدمان بصری HUD، نمودار زنده فریم‌تایم، سیستم هشدارهای سخت‌افزاری، اصلاح و یکپارچه‌سازی کامل تم لایت وب‌سایت و بسته‌های نصبی پایدار برای ویندوز و لینوکس منتشر شد!
+            The official **v0.5.0** release of Nexus Game Launcher introduces our flagship **In-Game Gaming Overlay HUD**, microsecond-accurate ETW frame timing & FPS telemetry, 6 customizable HUD visual themes, live Frametime jitter graphs, non-intrusive hardware diagnostic alerts, full website light theme overhaul, and rock-solid production packages for Windows and Linux!
 
             ---
 
-            ### ⚡ ویژگی‌های برجسته نسخه ۰.۵.۰ (What's New in v0.5.0)
+            ### 🎮 ماژول پرچمدار اورلی گیمینگ (Flagship In-Game Overlay HUD)
 
-            - 🎮 **اورلی گیمینگ درون‌بازی و مانیتورینگ بلادرنگ (In-Game Overlay HUD & Telemetry):**
-              - **رهگیری دقیق FPS و Frametime:** پایش زنده و بدون تاخیر نرخ فریم و زمان فریم بازی‌ها بر پایه رویدادهای هسته سیستم‌عامل (ETW) بدون ایجاد کوچکترین افت فریم یا سربار گرافیکی.
-              - **پایش جامع سلامت سخت‌افزار:** نمایش درصد استفاده پردازنده (CPU Usage)، کارت گرافیک (GPU Usage)، حافظه ویدئویی (VRAM)، رم سیستم (RAM)، دیسک، شبکه و وضعیت باتری لپ‌تاپ.
-              - **کلید میانبر و دسترسی سریع:** فعال‌سازی و بستن آنی اورلی با فشردن کلید میانبر `Ctrl+Shift+Z` در هنگام اجرای هر بازی.
-              - **استایل‌های متنوع HUD:** امکان انتخاب بین حالت‌های فشرده (Compact)، مینیمال و پیشرفته متناسب با سبک بازی شما.
+            - ⚡ **موتور سنجش فریم فوق‌دقیق بر پایه ETW (Zero-Injection Frame Timing):**
+              - اندازه‌گیری فریم‌ها بدون کوچکترین افت کارایی (Zero Overhead) از طریق Event Tracing for Windows و ساب‌سیستم DXGI.
+              - کاملاً ایمن در بازی‌های آنلاین با آنتی‌چیت‌های Easy Anti-Cheat, BattlEye, Vanguard و Ricochet به دلیل عدم تزریق هرگونه DLL.
+              - سنجش لحظه‌ای FPS، میانگین فریم، شاخص‌های حیاتی 1% Low و 0.1% Low FPS و فریم‌تایم میکروثانیه‌ای (Frametime ms).
 
-            - 🌓 **اصلاح و ارتقای تم لایت سایت و داکیومنت‌ها (Website Light Theme Redesign):**
-              - رفع تمامی ناسازگاری‌های متنی، رنگ‌ها و پس‌زمینه‌ها در تم لایت برای خوانایی ۱۰۰٪.
-              - بازطراحی بخش کارت‌های Bento Grid، جدول بنچمارک مقایسه‌ای و پنجره انتخاب پکیج لینوکس.
+            - 📊 **سنسورهای عمیق تلمتری سخت‌افزار (Multi-Tier Hardware Diagnostics):**
+              - **CPU:** درصد استفاده کل و تک‌تک هسته‌ها، دمای پردازنده (Tctl/Tdie)، فرکانس کلاک و توان مصرفی پردازنده (Watts).
+              - **GPU:** درصد استفاده هسته گرافیکی، میزان حافظه ویدئویی (VRAM)، دمای هسته و هات‌اسپات، سرعت فن و اتصال به سنسورهای NVML و ADL/DXGI.
+              - **RAM, Disk & Network:** رم مصرفی بازی و سیستم، سرعت خواندن/نوشتن دیسک، سرعت آپلود/دانلود و پینگ شبکه.
+              - **Power & Battery:** درصد شارژ و سلامت باتری لپ‌تاپ‌های گیمینگ، نرخ دشارژ و تخمین زمان باقی‌مانده.
 
-            - ⚙️ **بهینه‌سازی معماری و راندمان سیستم (Engine Polish & Stability):**
-              - ارتقا به نسخه 0.5.0 در هسته Rust و Tauri 2 با مصرف رم فوق‌العاده پایین (~60-70MB).
-              - مدیریت بهینه رجیستری هوت‌کی و یکپارچه‌سازی با فرآیند اجرای بازی‌ها.
-              - به‌روزرسانی سیستم عیب‌یابی و ذخیره‌سازی محلی دیتابیس SQLite.
+            - 🎨 **۶ پوسته و چیدمان بصری متنوع HUD (6 Customizable Themes & Layouts):**
+              - شامل پوسته‌های Compact Badge (کپسولی و مینیاتوری)، Horizontal Bar (نوار افقی سایبرپانک)، Vertical Strip (ستونی)، Modular Cards (کارت‌های ماژولار)، Radial Gauges (عقربه‌ای سفینه‌ای) و Bracket HUD (زرهی).
 
-            - 🐧 **پشتیبانی پایدار از لینوکس (Linux & Steam Deck Support):**
-              - ارائه بیلد نهایی پکیج‌های AppImage، Debian (`.deb`) و Fedora/RHEL (`.rpm`) برای اکوسیستم آرچ لینوکس، مانجارو، استیم‌دک و اوبونتو.
+            - 📈 **نمودار زنده فریم‌تایم (Live Frametime Graph):**
+              - ترسیم ۶۰ فریم بر ثانیه نمودار زمانی فریم‌ها روی بوم Canvas با تشخیص بلادرنگ لگ و لکنت‌های ریز (Micro-Stutters).
+
+            - 🔔 **سیستم هوشمند اخطار سلامت سخت‌افزار (Hardware Safety Alerts):**
+              - اعلان هوشمند هنگام داغ شدن بیش از حد پردازنده یا گرافیک (>85°C/90°C) یا اشغال بحرانی حافظه رم.
+
+            - ⌨️ **کلید میانبر سراسری و پنجره شناور شفاف (Global Hotkey & Click-Through):**
+              - کلید پیش‌فرض `Ctrl+Shift+Z` برای باز و بسته کردن آنی اورلی با پنجره تمام‌شفاف کلیک‌ردشونده (WS_EX_TRANSPARENT) بدون تداخل با نشانه‌گیری موس.
+
+            ---
+
+            ### 🌓 بازطراحی و فیکس تم لایت وب‌سایت (Website Light Theme Redesign)
+
+            - اصلاح ۱۰۰٪ کنتراست رنگ متون و کارت‌ها در تم لایت در سایت رسمی و داکیومنت‌ها.
+            - اضافه شدن کارت پرچمدار Bento 9 جهت معرفی تعاملی اورلی به وب‌سایت.
+            - ارتقای رابط کاربری پنجره انتخاب پکیج‌های لینوکس و کدهای ترمینال.
+
+            ---
+
+            ### ⚙️ بهینه‌سازی و پایداری هسته برنامه (Core Performance & Stability)
+
+            - ارتقای معماری Rust و Tauri 2 به نگارش ۰.۵.۰ با مصرف رم فوق‌العاده پایین (~60-70MB).
+            - مدیریت بهینه رجیستری هوت‌کی و یکپارچه‌سازی با فرآیند اجرای بازی‌ها.
+            - امضای دیجیتال کامل تمام بسته‌ها برای فعال‌سازی سیستم آپدیت خودکار.
 
             ---
 
@@ -215,12 +236,18 @@ jobs:
               - کاربران فعلی در صورت باز بودن برنامه، اعلان به‌روزرسانی خودکار درون‌برنامه‌ای را دریافت خواهند کرد.
 
             - 🐧 **لینوکس (آرچ، مانجارو، استیم‌دک، فدورا، اوبونتو و تمام توزیع‌ها):**
-              - فایل `Nexus_0.5.0_amd64.AppImage` را دانلود کرده و دسترسی اجرا دهید:
+              - **پکیج همه‌منظوره AppImage (پیشنهادی):**
                 ```bash
                 chmod +x Nexus_0.5.0_amd64.AppImage
                 ./Nexus_0.5.0_amd64.AppImage
                 ```
-              - برای اوبونتو و دبیان: پکیج `nexus_0.5.0_amd64.deb` را دریافت و با دستور `sudo dpkg -i nexus_0.5.0_amd64.deb` نصب کنید.
-              - برای فدورا و ردهت: پکیج `Nexus-0.5.0-1.x86_64.rpm` را دریافت و با دستور `sudo dnf install ./Nexus-0.5.0-1.x86_64.rpm` نصب کنید.
+              - **پکیج دبیان و اوبونتو (.deb):**
+                ```bash
+                sudo dpkg -i nexus_0.5.0_amd64.deb
+                ```
+              - **پکیج فدورا و ردهت (.rpm):**
+                ```bash
+                sudo dnf install ./Nexus-0.5.0-1.x86_64.rpm
+                ```
           releaseDraft: false
           prerelease: false
