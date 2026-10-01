@@ -685,6 +685,9 @@ details[open] summary .faq-icon {
    ========================================================================== */
 html:not(.dark) {
   color-scheme: light;
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
 }
 
 html:not(.dark) body {
@@ -696,40 +699,119 @@ html:not(.dark) body {
 html:not(.dark) h1:not(.theme-exempt),
 html:not(.dark) h2:not(.theme-exempt),
 html:not(.dark) h3:not(.theme-exempt),
-html:not(.dark) h4:not(.theme-exempt) {
+html:not(.dark) h4:not(.theme-exempt),
+html:not(.dark) h5:not(.theme-exempt),
+html:not(.dark) h6:not(.theme-exempt) {
   color: #0f172a !important;
 }
 
 /* Secondary/Body Text */
 html:not(.dark) p:not(.theme-exempt) {
-  color: #475569;
+  color: #334155 !important;
 }
 
 /* Glass Panels & Bento Cards in Light Mode */
 html:not(.dark) .glass-panel {
-  background: rgba(255, 255, 255, 0.88) !important;
-  border-color: rgba(15, 23, 42, 0.09) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
   box-shadow:
     0 10px 30px -10px rgba(0, 0, 0, 0.06),
     0 0 1px rgba(0, 0, 0, 0.08) !important;
 }
 
 html:not(.dark) .glass-panel:hover {
-  border-color: rgba(124, 92, 255, 0.4) !important;
-  box-shadow: 0 20px 40px -15px rgba(124, 92, 255, 0.15) !important;
+  border-color: rgba(124, 92, 255, 0.45) !important;
+  box-shadow: 0 20px 40px -15px rgba(124, 92, 255, 0.16) !important;
+}
+
+/* Bento Inner Cards & Metric Boxes */
+html:not(.dark) .glass-panel .bg-black\/40,
+html:not(.dark) .glass-panel .bg-black\/50 {
+  background: rgba(15, 23, 42, 0.04) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+html:not(.dark) .glass-panel .bg-black\/40 .text-slate-300,
+html:not(.dark) .glass-panel .bg-black\/40 .text-slate-400,
+html:not(.dark) .glass-panel .bg-black\/50 .text-slate-300,
+html:not(.dark) .glass-panel .bg-black\/50 .text-slate-400 {
+  color: #334155 !important;
+}
+
+html:not(.dark) .glass-panel .bg-slate-800 {
+  background: #e2e8f0 !important;
+}
+
+/* Bento Badges & Pills */
+html:not(.dark) .glass-panel .bg-white\/5 {
+  background: rgba(15, 23, 42, 0.04) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+html:not(.dark) .glass-panel .border-white\/5,
+html:not(.dark) .glass-panel .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.09) !important;
+}
+
+html:not(.dark) .glass-panel .text-slate-200 {
+  color: #1e293b !important;
+  font-weight: 600 !important;
+}
+
+html:not(.dark) .glass-panel .text-slate-300 {
+  color: #334155 !important;
+}
+
+html:not(.dark) .glass-panel .text-slate-400 {
+  color: #64748b !important;
+}
+
+html:not(.dark) .glass-panel .text-emerald-300 {
+  color: #059669 !important;
+  font-weight: 700 !important;
+}
+
+html:not(.dark) .glass-panel .text-purple-300 {
+  color: #7c3aed !important;
+  font-weight: 700 !important;
+}
+
+html:not(.dark) .glass-panel .text-cyan-300 {
+  color: #0284c7 !important;
+  font-weight: 700 !important;
+}
+
+html:not(.dark) .glass-panel .text-amber-300 {
+  color: #d97706 !important;
+  font-weight: 700 !important;
+}
+
+/* RAM Savings Calculator */
+html:not(.dark) #games-slider {
+  background: #e2e8f0 !important;
+}
+
+html:not(.dark) #games-slider::-webkit-slider-thumb {
+  background: #7c5cff !important;
+  box-shadow: 0 2px 6px rgba(124, 92, 255, 0.4) !important;
 }
 
 /* Navigation bar */
 html:not(.dark) nav {
-  background: rgba(255, 255, 255, 0.85) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
   border-color: rgba(15, 23, 42, 0.08) !important;
   box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.04);
 }
 
 /* Metrics Section */
 html:not(.dark) section.border-y {
-  background: rgba(241, 245, 249, 0.75) !important;
+  background: rgba(241, 245, 249, 0.8) !important;
   border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+html:not(.dark) section.border-y .text-slate-400 {
+  color: #475569 !important;
+  font-weight: 600 !important;
 }
 
 /* App Mockup Outer Frame */
@@ -740,15 +822,60 @@ html:not(.dark) .app-mockup-frame {
     0 0 0 1px rgba(15, 23, 42, 0.08) !important;
 }
 
+/* Floating Mockup Badges */
+html:not(.dark) .animate-float {
+  background: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
+}
+
+html:not(.dark) .animate-float span[data-i18n='badge_floating_ram'] {
+  color: #0284c7 !important;
+}
+
+html:not(.dark) .animate-float span[data-i18n='badge_floating_turbo'] {
+  color: #7c3aed !important;
+}
+
+/* System Specs Cards */
+html:not(.dark) #specs .bg-white\/5 {
+  background: rgba(15, 23, 42, 0.04) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+html:not(.dark) #specs .text-white {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+html:not(.dark) #specs .text-slate-400 {
+  color: #64748b !important;
+}
+
 /* Comparison Table */
 html:not(.dark) table {
   border-color: rgba(15, 23, 42, 0.08) !important;
 }
 
+html:not(.dark) table thead {
+  background-color: rgba(241, 245, 249, 0.9) !important;
+}
+
 html:not(.dark) table th {
-  background-color: rgba(241, 245, 249, 0.85) !important;
   color: #0f172a !important;
   border-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+html:not(.dark) table th.text-slate-300,
+html:not(.dark) table th .text-slate-300 {
+  color: #475569 !important;
+}
+
+html:not(.dark) table tbody tr {
+  border-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+html:not(.dark) table tbody tr:hover {
+  background: rgba(15, 23, 42, 0.02) !important;
 }
 
 html:not(.dark) table td {
@@ -756,21 +883,80 @@ html:not(.dark) table td {
   color: #334155 !important;
 }
 
+html:not(.dark) table td.text-slate-200,
+html:not(.dark) table td .text-slate-200 {
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+html:not(.dark) table td.text-slate-400,
+html:not(.dark) table td .text-slate-400 {
+  color: #64748b !important;
+}
+
+html:not(.dark) table td.text-slate-500,
+html:not(.dark) table td .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+html:not(.dark) table td.text-cyan-300,
+html:not(.dark) table td .text-cyan-300 {
+  color: #0284c7 !important;
+}
+
+html:not(.dark) table td.text-emerald-400,
+html:not(.dark) table td .text-emerald-400 {
+  color: #059669 !important;
+}
+
+html:not(.dark) table td.text-rose-400,
+html:not(.dark) table td .text-rose-400 {
+  color: #e11d48 !important;
+}
+
+html:not(.dark) table td.text-amber-400,
+html:not(.dark) table td .text-amber-400 {
+  color: #d97706 !important;
+}
+
 /* Details / FAQ Accordion */
 html:not(.dark) details {
-  background: rgba(255, 255, 255, 0.85) !important;
-  border-color: rgba(15, 23, 42, 0.08) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-color: rgba(15, 23, 42, 0.09) !important;
+}
+
+html:not(.dark) details:hover {
+  border-color: rgba(124, 92, 255, 0.35) !important;
 }
 
 html:not(.dark) details summary {
   color: #0f172a !important;
 }
 
-html:not(.dark) details p {
-  color: #475569 !important;
+html:not(.dark) details summary span {
+  color: #0f172a !important;
 }
 
-/* Footer in Light Mode */
+html:not(.dark) details summary .faq-icon {
+  color: #7c5cff !important;
+}
+
+html:not(.dark) details p {
+  color: #475569 !important;
+  border-top-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+/* CTA Section & Footer */
+html:not(.dark) #download .text-slate-400 {
+  color: #64748b !important;
+}
+
+html:not(.dark) #download .btn-hero-github .bg-black\/35 {
+  background: rgba(15, 23, 42, 0.08) !important;
+  border-color: rgba(124, 92, 255, 0.3) !important;
+  color: #7c5cff !important;
+}
+
 html:not(.dark) footer {
   background-color: #f1f5f9 !important;
   border-color: rgba(15, 23, 42, 0.08) !important;
@@ -787,22 +973,88 @@ html:not(.dark) footer .text-slate-400 {
 /* Linux Download Modal in Light Mode */
 html:not(.dark) #linux-download-modal .bg-\[\#0b0e17\] {
   background: #ffffff !important;
-  border-color: rgba(124, 92, 255, 0.3) !important;
-  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.25) !important;
+  border-color: rgba(124, 92, 255, 0.35) !important;
+  box-shadow: 0 30px 80px -20px rgba(15, 23, 42, 0.25) !important;
+}
+
+html:not(.dark) #linux-download-modal h3,
+html:not(.dark) #linux-download-modal h4,
+html:not(.dark) #linux-download-modal #linux-modal-heading {
+  color: #0f172a !important;
+}
+
+html:not(.dark) #linux-download-modal p {
+  color: #475569 !important;
+}
+
+html:not(.dark) #linux-download-modal .text-slate-300 {
+  color: #475569 !important;
+}
+
+html:not(.dark) #linux-download-modal .text-slate-400 {
+  color: #64748b !important;
+}
+
+html:not(.dark) #linux-download-modal button[aria-label='بستن'] {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+html:not(.dark) #linux-download-modal button[aria-label='بستن']:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
 html:not(.dark) #linux-download-modal .bg-white\/\[0\.03\] {
-  background: rgba(15, 23, 42, 0.03) !important;
-  border-color: rgba(15, 23, 42, 0.08) !important;
+  background: #f8fafc !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
 }
 
 html:not(.dark) #linux-download-modal .bg-white\/\[0\.03\]:hover {
-  background: rgba(15, 23, 42, 0.05) !important;
-  border-color: rgba(124, 92, 255, 0.3) !important;
+  background: #f1f5f9 !important;
+  border-color: rgba(124, 92, 255, 0.4) !important;
+}
+
+html:not(.dark) #linux-download-modal a.bg-white\/10 {
+  background: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06) !important;
+}
+
+html:not(.dark) #linux-download-modal a.bg-white\/10:hover {
+  background: #f1f5f9 !important;
+  border-color: #7c5cff !important;
+  color: #7c5cff !important;
+}
+
+html:not(.dark) #linux-download-modal a.bg-white\/10 span {
+  color: inherit !important;
+}
+
+html:not(.dark) #linux-download-modal a.bg-white\/10 span[data-role^='download-size'] {
+  background: #e2e8f0 !important;
+  color: #334155 !important;
 }
 
 html:not(.dark) #linux-download-modal .bg-black\/50,
 html:not(.dark) #linux-download-modal .bg-black\/40 {
   background: #0f172a !important;
-  border-color: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+html:not(.dark) #linux-download-modal .bg-black\/50 span.truncate {
+  color: #38bdf8 !important;
+}
+
+html:not(.dark) #linux-download-modal .bg-black\/50 button {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+html:not(.dark) #linux-download-modal .bg-black\/50 button:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  color: #ffffff !important;
 }
