@@ -25,7 +25,7 @@ export async function getCurrentAppVersion(): Promise<string> {
     return await getVersion()
   } catch (error) {
     console.warn('[Updater] Failed to get app version from runtime, falling back:', error)
-    return '0.5.0'
+    return '0.6.0'
   }
 }
 
@@ -137,7 +137,7 @@ export async function checkForUpdates(): Promise<{
 
   try {
     const update = await check({
-      timeout: 15000,
+      timeout: 3500,
     })
 
     return { update, error: null }

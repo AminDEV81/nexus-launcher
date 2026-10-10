@@ -1,5 +1,6 @@
 pub mod backup;
 pub mod booster;
+pub mod cleanup;
 pub mod collections;
 pub mod download;
 pub mod games;
@@ -16,6 +17,7 @@ pub mod stats;
 pub mod steam_price;
 pub mod soundtrack;
 pub mod system;
+pub mod system_tweaks;
 pub mod tags;
 
 // As each Epic adds backend functionality, its commands get their own

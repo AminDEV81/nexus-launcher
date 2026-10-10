@@ -343,6 +343,27 @@ mod ram {
             .args(["advapi32.dll,ProcessIdleTasks"])
             .spawn();
 
+        // Purge Windows Standby List cache (Intelligent Standby List Cleaner logic)
+        // SystemMemoryListInformation = 80, MemoryPurgeStandbyList = 4
+        unsafe {
+            let ntdll_name = b"ntdll.dll\0";
+            let h_ntdll = windows_sys::Win32::System::LibraryLoader::GetModuleHandleA(ntdll_name.as_ptr());
+            if !h_ntdll.is_null() {
+                let func_name = b"NtSetSystemInformation\0";
+                let proc = windows_sys::Win32::System::LibraryLoader::GetProcAddress(h_ntdll, func_name.as_ptr());
+                if let Some(proc) = proc {
+                    type NtSetSystemInfoFn = unsafe extern "system" fn(u32, *const std::ffi::c_void, u32) -> i32;
+                    let nt_set_sys_info: NtSetSystemInfoFn = std::mem::transmute(proc);
+                    let command: u32 = 4; // MemoryPurgeStandbyList
+                    let _ = nt_set_sys_info(
+                        80,
+                        &command as *const _ as *const std::ffi::c_void,
+                        std::mem::size_of::<u32>() as u32,
+                    );
+                }
+            }
+        }
+
         system.refresh_memory();
         let after = system.available_memory();
         let freed = after.saturating_sub(before);
@@ -351,7 +372,7 @@ mod ram {
             id: "ram".into(),
             label: "Free up RAM".into(),
             applied: trimmed > 0,
-            detail: format!("Trimmed memory in {trimmed} processes."),
+            detail: format!("Trimmed memory in {trimmed} processes & purged Standby cache."),
             metric: Some(format_bytes(freed)),
         }
     }
@@ -448,9 +469,10 @@ mod power_plan {
     use std::process::Command;
     use std::time::Duration;
 
-    /// The Windows "High performance" power scheme's well-known GUID —
-    /// stable across Windows versions, no lookup needed.
+    /// The Windows "High performance" power scheme's well-known GUID.
     const HIGH_PERFORMANCE_SCHEME_GUID: &str = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
+    /// The Windows "Ultimate Performance" power scheme GUID.
+    const ULTIMATE_PERFORMANCE_SCHEME_GUID: &str = "e9a42b02-d5df-448d-aa00-03f14749eb61";
 
     fn parse_active_scheme_guid(output: &str) -> Option<String> {
         output
@@ -462,7 +484,7 @@ mod power_plan {
     pub fn boost(state: &BoosterState) -> BoostStepResult {
         let mut get_cmd = Command::new("powercfg");
         get_cmd.arg("/getactivescheme");
-        if let Some(output) = super::run_command_with_timeout(get_cmd, Duration::from_millis(2000)) {
+        if let Some(output) = super::run_command_with_timeout(get_cmd, Duration::from_millis(500)) {
             if let Some(guid) = parse_active_scheme_guid(&String::from_utf8_lossy(&output.stdout)) {
                 *state
                     .previous_power_scheme
@@ -471,22 +493,40 @@ mod power_plan {
             }
         }
 
-        let mut set_cmd = Command::new("powercfg");
-        set_cmd.args(["/setactive", HIGH_PERFORMANCE_SCHEME_GUID]);
-        let applied = super::run_command_with_timeout(set_cmd, Duration::from_millis(2000))
+        // Try Ultimate Performance first, fall back to High Performance
+        let mut set_ultimate = Command::new("powercfg");
+        set_ultimate.args(["/setactive", ULTIMATE_PERFORMANCE_SCHEME_GUID]);
+        let mut applied = super::run_command_with_timeout(set_ultimate, Duration::from_millis(400))
             .map(|status| status.status.success())
             .unwrap_or(false);
+        let is_ultimate = applied;
+
+        if !applied {
+            let mut set_high = Command::new("powercfg");
+            set_high.args(["/setactive", HIGH_PERFORMANCE_SCHEME_GUID]);
+            applied = super::run_command_with_timeout(set_high, Duration::from_millis(400))
+                .map(|status| status.status.success())
+                .unwrap_or(false);
+        }
 
         BoostStepResult {
             id: "power_plan".into(),
             label: "High performance power plan".into(),
             applied,
-            detail: if applied {
-                "Switched Windows to the High performance power plan.".into()
+            detail: if is_ultimate {
+                "Switched Windows to Ultimate Performance power plan.".into()
+            } else if applied {
+                "Switched Windows to High Performance power plan.".into()
             } else {
                 "Could not switch the power plan.".into()
             },
-            metric: None,
+            metric: if is_ultimate {
+                Some("Ultimate".into())
+            } else if applied {
+                Some("High".into())
+            } else {
+                None
+            },
         }
     }
 
@@ -666,7 +706,7 @@ mod indexer_pause {
         let mut cmd = Command::new("net");
         cmd.args(["stop", "wsearch"]).creation_flags(CREATE_NO_WINDOW);
 
-        let ok = super::run_command_with_timeout(cmd, Duration::from_millis(2000))
+        let ok = super::run_command_with_timeout(cmd, Duration::from_millis(400))
             .map(|out| out.status.success())
             .unwrap_or(false);
 
@@ -895,3 +935,27 @@ pub async fn boost_ram_only() -> AppResult<BoostStepResult> {
         .await
         .map_err(|e| crate::error::AppError::Other(e.to_string()))
 }
+
+/// Dynamically sets the game process priority class to High.
+#[cfg(windows)]
+pub fn set_process_high_priority(pid: u32) -> bool {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, SetPriorityClass, HIGH_PRIORITY_CLASS, PROCESS_SET_INFORMATION,
+    };
+    unsafe {
+        let handle = OpenProcess(PROCESS_SET_INFORMATION, 0, pid);
+        if handle.is_null() {
+            return false;
+        }
+        let ok = SetPriorityClass(handle, HIGH_PRIORITY_CLASS) != 0;
+        CloseHandle(handle);
+        ok
+    }
+}
+
+#[cfg(not(windows))]
+pub fn set_process_high_priority(_pid: u32) -> bool {
+    false
+}
+

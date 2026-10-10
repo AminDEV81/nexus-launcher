@@ -11,6 +11,7 @@ import {
   Settings2,
   Sparkles,
   ArrowUpCircle,
+  Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
@@ -19,6 +20,7 @@ import { AppearancePanel } from '../components/appearance-panel'
 import { PerformancePanel } from '../components/performance-panel'
 import { ApiKeysPanel } from '../components/api-keys-panel'
 import { BackupPanel } from '../components/backup-panel'
+import { CleanupPanel } from '../components/cleanup-panel'
 import { SystemSpecsPanel } from '../components/system-specs-panel'
 import { SoundtrackSettingsPanel } from '../components/soundtrack-settings-panel'
 import { BoosterPanel } from '@/features/booster/components/booster-panel'
@@ -61,6 +63,12 @@ const SECTIONS = [
     label: 'Backup',
     description: 'Save and restore your library',
     icon: DatabaseBackup,
+  },
+  {
+    id: 'cleanup',
+    label: 'Clean Up',
+    description: 'Storage analysis & disk cleaner',
+    icon: Trash2,
   },
   {
     id: 'updates',
@@ -190,6 +198,7 @@ export function SettingsPage() {
               {activeSection === 'soundtrack' && <SoundtrackSettingsPanel />}
               {activeSection === 'metadata' && <ApiKeysPanel />}
               {activeSection === 'backup' && <BackupPanel />}
+              {activeSection === 'cleanup' && <CleanupPanel />}
               {activeSection === 'updates' && <UpdatesPanel />}
             </motion.div>
           </AnimatePresence>

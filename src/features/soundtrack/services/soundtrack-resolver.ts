@@ -72,7 +72,12 @@ export class SoundtrackResolver {
       }
     }
 
-    // 4. LAYER 1: Multi-Provider Metadata Discovery
+    // 4. If offline, do not attempt online providers
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return []
+    }
+
+    // 5. LAYER 1: Multi-Provider Metadata Discovery
     const metadataProviders = providerRegistry.getProvidersForCapability('metadata')
     const discoveredAlbumsWithTracks: SoundtrackAlbumWithTracks[] = []
 

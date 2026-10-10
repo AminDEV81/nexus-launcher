@@ -6,6 +6,7 @@ import { useLaunchStore } from '@/store/launch-store'
 import { useLaunchBoostStore } from '@/features/booster/store/launch-boost-store'
 import { getRunningGames } from '@/services/games'
 import type { BoostReport } from '@/services/booster'
+import type { Game } from '@/types/models'
 
 interface PlaytimeUpdatedPayload {
   game_id: string
@@ -72,11 +73,45 @@ export function usePlaytimeTracking() {
 
     listen<LaunchBoostStartPayload>('launch-boost-start', (event) => {
       const state = useLaunchBoostStore.getState()
+      let g: Game | undefined
+      const queries = queryClient.getQueriesData<Game[]>({ queryKey: ['games'] })
+      for (const [, list] of queries) {
+        if (Array.isArray(list)) {
+          const found = list.find((x) => x.id === event.payload.game_id)
+          if (found) {
+            g = found
+            break
+          }
+        }
+      }
+
       if (!state.isOpen) {
         state.open({
           id: event.payload.game_id,
-          name: event.payload.game_name,
-          cover_path: event.payload.cover_path,
+          name: event.payload.game_name || g?.name || 'Game',
+          cover_path: event.payload.cover_path ?? g?.cover_path ?? null,
+          banner_path: g?.banner_path,
+          background_path: g?.background_path,
+          logo_path: g?.logo_path,
+          developer: g?.developer,
+          genres: g?.genres,
+        })
+      } else if (state.game) {
+        // Enrich existing state with real backend title and artwork
+        useLaunchBoostStore.setState({
+          game: {
+            ...state.game,
+            name:
+              state.game.name === 'Game' && event.payload.game_name
+                ? event.payload.game_name
+                : state.game.name,
+            cover_path: state.game.cover_path ?? event.payload.cover_path ?? g?.cover_path ?? null,
+            banner_path: state.game.banner_path ?? g?.banner_path,
+            background_path: state.game.background_path ?? g?.background_path,
+            logo_path: state.game.logo_path ?? g?.logo_path,
+            developer: state.game.developer ?? g?.developer,
+            genres: state.game.genres ?? g?.genres,
+          },
         })
       }
     }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))

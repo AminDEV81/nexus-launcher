@@ -19,7 +19,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useSettings, useSetSetting } from '../hooks/use-settings'
 import { openGoogleAuthWindow } from '@/services/hub'
 import { cn } from '@/lib/utils'
-import { StorageCleanupCard } from './storage-cleanup-card'
 import { POPULAR_REGIONS, DEFAULT_STEAM_REGION_KEY } from '@/features/hub/hooks/use-steam-price'
 
 export function ApiKeysPanel() {
@@ -532,9 +531,6 @@ export function ApiKeysPanel() {
           </div>
         </div>
       </div>
-
-      {/* Storage Maintenance & Orphaned Cover Purge */}
-      <StorageCleanupCard />
 
       {/* Auto-Detection Note */}
       <div className="flex items-center gap-3 rounded-2xl border border-border/80 bg-surface/50 p-4 text-xs text-muted shadow-xs">

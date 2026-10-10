@@ -145,21 +145,16 @@ impl MetadataProvider for NexusCloudProvider {
         match res {
             Ok(games) if !games.is_empty() => Ok(games),
             _ => {
-                // Smart fallback for filters when query text is empty
-                if clean_q.is_empty() {
+                // Fallback only if no specific genre/platform filters were set
+                if clean_q.is_empty() && genre_ids.is_empty() && platform_ids.is_empty() {
                     if effective_release.as_deref() == Some("upcoming") {
                         return self.fetch_feed("coming_soon", offset).await;
                     }
-                    if filters.min_rating.unwrap_or(0) >= 80 || filters.sort.as_deref() == Some("rating") {
-                        if let Ok(mut top) = self.fetch_feed("top_rated", offset).await {
-                            if let Some(min_r) = filters.min_rating {
-                                top.retain(|g| g.rating.unwrap_or(0) >= min_r);
-                            }
-                            return Ok(top);
-                        }
-                    }
                     if effective_release.as_deref() == Some("new") {
                         return self.fetch_feed("new_releases", offset).await;
+                    }
+                    if filters.min_rating.unwrap_or(0) >= 80 || filters.sort.as_deref() == Some("rating") {
+                        return self.fetch_feed("top_rated", offset).await;
                     }
                 }
                 res

@@ -160,7 +160,7 @@ fn string_names(entry: &Value, key: &str) -> Vec<String> {
             items
                 .iter()
                 .filter_map(|item| item.get("name").and_then(Value::as_str))
-                .take(4)
+                .take(8)
                 .map(str::to_string)
                 .collect()
         })
@@ -557,7 +557,7 @@ pub async fn list_hub_platforms(
                 .map(|item| HubPlatform {
                     id: item.id,
                     name: item.name,
-                    abbreviation: String::new(),
+                    abbreviation: item.abbreviation.unwrap_or_default(),
                 })
                 .collect()),
             Err(err) => {

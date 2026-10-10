@@ -99,19 +99,20 @@ interface QuickGenre {
   name: string
   emoji: string
   matchTerms: string[]
+  fallbackId: number
 }
 
 /** Quick filter categories displayed below the search bar for instant 1-click filtering. */
 const QUICK_GENRES: readonly QuickGenre[] = [
-  { name: 'Action', emoji: '⚔️', matchTerms: ['action', 'hack and slash'] },
-  { name: 'Role-playing (RPG)', emoji: '🛡️', matchTerms: ['role-playing', 'rpg'] },
-  { name: 'Shooter', emoji: '🎯', matchTerms: ['shooter'] },
-  { name: 'Adventure', emoji: '🗺️', matchTerms: ['adventure'] },
-  { name: 'Strategy', emoji: '♟️', matchTerms: ['strategy'] },
-  { name: 'Indie', emoji: '✨', matchTerms: ['indie'] },
-  { name: 'Racing', emoji: '🏎️', matchTerms: ['racing'] },
-  { name: 'Simulator', emoji: '🕹️', matchTerms: ['simulator'] },
-  { name: 'Fighting', emoji: '🥊', matchTerms: ['fighting'] },
+  { name: 'Action', emoji: '⚔️', matchTerms: ['hack and slash', 'action'], fallbackId: 25 },
+  { name: 'Role-playing (RPG)', emoji: '🛡️', matchTerms: ['role-playing', 'rpg'], fallbackId: 12 },
+  { name: 'Shooter', emoji: '🎯', matchTerms: ['shooter'], fallbackId: 5 },
+  { name: 'Adventure', emoji: '🗺️', matchTerms: ['adventure'], fallbackId: 31 },
+  { name: 'Strategy', emoji: '♟️', matchTerms: ['strategy'], fallbackId: 15 },
+  { name: 'Indie', emoji: '✨', matchTerms: ['indie'], fallbackId: 32 },
+  { name: 'Racing', emoji: '🏎️', matchTerms: ['racing'], fallbackId: 10 },
+  { name: 'Simulator', emoji: '🕹️', matchTerms: ['simulator'], fallbackId: 13 },
+  { name: 'Fighting', emoji: '🥊', matchTerms: ['fighting'], fallbackId: 4 },
 ] as const
 
 /** Sort options — values must stay in sync with `sort_clause` on the
@@ -204,9 +205,12 @@ export function HubPage() {
   // Any filter or sort alone is a valid browse mode — no term needed.
   const isFiltering = searchQuery.trim().length >= 2 || hasAnyFilter
 
-  // Human labels for the active filters — the toolbar's removable pills
-  // and the results header both describe the query by these.
-  const selectedGenres = (genres.data ?? []).filter((genre) => genreIds.includes(genre.id))
+  const selectedGenres = genreIds.map((id) => {
+    const found = (genres.data ?? []).find((g) => g.id === id)
+    if (found) return found
+    const quick = QUICK_GENRES.find((qg) => qg.fallbackId === id)
+    return { id, name: quick ? quick.name : `Genre ${id}` }
+  })
   const selectedPlatforms = (platforms.data ?? []).filter((platform) =>
     platformIds.includes(platform.id),
   )
@@ -681,14 +685,14 @@ export function HubPage() {
                   const gName = g.name.toLowerCase()
                   return qg.matchTerms.some((term) => gName.includes(term.toLowerCase()))
                 })
-                const isSelected = matchingGenre ? genreIds.includes(matchingGenre.id) : false
+                const targetId = matchingGenre ? matchingGenre.id : qg.fallbackId
+                const isSelected = genreIds.includes(targetId)
                 return (
                   <button
                     key={qg.name}
                     type="button"
                     onClick={() => {
-                      if (!matchingGenre) return
-                      toggleGenreId(matchingGenre.id)
+                      toggleGenreId(targetId)
                     }}
                     className={cn(
                       'rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0',
@@ -792,12 +796,6 @@ export function HubPage() {
             inWishlist={inWishlist}
             isInstalled={isInstalled}
             inMemory={inMemory}
-            selectedGenres={selectedGenres}
-            selectedPlatforms={selectedPlatforms}
-            minRating={minRating}
-            release={release}
-            yearFrom={yearFrom}
-            yearTo={yearTo}
           />
         ) : isPending ? (
           <HubFeedSkeleton />
@@ -863,12 +861,6 @@ function SearchResults({
   inWishlist,
   isInstalled,
   inMemory,
-  selectedGenres = [],
-  selectedPlatforms = [],
-  minRating = null,
-  release = null,
-  yearFrom = null,
-  yearTo = null,
 }: {
   query: string
   /** Human labels of the active filters (genre, platform, release,
@@ -886,71 +878,50 @@ function SearchResults({
   inWishlist?: HubLibraryMatcher
   isInstalled?: HubLibraryMatcher
   inMemory?: HubLibraryMatcher
-  selectedGenres?: { id: number; name: string }[]
-  selectedPlatforms?: { id: number; name: string; abbreviation?: string }[]
-  minRating?: number | null
-  release?: string | null
-  yearFrom?: number | null
-  yearTo?: number | null
 }) {
   const rawResults = useMemo(() => search.data?.pages.flat() ?? [], [search.data])
   const hasTerm = query.trim().length >= 2
   const partsLabel = filterParts.join(' · ')
   const { data: settings } = useSettings()
   const providerMode = settings?.metadata_provider_mode ?? 'public'
+  const genreIds = useHubSearchStore((s) => s.genreIds)
+  const genres = useHubGenres()
 
-  // Conjunction filter: Every game MUST contain ALL selected genres and active filters
+  const selectedGenreNames = useMemo(() => {
+    if (!genreIds.length || !genres.data?.length) return []
+    return genreIds
+      .map((id) => genres.data?.find((g) => g.id === id)?.name)
+      .filter((n): n is string => Boolean(n))
+  }, [genreIds, genres.data])
+
+  // Deduplicate results by IGDB ID and ensure strict AND matching for selected genres
   const results = useMemo(() => {
+    const seen = new Set<number>()
     return rawResults.filter((game) => {
-      // 1. Must contain ALL selected genres (at least these, more is fine)
-      if (selectedGenres.length > 0) {
+      if (seen.has(game.igdb_id)) return false
+      seen.add(game.igdb_id)
+
+      if (selectedGenreNames.length > 0) {
         const gameGenres = (game.genres || []).map((g) => g.toLowerCase().trim())
-        const hasAllGenres = selectedGenres.every((sg) => {
-          const target = sg.name.toLowerCase().trim()
-          return gameGenres.some(
-            (gg) => gg === target || gg.includes(target) || target.includes(gg),
-          )
+        const hasAllGenres = selectedGenreNames.every((selName) => {
+          const target = selName.toLowerCase().trim()
+          return gameGenres.some((gg) => {
+            if (gg === target) return true
+            const ggClean = gg.replace(/[()]/g, '').trim()
+            const targetClean = target.replace(/[()]/g, '').trim()
+            return (
+              ggClean === targetClean ||
+              ggClean.includes(targetClean) ||
+              targetClean.includes(ggClean)
+            )
+          })
         })
         if (!hasAllGenres) return false
       }
 
-      // 2. Platform match (if platforms are selected, must be on at least one)
-      if (selectedPlatforms.length > 0) {
-        const gamePlatforms = (game.platforms || []).map((p) => p.toLowerCase().trim())
-        const hasPlatform = selectedPlatforms.some((sp) => {
-          const abbrev = (sp.abbreviation || '').toLowerCase().trim()
-          const name = sp.name.toLowerCase().trim()
-          return gamePlatforms.some(
-            (gp) => (abbrev && gp.includes(abbrev)) || gp.includes(name) || name.includes(gp),
-          )
-        })
-        if (!hasPlatform) return false
-      }
-
-      // 3. Min rating filter
-      if (minRating !== null) {
-        if (game.rating === null || game.rating === undefined || game.rating < minRating) {
-          return false
-        }
-      }
-
-      // 4. Release year / Era filter
-      if (yearFrom !== null || yearTo !== null) {
-        if (!game.release_date) return false
-        const year = parseInt(game.release_date.slice(0, 4), 10)
-        if (isNaN(year)) return false
-        if (yearFrom !== null && year < yearFrom) return false
-        if (yearTo !== null && year > yearTo) return false
-      } else if (release === 'upcoming') {
-        const currentYear = new Date().getFullYear()
-        if (!game.release_date) return true
-        const year = parseInt(game.release_date.slice(0, 4), 10)
-        if (!isNaN(year) && year < currentYear) return false
-      }
-
       return true
     })
-  }, [rawResults, selectedGenres, selectedPlatforms, minRating, yearFrom, yearTo, release])
+  }, [rawResults, selectedGenreNames])
 
   // Automatically fetch next page if filtered results are sparse and upstream has more
   useEffect(() => {

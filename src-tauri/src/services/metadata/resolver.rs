@@ -24,8 +24,8 @@ impl Default for CircuitBreaker {
 }
 
 impl CircuitBreaker {
-    const FAILURE_THRESHOLD: u32 = 3;
-    const COOLDOWN_SECONDS: i64 = 60;
+    const FAILURE_THRESHOLD: u32 = 2;
+    const COOLDOWN_SECONDS: i64 = 30;
 
     pub fn is_open(&self) -> bool {
         let failures = self.consecutive_failures.load(Ordering::Relaxed);
@@ -246,7 +246,7 @@ impl MetadataProviderResolver {
             .unwrap_or_default();
         let sort_str = filters.sort.as_deref().unwrap_or("");
         let cache_key = format!(
-            "search:v6:{mode_str}:{clean_q}:{offset}:{g_str}:{p_str}:{rel_str}:{rating_str}:{sort_str}"
+            "search:v7:{mode_str}:{clean_q}:{offset}:{g_str}:{p_str}:{rel_str}:{rating_str}:{sort_str}"
         );
 
         {

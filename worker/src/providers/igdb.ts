@@ -178,39 +178,49 @@ export async function searchGames(
       conditions.push(`platforms = (${platformIds.join(',')})`)
     }
     if (minRating != null) {
-      conditions.push(`aggregated_rating >= ${minRating}`)
+      conditions.push(
+        `(aggregated_rating >= ${minRating} | total_rating >= ${minRating} | rating >= ${minRating})`,
+      )
     }
     if (release) {
       if (release === 'upcoming') {
         conditions.push(`first_release_date > ${now}`)
       } else if (release === 'new') {
-        conditions.push(`first_release_date < ${now} & first_release_date > ${now - 90 * 86400}`)
+        conditions.push(`first_release_date > ${now - 90 * 86400} & first_release_date < ${now}`)
       } else if (release === 'last-year') {
-        conditions.push(`first_release_date < ${now} & first_release_date > ${now - 365 * 86400}`)
+        conditions.push(`first_release_date > ${now - 365 * 86400} & first_release_date < ${now}`)
       } else if (release === 'last-3-years') {
         conditions.push(
-          `first_release_date < ${now} & first_release_date > ${now - 3 * 365 * 86400}`,
+          `first_release_date > ${now - 3 * 365 * 86400} & first_release_date < ${now}`,
         )
+      } else if (release.startsWith('-')) {
+        const to = parseInt(release.replace('-', ''), 10)
+        if (!isNaN(to)) {
+          const endTs = Math.floor(Date.UTC(to + 1, 0, 1) / 1000)
+          conditions.push(`first_release_date < ${endTs}`)
+        }
+      } else if (release.endsWith('+')) {
+        const from = parseInt(release.replace('+', ''), 10)
+        if (!isNaN(from)) {
+          const startTs = Math.floor(Date.UTC(from, 0, 1) / 1000)
+          conditions.push(`first_release_date >= ${startTs}`)
+        }
       } else if (release.includes('-')) {
         const parts = release.split('-')
         const from = parseInt(parts[0], 10)
         const to = parseInt(parts[1], 10)
         if (!isNaN(from) && !isNaN(to)) {
-          const startTs = Math.floor(new Date(`${from}-01-01T00:00:00Z`).getTime() / 1000)
-          const endTs = Math.floor(new Date(`${to + 1}-01-01T00:00:00Z`).getTime() / 1000)
+          const minYear = Math.min(from, to)
+          const maxYear = Math.max(from, to)
+          const startTs = Math.floor(Date.UTC(minYear, 0, 1) / 1000)
+          const endTs = Math.floor(Date.UTC(maxYear + 1, 0, 1) / 1000)
           conditions.push(`first_release_date >= ${startTs} & first_release_date < ${endTs}`)
-        }
-      } else if (release.endsWith('+')) {
-        const from = parseInt(release.replace('+', ''), 10)
-        if (!isNaN(from)) {
-          const startTs = Math.floor(new Date(`${from}-01-01T00:00:00Z`).getTime() / 1000)
-          conditions.push(`first_release_date >= ${startTs}`)
         }
       } else {
         const year = parseInt(release, 10)
         if (!isNaN(year)) {
-          const startTs = Math.floor(new Date(`${year}-01-01T00:00:00Z`).getTime() / 1000)
-          const endTs = Math.floor(new Date(`${year + 1}-01-01T00:00:00Z`).getTime() / 1000)
+          const startTs = Math.floor(Date.UTC(year, 0, 1) / 1000)
+          const endTs = Math.floor(Date.UTC(year + 1, 0, 1) / 1000)
           conditions.push(`first_release_date >= ${startTs} & first_release_date < ${endTs}`)
         }
       }
@@ -221,6 +231,8 @@ export async function searchGames(
     else if (sort === 'newest') sortOrder = 'first_release_date desc'
     else if (sort === 'oldest') sortOrder = 'first_release_date asc'
     else if (sort === 'name') sortOrder = 'name asc'
+    else if (release === 'upcoming') sortOrder = 'first_release_date asc'
+    else if (release === 'new') sortOrder = 'first_release_date desc'
 
     const query = `${FIELDS_LIST}; where ${conditions.join(' & ')}; sort ${sortOrder}; limit 24; offset ${offset};`
     const raw = await queryIgdb('games', query, env)
@@ -317,8 +329,11 @@ export async function getGenres(env: Env): Promise<{ id: number; name: string }[
   return await queryIgdb('genres', query, env)
 }
 
-export async function getPlatforms(env: Env): Promise<{ id: number; name: string }[]> {
-  const query = 'fields name; sort name asc; limit 50;'
+export async function getPlatforms(
+  env: Env,
+): Promise<{ id: number; name: string; abbreviation?: string }[]> {
+  const query =
+    'fields name, abbreviation; where id = (3, 6, 14, 48, 49, 130, 167, 169, 508); sort name asc; limit 50;'
   return await queryIgdb('platforms', query, env)
 }
 

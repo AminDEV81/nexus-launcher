@@ -134,4 +134,6 @@ impl UnifiedArtwork {
 pub struct NameIdItem {
     pub id: i64,
     pub name: String,
+    #[serde(default)]
+    pub abbreviation: Option<String>,
 }

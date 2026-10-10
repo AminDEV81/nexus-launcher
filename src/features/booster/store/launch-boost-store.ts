@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand'
+import { create } from 'zustand'
 
 export interface BoostProgressStep {
   id: string
@@ -13,6 +13,9 @@ export interface LaunchBoostGameInfo {
   id: string
   name: string
   cover_path: string | null
+  banner_path?: string | null
+  background_path?: string | null
+  logo_path?: string | null
   developer?: string | null
   genres?: string[]
 }

@@ -595,6 +595,7 @@ pub async fn launch_game(
                         percent,
                     },
                 );
+                std::thread::sleep(std::time::Duration::from_millis(70));
             },
         );
         let _ = app.emit("game-boosted", &report);
@@ -605,6 +606,7 @@ pub async fn launch_game(
                 report,
             },
         );
+        std::thread::sleep(std::time::Duration::from_millis(150));
     }
 
     if let Some(hook) = target
@@ -631,6 +633,7 @@ pub async fn launch_game(
                 percent: 92,
             },
         );
+        std::thread::sleep(std::time::Duration::from_millis(150));
     }
 
     // For the Steam hand-off, remember which same-named processes were
@@ -699,6 +702,7 @@ pub async fn launch_game(
         exe_name,
         steam_baseline,
         target.post_launch_command,
+        should_boost,
     ));
 
     Ok(())
@@ -723,6 +727,7 @@ fn snapshot_pids_by_name(system: &mut System, exe_name: &str) -> HashSet<u32> {
 /// Keeps polling until it disappears, emitting `playtime-updated`
 /// on every tick, then synchronizes save data back to session_profile_id,
 /// records the finished session, and emits `game-exited`.
+#[allow(clippy::too_many_arguments)]
 async fn track_session(
     app: AppHandle,
     game_id: String,
@@ -731,6 +736,7 @@ async fn track_session(
     exe_name: Option<String>,
     steam_baseline: HashSet<u32>,
     post_launch_command: Option<String>,
+    should_boost: bool,
 ) {
     let mut system = System::new_all();
 
@@ -751,6 +757,7 @@ async fn track_session(
     };
 
     app.state::<LaunchTracker>().set_pid(&game_id, pid);
+    crate::commands::booster::set_process_high_priority(pid);
 
     let mut job_tracker = ProcessJobTracker::new();
     if let Some(ref jt) = job_tracker {
@@ -762,6 +769,11 @@ async fn track_session(
 
     let started_at = Utc::now();
     let _ = app.emit("game-launched", &game_id);
+    if should_boost {
+        // Allow the launch-boost modal's "ARMED / READY" animation and sound
+        // to finish displaying to the user before hiding or minimizing the window
+        tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
+    }
     handle_launch_window_action(&app);
 
     let sys_pid = Pid::from_u32(pid);

@@ -290,13 +290,34 @@ export function useLaunchGame() {
       const autoBoostEnabled = settings?.auto_boost_enabled === 'true'
 
       if (autoBoostEnabled) {
-        const cachedGames = queryClient.getQueryData<Game[]>(gamesKey)
-        const game = cachedGames?.find((g) => g.id === gameId)
+        let game: Game | undefined
+        const queries = queryClient.getQueriesData<Game[]>({ queryKey: gamesKey })
+        for (const [, list] of queries) {
+          if (Array.isArray(list)) {
+            const found = list.find((g) => g.id === gameId)
+            if (found) {
+              game = found
+              break
+            }
+          }
+        }
+
+        if (!game) {
+          try {
+            game = await gamesService.getGame(gameId)
+          } catch {
+            // Non-fatal fallback
+          }
+        }
+
         if (game) {
           useLaunchBoostStore.getState().open({
             id: game.id,
             name: game.name,
             cover_path: game.cover_path,
+            banner_path: game.banner_path,
+            background_path: game.background_path,
+            logo_path: game.logo_path,
             developer: game.developer,
             genres: game.genres,
           })

@@ -362,7 +362,11 @@ impl MetadataProvider for DirectIgdbProvider {
             .filter_map(|v| {
                 let id = v.get("id")?.as_i64()?;
                 let name = v.get("name")?.as_str()?.to_string();
-                Some(NameIdItem { id, name })
+                Some(NameIdItem {
+                    id,
+                    name,
+                    abbreviation: None,
+                })
             })
             .collect();
         Ok(items)
@@ -375,7 +379,7 @@ impl MetadataProvider for DirectIgdbProvider {
             &self.client_id,
             &token,
             "platforms",
-            "fields name; sort name asc; limit 50;",
+            "fields name,abbreviation; where id = (3, 6, 14, 48, 49, 130, 167, 169, 508); sort name asc; limit 50;",
         )
         .await?;
 
@@ -388,7 +392,15 @@ impl MetadataProvider for DirectIgdbProvider {
             .filter_map(|v| {
                 let id = v.get("id")?.as_i64()?;
                 let name = v.get("name")?.as_str()?.to_string();
-                Some(NameIdItem { id, name })
+                let abbreviation = v
+                    .get("abbreviation")
+                    .and_then(|a| a.as_str())
+                    .map(|s| s.to_string());
+                Some(NameIdItem {
+                    id,
+                    name,
+                    abbreviation,
+                })
             })
             .collect();
         Ok(items)

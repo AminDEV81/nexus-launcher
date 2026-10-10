@@ -19,7 +19,6 @@ import { useGames } from '@/features/library/hooks/use-games'
 import { useCollections } from '@/features/collections/hooks/use-collections'
 import { useTags } from '@/features/library/hooks/use-tags'
 import { useProfileStore } from '@/store/profile-store'
-import { StorageCleanupCard } from './storage-cleanup-card'
 import { ExportBackupModal } from './export-backup-modal'
 
 const BACKUP_FILTER = [{ name: 'Nexus Backup', extensions: ['json'] }]
@@ -143,9 +142,6 @@ export function BackupPanel() {
           </div>
         </div>
       </div>
-
-      {/* Storage Maintenance & Orphaned Cover Purge */}
-      <StorageCleanupCard />
 
       {/* Export & Import Action Vault */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

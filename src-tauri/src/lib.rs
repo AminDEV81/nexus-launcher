@@ -282,6 +282,13 @@ pub fn run() {
             commands::booster::scan_boostable_apps,
             commands::booster::run_game_boost,
             commands::booster::boost_ram_only,
+            commands::system_tweaks::get_system_tweak_status,
+            commands::system_tweaks::create_restore_point,
+            commands::system_tweaks::toggle_network_tweaks,
+            commands::system_tweaks::toggle_gpu_msi_mode,
+            commands::system_tweaks::toggle_bcd_tweaks,
+            commands::system_tweaks::toggle_telemetry_debloat,
+            commands::system_tweaks::clean_shader_caches,
             commands::download::start_download,
             commands::download::start_game_download,
             commands::download::start_batch_downloads,
@@ -352,6 +359,8 @@ pub fn run() {
             commands::overlay::is_overlay_visible,
             commands::overlay::get_overlay_hotkey_status,
             commands::overlay::push_overlay_notification,
+            commands::cleanup::scan_cleanup_targets,
+            commands::cleanup::execute_cleanup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

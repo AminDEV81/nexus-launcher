@@ -12,7 +12,7 @@ import type { HubGame, HubSearchFilters } from '@/types/models'
 const HUB_REFRESH = {
   staleTime: 15 * 60_000,
   refetchInterval: 30 * 60_000,
-  refetchOnWindowFocus: true,
+  refetchOnWindowFocus: false,
 }
 
 export function useHubNewReleases() {
