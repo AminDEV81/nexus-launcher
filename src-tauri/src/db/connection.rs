@@ -2,6 +2,7 @@ use crate::error::AppResult;
 use rusqlite::Connection;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::AppHandle;
 
 /// Wraps the single SQLite connection used by the whole app.
@@ -23,6 +24,9 @@ impl Database {
 
         let db_path = resolve_db_path(&data_dir);
         let mut connection = Connection::open(&db_path)?;
+
+        // Wait up to 5s if SQLite is momentarily busy (e.g. WAL checkpointing)
+        connection.busy_timeout(Duration::from_secs(5))?;
 
         // Sensible defaults for a local desktop app: WAL improves
         // read/write concurrency between the UI thread and background

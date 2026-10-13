@@ -9,10 +9,17 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use walkdir::WalkDir;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
+
+fn is_safe_relative_path(path: &Path) -> bool {
+    !path.as_os_str().is_empty()
+        && path
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)))
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SaveArchiveLocationMeta {
@@ -98,9 +105,9 @@ pub fn export_save_to_zip(
     let active_prof = get_active_profile_id_internal(conn);
     let prof_id = profile_id.unwrap_or(&active_prof);
 
-    // Get game title
+    // Get game name (column in `games` table is `name`)
     let game_title: String = conn
-        .query_row("SELECT title FROM games WHERE id = ?1", params![game_id], |r| r.get(0))
+        .query_row("SELECT name FROM games WHERE id = ?1", params![game_id], |r| r.get(0))
         .map_err(|_| SaveManagerError::Other(format!("Game not found: {game_id}")))?;
 
     // Get profile name
@@ -212,7 +219,7 @@ pub fn export_save_to_zip(
         profile_id: prof_id.to_string(),
         profile_name,
         created_at: chrono::Utc::now().to_rfc3339(),
-        app_version: "Nexus Launcher 0.4.0".to_string(),
+        app_version: format!("Nexus Launcher {}", env!("CARGO_PKG_VERSION")),
         file_count: total_files_found,
         total_uncompressed_bytes,
         locations: manifest_locations,
@@ -347,7 +354,7 @@ pub fn inspect_save_zip(archive_path: &Path) -> SaveResult<SaveArchiveManifest> 
         profile_id: String::new(),
         profile_name: "Generic Backup".to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
-        app_version: "Nexus Launcher".to_string(),
+        app_version: format!("Nexus Launcher {}", env!("CARGO_PKG_VERSION")),
         file_count,
         total_uncompressed_bytes,
         locations: Vec::new(),
@@ -371,9 +378,9 @@ pub fn restore_save_from_zip(
     let active_prof = get_active_profile_id_internal(conn);
     let prof_id = profile_id.unwrap_or(&active_prof);
 
-    // Verify game exists
+    // Verify game exists (column in `games` table is `name`)
     let _game_title: String = conn
-        .query_row("SELECT title FROM games WHERE id = ?1", params![game_id], |r| r.get(0))
+        .query_row("SELECT name FROM games WHERE id = ?1", params![game_id], |r| r.get(0))
         .map_err(|_| SaveManagerError::Other(format!("Game not found: {game_id}")))?;
 
     let mut enabled_locs = TransactionCoordinator::get_enabled_save_locations(conn, game_id)?;
@@ -433,8 +440,8 @@ pub fn restore_save_from_zip(
         target_dirs.push((loc.id.clone(), dirs_for_loc));
     }
 
-    // Safety snapshot before restore if existing files exist
-    let mut snapshot_candidates: Vec<(&str, &Path, &str)> = Vec::new();
+    // Safety snapshot before restore if existing files exist (no Box::leak)
+    let mut owned_snapshot_paths: Vec<(String, PathBuf)> = Vec::new();
     for loc in &enabled_locs {
         let p = if is_active {
             expand_save_path(&loc.raw_path)
@@ -442,11 +449,15 @@ pub fn restore_save_from_zip(
             TransactionCoordinator::get_profile_current_path(prof_id, game_id, &loc.id)
         };
         if p.exists() {
-            snapshot_candidates.push((&loc.id, Box::leak(Box::new(p)), ""));
+            owned_snapshot_paths.push((loc.id.clone(), p));
         }
     }
 
-    if !snapshot_candidates.is_empty() {
+    if !owned_snapshot_paths.is_empty() {
+        let snapshot_candidates: Vec<(&str, &Path, &str)> = owned_snapshot_paths
+            .iter()
+            .map(|(id, p)| (id.as_str(), p.as_path(), ""))
+            .collect();
         let _ = SnapshotEngine::create_snapshot(
             prof_id,
             game_id,
@@ -480,6 +491,11 @@ pub fn restore_save_from_zip(
             (None, PathBuf::from(&entry_name))
         };
 
+        // Strict Zip-Slip prevention: only normal relative path components are allowed
+        if !is_safe_relative_path(&rel_path) {
+            continue;
+        }
+
         let matched_targets: Vec<PathBuf> = match loc_id_opt {
             Some(ref lid) => {
                 target_dirs
@@ -502,9 +518,7 @@ pub fn restore_save_from_zip(
         if entry.is_dir() {
             for target_base in &matched_targets {
                 let out_dir = target_base.join(&rel_path);
-                if out_dir.starts_with(target_base) {
-                    let _ = fs::create_dir_all(&out_dir);
-                }
+                let _ = fs::create_dir_all(&out_dir);
             }
         } else {
             let mut file_content = Vec::with_capacity(entry.size() as usize);
@@ -512,10 +526,6 @@ pub fn restore_save_from_zip(
 
             for target_base in &matched_targets {
                 let out_file = target_base.join(&rel_path);
-                if !out_file.starts_with(target_base) {
-                    continue; // Skip zip slip
-                }
-
                 if let Some(parent) = out_file.parent() {
                     let _ = fs::create_dir_all(parent);
                 }
@@ -567,5 +577,13 @@ mod tests {
         assert!(path_str.contains("Cyberpunk_2077"));
         assert!(path_str.contains("Player_1"));
         assert!(path_str.ends_with(".zip"));
+    }
+
+    #[test]
+    fn test_is_safe_relative_path() {
+        assert!(is_safe_relative_path(Path::new("slot1/save.dat")));
+        assert!(!is_safe_relative_path(Path::new("../evil.dll")));
+        assert!(!is_safe_relative_path(Path::new("slot1/../../evil.dll")));
+        assert!(!is_safe_relative_path(Path::new("/etc/passwd")));
     }
 }

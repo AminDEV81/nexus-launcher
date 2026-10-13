@@ -124,7 +124,7 @@ enum EngineOutcome {
 
 fn download_client() -> reqwest::Client {
     reqwest::Client::builder()
-        .user_agent("NexusLauncher/0.1")
+        .user_agent(concat!("NexusLauncher/", env!("CARGO_PKG_VERSION")))
         .tcp_nodelay(true)
         .tcp_keepalive(Some(Duration::from_secs(15)))
         .pool_max_idle_per_host(32)

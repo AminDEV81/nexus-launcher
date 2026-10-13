@@ -17,6 +17,7 @@ export class NexusAudioEngine {
   private analyser: AnalyserNode | null = null
   private sourceNode: MediaElementAudioSourceNode | null = null
   private ytIframe: HTMLIFrameElement | null = null
+  private ytMessageListenerAttached = false
   private ytCurrentTime = 0
   private ytDuration = 0
   private ytPollTimer: ReturnType<typeof setInterval> | null = null
@@ -138,106 +139,121 @@ export class NexusAudioEngine {
     document.body.appendChild(iframe)
     this.ytIframe = iframe
 
-    window.addEventListener('message', (event) => {
-      if (!this.ytIframe || this.currentSource?.type !== 'youtube') return
-      try {
-        const raw = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
-        if (!raw) return
-
-        // 1. Handshake
-        if (raw.event === 'initialDelivery' || raw.event === 'onReady') {
-          this.ytIframe?.contentWindow?.postMessage('{"event":"listening"}', '*')
-          this.ytIframe?.contentWindow?.postMessage(
-            JSON.stringify({
-              event: 'command',
-              func: 'setVolume',
-              args: [this.muted ? 0 : this.volume * 100],
-            }),
-            '*',
-          )
-          this.ytIframe?.contentWindow?.postMessage(
-            '{"event":"command","func":"playVideo","args":""}',
-            '*',
-          )
+    if (!this.ytMessageListenerAttached && typeof window !== 'undefined') {
+      this.ytMessageListenerAttached = true
+      window.addEventListener('message', (event) => {
+        if (!this.ytIframe || this.currentSource?.type !== 'youtube') return
+        if (
+          event.origin &&
+          !event.origin.includes('youtube.com') &&
+          !event.origin.includes('youtube-nocookie.com') &&
+          !event.origin.startsWith('http://localhost')
+        ) {
+          return
         }
+        try {
+          const raw = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
+          if (!raw) return
 
-        // 2. Direct onStateChange events
-        if (raw.event === 'onStateChange') {
-          const stateVal =
-            typeof raw.info === 'number' ? raw.info : typeof raw.data === 'number' ? raw.data : null
-
-          if (stateVal === 1) {
-            this.setState('playing')
-          } else if (stateVal === 2) {
-            this.setState('paused')
-          } else if (stateVal === 3) {
-            if (this.ytCurrentTime === 0) {
-              this.setState('buffering')
-            }
-          } else if (stateVal === 0) {
-            this.setState('ended')
-            this.events.onTrackEnded?.()
+          // 1. Handshake
+          if (raw.event === 'initialDelivery' || raw.event === 'onReady') {
+            this.ytIframe?.contentWindow?.postMessage('{"event":"listening"}', '*')
+            this.ytIframe?.contentWindow?.postMessage(
+              JSON.stringify({
+                event: 'command',
+                func: 'setVolume',
+                args: [this.muted ? 0 : this.volume * 100],
+              }),
+              '*',
+            )
+            this.ytIframe?.contentWindow?.postMessage(
+              '{"event":"command","func":"playVideo","args":""}',
+              '*',
+            )
           }
-        }
 
-        // 3. infoDelivery events (composite object or scalar command response)
-        if (raw.event === 'infoDelivery') {
-          const info = raw.info
-          if (info !== undefined && info !== null) {
-            if (typeof info === 'object') {
-              if (typeof info.currentTime === 'number') {
-                this.ytCurrentTime = info.currentTime
-                if (info.currentTime > 0 && this.state !== 'paused' && this.state !== 'ended') {
-                  this.setState('playing')
-                }
+          // 2. Direct onStateChange events
+          if (raw.event === 'onStateChange') {
+            const stateVal =
+              typeof raw.info === 'number'
+                ? raw.info
+                : typeof raw.data === 'number'
+                  ? raw.data
+                  : null
+
+            if (stateVal === 1) {
+              this.setState('playing')
+            } else if (stateVal === 2) {
+              this.setState('paused')
+            } else if (stateVal === 3) {
+              if (this.ytCurrentTime === 0) {
+                this.setState('buffering')
               }
-              if (typeof info.duration === 'number' && info.duration > 0) {
-                this.ytDuration = info.duration
-              }
-              if (typeof info.playerState === 'number') {
-                if (info.playerState === 1) {
-                  this.setState('playing')
-                } else if (info.playerState === 2) {
-                  this.setState('paused')
-                } else if (info.playerState === 3) {
-                  if (this.ytCurrentTime === 0) {
-                    this.setState('buffering')
+            } else if (stateVal === 0) {
+              this.setState('ended')
+              this.events.onTrackEnded?.()
+            }
+          }
+
+          // 3. infoDelivery events (composite object or scalar command response)
+          if (raw.event === 'infoDelivery') {
+            const info = raw.info
+            if (info !== undefined && info !== null) {
+              if (typeof info === 'object') {
+                if (typeof info.currentTime === 'number') {
+                  this.ytCurrentTime = info.currentTime
+                  if (info.currentTime > 0 && this.state !== 'paused' && this.state !== 'ended') {
+                    this.setState('playing')
                   }
-                } else if (info.playerState === 0) {
-                  this.setState('ended')
-                  this.events.onTrackEnded?.()
                 }
-              }
-              this.events.onTimeUpdate?.(this.ytCurrentTime, this.ytDuration)
-            } else if (typeof info === 'number') {
-              if (info === 1 && this.state !== 'playing') {
-                this.setState('playing')
-              } else if (info === 2 && this.state === 'playing') {
-                this.setState('paused')
-              } else if (info === 0) {
-                this.setState('ended')
-                this.events.onTrackEnded?.()
-              } else if (info > 3) {
-                if (this.ytDuration > 0 && info <= this.ytDuration) {
-                  this.ytCurrentTime = info
-                } else if (this.ytDuration === 0) {
-                  this.ytDuration = info
+                if (typeof info.duration === 'number' && info.duration > 0) {
+                  this.ytDuration = info.duration
+                }
+                if (typeof info.playerState === 'number') {
+                  if (info.playerState === 1) {
+                    this.setState('playing')
+                  } else if (info.playerState === 2) {
+                    this.setState('paused')
+                  } else if (info.playerState === 3) {
+                    if (this.ytCurrentTime === 0) {
+                      this.setState('buffering')
+                    }
+                  } else if (info.playerState === 0) {
+                    this.setState('ended')
+                    this.events.onTrackEnded?.()
+                  }
                 }
                 this.events.onTimeUpdate?.(this.ytCurrentTime, this.ytDuration)
+              } else if (typeof info === 'number') {
+                if (info === 1 && this.state !== 'playing') {
+                  this.setState('playing')
+                } else if (info === 2 && this.state === 'playing') {
+                  this.setState('paused')
+                } else if (info === 0) {
+                  this.setState('ended')
+                  this.events.onTrackEnded?.()
+                } else if (info > 3) {
+                  if (this.ytDuration > 0 && info <= this.ytDuration) {
+                    this.ytCurrentTime = info
+                  } else if (this.ytDuration === 0) {
+                    this.ytDuration = info
+                  }
+                  this.events.onTimeUpdate?.(this.ytCurrentTime, this.ytDuration)
+                }
               }
             }
           }
-        }
 
-        // 4. Playback error from embed
-        if (raw.event === 'onError') {
-          this.setState('error')
-          this.events.onError?.('Track playback failed in embed')
+          // 4. Playback error from embed
+          if (raw.event === 'onError') {
+            this.setState('error')
+            this.events.onError?.('Track playback failed in embed')
+          }
+        } catch {
+          // Not a JSON message from YT
         }
-      } catch {
-        // Not a JSON message from YT
-      }
-    })
+      })
+    }
 
     return iframe
   }

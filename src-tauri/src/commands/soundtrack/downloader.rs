@@ -1,11 +1,11 @@
 use crate::db::Database;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use futures_util::StreamExt;
 use rusqlite::params;
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Component, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
@@ -56,6 +56,23 @@ pub async fn start_download(
     state: tauri::State<'_, SoundtrackDownloadState>,
     req: DownloadSoundtrackRequest,
 ) -> AppResult<()> {
+    let trimmed_url = req.url.trim();
+    if !trimmed_url.starts_with("https://") && !trimmed_url.starts_with("http://") {
+        return Err(AppError::Invalid(
+            "Soundtrack download URL must use http or https.".into(),
+        ));
+    }
+
+    let path = PathBuf::from(&req.target_path);
+    if path
+        .components()
+        .any(|c| matches!(c, Component::ParentDir))
+    {
+        return Err(AppError::Invalid(
+            "Invalid target path: path traversal is not allowed.".into(),
+        ));
+    }
+
     // Check if already active
     {
         let active_map = state.active.lock().unwrap();
@@ -75,7 +92,6 @@ pub async fn start_download(
     }
 
     // Ensure parent directory exists
-    let path = PathBuf::from(&req.target_path);
     if let Some(parent) = path.parent() {
         let _ = fs::create_dir_all(parent);
     }
@@ -151,7 +167,21 @@ pub async fn start_download(
         loop {
             tokio::select! {
                 _ = cancel.cancelled() => {
-                    // Download paused or cancelled
+                    // Persist paused status in DB and remove active task entry
+                    if let Some(db_state) = app_clone.try_state::<Database>() {
+                        if let Ok(conn) = db_state.connection.lock() {
+                            let _ = conn.execute(
+                                "UPDATE soundtrack_downloads
+                                 SET status = 'paused', downloaded_bytes = ?1, total_bytes = ?2, speed_bps = 0, updated_at = datetime('now')
+                                 WHERE id = ?3",
+                                params![downloaded_bytes, total_bytes, &download_id_clone],
+                            );
+                        }
+                    }
+                    if let Some(dl_state) = app_clone.try_state::<SoundtrackDownloadState>() {
+                        let mut active = dl_state.active.lock().unwrap();
+                        active.remove(&download_id_clone);
+                    }
                     let _ = app_clone.emit("soundtrack-download-progress", SoundtrackDownloadProgress {
                         id: download_id_clone.clone(),
                         track_id: track_id_clone.clone(),

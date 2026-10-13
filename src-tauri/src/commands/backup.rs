@@ -53,6 +53,7 @@ const TABLES: &[&str] = &[
     "soundtrack_downloads",
     "soundtrack_local_files",
     "metadata_cache",
+    "overlay_config",
 ];
 
 #[derive(Serialize)]

@@ -1505,13 +1505,28 @@ pub async fn open_google_auth_window(app: AppHandle) -> AppResult<()> {
 /// Webview window loading youtube.com (not an iframe), the user's logged-in Google session
 /// plays age-restricted trailers directly with zero embed restrictions.
 /// Sized responsively in 16:9 aspect ratio and stripped of YouTube clutter.
+fn validate_youtube_video_id(raw: &str) -> AppResult<&str> {
+    let trimmed = raw.trim();
+    if trimmed.len() < 6
+        || trimmed.len() > 20
+        || !trimmed
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(AppError::Invalid("Invalid YouTube video ID.".into()));
+    }
+    Ok(trimmed)
+}
+
 #[tauri::command]
 pub async fn open_trailer_window(app: AppHandle, video_id: String, title: String) -> AppResult<()> {
+    let valid_id = validate_youtube_video_id(&video_id)?;
+
     if let Some(window) = app.get_webview_window("trailer_player") {
         let _ = window.close();
     }
 
-    let watch_url = format!("https://www.youtube.com/watch?v={video_id}&autoplay=1")
+    let watch_url = format!("https://www.youtube.com/watch?v={valid_id}&autoplay=1")
         .parse()
         .map_err(|err| AppError::Other(format!("invalid trailer URL: {err}")))?;
 
@@ -1574,10 +1589,11 @@ pub async fn mount_embedded_trailer(
         .map(|p| p.to_logical::<f64>(scale_factor))
         .unwrap_or(tauri::LogicalPosition::new(0.0, 0.0));
 
+    let valid_id = validate_youtube_video_id(&video_id)?;
     let screen_x = main_pos.x + x;
     let screen_y = main_pos.y + y;
 
-    let watch_url = format!("https://www.youtube.com/watch?v={video_id}&autoplay=1")
+    let watch_url = format!("https://www.youtube.com/watch?v={valid_id}&autoplay=1")
         .parse()
         .map_err(|err| AppError::Other(format!("invalid trailer URL: {err}")))?;
 

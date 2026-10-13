@@ -32,7 +32,22 @@
       "devCsp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: http://asset.localhost asset: data: blob:; media-src 'self' https: http://asset.localhost asset: data: blob:; font-src 'self' data: https:; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420 http://localhost:1420 https:; frame-src 'self' https:; child-src 'self' https:; object-src 'none'; base-uri 'self'",
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/artwork/**", "$EXE/artwork/**"]
+        "scope": [
+          "$APPDATA/artwork/**",
+          "$EXE/artwork/**",
+          "$AUDIO/**",
+          "$HOME/Music/**",
+          "$APPDATA/soundtracks/**",
+          "$EXE/Soundtracks/**",
+          "**/*.mp3",
+          "**/*.flac",
+          "**/*.wav",
+          "**/*.ogg",
+          "**/*.m4a",
+          "**/*.aac",
+          "**/*.opus",
+          "**/*.webm"
+        ]
       }
     }
   },

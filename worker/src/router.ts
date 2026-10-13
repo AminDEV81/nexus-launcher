@@ -8,7 +8,11 @@ import * as igdb from './providers/igdb'
 import * as sgdb from './providers/steamgrid'
 import * as steam from './providers/steam'
 
-export async function handleRequest(request: Request, env: Env): Promise<Response> {
+export async function handleRequest(
+  request: Request,
+  env: Env,
+  ctx?: ExecutionContext,
+): Promise<Response> {
   const url = new URL(request.url)
   const pathname = url.pathname
 
@@ -236,9 +240,13 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
       return createErrorResponse('NOT_FOUND', 'Route not found', 404)
     })
 
-    // Store successful response in Edge Cache
+    // Store successful response in Edge Cache asynchronously when ExecutionContext is available
     if (request.method === 'GET' && response.status === 200) {
-      await putEdgeCache(request, response)
+      if (ctx && typeof ctx.waitUntil === 'function') {
+        ctx.waitUntil(putEdgeCache(request, response.clone()))
+      } else {
+        await putEdgeCache(request, response)
+      }
     }
 
     return response

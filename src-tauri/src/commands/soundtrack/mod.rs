@@ -7,11 +7,85 @@ pub mod youtube;
 pub use downloader::SoundtrackDownloadState;
 pub use models::*;
 
+use crate::commands::metadata::HttpClient;
 use crate::db::Database;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
+use futures_util::StreamExt;
 use rusqlite::params;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use tauri::{AppHandle, State};
+
+/// Maximum response body size (5 MB) accepted by `soundtrack_http_get`.
+const MAX_HTTP_TEXT_BYTES: usize = 5 * 1024 * 1024;
+
+/// Allowed external domains for `soundtrack_http_get` metadata/HTML scraping.
+const ALLOWED_SOUNDTRACK_HOSTS: &[&str] = &[
+    "downloads.khinsider.com",
+    "vgmtreasurechest.com",
+    "musicbrainz.org",
+    "coverartarchive.org",
+    "archive.org",
+    "audius.co",
+    "store.steampowered.com",
+    "steamstatic.com",
+    "piped.private.coffee",
+    "kavin.rocks",
+    "piped.video",
+];
+
+fn validate_soundtrack_url(raw_url: &str) -> AppResult<reqwest::Url> {
+    let parsed = reqwest::Url::parse(raw_url.trim())
+        .map_err(|_| AppError::Invalid("Invalid soundtrack URL.".into()))?;
+
+    let scheme = parsed.scheme();
+    if scheme != "https" && scheme != "http" {
+        return Err(AppError::Invalid(
+            "Only http and https URLs are permitted.".into(),
+        ));
+    }
+
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| AppError::Invalid("URL is missing a host.".into()))?
+        .to_ascii_lowercase();
+
+    if host == "localhost" || host.ends_with(".local") || host.ends_with(".internal") {
+        return Err(AppError::Invalid(
+            "Local network URLs are not permitted.".into(),
+        ));
+    }
+
+    if let Ok(ip) = host.trim_matches(['[', ']']).parse::<IpAddr>() {
+        let is_private_or_local = match ip {
+            IpAddr::V4(v4) => {
+                v4.is_loopback()
+                    || v4.is_private()
+                    || v4.is_link_local()
+                    || v4.is_broadcast()
+                    || v4.is_unspecified()
+            }
+            IpAddr::V6(v6) => v6.is_loopback() || v6.is_unspecified(),
+        };
+        if is_private_or_local {
+            return Err(AppError::Invalid(
+                "Private or loopback IP addresses are not permitted.".into(),
+            ));
+        }
+    }
+
+    let host_allowed = ALLOWED_SOUNDTRACK_HOSTS
+        .iter()
+        .any(|allowed| host == *allowed || host.ends_with(&format!(".{allowed}")));
+
+    if !host_allowed {
+        return Err(AppError::Invalid(format!(
+            "Host '{host}' is not in the soundtrack provider allowlist."
+        )));
+    }
+
+    Ok(parsed)
+}
 
 #[tauri::command]
 pub fn soundtrack_resolve_game(
@@ -219,16 +293,18 @@ pub async fn soundtrack_search_youtube(
 pub async fn soundtrack_http_get(
     url: String,
     headers: Option<std::collections::HashMap<String, String>>,
+    http: State<'_, HttpClient>,
 ) -> AppResult<String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| crate::error::AppError::Other(e.to_string()))?;
+    let parsed_url = validate_soundtrack_url(&url)?;
 
-    let mut req = client.get(&url).header(
-        reqwest::header::USER_AGENT,
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    );
+    let mut req = http
+        .0
+        .get(parsed_url)
+        .timeout(std::time::Duration::from_secs(10))
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        );
 
     if let Some(hdrs) = headers {
         for (k, v) in hdrs {
@@ -239,21 +315,35 @@ pub async fn soundtrack_http_get(
     let res = req
         .send()
         .await
-        .map_err(|e| crate::error::AppError::Other(e.to_string()))?;
+        .map_err(|e| AppError::Other(e.to_string()))?;
 
     if !res.status().is_success() {
-        return Err(crate::error::AppError::Other(format!(
+        return Err(AppError::Other(format!(
             "HTTP {} for {}",
             res.status(),
             url
         )));
     }
 
-    let text = res
-        .text()
-        .await
-        .map_err(|e| crate::error::AppError::Other(e.to_string()))?;
+    if let Some(len) = res.content_length() {
+        if len as usize > MAX_HTTP_TEXT_BYTES {
+            return Err(AppError::Invalid(
+                "Response exceeds maximum allowed size (5 MB).".into(),
+            ));
+        }
+    }
 
-    Ok(text)
+    let mut body = Vec::new();
+    let mut stream = res.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let bytes = chunk.map_err(|e| AppError::Other(e.to_string()))?;
+        if body.len() + bytes.len() > MAX_HTTP_TEXT_BYTES {
+            return Err(AppError::Invalid(
+                "Response exceeds maximum allowed size (5 MB).".into(),
+            ));
+        }
+        body.extend_from_slice(&bytes);
+    }
+
+    Ok(String::from_utf8_lossy(&body).into_owned())
 }
-

@@ -92,18 +92,23 @@ pub fn run() {
             app.manage(database);
 
             // Run save location auto-configuration in the background after startup
-            // to avoid blocking window display and prevent disk I/O spikes at launch
+            // inside `spawn_blocking` with fine-grained per-game locking so neither
+            // Tokio worker threads nor the SQLite mutex stall UI IPC calls.
             let bg_app = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                let db = bg_app.state::<Database>();
-                let lock_res = db.connection.lock();
-                if let Ok(conn) = lock_res {
-                    let configured = commands::save_manager::auto_configure_all_installed_games(&conn);
+                let _ = tokio::task::spawn_blocking(move || {
+                    let db = bg_app.state::<Database>();
+                    let configured =
+                        commands::save_manager::auto_configure_all_installed_games_unlocked(&db);
                     if configured > 0 {
-                        log::info!("Auto-configured save locations for {} games from save manifest database", configured);
+                        log::info!(
+                            "Auto-configured save locations for {} games from save manifest database",
+                            configured
+                        );
                     }
-                }
+                })
+                .await;
             });
 
             app.manage(commands::save_manager::locks::SaveManagerLocks::default());

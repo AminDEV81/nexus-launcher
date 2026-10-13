@@ -513,6 +513,7 @@ pub fn clean_all_duplicate_save_locations(conn: &Connection) {
 }
 
 /// Auto-configures save locations for all installed games currently lacking valid save locations.
+#[allow(dead_code)]
 pub fn auto_configure_all_installed_games(conn: &Connection) -> usize {
     clean_all_duplicate_save_locations(conn);
     let mut configured_count = 0;
@@ -533,6 +534,45 @@ pub fn auto_configure_all_installed_games(conn: &Connection) -> usize {
 
         if !has_enabled_save {
             if let Ok(new_locs) = auto_configure_game_save(conn, &gid) {
+                if new_locs.iter().any(|l| l.is_enabled) {
+                    configured_count += 1;
+                }
+            }
+        }
+    }
+
+    configured_count
+}
+
+/// Startup-safe variant that releases the database mutex between each game's
+/// filesystem detection pass so UI IPC commands never stall behind a long lock.
+pub fn auto_configure_all_installed_games_unlocked(db: &Database) -> usize {
+    let game_ids: Vec<String> = {
+        let Ok(conn) = db.connection.lock() else {
+            return 0;
+        };
+        clean_all_duplicate_save_locations(&conn);
+        let Ok(mut stmt) = conn.prepare("SELECT id FROM games WHERE is_installed = 1") else {
+            return 0;
+        };
+        let ids: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .ok()
+            .map(|rows| rows.filter_map(Result::ok).collect())
+            .unwrap_or_default();
+
+        ids.into_iter()
+            .filter(|gid| {
+                let existing = get_game_locations_dto_internal(&conn, gid).unwrap_or_default();
+                !existing.iter().any(|l| l.is_enabled && l.location_type == "save")
+            })
+            .collect()
+    };
+
+    let mut configured_count = 0;
+    for gid in game_ids {
+        if let Ok(conn) = db.connection.lock() {
+            if let Ok(new_locs) = auto_configure_game_save(&conn, &gid) {
                 if new_locs.iter().any(|l| l.is_enabled) {
                     configured_count += 1;
                 }
@@ -929,7 +969,7 @@ pub async fn get_default_save_backup_path(
     let prof_id = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
 
     let game_title: String = conn
-        .query_row("SELECT title FROM games WHERE id = ?1", params![game_id], |r| r.get(0))
+        .query_row("SELECT name FROM games WHERE id = ?1", params![game_id], |r| r.get(0))
         .map_err(|_| format!("Game not found: {game_id}"))?;
 
     let profile_name: String = conn
