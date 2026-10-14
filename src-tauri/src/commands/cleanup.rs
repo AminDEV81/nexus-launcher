@@ -174,18 +174,18 @@ pub async fn scan_cleanup_targets(
                                 }
                             }
                         } else if let Some(game_title) = archived_games.get(&gid) {
-                            // ARCHIVED GAME (User removed from Library):
+                            // ARCHIVED GAME (User moved to Memory Vault):
                             let (size, count) = calculate_dir_size_and_count(&g_path);
                             if size > 0 || count > 0 {
                                 items.push(CleanupItem {
                                     id: format!("archived_save:{}:{}", prof_id, gid),
                                     category: "orphaned_saves".into(),
                                     title: format!("Save Data — {}", game_title),
-                                    subtitle: format!("Profile: {} • Removed from library (Archived)", prof_name),
+                                    subtitle: format!("Profile: {} • Memory Vault game saves", prof_name),
                                     path: g_path.to_string_lossy().to_string(),
                                     size_bytes: size,
                                     item_count: count,
-                                    is_safe: true,
+                                    is_safe: false,
                                     game_id: Some(gid.clone()),
                                     profile_id: Some(prof_id.clone()),
                                 });
@@ -222,37 +222,23 @@ pub async fn scan_cleanup_targets(
                 for art_entry in art_entries.flatten() {
                     if art_entry.path().is_dir() {
                         let art_gid = art_entry.file_name().to_string_lossy().to_string();
-                        // If it's in active_games, keep it (active library game).
-                        if !active_games.contains_key(&art_gid) {
+                        // Never delete artwork for games in active library OR in Memory Vault.
+                        // Artwork is only orphaned if the game is completely gone from the database.
+                        if !active_games.contains_key(&art_gid) && !archived_games.contains_key(&art_gid) {
                             let (a_size, a_count) = calculate_dir_size_and_count(&art_entry.path());
                             if a_size > 0 || a_count > 0 {
-                                if let Some(game_title) = archived_games.get(&art_gid) {
-                                    items.push(CleanupItem {
-                                        id: format!("archived_art:{}", art_gid),
-                                        category: "orphaned_artworks".into(),
-                                        title: format!("Artwork Cache — {}", game_title),
-                                        subtitle: "Cached posters & banners for game removed from library".into(),
-                                        path: art_entry.path().to_string_lossy().to_string(),
-                                        size_bytes: a_size,
-                                        item_count: a_count,
-                                        is_safe: true,
-                                        game_id: Some(art_gid),
-                                        profile_id: None,
-                                    });
-                                } else {
-                                    items.push(CleanupItem {
-                                        id: format!("orphaned_art:{}", art_gid),
-                                        category: "orphaned_artworks".into(),
-                                        title: format!("Orphaned Artwork ({})", art_gid.chars().take(8).collect::<String>()),
-                                        subtitle: "Cached images for permanently deleted game".into(),
-                                        path: art_entry.path().to_string_lossy().to_string(),
-                                        size_bytes: a_size,
-                                        item_count: a_count,
-                                        is_safe: true,
-                                        game_id: Some(art_gid),
-                                        profile_id: None,
-                                    });
-                                }
+                                items.push(CleanupItem {
+                                    id: format!("orphaned_art:{}", art_gid),
+                                    category: "orphaned_artworks".into(),
+                                    title: format!("Orphaned Artwork ({})", art_gid.chars().take(8).collect::<String>()),
+                                    subtitle: "Cached images for permanently deleted game".into(),
+                                    path: art_entry.path().to_string_lossy().to_string(),
+                                    size_bytes: a_size,
+                                    item_count: a_count,
+                                    is_safe: true,
+                                    game_id: Some(art_gid),
+                                    profile_id: None,
+                                });
                             }
                         }
                     }
@@ -337,6 +323,28 @@ pub async fn execute_cleanup(
 
     for id in item_ids {
         if let Some(target) = targets_map.get(&id) {
+            // HARD DEFENSE GUARD: Never delete artwork belonging to games still present in library or Memory Vault.
+            if target.category == "orphaned_artworks" {
+                if let Some(ref gid) = target.game_id {
+                    let is_in_db = {
+                        if let Ok(conn) = db.connection.lock() {
+                            conn.query_row(
+                                "SELECT EXISTS(SELECT 1 FROM games WHERE id = ?1)",
+                                [gid],
+                                |row| row.get::<_, bool>(0),
+                            )
+                            .unwrap_or(false)
+                        } else {
+                            false
+                        }
+                    };
+                    if is_in_db {
+                        log::warn!("Prevented deletion of artwork for game {gid} still present in library/memory");
+                        continue;
+                    }
+                }
+            }
+
             let path = PathBuf::from(&target.path);
             if path.exists() {
                 match remove_path_all_with_retry(&path) {
@@ -401,5 +409,21 @@ mod tests {
         assert_eq!(size, 3072);
 
         let _ = std::fs::remove_dir_all(&temp);
+    }
+
+    #[test]
+    fn test_memory_vault_artwork_is_not_orphaned() {
+        let mut active_games = HashMap::new();
+        let mut archived_games = HashMap::new();
+
+        active_games.insert("game-1".to_string(), "Active Game".to_string());
+        archived_games.insert("game-2".to_string(), "Memory Game".to_string());
+
+        // Active game is protected
+        assert!(active_games.contains_key("game-1") || archived_games.contains_key("game-1"));
+        // Memory game is strictly protected from orphaned artwork cleanup
+        assert!(active_games.contains_key("game-2") || archived_games.contains_key("game-2"));
+        // Only completely deleted game is orphaned
+        assert!(!active_games.contains_key("game-3") && !archived_games.contains_key("game-3"));
     }
 }

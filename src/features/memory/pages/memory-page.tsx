@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Sparkles, Search, ArrowUpDown, Clock } from 'lucide-react'
 import {
   useGames,
@@ -8,6 +9,7 @@ import {
 import { CoverPickerModal } from '@/features/library/components/cover-picker-modal'
 import { PlaytimeEditorModal } from '@/features/library/components/playtime-editor-modal'
 import { EditGameNameModal } from '@/components/modals/edit-game-name-modal'
+import { repairMissingCovers } from '@/services/metadata'
 import { MemoryCard } from '../components/memory-card'
 import { DeleteConfirmModal } from '../components/delete-confirm-modal'
 import { useUiStore } from '@/store/ui-store'
@@ -17,6 +19,7 @@ type SortOption = 'playtime' | 'name' | 'recent'
 
 export function MemoryPage() {
   const { data: allGames = [], isPending } = useGames()
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<SortOption>('playtime')
 
@@ -33,6 +36,21 @@ export function MemoryPage() {
   useEffect(() => {
     useUiStore.getState().selectGame(null)
   }, [])
+
+  // Proactively repair any missing covers in the background
+  useEffect(() => {
+    let active = true
+    repairMissingCovers()
+      .then((res) => {
+        if (active && res.repaired_count > 0) {
+          queryClient.invalidateQueries({ queryKey: ['games'] })
+        }
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [queryClient])
 
   // Filter games that belong to Memory
   const memoryGames = useMemo(() => {

@@ -36,6 +36,14 @@ interface CoverMediaProps {
    * here. When omitted, CoverMedia tracks hover on itself.
    */
   hovered?: boolean
+  /**
+   * Optional custom fallback element to render if image fails to load.
+   */
+  fallback?: React.ReactNode
+  /**
+   * Optional callback when media loading fails.
+   */
+  onError?: () => void
 }
 
 /**
@@ -69,10 +77,24 @@ export function CoverMedia({
   animatedEnabled = true,
   alwaysLive = false,
   hovered,
+  fallback,
+  onError,
 }: CoverMediaProps) {
   const [failed, setFailed] = useState(false)
 
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
+
+  const handleFail = () => {
+    setFailed(true)
+    onError?.()
+  }
+
   if (failed) {
+    if (fallback) {
+      return <>{fallback}</>
+    }
     return (
       <div className={`flex items-center justify-center bg-surface-raised ${className ?? ''}`}>
         <ImageOff className="size-5 text-subtle" strokeWidth={1.5} />
@@ -88,7 +110,7 @@ export function CoverMedia({
         canPlay={animatedEnabled}
         alwaysLive={alwaysLive}
         hoveredProp={hovered}
-        onError={() => setFailed(true)}
+        onError={handleFail}
       />
     )
   }
@@ -101,7 +123,7 @@ export function CoverMedia({
         canPlay={animatedEnabled}
         alwaysLive={alwaysLive}
         hoveredProp={hovered}
-        onError={() => setFailed(true)}
+        onError={handleFail}
       />
     )
   }
@@ -113,7 +135,7 @@ export function CoverMedia({
       className={className}
       draggable={false}
       loading="lazy"
-      onError={() => setFailed(true)}
+      onError={handleFail}
     />
   )
 }

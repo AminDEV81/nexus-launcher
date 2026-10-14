@@ -1343,3 +1343,130 @@ pub fn cleanup_orphaned_artworks(
 ) -> AppResult<artwork::OrphanedArtworkSummary> {
     artwork::cleanup_orphaned_artworks(&app, &db)
 }
+
+#[derive(serde::Serialize)]
+pub struct CoverRepairResult {
+    pub repaired_count: usize,
+    pub total_missing: usize,
+}
+
+#[tauri::command]
+pub async fn repair_missing_covers(
+    app: AppHandle,
+    db: State<'_, Database>,
+    http: State<'_, HttpClient>,
+    resolver: State<'_, Arc<MetadataProviderResolver>>,
+) -> AppResult<CoverRepairResult> {
+    use crate::services::providers::traits::MetadataProvider;
+
+    struct MissingTarget {
+        id: String,
+        name: String,
+        steam_app_id: Option<String>,
+        igdb_id: Option<i64>,
+    }
+
+    // 1. Gather all games whose cover_path is null or points to a non-existent file
+    let targets: Vec<MissingTarget> = {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        let mut stmt = conn.prepare("SELECT id, name, cover_path, steam_app_id, igdb_id FROM games")?;
+        let rows = stmt.query_map([], |row| {
+            let id: String = row.get(0)?;
+            let name: String = row.get(1)?;
+            let cover_path: Option<String> = row.get(2)?;
+            let steam_app_id: Option<String> = row.get(3)?;
+            let igdb_id: Option<i64> = row.get(4)?;
+            Ok((id, name, cover_path, steam_app_id, igdb_id))
+        })?;
+
+        rows.filter_map(Result::ok)
+            .filter(|(_, _, cover_path, _, _)| match cover_path {
+                Some(ref p) => !std::path::Path::new(p).exists(),
+                None => true,
+            })
+            .map(|(id, name, _, steam_app_id, igdb_id)| MissingTarget {
+                id,
+                name,
+                steam_app_id,
+                igdb_id,
+            })
+            .collect()
+    };
+
+    let total_missing = targets.len();
+    if total_missing == 0 {
+        return Ok(CoverRepairResult {
+            repaired_count: 0,
+            total_missing: 0,
+        });
+    }
+
+    let mut repaired_count = 0;
+
+    for target in targets {
+        // a) First check artwork_cache for existing source_url
+        let cached_source_url: Option<String> = {
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            conn.query_row(
+                "SELECT source_url FROM artwork_cache WHERE game_id = ?1 AND kind = 'cover' AND source_url IS NOT NULL ORDER BY ordinal ASC LIMIT 1",
+                [&target.id],
+                |row| row.get(0),
+            )
+            .ok()
+        };
+
+        let mut resolved_url = cached_source_url;
+
+        // b) If no cached URL, resolve via provider resolver
+        if resolved_url.is_none() {
+            if let Ok(options) = resolver
+                .get_artwork_options(&db, "cover", target.steam_app_id.as_deref(), &target.name)
+                .await
+            {
+                if let Some(first) = options.into_iter().find(|o| !o.url.is_empty()) {
+                    resolved_url = Some(first.url);
+                }
+            }
+        }
+
+        // c) Fallback: if igdb_id exists, fetch details directly from cloud
+        if resolved_url.is_none() {
+            if let Some(igdb_id) = target.igdb_id {
+                let cloud = crate::services::providers::nexus_cloud::NexusCloudProvider::new(
+                    http.0.clone(),
+                    None,
+                );
+                if let Ok(Some(details)) = cloud.get_game_details(igdb_id).await {
+                    if let Some(cover) = details.game.cover_url {
+                        resolved_url = Some(cover);
+                    }
+                }
+            }
+        }
+
+        // d) Download and apply if URL was resolved (keeping cover_is_animated in sync)
+        if let Some(url) = resolved_url {
+            let is_anim = url
+                .rsplit('.')
+                .next()
+                .and_then(|ext| ext.split(['?', '#']).next())
+                .map(|ext| ext.eq_ignore_ascii_case("gif") || ext.eq_ignore_ascii_case("webm") || ext.eq_ignore_ascii_case("mp4"))
+                .unwrap_or(false);
+            if let Ok(local_path) = artwork::download_artwork(&http.0, &app, &target.id, "cover", &url, false).await {
+                let conn = db.connection.lock().expect("db mutex poisoned");
+                let _ = conn.execute(
+                    "UPDATE games SET cover_path = ?1, cover_is_animated = ?2 WHERE id = ?3",
+                    rusqlite::params![local_path, is_anim, target.id],
+                );
+                let _ = artwork::record_artwork_cache(&conn, &target.id, "cover", &local_path, Some(&url), false);
+                repaired_count += 1;
+            }
+        }
+    }
+
+    Ok(CoverRepairResult {
+        repaired_count,
+        total_missing,
+    })
+}
+

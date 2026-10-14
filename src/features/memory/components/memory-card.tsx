@@ -141,20 +141,36 @@ export function MemoryCard({
               transition={{ duration: 0.2 * speed }}
               className="relative size-full"
             >
-              {coverSrc ? (
-                <CoverMedia
-                  src={coverSrc}
-                  className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-106"
-                  isAnimated={game.cover_is_animated}
-                  animatedEnabled={game.animated_cover_enabled}
-                  hovered={isHovered}
-                />
-              ) : (
-                <div className="flex size-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-surface-raised via-surface to-surface-raised p-4 text-center">
-                  <Sparkles className="size-8 text-amber-400/40" />
-                  <span className="text-xs font-bold text-muted">{game.name}</span>
-                </div>
-              )}
+              {(() => {
+                const fallbackPlaceholder = (
+                  <div className="flex size-full flex-col items-center justify-center gap-2.5 bg-gradient-to-br from-surface-raised via-surface to-surface-raised p-4 text-center">
+                    <div className="flex size-12 items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-sm shadow-amber-500/10">
+                      <Sparkles className="size-6 text-amber-400" />
+                    </div>
+                    <span className="line-clamp-2 px-1 text-xs font-bold text-text">
+                      {game.name}
+                    </span>
+                    <span className="text-[10px] text-subtle">
+                      {game.genres.length > 0
+                        ? game.genres.slice(0, 2).join(' • ')
+                        : 'Memory Vault'}
+                    </span>
+                  </div>
+                )
+
+                return coverSrc ? (
+                  <CoverMedia
+                    src={coverSrc}
+                    className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-106"
+                    isAnimated={game.cover_is_animated}
+                    animatedEnabled={game.animated_cover_enabled}
+                    hovered={isHovered}
+                    fallback={fallbackPlaceholder}
+                  />
+                ) : (
+                  fallbackPlaceholder
+                )
+              })()}
 
               {/* Pure black-based vignette (clean in both light & dark themes) */}
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/35" />

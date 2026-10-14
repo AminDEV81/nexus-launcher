@@ -284,6 +284,7 @@ pub fn run() {
             commands::metadata::reset_artwork,
             commands::metadata::get_orphaned_artwork_summary,
             commands::metadata::cleanup_orphaned_artworks,
+            commands::metadata::repair_missing_covers,
             commands::booster::scan_boostable_apps,
             commands::booster::run_game_boost,
             commands::booster::boost_ram_only,

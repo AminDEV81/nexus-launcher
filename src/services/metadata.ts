@@ -109,3 +109,12 @@ export function getOrphanedArtworkSummary() {
 export function cleanupOrphanedArtworks() {
   return call<OrphanedArtworkSummary>('cleanup_orphaned_artworks')
 }
+
+export interface CoverRepairResult {
+  repaired_count: number
+  total_missing: number
+}
+
+export function repairMissingCovers() {
+  return call<CoverRepairResult>('repair_missing_covers')
+}
