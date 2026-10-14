@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { assetUrl } from '@/lib/asset-url'
 import { useLaunchGame } from '@/features/library/hooks/use-games'
 import { useLaunchStore } from '@/store/launch-store'
+import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { useSmoothedSpeed } from '../hooks/use-smoothed-speed'
 import { ChunkStreamVisualizer } from './chunk-stream-visualizer'
 import type { DownloadInfo } from '@/services/download'
@@ -77,6 +78,7 @@ export function GroupedDownloadCard({
   busy,
 }: GroupedDownloadCardProps) {
   const [expanded, setExpanded] = useState(false)
+  const speed = useAnimationSpeed()
   const launchGame = useLaunchGame()
   const runningGameIds = useLaunchStore((s) => s.runningGameIds)
   const isRunning = game ? runningGameIds.has(game.id) : false
@@ -298,7 +300,7 @@ export function GroupedDownloadCard({
               )}
               initial={false}
               animate={{ width: `${extracting ? extractPct : pct}%` }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
+              transition={{ duration: 0.3 * speed, ease: 'easeOut' }}
             />
           </div>
 
@@ -364,7 +366,7 @@ export function GroupedDownloadCard({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              transition={{ duration: 0.25 * speed, ease: 'easeInOut' }}
               className="overflow-hidden border-t border-border/70 mt-4 pt-3.5"
             >
               <div className="mb-2 text-[11px] font-bold text-subtle uppercase tracking-wider">

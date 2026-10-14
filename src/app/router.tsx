@@ -17,20 +17,8 @@ import { LazyDownloadsPage } from './lazy-downloads-page'
 import { LazySoundtrackPage } from './lazy-soundtrack-page'
 import { OverlaySettingsPage } from '@/features/overlay/pages/overlay-settings-page'
 import { OverlayWindowPage } from '@/features/overlay/pages/overlay-window-page'
+import { BoosterPanel } from '@/features/booster/components/booster-panel'
 
-/**
- * `createHashRouter` (not `createBrowserRouter`) because Tauri serves the
- * frontend from a local `tauri://` / `asset://` origin rather than a real
- * HTTP server with path-based routing support — hash routing avoids
- * needing server-side rewrites that don't exist here.
- *
- * `AppShell` is a layout route: every page renders inside it, below the
- * title bar and beside the sidebar. Routes below correspond 1:1 with
- * `components/layout/nav-items.ts`. The five library views (Library,
- * Recently Played, Favorites, Installed, Hidden) all share `LibraryPage`
- * — they're the same grid with a different `scope` filter, not five
- * separate implementations.
- */
 export const router = createHashRouter([
   {
     element: <AppShell />,
@@ -131,6 +119,10 @@ export const router = createHashRouter([
       {
         path: '/memory',
         element: <MemoryPage />,
+      },
+      {
+        path: '/booster',
+        element: <BoosterPanel standalonePage />,
       },
       {
         path: '/stats',

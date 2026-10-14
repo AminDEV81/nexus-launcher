@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react'
 import { playButtonClick } from '@/lib/sound-engine'
+import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { assetUrl } from '@/lib/asset-url'
 import { useSoundtrackPlayer } from '../../hooks/use-soundtrack-player'
 import { AudioVisualizer } from './audio-visualizer'
@@ -57,6 +58,7 @@ export function MiniPlayer() {
   } = useSoundtrackPlayer()
 
   const [queueOpen, setQueueOpen] = useState(false)
+  const speed = useAnimationSpeed()
   const isPlaying =
     playbackState === 'playing' ||
     (playbackState !== 'paused' && playbackState !== 'error' && currentTime > 0)
@@ -88,7 +90,7 @@ export function MiniPlayer() {
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.28 * speed, ease: [0.16, 1, 0.3, 1] }}
             className="relative z-40 flex h-20 shrink-0 items-center justify-between border-t border-border/90 bg-surface/90 px-4 backdrop-blur-2xl shadow-2xl select-none"
           >
             {/* Top Scrubber Progress Bar */}

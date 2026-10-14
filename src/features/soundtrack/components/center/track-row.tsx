@@ -1,6 +1,7 @@
+import { memo } from 'react'
 import { Heart, Play } from 'lucide-react'
 import { playButtonClick } from '@/lib/sound-engine'
-import { useSoundtrackPlayer } from '../../hooks/use-soundtrack-player'
+import { useSoundtrackStore } from '../../store/soundtrack-store'
 import type { GameIdentity, SoundtrackAlbum, SoundtrackTrack } from '../../types'
 
 interface TrackRowProps {
@@ -19,23 +20,30 @@ function formatDuration(ms: number) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function TrackRow({ track, album, game, index, allTracks }: TrackRowProps) {
-  const {
-    currentTrack,
-    playbackState,
-    currentTime,
-    playTrack,
-    togglePlay,
-    favorites,
-    toggleFavorite,
-  } = useSoundtrackPlayer()
-
-  const isCurrent = currentTrack?.id === track.id
-  const isPlaying =
-    isCurrent &&
-    (playbackState === 'playing' ||
-      (playbackState !== 'paused' && playbackState !== 'error' && currentTime > 0))
-  const isFavorite = favorites.has(track.id)
+export const TrackRow = memo(function TrackRow({
+  track,
+  album,
+  game,
+  index,
+  allTracks,
+}: TrackRowProps) {
+  const isCurrent = useSoundtrackStore((s) => s.currentTrack?.id === track.id)
+  const isPlaying = useSoundtrackStore(
+    (s) =>
+      s.currentTrack?.id === track.id &&
+      (s.playbackState === 'playing' ||
+        (s.playbackState !== 'paused' && s.playbackState !== 'error' && s.currentTime > 0)),
+  )
+  const isLoading = useSoundtrackStore(
+    (s) =>
+      s.currentTrack?.id === track.id &&
+      (s.playbackState === 'loading' || s.playbackState === 'buffering') &&
+      s.currentTime === 0,
+  )
+  const isFavorite = useSoundtrackStore((s) => s.favorites.has(track.id))
+  const playTrack = useSoundtrackStore((s) => s.playTrack)
+  const togglePlay = useSoundtrackStore((s) => s.togglePlay)
+  const toggleFavorite = useSoundtrackStore((s) => s.toggleFavorite)
 
   function handleRowClick() {
     playButtonClick()
@@ -58,9 +66,7 @@ export function TrackRow({ track, album, game, index, allTracks }: TrackRowProps
       {/* Track Index / Play Icon / Equalizer */}
       <div className="flex items-center gap-3 min-w-0 flex-1">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-xl font-mono text-xs text-muted group-hover:text-accent">
-          {isCurrent &&
-          (playbackState === 'loading' || playbackState === 'buffering') &&
-          currentTime === 0 ? (
+          {isLoading ? (
             <span className="size-3.5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
           ) : isPlaying ? (
             <div className="flex items-end gap-0.5 h-3.5">
@@ -125,4 +131,4 @@ export function TrackRow({ track, album, game, index, allTracks }: TrackRowProps
       </div>
     </div>
   )
-}
+})

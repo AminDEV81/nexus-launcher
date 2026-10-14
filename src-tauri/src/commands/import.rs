@@ -130,36 +130,44 @@ pub(crate) fn find_best_executable(root: &Path) -> Option<String> {
 /// there's exactly one candidate and otherwise shows this list for the
 /// user to pick from.
 #[tauri::command]
-pub fn scan_folder_for_executables(folder_path: String) -> AppResult<Vec<ExecutableCandidate>> {
-    let root = Path::new(&folder_path);
-    if !root.is_dir() {
-        return Err(AppError::Invalid(format!("{folder_path} is not a folder")));
-    }
+pub async fn scan_folder_for_executables(folder_path: String) -> AppResult<Vec<ExecutableCandidate>> {
+    tokio::task::spawn_blocking(move || {
+        let root = Path::new(&folder_path);
+        if !root.is_dir() {
+            return Err(AppError::Invalid(format!("{folder_path} is not a folder")));
+        }
 
-    Ok(list_executable_candidates(root))
+        Ok(list_executable_candidates(root))
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?
 }
 
 /// Total size on disk for a file or, recursively, a folder — used to
 /// populate `games.install_size_bytes` when a game is added by folder
 /// (a single exe's own size isn't a meaningful "install size").
 #[tauri::command]
-pub fn compute_path_size(path: String) -> AppResult<u64> {
-    let root = Path::new(&path);
-    if !root.exists() {
-        return Err(AppError::Invalid(format!("{path} does not exist")));
-    }
+pub async fn compute_path_size(path: String) -> AppResult<u64> {
+    tokio::task::spawn_blocking(move || {
+        let root = Path::new(&path);
+        if !root.exists() {
+            return Err(AppError::Invalid(format!("{path} does not exist")));
+        }
 
-    if root.is_file() {
-        return Ok(root.metadata().map(|meta| meta.len()).unwrap_or(0));
-    }
+        if root.is_file() {
+            return Ok(root.metadata().map(|meta| meta.len()).unwrap_or(0));
+        }
 
-    let total = WalkDir::new(root)
-        .into_iter()
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.file_type().is_file())
-        .filter_map(|entry| entry.metadata().ok())
-        .map(|meta| meta.len())
-        .sum();
+        let total = WalkDir::new(root)
+            .into_iter()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_type().is_file())
+            .filter_map(|entry| entry.metadata().ok())
+            .map(|meta| meta.len())
+            .sum();
 
-    Ok(total)
+        Ok(total)
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?
 }

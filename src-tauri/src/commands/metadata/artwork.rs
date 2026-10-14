@@ -94,6 +94,14 @@ pub async fn download_artwork(
             "artwork URLs must be http(s) links".into(),
         ));
     }
+    let host = parsed_url
+        .host_str()
+        .ok_or_else(|| AppError::Invalid("artwork URL is missing a host".into()))?;
+    if crate::commands::profiles::is_blocked_host_or_ip(host) {
+        return Err(AppError::Invalid(
+            "private or local network artwork URLs are not permitted".into(),
+        ));
+    }
 
     let extension = url
         .rsplit('.')

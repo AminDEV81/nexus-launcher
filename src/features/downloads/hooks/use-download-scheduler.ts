@@ -4,7 +4,7 @@ import { useSettings } from '@/features/settings/hooks/use-settings'
 import { useDownloads, usePauseDownload, useResumeDownload } from './use-downloads'
 import { call } from '@/services/tauri'
 
-function isTimeInWindow(startTime: string, endTime: string, now: Date): boolean {
+export function isTimeInWindow(startTime: string, endTime: string, now: Date): boolean {
   const [sH, sM] = startTime.split(':').map(Number)
   const [eH, eM] = endTime.split(':').map(Number)
   if (isNaN(sH) || isNaN(sM) || isNaN(eH) || isNaN(eM)) return true
@@ -27,9 +27,20 @@ export function useDownloadScheduler() {
   const resume = useResumeDownload()
   const hasTriggeredShutdown = useRef(false)
   const hadActiveDownloads = useRef(false)
+  const pausedByScheduler = useRef<Set<string>>(new Set())
+  const wasWindowActive = useRef<boolean | null>(null)
+
+  const downloadsRef = useRef(downloads)
+  downloadsRef.current = downloads
+  const pauseMutateRef = useRef(pause.mutate)
+  pauseMutateRef.current = pause.mutate
+  const resumeMutateRef = useRef(resume.mutate)
+  resumeMutateRef.current = resume.mutate
 
   useEffect(() => {
     if (!settings || settings.download_scheduler_enabled !== 'true') {
+      wasWindowActive.current = null
+      pausedByScheduler.current.clear()
       return
     }
 
@@ -48,44 +59,49 @@ export function useDownloadScheduler() {
     const action = settings.download_scheduler_action || 'shutdown'
 
     const checkSchedule = () => {
+      const currentDownloads = downloadsRef.current
       const now = new Date()
       const dayOfWeek = now.getDay()
 
       const isDayActive = selectedDays.includes(dayOfWeek)
       const isWindowActive = isDayActive && isTimeInWindow(startTime, endTime, now)
+      const transitionedToActive = wasWindowActive.current !== true && isWindowActive
+      wasWindowActive.current = isWindowActive
 
-      const activeDownloads = downloads.filter(
+      const activeDownloads = currentDownloads.filter(
         (d) => d.status === 'downloading' || d.status === 'extracting',
       )
-      const pausedDownloads = downloads.filter((d) => d.status === 'paused')
+      const pausedDownloads = currentDownloads.filter((d) => d.status === 'paused')
+      const queuedDownloads = currentDownloads.filter((d) => d.status === 'queued')
 
-      if (activeDownloads.length > 0) {
+      if (activeDownloads.length > 0 || queuedDownloads.length > 0) {
         hadActiveDownloads.current = true
       }
 
       if (isWindowActive) {
-        // Inside active schedule: resume any paused downloads
+        // Resume downloads that were paused by the scheduler, or all paused downloads when first entering the window
         for (const d of pausedDownloads) {
-          if (!resume.isPending) {
-            resume.mutate(d.id)
+          if (transitionedToActive || pausedByScheduler.current.has(d.id)) {
+            pausedByScheduler.current.delete(d.id)
+            resumeMutateRef.current(d.id)
           }
         }
       } else {
-        // Outside schedule: pause active downloads
+        // Outside schedule: pause active downloads and remember we paused them
         for (const d of activeDownloads) {
-          if (!pause.isPending) {
-            pause.mutate(d.id)
-          }
+          pausedByScheduler.current.add(d.id)
+          pauseMutateRef.current(d.id)
         }
       }
 
-      // Check auto power action
+      // Check auto power action only when all active, paused, and queued downloads are done
       if (
         autoShutdown &&
         hadActiveDownloads.current &&
         activeDownloads.length === 0 &&
         pausedDownloads.length === 0 &&
-        downloads.length > 0 &&
+        queuedDownloads.length === 0 &&
+        currentDownloads.length > 0 &&
         !hasTriggeredShutdown.current
       ) {
         hasTriggeredShutdown.current = true
@@ -97,5 +113,5 @@ export function useDownloadScheduler() {
     checkSchedule()
     const interval = setInterval(checkSchedule, 15000)
     return () => clearInterval(interval)
-  }, [settings, downloads, pause, resume])
+  }, [settings])
 }

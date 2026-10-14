@@ -1,8 +1,9 @@
+import { memo } from 'react'
 import { motion } from 'framer-motion'
 import { Disc3, Heart, Play } from 'lucide-react'
 import { assetUrl } from '@/lib/asset-url'
 import { playButtonClick } from '@/lib/sound-engine'
-import { useSoundtrackPlayer } from '../../hooks/use-soundtrack-player'
+import { useSoundtrackStore } from '../../store/soundtrack-store'
 import type { SoundtrackAlbumWithTracks } from '../../types'
 
 interface AlbumCardProps {
@@ -10,14 +11,17 @@ interface AlbumCardProps {
   onOpenDetails: (album: SoundtrackAlbumWithTracks) => void
 }
 
-export function AlbumCard({ albumWithTracks, onOpenDetails }: AlbumCardProps) {
-  const { playAlbum, currentAlbum, playbackState, favorites, toggleFavorite } =
-    useSoundtrackPlayer()
+export const AlbumCard = memo(function AlbumCard({
+  albumWithTracks,
+  onOpenDetails,
+}: AlbumCardProps) {
   const { album, tracks } = albumWithTracks
-
-  const isCurrent = currentAlbum?.id === album.id
-  const isPlaying = isCurrent && playbackState === 'playing'
-  const isFavorite = favorites.has(album.id)
+  const isPlaying = useSoundtrackStore(
+    (s) => s.currentAlbum?.id === album.id && s.playbackState === 'playing',
+  )
+  const isFavorite = useSoundtrackStore((s) => s.favorites.has(album.id))
+  const playAlbum = useSoundtrackStore((s) => s.playAlbum)
+  const toggleFavorite = useSoundtrackStore((s) => s.toggleFavorite)
 
   function handlePlay(e: React.MouseEvent) {
     e.stopPropagation()
@@ -40,6 +44,7 @@ export function AlbumCard({ albumWithTracks, onOpenDetails }: AlbumCardProps) {
           <img
             src={coverSrc}
             alt={album.title}
+            loading="lazy"
             className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-108"
           />
         ) : (
@@ -107,4 +112,4 @@ export function AlbumCard({ albumWithTracks, onOpenDetails }: AlbumCardProps) {
       </div>
     </motion.div>
   )
-}
+})

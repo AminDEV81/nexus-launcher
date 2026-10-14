@@ -1,8 +1,20 @@
 use crate::db::Database;
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use serde::Serialize;
+use std::sync::{Mutex, OnceLock};
 use sysinfo::{Disks, System};
 use tauri::State;
+
+static LIVE_METRICS_SYSTEM: OnceLock<Mutex<System>> = OnceLock::new();
+
+fn shared_metrics_system() -> &'static Mutex<System> {
+    LIVE_METRICS_SYSTEM.get_or_init(|| {
+        let mut sys = System::new();
+        sys.refresh_cpu_all();
+        sys.refresh_memory();
+        Mutex::new(sys)
+    })
+}
 
 #[derive(Serialize)]
 pub struct HealthStatus {
@@ -259,10 +271,13 @@ fn query_windows_os_info() -> (Option<String>, Option<String>) {
 
 /// Dynamically retrieves comprehensive hardware, OS, and system specifications for any PC.
 #[tauri::command]
-pub fn get_system_specs(app: tauri::AppHandle) -> AppResult<SystemSpecs> {
-    let mut sys = System::new();
-    sys.refresh_cpu_all();
-    sys.refresh_memory();
+pub async fn get_system_specs(app: tauri::AppHandle) -> AppResult<SystemSpecs> {
+    tokio::task::spawn_blocking(move || {
+        let mut sys = System::new();
+        sys.refresh_cpu_all();
+        std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+        sys.refresh_cpu_all();
+        sys.refresh_memory();
 
     let cpus = sys.cpus();
     let cpu_brand = cpus
@@ -374,6 +389,9 @@ pub fn get_system_specs(app: tauri::AppHandle) -> AppResult<SystemSpecs> {
         motherboard,
         displays: display_list,
     })
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?
 }
 
 /// Round-trips through SQLite so the frontend can confirm, on startup,
@@ -424,36 +442,44 @@ pub fn shutdown_system(action: Option<String>) -> AppResult<()> {
 }
 
 /// Returns lightweight, real-time memory and CPU metrics for live UI updating.
+/// Reuses a persistent `System` instance so `sysinfo` computes accurate CPU usage deltas
+/// between polls without blocking the main UI thread.
 #[tauri::command]
-pub fn get_live_metrics() -> AppResult<LiveSystemMetrics> {
-    let mut sys = System::new();
-    sys.refresh_cpu_all();
-    sys.refresh_memory();
+pub async fn get_live_metrics() -> AppResult<LiveSystemMetrics> {
+    tokio::task::spawn_blocking(|| {
+        let mut sys = shared_metrics_system()
+            .lock()
+            .expect("live metrics system mutex poisoned");
+        sys.refresh_cpu_all();
+        sys.refresh_memory();
 
-    let total_memory = sys.total_memory();
-    let used_memory = sys.used_memory();
-    let free_memory = total_memory.saturating_sub(used_memory);
-    let memory = MemorySpecs {
-        total_bytes: total_memory,
-        used_bytes: used_memory,
-        free_bytes: free_memory,
-        total_swap_bytes: sys.total_swap(),
-        used_swap_bytes: sys.used_swap(),
-    };
+        let total_memory = sys.total_memory();
+        let used_memory = sys.used_memory();
+        let free_memory = total_memory.saturating_sub(used_memory);
+        let memory = MemorySpecs {
+            total_bytes: total_memory,
+            used_bytes: used_memory,
+            free_bytes: free_memory,
+            total_swap_bytes: sys.total_swap(),
+            used_swap_bytes: sys.used_swap(),
+        };
 
-    let cpus = sys.cpus();
-    let cpu_freq = cpus.first().map(|c| c.frequency()).unwrap_or(0);
-    let cpu_usage: f32 = if !cpus.is_empty() {
-        cpus.iter().map(|c| c.cpu_usage()).sum::<f32>() / cpus.len() as f32
-    } else {
-        0.0
-    };
+        let cpus = sys.cpus();
+        let cpu_freq = cpus.first().map(|c| c.frequency()).unwrap_or(0);
+        let cpu_usage: f32 = if !cpus.is_empty() {
+            cpus.iter().map(|c| c.cpu_usage()).sum::<f32>() / cpus.len() as f32
+        } else {
+            0.0
+        };
 
-    Ok(LiveSystemMetrics {
-        memory,
-        cpu_usage_percent: (cpu_usage * 10.0).round() / 10.0,
-        cpu_frequency_mhz: cpu_freq,
+        Ok(LiveSystemMetrics {
+            memory,
+            cpu_usage_percent: (cpu_usage * 10.0).round() / 10.0,
+            cpu_frequency_mhz: cpu_freq,
+        })
     })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?
 }
 
 

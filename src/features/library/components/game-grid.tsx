@@ -147,7 +147,7 @@ export function GameGrid({ games, selectedId, onSelect, onContextMenu }: GameGri
                   <GameCard
                     game={game}
                     selected={game.id === selectedId}
-                    onSelect={() => handleClick(game.id)}
+                    onSelect={handleClick}
                     onContextMenu={onContextMenu}
                   />
                 </div>

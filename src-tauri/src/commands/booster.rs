@@ -43,28 +43,45 @@ use sysinfo::{ProcessesToUpdate, System};
 /// Matching strips a trailing `.exe` and lower-cases both sides, so the
 /// same table covers Windows (`Chrome.exe`), macOS (`Chrome`), and
 /// Linux (`chrome`) process names without needing three separate lists.
-const BOOSTABLE_PROCESSES: &[(&str, &str)] = &[
-    ("chrome", "Google Chrome"),
-    ("msedge", "Microsoft Edge"),
-    ("firefox", "Firefox"),
-    ("opera", "Opera"),
-    ("brave", "Brave"),
-    ("vivaldi", "Vivaldi"),
-    ("slack", "Slack"),
-    ("teams", "Microsoft Teams"),
-    ("ms-teams", "Microsoft Teams"),
-    ("skype", "Skype"),
-    ("zoom", "Zoom"),
-    ("onedrive", "OneDrive"),
-    ("dropbox", "Dropbox"),
-    ("googledrivefs", "Google Drive"),
-    ("icloudservices", "iCloud"),
-    ("ccleaner64", "CCleaner"),
-    ("ccleaner", "CCleaner"),
-    ("utorrent", "uTorrent"),
-    ("qbittorrent", "qBittorrent"),
-    ("creative cloud", "Adobe Creative Cloud"),
-    ("adobeipcbroker", "Adobe Helper"),
+const BOOSTABLE_PROCESSES: &[(&str, &str, &str)] = &[
+    // Web Browsers
+    ("chrome", "Google Chrome", "browser"),
+    ("msedge", "Microsoft Edge", "browser"),
+    ("firefox", "Firefox", "browser"),
+    ("opera", "Opera / Opera GX", "browser"),
+    ("brave", "Brave Browser", "browser"),
+    ("vivaldi", "Vivaldi", "browser"),
+    ("waterfox", "Waterfox", "browser"),
+    // Chat, Media & Overlays
+    ("discord", "Discord", "chat_media"),
+    ("spotify", "Spotify", "chat_media"),
+    ("slack", "Slack", "chat_media"),
+    ("teams", "Microsoft Teams", "chat_media"),
+    ("ms-teams", "Microsoft Teams", "chat_media"),
+    ("skype", "Skype", "chat_media"),
+    ("zoom", "Zoom", "chat_media"),
+    ("telegram", "Telegram Desktop", "chat_media"),
+    ("overwolf", "Overwolf Overlay", "chat_media"),
+    // Cloud Sync & Storage
+    ("onedrive", "Microsoft OneDrive", "cloud_sync"),
+    ("dropbox", "Dropbox", "cloud_sync"),
+    ("googledrivefs", "Google Drive", "cloud_sync"),
+    ("icloudservices", "Apple iCloud", "cloud_sync"),
+    ("megasync", "MEGAsync", "cloud_sync"),
+    ("nextcloud", "Nextcloud", "cloud_sync"),
+    // Background Utilities & Bloat
+    ("wallpaper32", "Wallpaper Engine", "utility"),
+    ("wallpaper64", "Wallpaper Engine", "utility"),
+    ("ccleaner64", "CCleaner", "utility"),
+    ("ccleaner", "CCleaner", "utility"),
+    ("utorrent", "uTorrent", "utility"),
+    ("qbittorrent", "qBittorrent", "utility"),
+    ("creative cloud", "Adobe Creative Cloud", "utility"),
+    ("adobeipcbroker", "Adobe IPC Broker", "utility"),
+    ("acrotray", "Adobe Acrobat Tray", "utility"),
+    ("widgets", "Windows Widgets", "utility"),
+    ("phoneexperiencehost", "Windows Phone Link", "utility"),
+    ("cortana", "Cortana", "utility"),
 ];
 
 pub const ALL_MODULE_IDS: &[&str] = &[
@@ -86,6 +103,7 @@ pub const ALL_MODULE_IDS: &[&str] = &[
 #[derive(Default)]
 pub struct BoosterState {
     previous_power_scheme: Mutex<Option<String>>,
+    timer_resolution_active: std::sync::atomic::AtomicBool,
 }
 
 #[derive(Clone, Serialize)]
@@ -104,18 +122,26 @@ pub struct BoostStepResult {
 pub struct BoostReport {
     pub steps: Vec<BoostStepResult>,
     pub closed_apps: Vec<String>,
+    pub freed_ram_bytes: u64,
 }
 
 #[derive(Clone, Serialize)]
 pub struct BoostableApp {
     pub name: String,
     pub pid: u32,
+    pub memory_bytes: u64,
+    pub cpu_usage: f32,
+    pub instance_count: u32,
+    pub category: String,
 }
 
 fn format_bytes(bytes: u64) -> String {
+    const GB: u64 = 1024 * 1024 * 1024;
     const MB: u64 = 1024 * 1024;
     const KB: u64 = 1024;
-    if bytes >= MB {
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
         format!("{:.1} MB", bytes as f64 / MB as f64)
     } else if bytes >= KB {
         format!("{:.0} KB", bytes as f64 / KB as f64)
@@ -147,63 +173,119 @@ fn enabled_modules(db: &Database) -> Vec<String> {
     }
 }
 
+/// Reads `booster_excluded_apps` from the `settings` table so users can
+/// protect/whitelist apps like Discord or Spotify during Game Boost.
+fn excluded_apps(db: &Database) -> Vec<String> {
+    let conn = db.connection.lock().expect("db mutex poisoned");
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'booster_excluded_apps'",
+            [],
+            |row| row.get(0),
+        )
+        .ok();
+
+    match raw {
+        Some(value) if !value.trim().is_empty() => value
+            .split(',')
+            .map(|part| part.trim().to_lowercase())
+            .filter(|part| !part.is_empty())
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
 // ---------------------------------------------------------------------
 // Module 1: close background apps
 // ---------------------------------------------------------------------
 
-fn display_name_for(process_name: &str) -> Option<String> {
+fn match_boostable_process(process_name: &str) -> Option<(&'static str, &'static str)> {
     let lower = process_name.to_lowercase();
     let base = lower.strip_suffix(".exe").unwrap_or(&lower);
     BOOSTABLE_PROCESSES
         .iter()
-        .find(|(key, _)| *key == base)
-        .map(|(_, display)| display.to_string())
+        .find(|(key, _, _)| *key == base)
+        .map(|(_, display, category)| (*display, *category))
 }
 
 /// Lets the settings panel show *which* known background apps are
-/// currently running before the person commits to closing them. Async +
-/// off the main thread: the process-list refresh alone costs hundreds
-/// of ms and would otherwise freeze the window event loop.
+/// currently running (grouped by application with total RAM, CPU, and
+/// instance counts) before the person commits to closing them.
 #[tauri::command]
 pub async fn scan_boostable_apps() -> Vec<BoostableApp> {
     tokio::task::spawn_blocking(|| {
         let mut system = System::new();
         system.refresh_processes(ProcessesToUpdate::All, true);
 
-        system
-            .processes()
-            .values()
-            .filter_map(|process| {
-                let display = display_name_for(&process.name().to_string_lossy())?;
-                Some(BoostableApp {
-                    name: display,
-                    pid: process.pid().as_u32(),
+        let mut grouped: std::collections::HashMap<String, BoostableApp> =
+            std::collections::HashMap::new();
+
+        for process in system.processes().values() {
+            let Some((display, category)) =
+                match_boostable_process(&process.name().to_string_lossy())
+            else {
+                continue;
+            };
+            let mem = process.memory();
+            let cpu = process.cpu_usage();
+            let pid = process.pid().as_u32();
+
+            grouped
+                .entry(display.to_string())
+                .and_modify(|entry| {
+                    entry.memory_bytes = entry.memory_bytes.saturating_add(mem);
+                    entry.cpu_usage += cpu;
+                    entry.instance_count += 1;
                 })
-            })
-            .collect()
+                .or_insert_with(|| BoostableApp {
+                    name: display.to_string(),
+                    pid,
+                    memory_bytes: mem,
+                    cpu_usage: (cpu * 10.0).round() / 10.0,
+                    instance_count: 1,
+                    category: category.to_string(),
+                });
+        }
+
+        let mut list: Vec<BoostableApp> = grouped.into_values().collect();
+        list.sort_by(|a, b| b.memory_bytes.cmp(&a.memory_bytes));
+        list
     })
     .await
     .unwrap_or_default()
 }
 
-fn close_background_apps() -> (BoostStepResult, Vec<String>) {
+fn close_background_apps(excluded: &[String]) -> (BoostStepResult, Vec<String>, u64) {
     let mut system = System::new();
     system.refresh_processes(ProcessesToUpdate::All, true);
 
     let mut closed: Vec<String> = Vec::new();
+    let mut freed_bytes: u64 = 0;
+
     for process in system.processes().values() {
-        let Some(display) = display_name_for(&process.name().to_string_lossy()) else {
+        let Some((display, _)) = match_boostable_process(&process.name().to_string_lossy()) else {
             continue;
         };
-        if process.kill() && !closed.contains(&display) {
-            closed.push(display);
+        if excluded.iter().any(|ex| ex == &display.to_lowercase()) {
+            continue;
+        }
+        let proc_mem = process.memory();
+        if process.kill() {
+            freed_bytes = freed_bytes.saturating_add(proc_mem);
+            if !closed.iter().any(|c| c == display) {
+                closed.push(display.to_string());
+            }
         }
     }
 
     let detail = if closed.is_empty() {
         "No unnecessary background apps were running.".to_string()
     } else {
-        format!("Closed {}.", closed.join(", "))
+        format!(
+            "Closed {} ({} reclaimed).",
+            closed.join(", "),
+            format_bytes(freed_bytes)
+        )
     };
 
     (
@@ -212,9 +294,14 @@ fn close_background_apps() -> (BoostStepResult, Vec<String>) {
             label: "Close background apps".into(),
             applied: true,
             detail,
-            metric: Some(format!("{} apps", closed.len())),
+            metric: Some(if freed_bytes > 0 {
+                format!("{} apps • {}", closed.len(), format_bytes(freed_bytes))
+            } else {
+                format!("{} apps", closed.len())
+            }),
         },
         closed,
+        freed_bytes,
     )
 }
 
@@ -305,7 +392,7 @@ mod ram {
     /// process's working set, since `EmptyWorkingSet` only *asks* for a
     /// minimum working set — how much actually comes back to the
     /// system-wide free pool is what the person actually cares about.
-    pub fn boost() -> BoostStepResult {
+    pub fn boost() -> (BoostStepResult, u64) {
         let mut system = System::new_all();
         system.refresh_memory();
         let before = system.available_memory();
@@ -368,13 +455,16 @@ mod ram {
         let after = system.available_memory();
         let freed = after.saturating_sub(before);
 
-        BoostStepResult {
-            id: "ram".into(),
-            label: "Free up RAM".into(),
-            applied: trimmed > 0,
-            detail: format!("Trimmed memory in {trimmed} processes & purged Standby cache."),
-            metric: Some(format_bytes(freed)),
-        }
+        (
+            BoostStepResult {
+                id: "ram".into(),
+                label: "Free up RAM".into(),
+                applied: trimmed > 0,
+                detail: format!("Trimmed memory in {trimmed} processes & purged Standby cache."),
+                metric: Some(format_bytes(freed)),
+            },
+            freed,
+        )
     }
 }
 
@@ -382,14 +472,17 @@ mod ram {
 mod ram {
     use crate::commands::booster::BoostStepResult;
 
-    pub fn boost() -> BoostStepResult {
-        BoostStepResult {
-            id: "ram".into(),
-            label: "Free up RAM".into(),
-            applied: false,
-            detail: "Not available on this OS.".into(),
-            metric: None,
-        }
+    pub fn boost() -> (BoostStepResult, u64) {
+        (
+            BoostStepResult {
+                id: "ram".into(),
+                label: "Free up RAM".into(),
+                applied: false,
+                detail: "Not available on this OS.".into(),
+                metric: None,
+            },
+            0,
+        )
     }
 }
 
@@ -797,16 +890,28 @@ mod visual_fx {
 
 #[cfg(windows)]
 mod timer_res {
-    use crate::commands::booster::BoostStepResult;
+    use crate::commands::booster::{BoostStepResult, BoosterState};
+    use std::sync::atomic::Ordering;
 
     #[link(name = "winmm")]
     extern "system" {
         fn timeBeginPeriod(u_period: u32) -> u32;
+        fn timeEndPeriod(u_period: u32) -> u32;
     }
 
-    pub fn boost() -> BoostStepResult {
-        let res = unsafe { timeBeginPeriod(1) };
-        let ok = res == 0;
+    pub fn boost(state: &BoosterState) -> BoostStepResult {
+        let already = state.timer_resolution_active.load(Ordering::SeqCst);
+        let ok = if already {
+            true
+        } else {
+            let res = unsafe { timeBeginPeriod(1) };
+            if res == 0 {
+                state.timer_resolution_active.store(true, Ordering::SeqCst);
+                true
+            } else {
+                false
+            }
+        };
 
         BoostStepResult {
             id: "timer_res".into(),
@@ -820,13 +925,21 @@ mod timer_res {
             metric: if ok { Some("1.0 ms".into()) } else { None },
         }
     }
+
+    pub fn restore(state: &BoosterState) {
+        if state.timer_resolution_active.swap(false, Ordering::SeqCst) {
+            unsafe {
+                let _ = timeEndPeriod(1);
+            }
+        }
+    }
 }
 
 #[cfg(not(windows))]
 mod timer_res {
-    use crate::commands::booster::BoostStepResult;
+    use crate::commands::booster::{BoostStepResult, BoosterState};
 
-    pub fn boost() -> BoostStepResult {
+    pub fn boost(_state: &BoosterState) -> BoostStepResult {
         BoostStepResult {
             id: "timer_res".into(),
             label: "High-precision 1ms timer".into(),
@@ -835,6 +948,8 @@ mod timer_res {
             metric: None,
         }
     }
+
+    pub fn restore(_state: &BoosterState) {}
 }
 
 // ---------------------------------------------------------------------
@@ -851,10 +966,12 @@ where
     F: FnMut(&BoostStepResult, usize, usize),
 {
     let modules = enabled_modules(db);
+    let excluded = excluded_apps(db);
     let has = |id: &str| modules.iter().any(|m| m == id);
 
     let mut steps = Vec::new();
     let mut closed_apps = Vec::new();
+    let mut freed_ram_bytes: u64 = 0;
 
     let total_steps = ALL_MODULE_IDS.iter().filter(|&&id| has(id)).count().max(1);
     let mut current_step = 0;
@@ -866,15 +983,18 @@ where
     };
 
     if has("close_apps") {
-        let (step, closed) = close_background_apps();
+        let (step, closed, app_ram_freed) = close_background_apps(&excluded);
         closed_apps = closed;
+        freed_ram_bytes = freed_ram_bytes.saturating_add(app_ram_freed);
         record(step, &mut on_step);
     }
     if has("cpu") {
         record(cpu_priority::boost(), &mut on_step);
     }
     if has("ram") {
-        record(ram::boost(), &mut on_step);
+        let (step, ram_freed) = ram::boost();
+        freed_ram_bytes = freed_ram_bytes.saturating_add(ram_freed);
+        record(step, &mut on_step);
     }
     if has("temp") {
         record(clear_temp_files(), &mut on_step);
@@ -895,10 +1015,14 @@ where
         record(visual_fx::boost(), &mut on_step);
     }
     if has("timer_res") {
-        record(timer_res::boost(), &mut on_step);
+        record(timer_res::boost(state), &mut on_step);
     }
 
-    BoostReport { steps, closed_apps }
+    BoostReport {
+        steps,
+        closed_apps,
+        freed_ram_bytes,
+    }
 }
 
 /// Runs every *enabled* module (per the `booster_enabled_modules`
@@ -911,29 +1035,109 @@ pub fn perform_boost(db: &Database, state: &BoosterState) -> BoostReport {
 
 #[tauri::command]
 pub async fn run_game_boost(
-    db: tauri::State<'_, Database>,
-    state: tauri::State<'_, BoosterState>,
+    app: tauri::AppHandle,
 ) -> AppResult<BoostReport> {
-    // Async so the blocking process/registry/powercfg work below runs on
-    // the command runtime instead of the main thread (see
-    // `scan_boostable_apps`).
-    Ok(perform_boost(&db, &state))
+    tokio::task::spawn_blocking(move || {
+        use tauri::Manager;
+        let db = app.state::<Database>();
+        let state = app.state::<BoosterState>();
+        perform_boost(&db, &state)
+    })
+    .await
+    .map_err(|e| crate::error::AppError::Other(e.to_string()))
 }
 
-/// Restores whatever power plan was active before the last boost — best
-/// effort, and a no-op if no boost has switched it. Called when the
-/// boosted game exits (`launch.rs`), not exposed as its own command
-/// since nothing else should trigger it.
+/// Restores whatever power plan and kernel timer resolution were active
+/// before the last boost — best effort, and a no-op if no boost was active.
 pub fn restore_power_plan(state: &BoosterState) {
     power_plan::restore(state);
+    timer_res::restore(state);
 }
 
 /// Trims working sets of running background processes to immediately free physical RAM.
 #[tauri::command]
 pub async fn boost_ram_only() -> AppResult<BoostStepResult> {
-    tokio::task::spawn_blocking(ram::boost)
+    tokio::task::spawn_blocking(|| ram::boost().0)
         .await
         .map_err(|e| crate::error::AppError::Other(e.to_string()))
+}
+
+/// Restores normal desktop operating state (power plan, 1.0ms kernel timer,
+/// and Windows Search indexer) on user demand from the Game Booster panel.
+#[tauri::command]
+pub async fn restore_game_boost(app: tauri::AppHandle) -> AppResult<BoostStepResult> {
+    tokio::task::spawn_blocking(move || {
+        use tauri::Manager;
+        let state = app.state::<BoosterState>();
+        restore_power_plan(&state);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            let _ = std::process::Command::new("net")
+                .args(["start", "wsearch"])
+                .creation_flags(CREATE_NO_WINDOW)
+                .status();
+        }
+        BoostStepResult {
+            id: "restore".into(),
+            label: "Restore Normal Desktop Mode".into(),
+            applied: true,
+            detail: "Restored balanced power plan, released 1.0ms kernel timer lock, and resumed background services.".into(),
+            metric: Some("Normal Mode".into()),
+        }
+    })
+    .await
+    .map_err(|e| crate::error::AppError::Other(e.to_string()))
+}
+
+/// Terminates a specific set of target background apps chosen by the user.
+#[tauri::command]
+pub async fn kill_selected_apps(app_names: Vec<String>) -> AppResult<BoostStepResult> {
+    tokio::task::spawn_blocking(move || {
+        let mut system = System::new();
+        system.refresh_processes(ProcessesToUpdate::All, true);
+        let target_lower: Vec<String> = app_names.iter().map(|s| s.to_lowercase()).collect();
+
+        let mut closed: Vec<String> = Vec::new();
+        let mut freed_bytes: u64 = 0;
+
+        for process in system.processes().values() {
+            let Some((display, _)) = match_boostable_process(&process.name().to_string_lossy()) else {
+                continue;
+            };
+            if !target_lower.iter().any(|t| t == &display.to_lowercase()) {
+                continue;
+            }
+            let proc_mem = process.memory();
+            if process.kill() {
+                freed_bytes = freed_bytes.saturating_add(proc_mem);
+                if !closed.iter().any(|c| c == display) {
+                    closed.push(display.to_string());
+                }
+            }
+        }
+
+        let detail = if closed.is_empty() {
+            "No matching background apps were running.".to_string()
+        } else {
+            format!(
+                "Terminated {} and reclaimed {}.",
+                closed.join(", "),
+                format_bytes(freed_bytes)
+            )
+        };
+
+        BoostStepResult {
+            id: "kill_selected".into(),
+            label: "Terminate Background Processes".into(),
+            applied: !closed.is_empty(),
+            detail,
+            metric: Some(format!("{} apps • {}", closed.len(), format_bytes(freed_bytes))),
+        }
+    })
+    .await
+    .map_err(|e| crate::error::AppError::Other(e.to_string()))
 }
 
 /// Dynamically sets the game process priority class to High.

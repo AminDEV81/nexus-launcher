@@ -262,13 +262,22 @@ fn sniff_kind(magic: &[u8]) -> Option<&'static str> {
 /// `trailer_url`: reqwest itself rejects other schemes, but the friendly
 /// error beats a generic network failure.
 fn validate_download_url(url: &str) -> AppResult<()> {
-    if url.starts_with("http://") || url.starts_with("https://") {
-        Ok(())
-    } else {
-        Err(AppError::Invalid(
+    let parsed = reqwest::Url::parse(url.trim())
+        .map_err(|e| AppError::Invalid(format!("invalid download URL: {e}")))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(AppError::Invalid(
             "only http(s) download links are supported".into(),
-        ))
+        ));
     }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| AppError::Invalid("download URL is missing a host".into()))?;
+    if crate::commands::profiles::is_blocked_host_or_ip(host) {
+        return Err(AppError::Invalid(
+            "private or local network download URLs are not permitted".into(),
+        ));
+    }
+    Ok(())
 }
 
 // ── DB + event helpers ───────────────────────────────────────────────
@@ -1131,7 +1140,13 @@ fn is_subsequent_multipart(file_path: &str) -> bool {
     false
 }
 
-fn extract_zip(app: &AppHandle, id: &str, file_path: &str, save_path: &str) -> Result<(), String> {
+fn extract_zip(
+    app: &AppHandle,
+    id: &str,
+    file_path: &str,
+    save_path: &str,
+    token: &CancellationToken,
+) -> Result<(), String> {
     let file =
         std::fs::File::open(file_path).map_err(|e| format!("cannot open archive: {e}"))?;
     let mut archive =
@@ -1142,10 +1157,16 @@ fn extract_zip(app: &AppHandle, id: &str, file_path: &str, save_path: &str) -> R
     let mut last_reported = 0u8;
 
     for i in 0..total {
+        if token.is_cancelled() {
+            return Err("extraction cancelled".into());
+        }
         let mut entry = archive
             .by_index(i)
             .map_err(|e| format!("bad archive entry: {e}"))?;
-        let entry_path = dest.join(entry.mangled_name());
+        let Some(safe_rel_path) = entry.enclosed_name().map(|p| p.to_path_buf()) else {
+            continue;
+        };
+        let entry_path = dest.join(safe_rel_path);
         if entry.is_dir() {
             std::fs::create_dir_all(&entry_path)
                 .map_err(|e| format!("cannot create folder: {e}"))?;
@@ -1198,7 +1219,13 @@ fn extract_7z(app: &AppHandle, id: &str, file_path: &str, save_path: &str) -> Re
 /// RAR extraction via the official UnRAR library (statically linked).
 /// UnRAR itself refuses archive entries whose paths escape the
 /// destination (`..` traversal is stripped), so this is the safe API.
-fn extract_rar(app: &AppHandle, id: &str, file_path: &str, save_path: &str) -> Result<(), String> {
+fn extract_rar(
+    app: &AppHandle,
+    id: &str,
+    file_path: &str,
+    save_path: &str,
+    token: &CancellationToken,
+) -> Result<(), String> {
     let dest = std::path::Path::new(save_path);
     std::fs::create_dir_all(dest).map_err(|e| format!("cannot create folder: {e}"))?;
 
@@ -1229,6 +1256,9 @@ fn extract_rar(app: &AppHandle, id: &str, file_path: &str, save_path: &str) -> R
         .read_header()
         .map_err(|e| format!("corrupt archive: {e}"))?
     {
+        if token.is_cancelled() {
+            return Err("extraction cancelled".into());
+        }
         archive = header
             .extract_with_base(dest)
             .map_err(|e| format!("cannot extract: {e}"))?;
@@ -1520,16 +1550,24 @@ fn start_next_global_queued_download(app: &AppHandle) -> bool {
     let db = app.state::<Database>();
     let Ok(conn) = db.connection.lock() else { return false; };
 
-    let next: Option<(String, String, String, String, Option<String>)> = conn.query_row(
-        "SELECT id, url, file_path, save_path, game_id FROM downloads WHERE status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
+    let next: Option<(String, String, String, String, Option<String>, Option<String>)> = conn.query_row(
+        "SELECT id, url, COALESCE(file_path, ''), save_path, game_id, chunk_state FROM downloads WHERE status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
         [],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
     ).ok();
 
-    if let Some((next_id, url, file_path, save_path, gid)) = next {
-        let _ = conn.execute("UPDATE downloads SET status = 'downloading' WHERE id = ?1", [&next_id]);
+    if let Some((next_id, url, stored_path, save_path, gid, saved_chunk_state)) = next {
+        let file_path = if stored_path.is_empty() {
+            format!("{save_path}/{}", file_name_from_url(&url))
+        } else {
+            stored_path
+        };
+        let _ = conn.execute(
+            "UPDATE downloads SET status = 'downloading', file_path = ?1, error_message = NULL, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![file_path, next_id],
+        );
         let gid_opt = gid.filter(|s| !s.is_empty());
-        begin_download(app, &state, next_id, url, file_path, save_path, gid_opt, None);
+        begin_download(app, &state, next_id, url, file_path, save_path, gid_opt, saved_chunk_state);
         true
     } else {
         false
@@ -1540,25 +1578,33 @@ fn start_next_sequential_part(app: &AppHandle, game_id: &Option<String>, save_pa
     let db = app.state::<Database>();
     let Ok(conn) = db.connection.lock() else { return false; };
 
-    let next: Option<(String, String, String, String, Option<String>)> = if let Some(gid) = game_id {
+    let next: Option<(String, String, String, String, Option<String>, Option<String>)> = if let Some(gid) = game_id {
         conn.query_row(
-            "SELECT id, url, file_path, save_path, game_id FROM downloads WHERE game_id = ?1 AND status IN ('queued', 'paused') ORDER BY rowid ASC, created_at ASC LIMIT 1",
+            "SELECT id, url, COALESCE(file_path, ''), save_path, game_id, chunk_state FROM downloads WHERE game_id = ?1 AND status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
             [gid],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
         ).ok()
     } else {
         conn.query_row(
-            "SELECT id, url, file_path, save_path, game_id FROM downloads WHERE save_path = ?1 AND status IN ('queued', 'paused') ORDER BY rowid ASC, created_at ASC LIMIT 1",
+            "SELECT id, url, COALESCE(file_path, ''), save_path, game_id, chunk_state FROM downloads WHERE save_path = ?1 AND status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
             [save_path],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
         ).ok()
     };
 
-    if let Some((next_id, url, file_path, save_path, gid)) = next {
-        let _ = conn.execute("UPDATE downloads SET status = 'downloading' WHERE id = ?1", [&next_id]);
+    if let Some((next_id, url, stored_path, save_path, gid, saved_chunk_state)) = next {
+        let file_path = if stored_path.is_empty() {
+            format!("{save_path}/{}", file_name_from_url(&url))
+        } else {
+            stored_path
+        };
+        let _ = conn.execute(
+            "UPDATE downloads SET status = 'downloading', file_path = ?1, error_message = NULL, updated_at = datetime('now') WHERE id = ?2",
+            rusqlite::params![file_path, next_id],
+        );
         let state = app.state::<DownloadState>();
         let gid_opt = gid.filter(|s| !s.is_empty());
-        begin_download(app, &state, next_id, url, file_path, save_path, gid_opt, None);
+        begin_download(app, &state, next_id, url, file_path, save_path, gid_opt, saved_chunk_state);
         true
     } else {
         false
@@ -1631,14 +1677,15 @@ async fn run_download(
                             let is_rar = lower.ends_with(".rar");
                             let app_clone = app.clone();
                             let m_id = master_id.clone();
+                            let token_clone = token.clone();
 
                             let extracted = tokio::task::spawn_blocking(move || {
                                 if is_7z {
                                     extract_7z(&app_clone, &m_id, &fp, &sp)
                                 } else if is_rar {
-                                    extract_rar(&app_clone, &m_id, &fp, &sp)
+                                    extract_rar(&app_clone, &m_id, &fp, &sp, &token_clone)
                                 } else {
-                                    extract_zip(&app_clone, &m_id, &fp, &sp)
+                                    extract_zip(&app_clone, &m_id, &fp, &sp, &token_clone)
                                 }
                             })
                             .await
@@ -2227,6 +2274,7 @@ pub async fn pause_download(
             let _ = app.emit("download-updated", info);
         }
     }
+    start_next_global_queued_download(&app);
     Ok(())
 }
 
@@ -2337,6 +2385,7 @@ pub async fn cancel_download(
             extract_percent: None,
         },
     );
+    start_next_global_queued_download(&app);
     Ok(())
 }
 
@@ -2397,6 +2446,7 @@ pub async fn delete_download(
             extract_percent: None,
         },
     );
+    start_next_global_queued_download(&app);
     Ok(())
 }
 
@@ -2468,4 +2518,38 @@ pub fn recover_orphaned_downloads(app: &AppHandle) {
         "UPDATE downloads SET status='paused', speed_bps=0, updated_at=datetime('now') WHERE status IN ('downloading','extracting')",
         [],
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_file_name_strips_traversal_and_reserved_names() {
+        assert_eq!(sanitize_file_name("../../etc/passwd"), "--..-..-etc-passwd");
+        assert_eq!(sanitize_file_name("CON.txt"), "_CON.txt");
+        assert_eq!(sanitize_file_name("NUL"), "_NUL");
+        assert_eq!(sanitize_file_name("   ...   "), "download");
+        assert_eq!(sanitize_file_name("game:edition?.zip"), "game-edition-.zip");
+    }
+
+    #[test]
+    fn test_validate_download_url_blocks_private_and_non_http() {
+        assert!(validate_download_url("https://cdn.example.com/archive.zip").is_ok());
+        assert!(validate_download_url("http://127.0.0.1:9000/file.zip").is_err());
+        assert!(validate_download_url("http://localhost/file.zip").is_err());
+        assert!(validate_download_url("http://192.168.0.10/file.zip").is_err());
+        assert!(validate_download_url("ftp://cdn.example.com/archive.zip").is_err());
+    }
+
+    #[test]
+    fn test_is_subsequent_multipart_detection() {
+        assert!(!is_subsequent_multipart("game.part1.rar"));
+        assert!(!is_subsequent_multipart("game.part01.rar"));
+        assert!(!is_subsequent_multipart("game.part001.rar"));
+        assert!(is_subsequent_multipart("game.part2.rar"));
+        assert!(is_subsequent_multipart("game.part02.rar"));
+        assert!(is_subsequent_multipart("game.002"));
+        assert!(is_subsequent_multipart("game.r00"));
+    }
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Play,
@@ -25,8 +25,7 @@ import { useTags } from '../hooks/use-tags'
 import { useLaunchStore } from '@/store/launch-store'
 import { useNavigate } from 'react-router-dom'
 import { useStartDownloadModalStore } from '@/features/downloads/store/start-download-modal-store'
-import { useDownloads } from '@/features/downloads/hooks/use-downloads'
-import { findActiveDownloadForGame } from '@/features/downloads/utils/match-download'
+import { useActiveDownloadForGame } from '@/features/downloads/hooks/use-downloads'
 import { formatElapsed, formatPlaytimeCompact, isGameUnreleased } from '../utils/format'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { playButtonClick, playCardHover } from '@/lib/sound-engine'
@@ -40,7 +39,12 @@ interface GameCardProps {
   onContextMenu: (game: Game, event: MouseEvent) => void
 }
 
-export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardProps) {
+export const GameCard = memo(function GameCard({
+  game,
+  selected,
+  onSelect,
+  onContextMenu,
+}: GameCardProps) {
   const navigate = useNavigate()
   const updateFlags = useUpdateGameFlags()
   const launchGame = useLaunchGame()
@@ -49,15 +53,10 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
   const isRunning = useLaunchStore((s) => s.runningGameIds.has(game.id))
   const elapsedSeconds = useLaunchStore((s) => s.elapsedSeconds[game.id])
   const { data: tags } = useTags()
-  const { data: downloads } = useDownloads()
+  const { data: activeDownload } = useActiveDownloadForGame(game)
   const cover = assetUrl(game.cover_path)
   const [hovered, setHovered] = useState(false)
   const speed = useAnimationSpeed()
-
-  const activeDownload = useMemo(
-    () => findActiveDownloadForGame(downloads, game),
-    [downloads, game],
-  )
   const isDownloading = Boolean(activeDownload)
   const downloadPercent =
     activeDownload && activeDownload.total_bytes > 0
@@ -501,4 +500,4 @@ export function GameCard({ game, selected, onSelect, onContextMenu }: GameCardPr
       </div>
     </div>
   )
-}
+})

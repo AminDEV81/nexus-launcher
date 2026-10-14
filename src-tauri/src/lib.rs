@@ -288,6 +288,8 @@ pub fn run() {
             commands::booster::scan_boostable_apps,
             commands::booster::run_game_boost,
             commands::booster::boost_ram_only,
+            commands::booster::restore_game_boost,
+            commands::booster::kill_selected_apps,
             commands::system_tweaks::get_system_tweak_status,
             commands::system_tweaks::create_restore_point,
             commands::system_tweaks::toggle_network_tweaks,

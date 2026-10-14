@@ -574,30 +574,40 @@ pub async fn launch_game(
     // closing background apps and switching power plans after the game
     // has already started defeats the point.
     if should_boost {
-        let app_emit = app.clone();
+        let app_boost = app.clone();
         let gid = game_id.clone();
-        let report = booster::perform_boost_with_progress(
-            &db,
-            &app.state::<booster::BoosterState>(),
-            |step, current, total| {
-                let percent = 10 + ((current as f32 / total as f32) * 75.0) as u32;
-                let _ = app_emit.emit(
-                    "launch-boost-progress",
-                    LaunchBoostStepPayload {
-                        game_id: gid.clone(),
-                        step_index: current,
-                        total_steps: total,
-                        module_id: step.id.clone(),
-                        label: step.label.clone(),
-                        applied: step.applied,
-                        detail: step.detail.clone(),
-                        metric: step.metric.clone(),
-                        percent,
-                    },
-                );
-                std::thread::sleep(std::time::Duration::from_millis(70));
-            },
-        );
+        let report = tokio::task::spawn_blocking(move || {
+            let db_state = app_boost.state::<Database>();
+            let booster_state = app_boost.state::<booster::BoosterState>();
+            booster::perform_boost_with_progress(
+                &db_state,
+                &booster_state,
+                |step, current, total| {
+                    let percent = 10 + ((current as f32 / total as f32) * 75.0) as u32;
+                    let _ = app_boost.emit(
+                        "launch-boost-progress",
+                        LaunchBoostStepPayload {
+                            game_id: gid.clone(),
+                            step_index: current,
+                            total_steps: total,
+                            module_id: step.id.clone(),
+                            label: step.label.clone(),
+                            applied: step.applied,
+                            detail: step.detail.clone(),
+                            metric: step.metric.clone(),
+                            percent,
+                        },
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(70));
+                },
+            )
+        })
+        .await
+        .unwrap_or_else(|_| booster::BoostReport {
+            steps: Vec::new(),
+            closed_apps: Vec::new(),
+            freed_ram_bytes: 0,
+        });
         let _ = app.emit("game-boosted", &report);
         let _ = app.emit(
             "launch-boost-complete",
@@ -606,7 +616,7 @@ pub async fn launch_game(
                 report,
             },
         );
-        std::thread::sleep(std::time::Duration::from_millis(150));
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
     }
 
     if let Some(hook) = target
@@ -633,7 +643,7 @@ pub async fn launch_game(
                 percent: 92,
             },
         );
-        std::thread::sleep(std::time::Duration::from_millis(150));
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
     }
 
     // For the Steam hand-off, remember which same-named processes were
@@ -787,17 +797,18 @@ async fn track_session(
 
     loop {
         tokio::time::sleep(POLL_INTERVAL).await;
-        system.refresh_processes(ProcessesToUpdate::All, true);
 
         let still_running = if let Some(ref jt) = job_tracker {
             jt.is_active()
         } else if is_script {
+            system.refresh_processes(ProcessesToUpdate::All, true);
             if system.process(sys_pid).is_some() {
                 true
             } else {
                 system.processes().values().any(|p| p.parent() == Some(sys_pid))
             }
         } else {
+            system.refresh_processes(ProcessesToUpdate::Some(&[sys_pid]), true);
             match system.process(sys_pid) {
                 None => false,
                 Some(process) => match exe_name.as_deref() {

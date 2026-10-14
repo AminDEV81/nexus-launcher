@@ -28,6 +28,7 @@ import { ErrorBoundary } from '@/components/error-boundary'
 import { MiniPlayer } from '@/features/soundtrack/components/player/mini-player'
 import { ExpandedPlayer } from '@/features/soundtrack/components/player/expanded-player'
 import { useSoundtrackDownloads } from '@/features/soundtrack/hooks/use-soundtrack-downloads'
+import { useSoundtrackGlobalShortcuts } from '@/features/soundtrack/hooks/use-soundtrack-player'
 import { CommandPalette } from '@/components/command-palette/command-palette'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { useWindowDragDropImport } from '@/features/library/hooks/use-window-drag-drop-import'
@@ -73,6 +74,7 @@ export function AppShell() {
   useWindowCloseIntercept()
   usePlaytimeTracking()
   useSoundtrackDownloads()
+  useSoundtrackGlobalShortcuts()
 
   const [showSplash, setShowSplash] = useState(true)
   const speed = useAnimationSpeed()

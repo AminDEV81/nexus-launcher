@@ -21,6 +21,7 @@ import { useLaunchGame } from '@/features/library/hooks/use-games'
 import { useUiStore } from '@/store/ui-store'
 import { useLaunchStore } from '@/store/launch-store'
 import { useSettings } from '@/features/settings/hooks/use-settings'
+import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { useSmoothedSpeed } from '../hooks/use-smoothed-speed'
 import { ChunkStreamVisualizer } from './chunk-stream-visualizer'
 import type { DownloadInfo } from '@/services/download'
@@ -81,6 +82,7 @@ export function DownloadCard({
 
   const remainingBytes = d.total_bytes > d.downloaded_bytes ? d.total_bytes - d.downloaded_bytes : 0
   const isDownloading = d.status === 'downloading'
+  const speed = useAnimationSpeed()
   const { smoothedSpeed, etaText } = useSmoothedSpeed(d.speed_bps, remainingBytes, isDownloading)
 
   const coverSrc = game?.cover_path ? assetUrl(game.cover_path) : null
@@ -352,7 +354,7 @@ export function DownloadCard({
               )}
               initial={false}
               animate={{ width: `${extracting ? extractPct : pct}%` }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
+              transition={{ duration: 0.3 * speed, ease: 'easeOut' }}
             />
           </div>
 

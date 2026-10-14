@@ -253,10 +253,9 @@ pub fn soundtrack_set_download_directory(
 }
 
 #[tauri::command]
-pub fn soundtrack_scan_library(
+pub async fn soundtrack_scan_library(
     paths: Option<Vec<String>>,
     app: AppHandle,
-    db: State<'_, Database>,
 ) -> AppResult<Vec<SoundtrackLocalFile>> {
     let scan_paths = match paths {
         Some(p) if !p.is_empty() => p.into_iter().map(PathBuf::from).collect(),
@@ -270,7 +269,13 @@ pub fn soundtrack_scan_library(
         }
     };
 
-    scanner::scan_directories(app, db, scan_paths)
+    tokio::task::spawn_blocking(move || {
+        use tauri::Manager;
+        let db = app.state::<Database>();
+        scanner::scan_directories(app.clone(), db, scan_paths)
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?
 }
 
 #[tauri::command]

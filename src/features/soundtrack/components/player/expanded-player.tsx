@@ -21,6 +21,7 @@ import {
   VolumeX,
 } from 'lucide-react'
 import { playButtonClick } from '@/lib/sound-engine'
+import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { assetUrl } from '@/lib/asset-url'
 import { useSoundtrackPlayer } from '../../hooks/use-soundtrack-player'
 import { AudioVisualizer } from './audio-visualizer'
@@ -73,6 +74,7 @@ export function ExpandedPlayer() {
   } = useSoundtrackPlayer()
 
   const [showSideQueue, setShowSideQueue] = useState(false)
+  const speed = useAnimationSpeed()
   const [queueDrawerOpen, setQueueDrawerOpen] = useState(false)
   const [hoverSeekSec, setHoverSeekSec] = useState<number | null>(null)
   const [hoverPercent, setHoverPercent] = useState<number>(0)
@@ -142,7 +144,7 @@ export function ExpandedPlayer() {
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.98 }}
-          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.28 * speed, ease: [0.16, 1, 0.3, 1] }}
           className="fixed inset-0 z-[120] flex flex-col justify-between overflow-hidden bg-bg/95 text-text select-none"
         >
           {/* 1. Dynamic Ambient Aura Mesh Gradient */}
@@ -340,7 +342,7 @@ export function ExpandedPlayer() {
                     {/* Album Jacket Poster (Foreground) */}
                     <motion.div
                       animate={{ scale: isPlaying ? 1 : 0.98 }}
-                      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                      transition={{ duration: 0.5 * speed, ease: [0.16, 1, 0.3, 1] }}
                       className="relative size-full overflow-hidden rounded-3xl border border-border/80 bg-surface-raised shadow-card dark:shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-10"
                     >
                       {coverSrc ? (
@@ -410,7 +412,7 @@ export function ExpandedPlayer() {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{ duration: 0.3 * speed, ease: [0.16, 1, 0.3, 1] }}
                   className="flex flex-col flex-1 w-full max-h-[380px] sm:max-h-[460px] rounded-3xl border border-border/80 bg-surface-raised/95 p-4 shadow-card overflow-hidden"
                 >
                   <div className="flex items-center justify-between pb-3 border-b border-border/80">

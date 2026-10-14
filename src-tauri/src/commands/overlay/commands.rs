@@ -9,6 +9,8 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Mutex;
 
+type KnownGameRow = (String, String, Option<String>, Option<String>);
+
 pub struct OverlayState {
     pub telemetry: Arc<Mutex<TelemetryManager>>,
     /// Single source of truth for "the HUD window is shown". The window
@@ -19,6 +21,9 @@ pub struct OverlayState {
     /// PID the user manually hid the HUD for; the auto-watcher must not
     /// reopen it for this process (0 = none).
     pub suppressed_pid: AtomicU32,
+    /// Short-lived cache of installed games so 100ms-500ms HUD telemetry
+    /// polls do not lock and query SQLite on every tick.
+    pub known_games_cache: std::sync::Mutex<Option<(std::time::Instant, Vec<KnownGameRow>)>>,
 }
 
 impl OverlayState {
@@ -28,7 +33,24 @@ impl OverlayState {
             hud_active: AtomicBool::new(false),
             foreground_game_pid: AtomicU32::new(0),
             suppressed_pid: AtomicU32::new(0),
+            known_games_cache: std::sync::Mutex::new(None),
         }
+    }
+
+    pub fn get_known_games_cached(&self, db: &Database) -> Vec<KnownGameRow> {
+        const CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(5);
+        if let Ok(guard) = self.known_games_cache.lock() {
+            if let Some((fetched_at, ref list)) = *guard {
+                if fetched_at.elapsed() < CACHE_TTL {
+                    return list.clone();
+                }
+            }
+        }
+        let fresh = load_known_games(db);
+        if let Ok(mut guard) = self.known_games_cache.lock() {
+            *guard = Some((std::time::Instant::now(), fresh.clone()));
+        }
+        fresh
     }
 }
 
@@ -160,7 +182,7 @@ pub async fn get_overlay_metrics(
     state: State<'_, OverlayState>,
     db: State<'_, Database>,
 ) -> Result<OverlayMetrics, String> {
-    let installed_games = load_known_games(&db);
+    let installed_games = state.get_known_games_cached(&db);
     let mut mgr = state.telemetry.lock().await;
     Ok(mgr.poll_metrics(&installed_games))
 }

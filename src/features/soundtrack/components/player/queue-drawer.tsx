@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Music, Play, Trash2, X } from 'lucide-react'
+import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { useSoundtrackStore } from '../../store/soundtrack-store'
 
 interface QueueDrawerProps {
@@ -15,6 +16,7 @@ function formatDuration(ms: number) {
 }
 
 export function QueueDrawer({ open, onClose }: QueueDrawerProps) {
+  const speed = useAnimationSpeed()
   const queue = useSoundtrackStore((s) => s.queue)
   const queueIndex = useSoundtrackStore((s) => s.queueIndex)
   const playTrack = useSoundtrackStore((s) => s.playTrack)
@@ -38,7 +40,7 @@ export function QueueDrawer({ open, onClose }: QueueDrawerProps) {
             initial={{ opacity: 0, x: 40 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 40 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.22 * speed, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-y-0 right-0 z-[145] flex h-full w-84 max-w-[90vw] flex-col border-l border-border bg-surface/95 backdrop-blur-2xl shadow-2xl"
           >
             {/* Header */}

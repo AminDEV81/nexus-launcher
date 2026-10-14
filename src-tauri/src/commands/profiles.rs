@@ -918,6 +918,63 @@ async fn search_steam_store_avatars(
     items
 }
 
+const MAX_AVATAR_BYTES: usize = 10 * 1024 * 1024;
+
+pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
+    let lower = host.trim().trim_matches(['[', ']']).to_ascii_lowercase();
+    if lower.is_empty()
+        || lower == "localhost"
+        || lower.ends_with(".local")
+        || lower.ends_with(".internal")
+    {
+        return true;
+    }
+    if let Ok(ip) = lower.parse::<std::net::IpAddr>() {
+        return match ip {
+            std::net::IpAddr::V4(v4) => {
+                v4.is_loopback()
+                    || v4.is_private()
+                    || v4.is_link_local()
+                    || v4.is_broadcast()
+                    || v4.is_unspecified()
+            }
+            std::net::IpAddr::V6(v6) => {
+                v6.is_loopback()
+                    || v6.is_unspecified()
+                    || (v6.segments()[0] & 0xfe00) == 0xfc00
+                    || (v6.segments()[0] & 0xffc0) == 0xfe80
+            }
+        };
+    }
+    false
+}
+
+fn validate_avatar_url(raw_url: &str) -> Result<reqwest::Url, String> {
+    let parsed = reqwest::Url::parse(raw_url.trim())
+        .map_err(|e| format!("Invalid avatar URL: {e}"))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err("Only http and https avatar URLs are allowed.".into());
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "Avatar URL is missing a host.".to_string())?;
+    if is_blocked_host_or_ip(host) {
+        return Err("Private or local network URLs are not permitted.".into());
+    }
+    Ok(parsed)
+}
+
+fn sanitize_avatar_mime(raw: &str) -> &'static str {
+    let base = raw.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
+    match base.as_str() {
+        "image/png" => "image/png",
+        "image/webp" => "image/webp",
+        "image/gif" => "image/gif",
+        "image/avif" => "image/avif",
+        _ => "image/jpeg",
+    }
+}
+
 #[tauri::command]
 pub async fn download_avatar_data_url(
     http: State<'_, crate::commands::metadata::HttpClient>,
@@ -927,9 +984,11 @@ pub async fn download_avatar_data_url(
         return Ok(url);
     }
 
+    let parsed_url = validate_avatar_url(&url)?;
+
     let resp = http
         .0
-        .get(&url)
+        .get(parsed_url)
         .header(
             "User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
@@ -942,17 +1001,29 @@ pub async fn download_avatar_data_url(
         return Err(format!("Avatar download failed with HTTP {}", resp.status()));
     }
 
+    if let Some(len) = resp.content_length() {
+        if len as usize > MAX_AVATAR_BYTES {
+            return Err("Avatar image exceeds the 10 MB size limit.".into());
+        }
+    }
+
     let content_type = resp
         .headers()
         .get("content-type")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("image/jpeg")
-        .to_string();
+        .map(sanitize_avatar_mime)
+        .unwrap_or("image/jpeg");
 
-    let bytes = resp
-        .bytes()
-        .await
-        .map_err(|e| format!("Failed to read avatar bytes: {e}"))?;
+    use futures_util::StreamExt;
+    let mut stream = resp.bytes_stream();
+    let mut bytes = Vec::new();
+    while let Some(chunk_res) = stream.next().await {
+        let chunk = chunk_res.map_err(|e| format!("Failed to read avatar bytes: {e}"))?;
+        if bytes.len() + chunk.len() > MAX_AVATAR_BYTES {
+            return Err("Avatar image exceeds the 10 MB size limit.".into());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
 
     let b64 = base64::prelude::BASE64_STANDARD.encode(&bytes);
     Ok(format!("data:{content_type};base64,{b64}"))
@@ -1073,3 +1144,26 @@ pub async fn search_gaming_avatars(
     Ok(items)
 }
 
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_avatar_url_blocks_ssrf_and_allows_public_https() {
+        assert!(validate_avatar_url("https://images.igdb.com/igdb/image/upload/t_thumb/abc.jpg").is_ok());
+        assert!(validate_avatar_url("http://127.0.0.1:8080/secret").is_err());
+        assert!(validate_avatar_url("http://localhost:3000/avatar.png").is_err());
+        assert!(validate_avatar_url("http://169.254.169.254/latest/meta-data").is_err());
+        assert!(validate_avatar_url("http://192.168.1.1/admin").is_err());
+        assert!(validate_avatar_url("file:///C:/Windows/System32/cmd.exe").is_err());
+    }
+
+    #[test]
+    fn test_sanitize_avatar_mime_restricts_to_safe_image_types() {
+        assert_eq!(sanitize_avatar_mime("image/png; charset=utf-8"), "image/png");
+        assert_eq!(sanitize_avatar_mime("image/webp"), "image/webp");
+        assert_eq!(sanitize_avatar_mime("text/html"), "image/jpeg");
+        assert_eq!(sanitize_avatar_mime("image/svg+xml"), "image/jpeg");
+    }
+}

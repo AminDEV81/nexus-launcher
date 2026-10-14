@@ -7,9 +7,16 @@ import { useDownloads, usePauseDownload, useResumeDownload } from './use-downloa
 export function useGamingMode() {
   const { data: settings } = useSettings()
   const { data: downloads = [] } = useDownloads()
-  const runningGameIds = useLaunchStore((s) => s.runningGameIds)
+  const runningCount = useLaunchStore((s) => s.runningGameIds.size)
   const pause = usePauseDownload()
   const resume = useResumeDownload()
+
+  const downloadsRef = useRef(downloads)
+  downloadsRef.current = downloads
+  const pauseMutateRef = useRef(pause.mutate)
+  pauseMutateRef.current = pause.mutate
+  const resumeMutateRef = useRef(resume.mutate)
+  resumeMutateRef.current = resume.mutate
 
   const pausedByGamingMode = useRef<Set<string>>(new Set())
   const prevRunningCount = useRef(0)
@@ -19,17 +26,15 @@ export function useGamingMode() {
   useEffect(() => {
     if (!isGamingModeEnabled) return
 
-    const runningCount = runningGameIds.size
-
     // Game just started running
     if (runningCount > 0 && prevRunningCount.current === 0) {
-      const active = downloads.filter(
+      const active = downloadsRef.current.filter(
         (d) => d.status === 'downloading' || d.status === 'extracting',
       )
       if (active.length > 0) {
         for (const d of active) {
           pausedByGamingMode.current.add(d.id)
-          pause.mutate(d.id)
+          pauseMutateRef.current(d.id)
         }
         toast.info('Gaming Mode: Downloads paused to reduce latency.', { duration: 3000 })
       }
@@ -42,12 +47,12 @@ export function useGamingMode() {
         pausedByGamingMode.current.clear()
 
         for (const id of idsToResume) {
-          resume.mutate(id)
+          resumeMutateRef.current(id)
         }
         toast.success('Gaming Mode: Game closed. Resuming downloads.', { duration: 3000 })
       }
     }
 
     prevRunningCount.current = runningCount
-  }, [runningGameIds, isGamingModeEnabled, downloads, pause, resume])
+  }, [runningCount, isGamingModeEnabled])
 }

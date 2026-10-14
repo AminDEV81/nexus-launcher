@@ -12,86 +12,125 @@ import {
 } from 'lucide-react'
 import type { BoosterModuleId } from '../hooks/use-game-boost'
 
+export type BoosterModuleCategory = 'cpu_kernel' | 'memory_io' | 'os_desktop'
+
 export interface BoosterModuleMeta {
   id: BoosterModuleId
   label: string
   description: string
   icon: LucideIcon
+  category: BoosterModuleCategory
+  impactBadge: string
   /** Windows-only modules — shown with a small badge so the toggle
    *  isn't a surprise no-op on macOS/Linux. */
   windowsOnly: boolean
 }
 
+export const BOOSTER_CATEGORY_LABELS: Record<BoosterModuleCategory, string> = {
+  cpu_kernel: 'CPU, Kernel & Frame Pacing',
+  memory_io: 'Memory, Standby Cache & Disk I/O',
+  os_desktop: 'Background Apps & Compositor',
+}
+
 export const BOOSTER_MODULES: BoosterModuleMeta[] = [
   {
     id: 'close_apps',
-    label: 'Close background apps',
-    description: 'Quits known bloat — browsers, chat apps, cloud sync — if they’re running.',
+    label: 'Close Background Bloatware',
+    description:
+      'Terminates memory-hungry browsers, updaters, and cloud sync clients while respecting your protected whitelist.',
     icon: Zap,
+    category: 'os_desktop',
+    impactBadge: '+RAM & CPU',
     windowsOnly: false,
-  },
-  {
-    id: 'cpu',
-    label: 'CPU priority for gaming',
-    description: 'Tells Windows to favor the game over background tasks for CPU/GPU scheduling.',
-    icon: Cpu,
-    windowsOnly: true,
   },
   {
     id: 'ram',
-    label: 'Free up RAM',
-    description: 'Trims idle processes’ memory and triggers Windows’ own memory maintenance.',
+    label: 'Working Set & Standby RAM Purge',
+    description:
+      'Calls Win32 EmptyWorkingSet across idle processes and flushes the Windows Standby Memory List to prevent micro-stutters.',
     icon: MemoryStick,
+    category: 'memory_io',
+    impactBadge: 'Zero Stutter',
     windowsOnly: true,
   },
   {
-    id: 'temp',
-    label: 'Clear temporary files',
-    description: 'Deletes loose files sitting in the temp folder to free up disk space.',
-    icon: Trash2,
-    windowsOnly: false,
-  },
-  {
-    id: 'power_plan',
-    label: 'High performance power plan',
-    description: 'Switches Windows to Performance mode, and restores it once you quit.',
-    icon: Gauge,
-    windowsOnly: true,
-  },
-  {
-    id: 'game_mode',
-    label: 'Windows Game Mode',
-    description: 'Tells Windows to prioritize the foreground game over background work.',
-    icon: Gamepad2,
+    id: 'cpu',
+    label: 'Foreground CPU & GPU Scheduling',
+    description:
+      'Sets SystemResponsiveness to 0% and elevates GPU Priority (8) and Scheduling Category (High) for active games.',
+    icon: Cpu,
+    category: 'cpu_kernel',
+    impactBadge: '+1% Low FPS',
     windowsOnly: true,
   },
   {
     id: 'gaming_priority',
-    label: 'Gaming Thread & MMCSS Priority',
+    label: 'Realtime MMCSS & Network Unthrottle',
     description:
-      'Disables MMCSS lazy mode and network throttling, dedicating 100% CPU thread slices to game rendering.',
+      'Disables MMCSS lazy mode, removes Windows network packet throttling, and suppresses background GameDVR capture.',
     icon: Zap,
-    windowsOnly: true,
-  },
-  {
-    id: 'indexer_pause',
-    label: 'Pause Windows Search indexer',
-    description: 'Suspends background disk indexing to prevent asset loading hitches.',
-    icon: Search,
-    windowsOnly: true,
-  },
-  {
-    id: 'visual_fx',
-    label: 'Optimize desktop visual effects',
-    description: 'Suppresses window animations to free GPU video memory and compositor cycles.',
-    icon: Layers,
+    category: 'cpu_kernel',
+    impactBadge: '-Input Lag',
     windowsOnly: true,
   },
   {
     id: 'timer_res',
-    label: 'High-precision 1ms timer',
-    description: 'Locks system timer resolution to 1.0ms for stutter-free frame pacing.',
+    label: '1.0ms High-Precision Kernel Timer',
+    description:
+      'Locks Windows multimedia kernel timer resolution to 1.0ms via winmm for ultra-consistent frame delivery.',
     icon: Timer,
+    category: 'cpu_kernel',
+    impactBadge: '1.0ms Pacing',
     windowsOnly: true,
+  },
+  {
+    id: 'power_plan',
+    label: 'Ultimate / High Performance Power Plan',
+    description:
+      'Switches CPU power delivery to Ultimate Performance mode during gameplay and automatically restores your plan on exit.',
+    icon: Gauge,
+    category: 'cpu_kernel',
+    impactBadge: 'Max Clock',
+    windowsOnly: true,
+  },
+  {
+    id: 'game_mode',
+    label: 'Windows Game Mode Lock',
+    description:
+      'Activates native Windows Game Mode to block Windows Update driver installs and background thread preemption.',
+    icon: Gamepad2,
+    category: 'os_desktop',
+    impactBadge: 'Core Lock',
+    windowsOnly: true,
+  },
+  {
+    id: 'indexer_pause',
+    label: 'Suspend Windows Search Indexer',
+    description:
+      'Pauses the wsearch disk indexing service while gaming so background SSD/HDD reads never hitch asset streaming.',
+    icon: Search,
+    category: 'memory_io',
+    impactBadge: 'Disk I/O Lock',
+    windowsOnly: true,
+  },
+  {
+    id: 'visual_fx',
+    label: 'Desktop DWM & VRAM Optimizer',
+    description:
+      'Suppresses desktop window transition overhead to free dedicated VRAM and DWM compositor bandwidth.',
+    icon: Layers,
+    category: 'os_desktop',
+    impactBadge: '+VRAM Free',
+    windowsOnly: true,
+  },
+  {
+    id: 'temp',
+    label: 'Flush OS Temporary Scratch Files',
+    description:
+      'Cleans loose temporary files in %TEMP% and Windows\\Temp before launch for clean shader and scratch writes.',
+    icon: Trash2,
+    category: 'memory_io',
+    impactBadge: 'Clean Scratch',
+    windowsOnly: false,
   },
 ]

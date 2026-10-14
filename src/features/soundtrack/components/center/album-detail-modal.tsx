@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Disc3, Heart, Play, Shuffle, X } from 'lucide-react'
 import { assetUrl } from '@/lib/asset-url'
 import { playButtonClick } from '@/lib/sound-engine'
+import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { useSoundtrackPlayer } from '../../hooks/use-soundtrack-player'
 import { TrackRow } from './track-row'
 import type { SoundtrackAlbumWithTracks, SoundtrackTrack } from '../../types'
@@ -24,6 +25,7 @@ function formatTotalDuration(ms: number) {
 }
 
 export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalProps) {
+  const speed = useAnimationSpeed()
   const { playAlbum, currentAlbum, playbackState, favorites, toggleFavorite } =
     useSoundtrackPlayer()
 
@@ -77,7 +79,7 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
           initial={{ opacity: 0, scale: 0.96, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 20 }}
-          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.25 * speed, ease: [0.16, 1, 0.3, 1] }}
           className="relative flex flex-col max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-3xl border border-border/80 bg-surface/95 shadow-2xl backdrop-blur-2xl"
         >
           {/* Close button */}

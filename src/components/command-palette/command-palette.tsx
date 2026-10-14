@@ -1,7 +1,20 @@
 import { useEffect } from 'react'
 import { Command } from 'cmdk'
 import { useNavigate } from 'react-router-dom'
-import { Search, Gamepad2, FolderHeart } from 'lucide-react'
+import {
+  Search,
+  Gamepad2,
+  FolderHeart,
+  Rocket,
+  Palette,
+  MonitorCog,
+  Cpu,
+  KeyRound,
+  Music,
+  DatabaseBackup,
+  Trash2,
+  ArrowUpCircle,
+} from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
 import { assetUrl } from '@/lib/asset-url'
 import { useCommandPaletteStore } from '@/store/command-palette-store'
@@ -9,19 +22,63 @@ import { useUiStore } from '@/store/ui-store'
 import { useGames } from '@/features/library/hooks/use-games'
 import { useCollections } from '@/features/collections/hooks/use-collections'
 
-/**
- * Mounted once at the app root (`app-shell.tsx`), same pattern as
- * `usePlaytimeTracking`. Reuses `Modal` for the overlay/backdrop/escape
- * handling rather than `cmdk`'s own `Command.Dialog` — that renders via
- * a Radix portal to `document.body` by default, which would escape the
- * app window's rounded-corner clipping the same way a plain `<Modal>`
- * portal would (see `Modal`'s own doc comment).
- *
- * Filtering is `cmdk`'s built-in fuzzy match (no custom `filter`) — it
- * already handles "type a few letters, best matches float up" well
- * enough for a games+collections list of this size that a bespoke
- * ranking isn't worth building.
- */
+const QUICK_SETTINGS_COMMANDS = [
+  {
+    label: 'Game Booster & OS Tuner',
+    keywords: 'boost fps ram process killer kernel timer msi ping',
+    path: '/booster',
+    icon: Rocket,
+  },
+  {
+    label: 'Settings: Appearance & Theme',
+    keywords: 'dark light mode palette accent color font blur compact density sound',
+    path: '/settings?section=appearance',
+    icon: Palette,
+  },
+  {
+    label: 'Settings: Launcher & Downloads',
+    keywords: 'parallel download streams speed limit bandwidth auto extract 60 fps gpu eco launch window',
+    path: '/settings?section=performance',
+    icon: MonitorCog,
+  },
+  {
+    label: 'Settings: Storefront, Steam Region & API Keys',
+    keywords: 'igdb steamgriddb nexus cloud steam region currency price youtube google',
+    path: '/settings?section=metadata',
+    icon: KeyRound,
+  },
+  {
+    label: 'Settings: Hardware & System Specs',
+    keywords: 'cpu gpu vram ram disk storage motherboard specs',
+    path: '/settings?section=system_specs',
+    icon: Cpu,
+  },
+  {
+    label: 'Settings: Soundtrack & Audio',
+    keywords: 'music ost visualizer download folder providers',
+    path: '/settings?section=soundtrack',
+    icon: Music,
+  },
+  {
+    label: 'Settings: Storage Cleaner',
+    keywords: 'cleanup disk space orphaned saves snapshots artwork cache',
+    path: '/settings?section=cleanup',
+    icon: Trash2,
+  },
+  {
+    label: 'Settings: Backup & Restore',
+    keywords: 'export import json database backup restore',
+    path: '/settings?section=backup',
+    icon: DatabaseBackup,
+  },
+  {
+    label: 'Settings: Updates & Version',
+    keywords: 'update version check github release',
+    path: '/settings?section=updates',
+    icon: ArrowUpCircle,
+  },
+]
+
 export function CommandPalette() {
   const isOpen = useCommandPaletteStore((s) => s.isOpen)
   const open = useCommandPaletteStore((s) => s.open)
@@ -53,6 +110,11 @@ export function CommandPalette() {
     close()
   }
 
+  function handleNavigate(path: string) {
+    navigate(path)
+    close()
+  }
+
   return (
     <Modal open={isOpen} onClose={close} widthClassName="max-w-lg">
       <Command shouldFilter className="flex max-h-[28rem] flex-col overflow-hidden">
@@ -60,7 +122,7 @@ export function CommandPalette() {
           <Search className="size-4 shrink-0 text-subtle" />
           <Command.Input
             autoFocus
-            placeholder="Search games and collections…"
+            placeholder="Search games, collections, settings, or tools…"
             className="w-full bg-transparent py-3 text-sm text-text outline-none placeholder:text-subtle"
           />
         </div>
@@ -120,6 +182,28 @@ export function CommandPalette() {
               ))}
             </Command.Group>
           )}
+
+          <Command.Group
+            heading="Settings & Optimization Tools"
+            className="px-2 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-subtle [&_[cmdk-group-items]]:mt-1"
+          >
+            {QUICK_SETTINGS_COMMANDS.map((item) => {
+              const Icon = item.icon
+              return (
+                <Command.Item
+                  key={item.path}
+                  value={`${item.label} ${item.keywords}`}
+                  onSelect={() => handleNavigate(item.path)}
+                  className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-text data-[selected=true]:bg-surface-raised"
+                >
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-accent/15 text-accent">
+                    <Icon className="size-3.5" />
+                  </span>
+                  <span className="truncate">{item.label}</span>
+                </Command.Item>
+              )
+            })}
+          </Command.Group>
         </Command.List>
       </Command>
     </Modal>

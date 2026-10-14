@@ -11,6 +11,7 @@ import {
   Download,
   Sparkles,
   Activity,
+  Rocket,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -39,6 +40,7 @@ export const LIBRARY_NAV_ITEMS: NavItem[] = [
 
 /** Secondary items, rendered under a "Manage" divider. */
 export const MANAGE_NAV_ITEMS: NavItem[] = [
+  { label: 'Game Booster', path: '/booster', icon: Rocket },
   { label: 'Stats', path: '/stats', icon: BarChart3 },
   { label: 'Overlay HUD', path: '/overlay', icon: Activity },
 ]

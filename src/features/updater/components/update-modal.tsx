@@ -20,6 +20,7 @@ import {
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { toast } from 'sonner'
 import { useUpdaterStore } from '@/store/updater-store'
+import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { cn } from '@/lib/utils'
 
 function formatBytes(bytes: number): string {
@@ -69,6 +70,7 @@ export function UpdateModal() {
   } = useUpdaterStore()
 
   const [copied, setCopied] = useState(false)
+  const speed = useAnimationSpeed()
 
   const copyCommand = (cmd: string) => {
     navigator.clipboard.writeText(cmd)
@@ -97,7 +99,7 @@ export function UpdateModal() {
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.2 * speed, ease: [0.16, 1, 0.3, 1] }}
           className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-border/80 bg-surface shadow-2xl"
         >
           {/* Header background accent glow */}
@@ -209,7 +211,7 @@ export function UpdateModal() {
                     <motion.div
                       className="h-full rounded-full bg-gradient-to-r from-accent to-emerald-400 shadow-[0_0_12px_var(--nx-accent)]"
                       style={{ width: `${Math.max(3, percentage)}%` }}
-                      transition={{ ease: 'easeOut', duration: 0.2 }}
+                      transition={{ ease: 'easeOut', duration: 0.2 * speed }}
                     />
                   </div>
                 </div>

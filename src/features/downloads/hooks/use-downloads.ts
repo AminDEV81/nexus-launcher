@@ -1,10 +1,12 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { playDownloadComplete } from '@/lib/sound-engine'
 import * as service from '@/services/download'
 import type { DownloadProgress } from '@/services/download'
+import { findActiveDownloadForGame } from '../utils/match-download'
+import type { Game } from '@/types/models'
 
 export const downloadsKey = ['downloads'] as const
 
@@ -18,6 +20,22 @@ export function useDownloads() {
     queryKey: downloadsKey,
     queryFn: service.getDownloads,
     refetchOnMount: 'always',
+  })
+}
+
+/**
+ * Selects only the active download matching a specific game so non-downloading
+ * library cards do not re-render on every 400ms progress tick.
+ */
+export function useActiveDownloadForGame(game: Game) {
+  const select = useCallback(
+    (rows: service.DownloadInfo[] | undefined) => findActiveDownloadForGame(rows, game),
+    [game],
+  )
+  return useQuery({
+    queryKey: downloadsKey,
+    queryFn: service.getDownloads,
+    select,
   })
 }
 

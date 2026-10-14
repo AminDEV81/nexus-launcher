@@ -90,10 +90,17 @@ export const OverlayWindowPage: React.FC = () => {
   useEffect(() => {
     if (!visible) return
     let cancelled = false
+    let inFlight = false
     const intervalMs = Math.max(100, config.refresh_interval_ms || 500)
 
     const tick = async () => {
-      if (!cancelled) await useOverlayStore.getState().pollMetrics()
+      if (cancelled || inFlight) return
+      inFlight = true
+      try {
+        await useOverlayStore.getState().pollMetrics()
+      } finally {
+        inFlight = false
+      }
     }
     void tick()
     const timer = setInterval(() => void tick(), intervalMs)

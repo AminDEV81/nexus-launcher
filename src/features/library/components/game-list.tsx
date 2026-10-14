@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import type { MouseEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -68,7 +68,7 @@ export function GameList({ games, selectedId, onSelect, onContextMenu }: GameLis
               <GameListRow
                 game={game}
                 selected={game.id === selectedId}
-                onSelect={() => handleClick(game.id)}
+                onSelect={handleClick}
                 onContextMenu={onContextMenu}
               />
             </div>
@@ -79,7 +79,7 @@ export function GameList({ games, selectedId, onSelect, onContextMenu }: GameLis
   )
 }
 
-function GameListRow({
+const GameListRow = memo(function GameListRow({
   game,
   selected,
   onSelect,
@@ -321,7 +321,10 @@ function GameListRow({
         {/* Context Menu Dots */}
         <button
           type="button"
-          onClick={(event) => onContextMenu(game, event)}
+          onClick={(event) => {
+            event.stopPropagation()
+            onContextMenu(game, event)
+          }}
           aria-label="More options"
           className="flex size-8 items-center justify-center rounded-xl text-subtle transition-colors hover:bg-surface-raised hover:text-text"
         >
@@ -330,4 +333,4 @@ function GameListRow({
       </div>
     </div>
   )
-}
+})

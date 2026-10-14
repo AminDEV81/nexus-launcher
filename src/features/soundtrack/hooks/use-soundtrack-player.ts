@@ -1,20 +1,20 @@
 import { useEffect } from 'react'
 import { useSoundtrackStore } from '../store/soundtrack-store'
 
-export function useSoundtrackPlayer() {
-  const store = useSoundtrackStore()
-  const loadFavorites = useSoundtrackStore((s) => s.loadFavorites)
-  const loadHistory = useSoundtrackStore((s) => s.loadHistory)
-
+/**
+ * Mounted once in `AppShell` to initialize soundtrack favorites/history
+ * and bind global media keyboard shortcuts without duplicating listeners
+ * across every consumer of `useSoundtrackPlayer()`.
+ */
+export function useSoundtrackGlobalShortcuts() {
   useEffect(() => {
-    // Initialize favorites and history on mount
+    const { loadFavorites, loadHistory } = useSoundtrackStore.getState()
     void loadFavorites()
     void loadHistory()
-  }, [loadFavorites, loadHistory])
+  }, [])
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Don't intercept if user is typing in an input, textarea, or contentEditable
       const target = e.target as HTMLElement | null
       if (
         target &&
@@ -26,9 +26,10 @@ export function useSoundtrackPlayer() {
         return
       }
 
+      const store = useSoundtrackStore.getState()
+
       // Space: Toggle Play/Pause
       if (e.code === 'Space' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        // Only if track is active or queue has items
         if (store.currentTrack || store.queue.length > 0) {
           e.preventDefault()
           store.togglePlay()
@@ -62,7 +63,9 @@ export function useSoundtrackPlayer() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [store])
+  }, [])
+}
 
-  return store
+export function useSoundtrackPlayer() {
+  return useSoundtrackStore()
 }

@@ -380,11 +380,16 @@ pub fn permanently_delete_game(
     // 5. Clean up downloads
     tx.execute("DELETE FROM downloads WHERE game_id = ?1", [&id])?;
 
-    // 6. Clean up collection links, tags, cached artwork rows, playtime sessions
+    // 6. Clean up collection links, tags, cached artwork rows, playtime sessions, and soundtrack records
     tx.execute("DELETE FROM collection_games WHERE game_id = ?1", [&id])?;
     tx.execute("DELETE FROM game_tags WHERE game_id = ?1", [&id])?;
     tx.execute("DELETE FROM artwork_cache WHERE game_id = ?1", [&id])?;
     tx.execute("DELETE FROM playtime_sessions WHERE game_id = ?1", [&id])?;
+    let _ = tx.execute("DELETE FROM soundtrack_game_links WHERE game_id = ?1", [&id]);
+    let _ = tx.execute("DELETE FROM soundtrack_albums WHERE game_id = ?1", [&id]);
+    let _ = tx.execute("DELETE FROM soundtrack_downloads WHERE game_id = ?1", [&id]);
+    let _ = tx.execute("DELETE FROM soundtrack_play_history WHERE game_id = ?1", [&id]);
+    let _ = tx.execute("DELETE FROM soundtrack_local_files WHERE game_id = ?1", [&id]);
 
     // 7. Delete the game record
     let changed = tx.execute("DELETE FROM games WHERE id = ?1", [&id])?;
@@ -458,15 +463,16 @@ fn generate_fluctuating_sessions(
             if rem == 0 {
                 break;
             }
-            let current = day_map.get_mut(&d).unwrap();
-            if rem > 0 && *current < max_day_secs {
-                let add = rem.min(max_day_secs - *current);
-                *current += add;
-                rem -= add;
-            } else if rem < 0 && *current > 1800 {
-                let sub = (-rem).min(*current - 1800);
-                *current -= sub;
-                rem += sub;
+            if let Some(current) = day_map.get_mut(&d) {
+                if rem > 0 && *current < max_day_secs {
+                    let add = rem.min(max_day_secs - *current);
+                    *current += add;
+                    rem -= add;
+                } else if rem < 0 && *current > 1800 {
+                    let sub = (-rem).min(*current - 1800);
+                    *current -= sub;
+                    rem += sub;
+                }
             }
         }
 
