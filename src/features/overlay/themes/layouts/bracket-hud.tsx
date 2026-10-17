@@ -40,8 +40,7 @@ export const BracketHudLayout: React.FC<LayoutProps> = ({ metrics, toggles, toke
     <div
       className={`nx-hud-in relative w-[280px] px-4 py-3.5 backdrop-blur-xl ${tokens.bgStyle.replace(/border(-\S+)?/g, '').trim()} ${tokens.fontFamily}`}
       style={{
-        background:
-          'linear-gradient(180deg, rgba(8,10,16,0.82) 0%, rgba(8,10,16,0.68) 100%)',
+        background: 'linear-gradient(180deg, rgba(8,10,16,0.82) 0%, rgba(8,10,16,0.68) 100%)',
       }}
     >
       <Corner pos="top-0 left-0 border-t-2 border-l-2" color={c} />

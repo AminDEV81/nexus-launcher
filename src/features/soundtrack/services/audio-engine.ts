@@ -2,13 +2,7 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import type { PlaybackSource } from '../types'
 
 export type AudioPlaybackState =
-  | 'idle'
-  | 'loading'
-  | 'playing'
-  | 'paused'
-  | 'buffering'
-  | 'ended'
-  | 'error'
+  'idle' | 'loading' | 'playing' | 'paused' | 'buffering' | 'ended' | 'error'
 
 export interface AudioEngineEvents {
   onStateChange?: (state: AudioPlaybackState) => void
@@ -350,10 +344,7 @@ export class NexusAudioEngine {
           }),
           '*',
         )
-        iframe.contentWindow?.postMessage(
-          '{"event":"command","func":"playVideo","args":""}',
-          '*',
-        )
+        iframe.contentWindow?.postMessage('{"event":"command","func":"playVideo","args":""}', '*')
       } else {
         this.ytIframeReady = false
         iframe.src = `https://www.youtube.com/embed/${source.url}?autoplay=1&enablejsapi=1&playsinline=1&controls=0${originParam}`
@@ -607,11 +598,7 @@ export class NexusAudioEngine {
 
   public preloadStream(url: string | null | undefined): void {
     if (!url || typeof Audio === 'undefined') return
-    if (
-      !url.startsWith('http://') &&
-      !url.startsWith('https://') &&
-      !url.startsWith('asset://')
-    ) {
+    if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('asset://')) {
       return
     }
     if (this.preloadedUrl === url) return

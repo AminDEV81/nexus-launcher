@@ -30,6 +30,7 @@ export interface CircadianHabits {
     description: string
     icon: 'Moon' | 'Flame' | 'Sun' | 'Sunrise' | 'Compass'
   }
+  peakHourLabel?: string
 }
 
 /**
@@ -59,7 +60,10 @@ export function calculateGamerLevel(totalSeconds: number): GamerLevelInfo {
   const progressPercent = Math.min(100, Math.max(0, Math.round((currentLevelXp / xpNeeded) * 100)))
 
   const nextLevelHours = Math.max(1, Math.round((nextThreshold / 60) * 10) / 10)
-  const hoursToNextLevel = Math.max(0.1, Math.round(((nextThreshold - totalMinutes) / 60) * 10) / 10)
+  const hoursToNextLevel = Math.max(
+    0.1,
+    Math.round(((nextThreshold - totalMinutes) / 60) * 10) / 10,
+  )
 
   return {
     level,
@@ -193,5 +197,10 @@ export function calculateCircadianHabits(sessions: RecentSession[]): CircadianHa
     }
   }
 
-  return { buckets, personaTitle: persona.title, dominantPersona: persona }
+  return {
+    buckets,
+    personaTitle: persona.title,
+    dominantPersona: persona,
+    peakHourLabel: top && top.hours > 0 ? top.label : undefined,
+  }
 }

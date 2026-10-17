@@ -24,9 +24,10 @@ import { playButtonClick } from '@/lib/sound-engine'
 
 interface GenreHourItem {
   genre: string
-  total_seconds: number
-  game_count: number
   hours: number
+  total_playtime_seconds?: number
+  total_seconds?: number
+  game_count?: number
 }
 
 interface GamerPassportModalProps {
@@ -35,7 +36,7 @@ interface GamerPassportModalProps {
   profile: Profile | null
   levelInfo: GamerLevelInfo
   summary: StatsSummary | undefined
-  topGenre: GenrePlaytime | undefined
+  topGenre?: (GenrePlaytime & { hours?: number }) | GenreHourItem
   genres?: GenreHourItem[]
   streak: number
   milestones: Milestone[]
@@ -207,11 +208,7 @@ function drawRoundedRect(
   ctx.closePath()
 }
 
-function truncateCanvasText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-): string {
+function truncateCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text
   let out = text
   while (out.length > 1 && ctx.measureText(`${out}…`).width > maxWidth) {
@@ -511,7 +508,7 @@ export function GamerPassportModal({
         label: 'DOMINANT GENRE DNA',
         value: topGenre?.genre || 'Multi-Genre',
         sub: topGenre
-          ? `${(topGenre.total_seconds / 3600).toFixed(1)}h (${topGenre.game_count} Titles)`
+          ? `${(('total_playtime_seconds' in topGenre ? (topGenre.total_playtime_seconds ?? 0) : (topGenre.total_seconds ?? 0)) / 3600).toFixed(1)}h Played`
           : 'Balanced Catalog',
         accent: isLight ? '#db2777' : '#ec4899',
       },
@@ -606,11 +603,7 @@ export function GamerPassportModal({
 
     ctx.fillStyle = textMain
     ctx.font = '900 34px system-ui, -apple-system, sans-serif'
-    ctx.fillText(
-      truncateCanvasText(ctx, champGame?.name || 'No Game Logged Yet', 430),
-      cxText,
-      696,
-    )
+    ctx.fillText(truncateCanvasText(ctx, champGame?.name || 'No Game Logged Yet', 430), cxText, 696)
 
     const champSharePct =
       champGame && (summary?.total_playtime_seconds ?? 0) > 0
@@ -731,7 +724,11 @@ export function GamerPassportModal({
       ctx.textAlign = 'right'
       ctx.fillStyle = textMuted
       ctx.font = '800 14px monospace'
-      ctx.fillText(`${g.hours.toFixed(1)}h • ${g.game_count} Games`, 1500, gy)
+      ctx.fillText(
+        `${g.hours.toFixed(1)}h${g.game_count ? ` • ${g.game_count} Games` : ''}`,
+        1500,
+        gy,
+      )
 
       drawRoundedRect(ctx, 842, gy + 12, 658, 14, 7)
       ctx.fillStyle = trackBg
@@ -773,9 +770,7 @@ export function GamerPassportModal({
     const canvas = canvasRef.current
     const dataUrl = canvas ? canvas.toDataURL('image/png') : previewDataUrl
     if (!dataUrl) return
-    const safeName = (profile?.name || 'operative')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
+    const safeName = (profile?.name || 'operative').toLowerCase().replace(/[^a-z0-9]+/g, '-')
     const link = document.createElement('a')
     link.download = `nexus-stats-${safeName}-${activeTheme.id}.png`
     link.href = dataUrl
@@ -864,7 +859,9 @@ export function GamerPassportModal({
                 <div>
                   <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-accent">
                     <Sparkles className="size-3" />
-                    <span>1600×1000 RETINA INFOGRAPHIC GENERATOR • 8 DARK &amp; LIGHT PALETTES</span>
+                    <span>
+                      1600×1000 RETINA INFOGRAPHIC GENERATOR • 8 DARK &amp; LIGHT PALETTES
+                    </span>
                   </div>
                   <h2 className="text-xl font-black tracking-tight text-text sm:text-2xl">
                     Share Your Gaming State &amp; Telemetry
@@ -942,7 +939,8 @@ export function GamerPassportModal({
             <div className="flex items-center gap-2 text-xs text-muted">
               <ImageIcon className="size-4 text-accent" />
               <span>
-                Switch between Dark &amp; Light Mode palettes above, then copy or download in 1600×1000 HD.
+                Switch between Dark &amp; Light Mode palettes above, then copy or download in
+                1600×1000 HD.
               </span>
             </div>
 

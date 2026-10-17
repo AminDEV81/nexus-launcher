@@ -3,7 +3,6 @@ import {
   Disc3,
   Maximize2,
   Moon,
-  Music,
   PanelLeftClose,
   PanelLeftOpen,
   Pause,

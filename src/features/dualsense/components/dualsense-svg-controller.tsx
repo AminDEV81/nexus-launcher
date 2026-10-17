@@ -43,12 +43,7 @@ interface DualSenseSvgControllerProps {
   isConnected?: boolean
   onButtonToggle?: (btn: string, pressed: boolean) => void
   onStickMove?: (stick: 'left' | 'right', x: number, y: number) => void
-  onTouchpadInput?: (
-    active: boolean,
-    x: number,
-    y: number,
-    clicked: boolean,
-  ) => void
+  onTouchpadInput?: (active: boolean, x: number, y: number, clicked: boolean) => void
 }
 
 /**
@@ -252,12 +247,8 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
       )
     } else if (touchDragging && onTouchpadInput) {
       const { x: svgX, y: svgY } = toBodyCoords(e)
-      const normTx = Math.round(
-        Math.max(0, Math.min(1, (svgX - 335) / (665 - 335))) * 1920,
-      )
-      const normTy = Math.round(
-        Math.max(0, Math.min(1, (svgY - 40) / (218 - 40))) * 1080,
-      )
+      const normTx = Math.round(Math.max(0, Math.min(1, (svgX - 335) / (665 - 335))) * 1920)
+      const normTy = Math.round(Math.max(0, Math.min(1, (svgY - 40) / (218 - 40))) * 1080)
       onTouchpadInput(true, normTx, normTy, touchClicked)
     }
   }
@@ -406,15 +397,33 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
           </radialGradient>
 
           <filter id="ds-orig-shadow" x="-15%" y="-15%" width="130%" height="135%">
-            <feDropShadow dx="0" dy="20" stdDeviation="16" floodColor="#000000" floodOpacity="0.48" />
+            <feDropShadow
+              dx="0"
+              dy="20"
+              stdDeviation="16"
+              floodColor="#000000"
+              floodOpacity="0.48"
+            />
           </filter>
 
           <filter id="ds-orig-stick-shadow" x="-35%" y="-35%" width="170%" height="170%">
-            <feDropShadow dx="0" dy="8" stdDeviation="5.5" floodColor="#000000" floodOpacity="0.65" />
+            <feDropShadow
+              dx="0"
+              dy="8"
+              stdDeviation="5.5"
+              floodColor="#000000"
+              floodOpacity="0.65"
+            />
           </filter>
 
           <filter id="ds-orig-btn-shadow" x="-25%" y="-25%" width="150%" height="150%">
-            <feDropShadow dx="0" dy="2" stdDeviation="1.8" floodColor="#475569" floodOpacity="0.28" />
+            <feDropShadow
+              dx="0"
+              dy="2"
+              stdDeviation="1.8"
+              floodColor="#475569"
+              floodOpacity="0.28"
+            />
           </filter>
 
           <filter id="ds-orig-bloom" x="-40%" y="-40%" width="180%" height="180%">
@@ -436,10 +445,7 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
           {/* 1. EXACT STUDIO-PHOTO LOW-PROFILE L1 / R1 SHOULDER CRESCENTS
               Tucked cleanly behind the white shoulder arch (x=161..276 and x=724..839),
               with ZERO L2/R2 progress bars, ZERO protruding double-humps, and ZERO diagonal black lines! */}
-          <g
-            transform={`translate(0, ${(state.l1 ? 3 : 0) + l2Ratio * 4})`}
-            {...bindBtn('l1')}
-          >
+          <g transform={`translate(0, ${(state.l1 ? 3 : 0) + l2Ratio * 4})`} {...bindBtn('l1')}>
             <path
               d="M 161 52
                  C 184 29, 228 24, 268 30
@@ -449,10 +455,7 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
             />
           </g>
 
-          <g
-            transform={`translate(0, ${(state.r1 ? 3 : 0) + r2Ratio * 4})`}
-            {...bindBtn('r1')}
-          >
+          <g transform={`translate(0, ${(state.r1 ? 3 : 0) + r2Ratio * 4})`} {...bindBtn('r1')}>
             <path
               d="M 839 52
                  C 816 29, 772 24, 732 30
@@ -534,10 +537,7 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
             </g>
 
             {/* Bottom Headset Port & Dock Contacts Step (Matches the bottom center detail in the studio photo) */}
-            <path
-              d="M 444 440 L 556 440 L 548 447 L 452 447 Z"
-              fill="#090A0E"
-            />
+            <path d="M 444 440 L 556 440 L 548 447 L 452 447 Z" fill="#090A0E" />
             <rect x="488" y="442" width="24" height="3" rx="1.5" fill="#1E293B" />
           </g>
 
@@ -784,10 +784,7 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
                 strokeWidth="1.4"
                 opacity="0.9"
               />
-              <polygon
-                points="0,-54 -7,-43 7,-43"
-                fill={state.dpadUp ? '#FFFFFF' : '#94A3B8'}
-              />
+              <polygon points="0,-54 -7,-43 7,-43" fill={state.dpadUp ? '#FFFFFF' : '#94A3B8'} />
             </g>
 
             {/* D-Pad DOWN */}
@@ -810,10 +807,7 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
                 strokeWidth="1.4"
                 opacity="0.9"
               />
-              <polygon
-                points="0,54 -7,43 7,43"
-                fill={state.dpadDown ? '#FFFFFF' : '#94A3B8'}
-              />
+              <polygon points="0,54 -7,43 7,43" fill={state.dpadDown ? '#FFFFFF' : '#94A3B8'} />
             </g>
 
             {/* D-Pad LEFT */}
@@ -836,10 +830,7 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
                 strokeWidth="1.4"
                 opacity="0.9"
               />
-              <polygon
-                points="-54,0 -43,-7 -43,7"
-                fill={state.dpadLeft ? '#FFFFFF' : '#94A3B8'}
-              />
+              <polygon points="-54,0 -43,-7 -43,7" fill={state.dpadLeft ? '#FFFFFF' : '#94A3B8'} />
             </g>
 
             {/* D-Pad RIGHT */}
@@ -862,10 +853,7 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
                 strokeWidth="1.4"
                 opacity="0.9"
               />
-              <polygon
-                points="54,0 43,-7 43,7"
-                fill={state.dpadRight ? '#FFFFFF' : '#94A3B8'}
-              />
+              <polygon points="54,0 43,-7 43,7" fill={state.dpadRight ? '#FFFFFF' : '#94A3B8'} />
             </g>
           </g>
 
@@ -1037,10 +1025,7 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
           </g>
 
           {/* Mic Mute Pill Button & Microphone Icon (500, 362) */}
-          <g
-            transform={`translate(500, 362) scale(${state.mute ? 0.92 : 1})`}
-            {...bindBtn('mute')}
-          >
+          <g transform={`translate(500, 362) scale(${state.mute ? 0.92 : 1})`} {...bindBtn('mute')}>
             <rect
               x="-16"
               y="-4.5"
@@ -1055,7 +1040,12 @@ export const DualSenseSvgController: React.FC<DualSenseSvgControllerProps> = ({
           {/* Tiny Mic Icon & Pinhole Below Mute Button */}
           <g transform="translate(500, 386)" opacity="0.55">
             <rect x="-2" y="-5" width="4" height="6" rx="2" fill="#64748B" />
-            <path d="M -4.5 -1 A 4.5 4.5 0 0 0 4.5 -1 M 0 3.5 V 6" fill="none" stroke="#64748B" strokeWidth="1.2" />
+            <path
+              d="M -4.5 -1 A 4.5 4.5 0 0 0 4.5 -1 M 0 3.5 V 6"
+              fill="none"
+              stroke="#64748B"
+              strokeWidth="1.2"
+            />
           </g>
           <circle cx="500" cy="408" r="2.2" fill="#08090C" />
 

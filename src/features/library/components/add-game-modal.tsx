@@ -519,7 +519,8 @@ function ChooseStep({
               </span>
             </div>
             <p className="mt-0.5 text-xs text-muted leading-relaxed">
-              Detect installed games across Steam, Epic, GOG, EA, Ubisoft, Xbox &amp; Local Cracked / Repack folders
+              Detect installed games across Steam, Epic, GOG, EA, Ubisoft, Xbox &amp; Local Cracked
+              / Repack folders
             </p>
           </div>
         </div>
@@ -761,14 +762,18 @@ function SystemScanStep({ onBack, onComplete }: SystemScanStepProps) {
                 <span>Deep Scanning Installed Stores & Registries</span>
               </div>
               <p className="text-xs text-muted max-w-md mx-auto">
-                Scanning Steam, Epic, GOG, EA, Ubisoft, Xbox &amp; Cracked / Repack Game Folders across all drives...
+                Scanning Steam, Epic, GOG, EA, Ubisoft, Xbox &amp; Cracked / Repack Game Folders
+                across all drives...
               </p>
             </div>
 
             {/* Active Platform Indicators */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 max-w-lg">
               {[
-                { name: 'Cracked / Repacks', color: 'border-rose-500/35 text-rose-400 bg-rose-500/15' },
+                {
+                  name: 'Cracked / Repacks',
+                  color: 'border-rose-500/35 text-rose-400 bg-rose-500/15',
+                },
                 { name: 'Steam', color: 'border-sky-500/30 text-sky-400 bg-sky-500/10' },
                 { name: 'Epic Games', color: 'border-zinc-500/30 text-zinc-300 bg-zinc-500/10' },
                 {
@@ -1156,23 +1161,6 @@ function ReviewStep({
   onBack,
   onConfirm,
 }: ReviewStepProps) {
-  if (isResolving) {
-    return (
-      <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 text-center">
-        <div className="relative flex size-16 items-center justify-center rounded-2xl bg-accent/10 text-accent shadow-[0_0_24px_var(--nx-accent)]/20">
-          <Loader2 className="size-7 animate-spin" />
-        </div>
-        <div>
-          <h3 className="text-base font-bold text-text">Scanning Target Game Files</h3>
-          <p className="mt-1 text-xs text-muted max-w-sm">
-            Detecting executable entry points, resolving symbolic targets, and calculating disk
-            footprint…
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   const [debouncedName, setDebouncedName] = useState(draft.name.trim())
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedName(draft.name.trim()), 200)
@@ -1196,6 +1184,23 @@ function ReviewStep({
   useEffect(() => {
     setPreviewCoverIdx(0)
   }, [primaryMatch?.igdb_id])
+
+  if (isResolving) {
+    return (
+      <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 text-center">
+        <div className="relative flex size-16 items-center justify-center rounded-2xl bg-accent/10 text-accent shadow-[0_0_24px_var(--nx-accent)]/20">
+          <Loader2 className="size-7 animate-spin" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-text">Scanning Target Game Files</h3>
+          <p className="mt-1 text-xs text-muted max-w-sm">
+            Detecting executable entry points, resolving symbolic targets, and calculating disk
+            footprint…
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const needsExecutable = draft.candidates.length > 0 && !draft.executablePath
   const canSubmit = Boolean(draft.executablePath?.trim() && draft.name.trim()) && !isSaving

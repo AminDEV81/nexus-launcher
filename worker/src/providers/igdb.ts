@@ -287,7 +287,9 @@ export async function searchGames(
     let sortOrder = 'total_rating_count desc'
     if (sort === 'rating') {
       sortOrder = 'total_rating desc'
-      conditions.push('(aggregated_rating != null | total_rating != null) & total_rating_count >= 5')
+      conditions.push(
+        '(aggregated_rating != null | total_rating != null) & total_rating_count >= 5',
+      )
     } else if (sort === 'hypes') {
       sortOrder = 'hypes desc'
       conditions.push('hypes != null')

@@ -149,7 +149,10 @@ function normalizeTokensForComparison(text: string): string[] {
       /\b(?:original|official|video|game|soundtrack|soundtracks|score|ost|music|audio|gamerip|complete|expanded|selection|selections|ep|vol|volume|disc|cd)\b/g,
       ' ',
     )
-    .replace(/\b(?:ps1|ps2|ps3|ps4|ps5|psp|psvita|xbox|360|switch|windows|pc|mac|linux|steam|nes|snes|n64|gamecube|wii|wiiu|3ds|ds|sega|genesis|dreamcast|arcade|ost)\b/g, ' ')
+    .replace(
+      /\b(?:ps1|ps2|ps3|ps4|ps5|psp|psvita|xbox|360|switch|windows|pc|mac|linux|steam|nes|snes|n64|gamecube|wii|wiiu|3ds|ds|sega|genesis|dreamcast|arcade|ost)\b/g,
+      ' ',
+    )
     .replace(/[^\w\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

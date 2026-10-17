@@ -85,9 +85,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       set((s) => ({
         activeProfile: updated,
         profiles: s.profiles.map((p) =>
-          p.id === profileId
-            ? { ...updated, is_active: true }
-            : { ...p, is_active: false },
+          p.id === profileId ? { ...updated, is_active: true } : { ...p, is_active: false },
         ),
         isGateOpen: false,
         isManagerModalOpen: false,

@@ -404,12 +404,12 @@ const CLIENT_VERIFIED_SCORES: Record<string, [number, number]> = {
   'dead rising': [85, 84],
   'darksiders ii': [84, 83],
   'darksiders 2': [84, 83],
-  'darksiders': [83, 83],
-  'ghostrunner': [81, 81],
+  darksiders: [83, 83],
+  ghostrunner: [81, 81],
   'ghostrunner 2': [80, 80],
   'cult of the lamb': [82, 84],
   'against the storm': [91, 92],
-  'ultrakill': [92, 92],
+  ultrakill: [92, 92],
   'pizza tower': [89, 90],
 }
 

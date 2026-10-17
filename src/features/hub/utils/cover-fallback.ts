@@ -28,9 +28,7 @@ export function buildCoverFallbackChain(
     null
 
   if (resolvedAppId && /^\d+$/.test(resolvedAppId)) {
-    pushUnique(
-      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`,
-    )
+    pushUnique(`https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`)
     pushUnique(
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/library_600x900.jpg`,
     )
@@ -41,9 +39,7 @@ export function buildCoverFallbackChain(
     pushUnique(
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/header.jpg`,
     )
-    pushUnique(
-      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/capsule_616x353.jpg`,
-    )
+    pushUnique(`https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/capsule_616x353.jpg`)
   }
 
   if (coverUrl && coverUrl.includes('images.igdb.com/igdb/image/upload/')) {

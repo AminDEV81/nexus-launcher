@@ -67,14 +67,7 @@ import type { HubGame } from '@/types/models'
 
 const SEARCH_DEBOUNCE_MS = 120
 
-type DropdownKey =
-  | 'sort'
-  | 'genres'
-  | 'platforms'
-  | 'release'
-  | 'rating'
-  | 'edition'
-  | null
+type DropdownKey = 'sort' | 'genres' | 'platforms' | 'release' | 'rating' | 'edition' | null
 
 const RELEASE_OPTIONS = [
   { key: 'upcoming', label: 'Upcoming Releases', shortLabel: 'Upcoming', icon: Clock },
@@ -172,9 +165,21 @@ const SORT_OPTIONS = [
 
 const GAME_CATEGORY_OPTIONS = [
   { key: 'all', label: 'All Editions', desc: 'Main games, remakes, remasters, and expansions' },
-  { key: 'main', label: 'Main & Standalone Games', desc: 'Full standalone releases & major remakes' },
-  { key: 'remake', label: 'Remakes, Remasters & Definitive', desc: 'Combined Remakes, HD Remasters & Director’s Cuts' },
-  { key: 'expansion', label: 'Expansions, DLC & Special Editions', desc: 'Story expansions, standalone DLC & Complete Editions' },
+  {
+    key: 'main',
+    label: 'Main & Standalone Games',
+    desc: 'Full standalone releases & major remakes',
+  },
+  {
+    key: 'remake',
+    label: 'Remakes, Remasters & Definitive',
+    desc: 'Combined Remakes, HD Remasters & Director’s Cuts',
+  },
+  {
+    key: 'expansion',
+    label: 'Expansions, DLC & Special Editions',
+    desc: 'Story expansions, standalone DLC & Complete Editions',
+  },
 ] as const
 
 const GAME_MODE_OPTIONS = [
@@ -362,12 +367,7 @@ export function HubPage() {
   // Pool of all loaded home feed games for instant client-side fallback when filtering
   const homeFeedPool = useMemo(() => {
     const map = new Map<number, HubGame>()
-    for (const list of [
-      newReleases.data,
-      topRated.data,
-      recommended.data,
-      comingSoon.data,
-    ]) {
+    for (const list of [newReleases.data, topRated.data, recommended.data, comingSoon.data]) {
       if (!list) continue
       for (const g of list) {
         if (!map.has(g.igdb_id)) map.set(g.igdb_id, g)
@@ -392,14 +392,10 @@ export function HubPage() {
     return out
   }, [newReleases.data, topRated.data])
 
-  const firstError =
-    newReleases.error ?? comingSoon.error ?? topRated.error ?? recommended.error
+  const firstError = newReleases.error ?? comingSoon.error ?? topRated.error ?? recommended.error
   const missingKeys = isMissingIgdbKeys(firstError, providerMode)
   const allInitialPending =
-    newReleases.isPending &&
-    comingSoon.isPending &&
-    topRated.isPending &&
-    recommended.isPending
+    newReleases.isPending && comingSoon.isPending && topRated.isPending && recommended.isPending
 
   const isAnyFeedFetching =
     refreshCatalog.isPending ||
@@ -531,8 +527,7 @@ export function HubPage() {
             <div
               className="absolute -left-20 -bottom-24 size-80 rounded-full opacity-80"
               style={{
-                background:
-                  'radial-gradient(circle, rgba(6, 182, 212, 0.14) 0%, transparent 70%)',
+                background: 'radial-gradient(circle, rgba(6, 182, 212, 0.14) 0%, transparent 70%)',
               }}
             />
             <div
@@ -670,10 +665,7 @@ export function HubPage() {
                   className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface-raised/80 px-2.5 py-1.5 text-xs font-bold text-text transition-all hover:border-accent/50 hover:text-accent active:scale-95 disabled:opacity-60 cursor-pointer"
                 >
                   <RefreshCw
-                    className={cn(
-                      'size-3.5 text-accent',
-                      isAnyFeedFetching && 'animate-spin',
-                    )}
+                    className={cn('size-3.5 text-accent', isAnyFeedFetching && 'animate-spin')}
                   />
                   <span className="hidden sm:inline">
                     {isAnyFeedFetching ? 'Syncing…' : 'Sync Live'}
@@ -765,9 +757,7 @@ export function HubPage() {
                               <div className="truncate text-xs font-bold text-text group-hover:text-accent transition-colors">
                                 {item.term}
                               </div>
-                              <div className="truncate text-[10px] text-subtle">
-                                {item.tag}
-                              </div>
+                              <div className="truncate text-[10px] text-subtle">{item.tag}</div>
                             </div>
                             <ArrowRight className="size-3.5 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
                           </button>
@@ -945,13 +935,9 @@ export function HubPage() {
                             .slice(0, 2)
                             .map((p) => p.abbreviation || p.name)
                             .join(', ') +
-                          (selectedPlatforms.length > 2
-                            ? ` +${selectedPlatforms.length - 2}`
-                            : '')
+                          (selectedPlatforms.length > 2 ? ` +${selectedPlatforms.length - 2}` : '')
                     }
-                    badgeCount={
-                      selectedPlatforms.length > 1 ? selectedPlatforms.length : undefined
-                    }
+                    badgeCount={selectedPlatforms.length > 1 ? selectedPlatforms.length : undefined}
                     active={selectedPlatforms.length > 0}
                     open={openDropdown === 'platforms'}
                     onClick={() => {
@@ -1251,14 +1237,8 @@ export function HubPage() {
                 <div className="relative">
                   <DropdownTriggerButton
                     icon={Layers}
-                    label={
-                      selectedCategoryLabel ??
-                      selectedModeLabel ??
-                      'Edition & Mode'
-                    }
-                    badgeCount={
-                      editionModeActiveCount > 0 ? editionModeActiveCount : undefined
-                    }
+                    label={selectedCategoryLabel ?? selectedModeLabel ?? 'Edition & Mode'}
+                    badgeCount={editionModeActiveCount > 0 ? editionModeActiveCount : undefined}
                     active={editionModeActiveCount > 0}
                     open={openDropdown === 'edition'}
                     onClick={() => {
@@ -1285,9 +1265,7 @@ export function HubPage() {
                               <button
                                 key={opt.key}
                                 type="button"
-                                onClick={() =>
-                                  setGameCategory(opt.key === 'all' ? null : opt.key)
-                                }
+                                onClick={() => setGameCategory(opt.key === 'all' ? null : opt.key)}
                                 className={cn(
                                   'flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-all cursor-pointer',
                                   selected
@@ -1317,9 +1295,7 @@ export function HubPage() {
                               <button
                                 key={opt.key}
                                 type="button"
-                                onClick={() =>
-                                  setGameMode(opt.key === 'all' ? null : opt.key)
-                                }
+                                onClick={() => setGameMode(opt.key === 'all' ? null : opt.key)}
                                 className={cn(
                                   'rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition-all cursor-pointer',
                                   selected
@@ -1475,9 +1451,7 @@ export function HubPage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setGameCategory(gameCategory === 'remake' ? null : 'remake')
-                }
+                onClick={() => setGameCategory(gameCategory === 'remake' ? null : 'remake')}
                 className={cn(
                   'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer',
                   gameCategory === 'remake'
@@ -1491,9 +1465,7 @@ export function HubPage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setGameCategory(gameCategory === 'expansion' ? null : 'expansion')
-                }
+                onClick={() => setGameCategory(gameCategory === 'expansion' ? null : 'expansion')}
                 className={cn(
                   'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer',
                   gameCategory === 'expansion'
@@ -1609,11 +1581,10 @@ export function HubPage() {
                         <SlidersHorizontal className="size-4" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-text">
-                          Advanced Discovery Filters
-                        </h3>
+                        <h3 className="text-sm font-bold text-text">Advanced Discovery Filters</h3>
                         <p className="text-[11px] text-subtle">
-                          Combine genres, platforms, play modes, editions, release eras, and critic ratings
+                          Combine genres, platforms, play modes, editions, release eras, and critic
+                          ratings
                         </p>
                       </div>
                     </div>
@@ -1693,9 +1664,7 @@ export function HubPage() {
                               key={opt.key}
                               label={opt.label}
                               active={(gameCategory ?? 'all') === opt.key}
-                              onClick={() =>
-                                setGameCategory(opt.key === 'all' ? null : opt.key)
-                              }
+                              onClick={() => setGameCategory(opt.key === 'all' ? null : opt.key)}
                             />
                           ))}
                         </PanelSection>
@@ -1768,9 +1737,7 @@ export function HubPage() {
                             key={r.value}
                             label={r.label}
                             active={minRating === r.value}
-                            onClick={() =>
-                              setMinRating(minRating === r.value ? null : r.value)
-                            }
+                            onClick={() => setMinRating(minRating === r.value ? null : r.value)}
                           />
                         ))}
                       </PanelSection>
@@ -1982,9 +1949,7 @@ function DropdownOptionRow({
         </div>
         <div className="min-w-0">
           <div className="truncate text-xs font-bold text-text">{label}</div>
-          {description && (
-            <div className="truncate text-[10px] text-subtle">{description}</div>
-          )}
+          {description && <div className="truncate text-[10px] text-subtle">{description}</div>}
         </div>
       </div>
       {selected && (
@@ -2217,7 +2182,12 @@ function clientMatchesFilters(
         'edition',
       ].some((kw) => nameLow.includes(kw) || summaryLow.includes(kw))
 
-    if (opts.gameCategory === 'main' && gt !== undefined && gt !== null && ![0, 8, 9, 10].includes(gt)) {
+    if (
+      opts.gameCategory === 'main' &&
+      gt !== undefined &&
+      gt !== null &&
+      ![0, 8, 9, 10].includes(gt)
+    ) {
       return false
     }
     if (opts.gameCategory === 'remake' && !isRemakeOrRemaster) return false
@@ -2275,8 +2245,7 @@ function clientMatchesFilters(
   }
 
   if (opts.minRating !== null) {
-    const effectiveScore =
-      game.metacritic_score ?? game.opencritic_score ?? game.rating ?? 0
+    const effectiveScore = game.metacritic_score ?? game.opencritic_score ?? game.rating ?? 0
     if (effectiveScore < opts.minRating) return false
   }
 
@@ -2369,27 +2338,19 @@ function SearchResults({
       })
     } else if (sort === 'hypes') {
       filtered.sort(
-        (a, b) =>
-          (b.hypes ?? 0) - (a.hypes ?? 0) ||
-          (b.rating_count ?? 0) - (a.rating_count ?? 0),
+        (a, b) => (b.hypes ?? 0) - (a.hypes ?? 0) || (b.rating_count ?? 0) - (a.rating_count ?? 0),
       )
     } else if (sort === 'newest') {
-      filtered.sort((a, b) =>
-        (b.release_date ?? '').localeCompare(a.release_date ?? ''),
-      )
+      filtered.sort((a, b) => (b.release_date ?? '').localeCompare(a.release_date ?? ''))
     } else if (sort === 'oldest') {
       filtered.sort((a, b) =>
-        (a.release_date ?? '9999-99-99').localeCompare(
-          b.release_date ?? '9999-99-99',
-        ),
+        (a.release_date ?? '9999-99-99').localeCompare(b.release_date ?? '9999-99-99'),
       )
     } else if (sort === 'name') {
       filtered.sort((a, b) => a.name.localeCompare(b.name))
     } else if (sort === 'popularity') {
       filtered.sort(
-        (a, b) =>
-          (b.rating_count ?? 0) - (a.rating_count ?? 0) ||
-          (b.hypes ?? 0) - (a.hypes ?? 0),
+        (a, b) => (b.rating_count ?? 0) - (a.rating_count ?? 0) || (b.hypes ?? 0) - (a.hypes ?? 0),
       )
     }
 

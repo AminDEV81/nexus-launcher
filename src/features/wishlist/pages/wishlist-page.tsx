@@ -230,9 +230,7 @@ export function WishlistPage() {
     } else if (activeTab === 'released') {
       list = list.filter((g) => !isGameUnreleased(g.release_date))
     } else if (activeTab === 'acclaimed') {
-      list = list.filter(
-        (g) => Math.max(g.metacritic_score ?? 0, g.opencritic_score ?? 0) >= 80,
-      )
+      list = list.filter((g) => Math.max(g.metacritic_score ?? 0, g.opencritic_score ?? 0) >= 80)
     }
 
     if (searchQuery.trim()) {
@@ -421,10 +419,7 @@ export function WishlistPage() {
                 title="Sync wishlist release dates, covers and critic scores with IGDB"
               >
                 <RefreshCw
-                  className={cn(
-                    'size-4',
-                    syncWishlistMutation.isPending && 'animate-spin',
-                  )}
+                  className={cn('size-4', syncWishlistMutation.isPending && 'animate-spin')}
                 />
                 <span>{syncWishlistMutation.isPending ? 'Syncing...' : 'Sync Radar'}</span>
               </button>

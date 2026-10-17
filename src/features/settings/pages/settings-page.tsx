@@ -46,10 +46,7 @@ export type SettingsSectionId =
 interface SectionMeta {
   id: SettingsSectionId
   category:
-    | 'Interface & Behavior'
-    | 'Gaming & Hardware'
-    | 'Integrations & Media'
-    | 'Data & Maintenance'
+    'Interface & Behavior' | 'Gaming & Hardware' | 'Integrations & Media' | 'Data & Maintenance'
   label: string
   shortDesc: string
   description: string
@@ -169,13 +166,15 @@ const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
   },
   {
     title: 'Accent Color Palette',
-    detail: 'Violet, Ocean, Emerald, Crimson, Amber, Cyberpunk, Solaris, Toxic, Aquamarine, Inferno',
+    detail:
+      'Violet, Ocean, Emerald, Crimson, Amber, Cyberpunk, Solaris, Toxic, Aquamarine, Inferno',
     keywords: 'palette color accent neon purple blue green red pink theme',
     sectionId: 'appearance',
   },
   {
     title: 'Typography & UI Font Family',
-    detail: 'Sora, Rajdhani, Orbitron, Chakra Petch, Plus Jakarta, JetBrains Mono, Outfit, Russo, Teko',
+    detail:
+      'Sora, Rajdhani, Orbitron, Chakra Petch, Plus Jakarta, JetBrains Mono, Outfit, Russo, Teko',
     keywords: 'font typography text family size style monospace sci-fi esports',
     sectionId: 'appearance',
   },
@@ -235,7 +234,8 @@ const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
   },
   {
     title: 'Game Booster & Auto-Boost on Launch',
-    detail: '1-click hardware optimization, Esports/Streamer presets, and automatic boost before games',
+    detail:
+      '1-click hardware optimization, Esports/Streamer presets, and automatic boost before games',
     keywords: 'game booster overclock auto boost fps performance optimize',
     sectionId: 'booster',
   },
@@ -253,7 +253,8 @@ const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
   },
   {
     title: 'Deep Windows Tweaks (Network Ping, GPU MSI Mode, BCD Timer)',
-    detail: 'Disable Nagle TCP delay, enable GPU MSI interrupts, disable Dynamic Tick, debloat telemetry',
+    detail:
+      'Disable Nagle TCP delay, enable GPU MSI interrupts, disable Dynamic Tick, debloat telemetry',
     keywords: 'network ping tcp nodelay msi gpu interrupt bcd timer hpet telemetry debloat',
     sectionId: 'booster',
   },
@@ -277,7 +278,8 @@ const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
   },
   {
     title: 'Steam Store Region & Currency Pricing',
-    detail: 'Set default country/currency (US, EU, UK, TR, AR, BR, UA, IN, JP...) for Wishlist & Hub prices',
+    detail:
+      'Set default country/currency (US, EU, UK, TR, AR, BR, UA, IN, JP...) for Wishlist & Hub prices',
     keywords: 'steam region currency price store country discount wishlist',
     sectionId: 'metadata',
   },
@@ -295,7 +297,8 @@ const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
   },
   {
     title: 'Export & Restore Library Backup (.json)',
-    detail: 'Back up or restore all games, collections, tags, profiles, play sessions, and settings',
+    detail:
+      'Back up or restore all games, collections, tags, profiles, play sessions, and settings',
     keywords: 'backup export import restore database sqlite json save',
     sectionId: 'backup',
   },
@@ -313,7 +316,11 @@ const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
   },
 ]
 
-const QUICK_JUMP_CHIPS: Array<{ label: string; sectionId: SettingsSectionId; icon: typeof Palette }> = [
+const QUICK_JUMP_CHIPS: Array<{
+  label: string
+  sectionId: SettingsSectionId
+  icon: typeof Palette
+}> = [
   { label: 'Theme & Fonts', sectionId: 'appearance', icon: Palette },
   { label: 'Download Turbo', sectionId: 'performance', icon: MonitorCog },
   { label: 'Game Booster', sectionId: 'booster', icon: Rocket },
@@ -386,7 +393,7 @@ export function SettingsPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-black tracking-tight text-text sm:text-3xl">Settings</h1>
               <span className="rounded-full border border-border bg-surface-raised px-3 py-0.5 font-mono text-xs font-bold text-text/90 shadow-2xs">
-                v{currentVersion || '0.6.0'} • {themeMode === 'dark' ? 'Dark Theme' : 'Light Theme'}
+                v{currentVersion || '0.7.0'} • {themeMode === 'dark' ? 'Dark Theme' : 'Light Theme'}
               </span>
             </div>
           </div>
@@ -446,7 +453,10 @@ export function SettingsPage() {
                   />
                 )}
                 <ChipIcon
-                  className={cn('relative z-10 size-3.5', isSelected ? 'text-white' : 'text-accent')}
+                  className={cn(
+                    'relative z-10 size-3.5',
+                    isSelected ? 'text-white' : 'text-accent',
+                  )}
                   strokeWidth={2.25}
                 />
                 <span className="relative z-10">{chip.label}</span>
@@ -620,9 +630,7 @@ export function SettingsPage() {
                         <span
                           className={cn(
                             'mt-0.5 block truncate text-[11px] font-semibold transition-colors',
-                            isActive
-                              ? 'text-text/85'
-                              : 'text-muted group-hover:text-text/80',
+                            isActive ? 'text-text/85' : 'text-muted group-hover:text-text/80',
                           )}
                         >
                           {section.shortDesc}
@@ -651,9 +659,7 @@ export function SettingsPage() {
           ref={mainScrollRef}
           className={cn(
             'min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] rounded-3xl border shadow-card transition-colors duration-200',
-            activeSection === 'booster'
-              ? 'border-accent/35 bg-bg'
-              : 'border-border bg-surface/65',
+            activeSection === 'booster' ? 'border-accent/35 bg-bg' : 'border-border bg-surface/65',
           )}
         >
           <AnimatePresence mode="wait" initial={false}>

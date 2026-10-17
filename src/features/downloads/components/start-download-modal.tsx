@@ -1222,7 +1222,6 @@ function UrlStep({
   )
 }
 
-
 function FallbackCoverThumb({ game, className }: { game: HubGame; className?: string }) {
   const candidates = useMemo(
     () => buildCoverFallbackChain(game.cover_url, game.backdrop_url),

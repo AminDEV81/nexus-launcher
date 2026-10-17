@@ -52,10 +52,7 @@ interface SoundtrackState {
   visualizerMode: VisualizerMode
 
   favorites: Set<string>
-  savedFavoriteTracks: Record<
-    string,
-    { track: SoundtrackTrack; album: SoundtrackAlbum | null }
-  >
+  savedFavoriteTracks: Record<string, { track: SoundtrackTrack; album: SoundtrackAlbum | null }>
   savedFavoriteAlbums: Record<string, SoundtrackAlbumWithTracks>
   recentlyPlayed: SoundtrackPlayHistory[]
   activeDownloads: Map<string, DownloadProgressPayload>

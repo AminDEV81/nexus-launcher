@@ -2,18 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { invoke } from '@tauri-apps/api/core'
-import {
-  Minus,
-  Square,
-  Copy,
-  X,
-  Sparkles,
-  Cpu,
-  Gamepad2,
-  Timer,
-  Zap,
-  Loader2,
-} from 'lucide-react'
+import { Minus, Square, Copy, X, Sparkles, Cpu, Gamepad2, Timer, Zap, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { LogoMark } from '@/components/brand/logo-mark'
 import { ProfileBadgeButton } from './profile-badge-button'

@@ -82,6 +82,8 @@ describe('matchesFilters', () => {
       tags: new Set(['t-backlog']),
       playtime: new Set(['10h-50h']),
       favoritesOnly: false,
+      installStatus: 'all',
+      minScore: null,
     }
     expect(matchesFilters(game, filters)).toBe(true)
 
@@ -122,6 +124,8 @@ describe('matchesFilters', () => {
         tags: new Set(),
         playtime: new Set(),
         favoritesOnly: false,
+        installStatus: 'all',
+        minScore: null,
       }),
     ).toBe(true)
   })

@@ -290,11 +290,7 @@ export function DualSensePage() {
   useEffect(() => {
     if (snapshot?.config) {
       setHexDraft(
-        rgbToHex(
-          snapshot.config.lightbarR,
-          snapshot.config.lightbarG,
-          snapshot.config.lightbarB,
-        ),
+        rgbToHex(snapshot.config.lightbarR, snapshot.config.lightbarG, snapshot.config.lightbarB),
       )
     }
   }, [
@@ -543,12 +539,7 @@ export function DualSensePage() {
     void syncOverrideToBackend(cur)
   }
 
-  const handleTouchpadInput = (
-    active: boolean,
-    x: number,
-    y: number,
-    clicked: boolean,
-  ) => {
+  const handleTouchpadInput = (active: boolean, x: number, y: number, clicked: boolean) => {
     const cur = {
       ...(overridesRef.current[activeSlot] ?? makeDefaultOverride(activeSlot)),
       slotIndex: activeSlot,
@@ -687,11 +678,7 @@ export function DualSensePage() {
     thumbRy: emulationActive ? (xb?.thumbRy ?? 0) : 0,
   }
 
-  const currentHex = rgbToHex(
-    cfg?.lightbarR ?? 0,
-    cfg?.lightbarG ?? 112,
-    cfg?.lightbarB ?? 255,
-  )
+  const currentHex = rgbToHex(cfg?.lightbarR ?? 0, cfg?.lightbarG ?? 112, cfg?.lightbarB ?? 255)
 
   return (
     <div className="flex h-full flex-col overflow-y-auto px-6 py-6 text-text">
@@ -812,11 +799,9 @@ export function DualSensePage() {
           const isSlotEmulating = Boolean(slotSnap?.xbox?.emulationActive)
           const isSlotConnected = Boolean(slotSnap?.dualsense?.connected)
           const sr =
-            slotSnap?.config?.lightbarR ??
-            (idx === 0 ? 0 : idx === 1 ? 239 : idx === 2 ? 16 : 168)
+            slotSnap?.config?.lightbarR ?? (idx === 0 ? 0 : idx === 1 ? 239 : idx === 2 ? 16 : 168)
           const sg =
-            slotSnap?.config?.lightbarG ??
-            (idx === 0 ? 112 : idx === 1 ? 68 : idx === 2 ? 185 : 85)
+            slotSnap?.config?.lightbarG ?? (idx === 0 ? 112 : idx === 1 ? 68 : idx === 2 ? 185 : 85)
           const sb =
             slotSnap?.config?.lightbarB ??
             (idx === 0 ? 255 : idx === 1 ? 68 : idx === 2 ? 129 : 247)
@@ -849,9 +834,7 @@ export function DualSensePage() {
                     </span>
                     <span
                       className={`size-2 rounded-full ${
-                        isSlotConnected
-                          ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]'
-                          : 'bg-subtle/50'
+                        isSlotConnected ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]' : 'bg-subtle/50'
                       }`}
                     />
                   </div>
@@ -890,11 +873,13 @@ export function DualSensePage() {
           <div className="flex items-center gap-2.5">
             <span className="size-2.5 rounded-full bg-subtle animate-pulse" />
             <span className="font-extrabold text-text">
-              Controller #{activeSlot + 1} is Disconnected — Both Controllers Displayed in Standby Grayscale
+              Controller #{activeSlot + 1} is Disconnected — Both Controllers Displayed in Standby
+              Grayscale
             </span>
           </div>
           <span className="font-medium text-muted">
-            Connect controller #{activeSlot + 1} via USB or Bluetooth to restore full RGB color &amp; live telemetry
+            Connect controller #{activeSlot + 1} via USB or Bluetooth to restore full RGB color
+            &amp; live telemetry
           </span>
         </div>
       )}
@@ -1174,22 +1159,118 @@ export function DualSensePage() {
           <div className="flex flex-col justify-between gap-4 xl:col-span-7">
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
               {[
-                { key: 'cross', psLabel: '✕ Cross', xbLabel: 'A Button', active: ds?.cross, badgeColor: 'text-blue-500' },
-                { key: 'circle', psLabel: '○ Circle', xbLabel: 'B Button', active: ds?.circle, badgeColor: 'text-rose-500' },
-                { key: 'square', psLabel: '□ Square', xbLabel: 'X Button', active: ds?.square, badgeColor: 'text-pink-500' },
-                { key: 'triangle', psLabel: '△ Triangle', xbLabel: 'Y Button', active: ds?.triangle, badgeColor: 'text-emerald-500' },
-                { key: 'l1', psLabel: 'L1 Bumper', xbLabel: 'LB Bumper', active: ds?.l1, badgeColor: 'text-accent' },
-                { key: 'r1', psLabel: 'R1 Bumper', xbLabel: 'RB Bumper', active: ds?.r1, badgeColor: 'text-accent' },
-                { key: 'l3', psLabel: 'L3 Click', xbLabel: 'LS Click', active: ds?.l3, badgeColor: 'text-accent' },
-                { key: 'r3', psLabel: 'R3 Click', xbLabel: 'RS Click', active: ds?.r3, badgeColor: 'text-accent' },
-                { key: 'dpadUp', psLabel: 'D-Pad Up', xbLabel: 'D-Pad Up', active: ds?.dpadUp, badgeColor: 'text-subtle' },
-                { key: 'dpadDown', psLabel: 'D-Pad Down', xbLabel: 'D-Pad Down', active: ds?.dpadDown, badgeColor: 'text-subtle' },
-                { key: 'dpadLeft', psLabel: 'D-Pad Left', xbLabel: 'D-Pad Left', active: ds?.dpadLeft, badgeColor: 'text-subtle' },
-                { key: 'dpadRight', psLabel: 'D-Pad Right', xbLabel: 'D-Pad Right', active: ds?.dpadRight, badgeColor: 'text-subtle' },
-                { key: 'create', psLabel: 'Create', xbLabel: 'View / Back', active: ds?.create, badgeColor: 'text-subtle' },
-                { key: 'options', psLabel: 'Options', xbLabel: 'Menu / Start', active: ds?.options, badgeColor: 'text-subtle' },
-                { key: 'ps', psLabel: 'PS Home', xbLabel: 'Xbox Guide', active: ds?.ps, badgeColor: 'text-emerald-500' },
-                { key: 'mute', psLabel: 'Mic Mute', xbLabel: 'Share', active: ds?.mute, badgeColor: 'text-amber-500' },
+                {
+                  key: 'cross',
+                  psLabel: '✕ Cross',
+                  xbLabel: 'A Button',
+                  active: ds?.cross,
+                  badgeColor: 'text-blue-500',
+                },
+                {
+                  key: 'circle',
+                  psLabel: '○ Circle',
+                  xbLabel: 'B Button',
+                  active: ds?.circle,
+                  badgeColor: 'text-rose-500',
+                },
+                {
+                  key: 'square',
+                  psLabel: '□ Square',
+                  xbLabel: 'X Button',
+                  active: ds?.square,
+                  badgeColor: 'text-pink-500',
+                },
+                {
+                  key: 'triangle',
+                  psLabel: '△ Triangle',
+                  xbLabel: 'Y Button',
+                  active: ds?.triangle,
+                  badgeColor: 'text-emerald-500',
+                },
+                {
+                  key: 'l1',
+                  psLabel: 'L1 Bumper',
+                  xbLabel: 'LB Bumper',
+                  active: ds?.l1,
+                  badgeColor: 'text-accent',
+                },
+                {
+                  key: 'r1',
+                  psLabel: 'R1 Bumper',
+                  xbLabel: 'RB Bumper',
+                  active: ds?.r1,
+                  badgeColor: 'text-accent',
+                },
+                {
+                  key: 'l3',
+                  psLabel: 'L3 Click',
+                  xbLabel: 'LS Click',
+                  active: ds?.l3,
+                  badgeColor: 'text-accent',
+                },
+                {
+                  key: 'r3',
+                  psLabel: 'R3 Click',
+                  xbLabel: 'RS Click',
+                  active: ds?.r3,
+                  badgeColor: 'text-accent',
+                },
+                {
+                  key: 'dpadUp',
+                  psLabel: 'D-Pad Up',
+                  xbLabel: 'D-Pad Up',
+                  active: ds?.dpadUp,
+                  badgeColor: 'text-subtle',
+                },
+                {
+                  key: 'dpadDown',
+                  psLabel: 'D-Pad Down',
+                  xbLabel: 'D-Pad Down',
+                  active: ds?.dpadDown,
+                  badgeColor: 'text-subtle',
+                },
+                {
+                  key: 'dpadLeft',
+                  psLabel: 'D-Pad Left',
+                  xbLabel: 'D-Pad Left',
+                  active: ds?.dpadLeft,
+                  badgeColor: 'text-subtle',
+                },
+                {
+                  key: 'dpadRight',
+                  psLabel: 'D-Pad Right',
+                  xbLabel: 'D-Pad Right',
+                  active: ds?.dpadRight,
+                  badgeColor: 'text-subtle',
+                },
+                {
+                  key: 'create',
+                  psLabel: 'Create',
+                  xbLabel: 'View / Back',
+                  active: ds?.create,
+                  badgeColor: 'text-subtle',
+                },
+                {
+                  key: 'options',
+                  psLabel: 'Options',
+                  xbLabel: 'Menu / Start',
+                  active: ds?.options,
+                  badgeColor: 'text-subtle',
+                },
+                {
+                  key: 'ps',
+                  psLabel: 'PS Home',
+                  xbLabel: 'Xbox Guide',
+                  active: ds?.ps,
+                  badgeColor: 'text-emerald-500',
+                },
+                {
+                  key: 'mute',
+                  psLabel: 'Mic Mute',
+                  xbLabel: 'Share',
+                  active: ds?.mute,
+                  badgeColor: 'text-amber-500',
+                },
               ].map((btn) => (
                 <button
                   key={btn.key}
@@ -1224,9 +1305,7 @@ export function DualSensePage() {
                   </div>
                   <span
                     className={`size-2 rounded-full transition-transform ${
-                      btn.active
-                        ? 'bg-white scale-125'
-                        : 'bg-border group-hover:bg-accent/60'
+                      btn.active ? 'bg-white scale-125' : 'bg-border group-hover:bg-accent/60'
                     }`}
                   />
                 </button>
@@ -1241,7 +1320,7 @@ export function DualSensePage() {
                     {emulationActive ? 'Left Trigger (LT ← L2)' : 'Left Trigger (L2)'}
                   </span>
                   <span className="rounded-md bg-accent/15 px-2 py-0.5 font-mono text-[11px] text-accent">
-                    {emulationActive ? xb?.lt ?? 0 : ds?.l2 ?? 0} / 255
+                    {emulationActive ? (xb?.lt ?? 0) : (ds?.l2 ?? 0)} / 255
                   </span>
                 </div>
                 <input
@@ -1268,7 +1347,7 @@ export function DualSensePage() {
                     {emulationActive ? 'Right Trigger (RT ← R2)' : 'Right Trigger (R2)'}
                   </span>
                   <span className="rounded-md bg-accent/15 px-2 py-0.5 font-mono text-[11px] text-accent">
-                    {emulationActive ? xb?.rt ?? 0 : ds?.r2 ?? 0} / 255
+                    {emulationActive ? (xb?.rt ?? 0) : (ds?.r2 ?? 0)} / 255
                   </span>
                 </div>
                 <input

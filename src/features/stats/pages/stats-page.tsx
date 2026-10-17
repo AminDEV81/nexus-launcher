@@ -109,14 +109,14 @@ export function StatsPage() {
   })
   const unlockedTrophiesCount = milestones.filter((m) => m.unlocked).length
   const playedCount = (games ?? []).filter((g) => g.total_playtime_seconds > 0).length
-  const totalGamesCount = summary?.total_games ?? (games?.length ?? 0)
+  const totalGamesCount = summary?.total_games ?? games?.length ?? 0
   const completionRate = totalGamesCount > 0 ? Math.round((playedCount / totalGamesCount) * 100) : 0
   const avgSessionMins =
     sessions && sessions.length > 0
       ? Math.max(
           1,
           Math.round(
-            sessions.reduce((acc, s) => acc + s.duration_seconds, 0) / sessions.length / 60,
+            sessions.reduce((acc, s) => acc + (s.duration_seconds ?? 0), 0) / sessions.length / 60,
           ),
         )
       : 0
@@ -266,7 +266,12 @@ export function StatsPage() {
                     {/* Lifetime Hours Big Readout */}
                     <div className="mt-3">
                       <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-subtle">
-                        LIFETIME LOGGED PLAYTIME • {(habits.dominantPersona?.title ?? habits.personaTitle ?? 'BALANCED ADVENTURER').toUpperCase()}
+                        LIFETIME LOGGED PLAYTIME •{' '}
+                        {(
+                          habits.dominantPersona?.title ??
+                          habits.personaTitle ??
+                          'BALANCED ADVENTURER'
+                        ).toUpperCase()}
                       </span>
                       <div className="mt-1 font-mono text-4xl font-black tracking-tight text-text sm:text-5xl drop-shadow-sm">
                         {formatPlaytime(summary?.total_playtime_seconds ?? 0)}
@@ -277,10 +282,20 @@ export function StatsPage() {
                     <div className="mt-3 max-w-md">
                       <div className="flex items-center justify-between font-mono text-[11px] font-bold">
                         <span className="text-muted">
-                          Next Rank ({levelInfo.nextLevelHours ?? Math.round((levelInfo.xpForNextLevel ?? 300) / 60)}h target)
+                          Next Rank (
+                          {levelInfo.nextLevelHours ??
+                            Math.round((levelInfo.xpForNextLevel ?? 300) / 60)}
+                          h target)
                         </span>
                         <span className="text-accent">
-                          {levelInfo.hoursToNextLevel ?? Math.max(0.1, Math.round(((levelInfo.xpForNextLevel - levelInfo.currentXp) / 60) * 10) / 10)}h remaining
+                          {levelInfo.hoursToNextLevel ??
+                            Math.max(
+                              0.1,
+                              Math.round(
+                                ((levelInfo.xpForNextLevel - levelInfo.currentXp) / 60) * 10,
+                              ) / 10,
+                            )}
+                          h remaining
                         </span>
                       </div>
                       <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-surface-raised ring-1 ring-inset ring-black/20">
@@ -983,7 +998,8 @@ function RandomGamePicker({ onOpenSmartRoulette }: { onOpenSmartRoulette: () => 
             Undecided what to play? Open Smart Game Roulette &amp; Mood Matcher
           </div>
           <div className="text-xs text-muted">
-            Filter by your mood (Quick 15m Burst, Unplayed Backlog Gem, High-Octane Action, or Deep Story) and spin the reel.
+            Filter by your mood (Quick 15m Burst, Unplayed Backlog Gem, High-Octane Action, or Deep
+            Story) and spin the reel.
           </div>
         </div>
       </div>

@@ -1,5 +1,8 @@
 import { memo, useState } from 'react'
-import { getSecondaryCoverFallbackUrl, resolveAlbumCoverFallback } from '../../services/curated-soundtracks'
+import {
+  getSecondaryCoverFallbackUrl,
+  resolveAlbumCoverFallback,
+} from '../../services/curated-soundtracks'
 import { motion } from 'framer-motion'
 import { Disc3, Gamepad2, Heart, Play } from 'lucide-react'
 import { assetUrl } from '@/lib/asset-url'
@@ -113,7 +116,10 @@ export const AlbumCard = memo(function AlbumCard({
           title={isFavorite ? 'Remove album from favorites' : 'Add album to favorites'}
         >
           <Heart
-            className={cn('size-4 transition-transform active:scale-125', isFavorite && 'fill-current')}
+            className={cn(
+              'size-4 transition-transform active:scale-125',
+              isFavorite && 'fill-current',
+            )}
           />
         </button>
 
