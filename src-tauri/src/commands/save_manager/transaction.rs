@@ -139,48 +139,40 @@ impl TransactionCoordinator {
             }
         }
         if locations.is_empty() {
-            // Unmanaged game: no action needed
             return Ok(String::new());
         }
 
         let op_id = JournalManager::create_operation(conn, "prepare_launch", Some(game_id), Some(profile_id))?;
         JournalManager::update_operation_state(conn, &op_id, "validated")?;
 
-        // 1. Pre-Existing Save Adoption & Protection for Default Profile:
-        // Before staging or committing any launch (especially if launched by a secondary profile),
-        // verify that the 'default' (main player) profile possesses the full saves from OS path.
-        // If the OS path currently contains saves that are absent or larger than what 'default' has,
-        // we copy them into 'default' first so the primary player never loses progress.
-        for loc in &locations {
-            let default_cur = Self::get_profile_current_path("default", game_id, &loc.id);
-            if loc.os_path.exists() {
-                if let Ok(os_th) = calculate_tree_hash(&loc.os_path) {
-                    if os_th.file_count > 0 {
-                        let cur_th = if default_cur.exists() {
-                            calculate_tree_hash(&default_cur).unwrap_or(crate::commands::save_manager::fs_ops::TreeHashResult {
-                                hash: String::new(),
-                                total_size: 0,
-                                file_count: 0,
-                            })
-                        } else {
-                            crate::commands::save_manager::fs_ops::TreeHashResult {
-                                hash: String::new(),
-                                total_size: 0,
-                                file_count: 0,
+        // 1. First-Time Unmanaged Save Adoption:
+        // If NO profile in `profile_game_saves` has ever recorded save files for this game yet,
+        // and the OS save directory already has pre-existing files (from before Nexus managed it):
+        // - Adopt those pre-existing files into `default` so the main user never loses pre-Nexus progress.
+        // - If the launching profile IS `default` (or if `profile_id` had never been initialized as empty),
+        //   it will launch with those adopted saves; if `profile_id != "default"`, `default` keeps the backup
+        //   and `profile_id` starts with its own isolated save directory!
+        let any_profile_has_saves: bool = conn
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM profile_game_saves WHERE game_id = ?1 AND file_count > 0",
+                params![game_id],
+                |row| row.get(0),
+            )
+            .unwrap_or(false);
+
+        if !any_profile_has_saves {
+            for loc in &locations {
+                if loc.os_path.exists() {
+                    if let Ok(os_th) = calculate_tree_hash(&loc.os_path) {
+                        if os_th.file_count > 0 {
+                            let default_cur = Self::get_profile_current_path("default", game_id, &loc.id);
+                            if loc.os_path.is_file() {
+                                if let Some(parent) = default_cur.parent() {
+                                    let _ = fs::create_dir_all(parent);
+                                }
+                            } else {
+                                let _ = fs::create_dir_all(&default_cur);
                             }
-                        };
-
-                        let is_secondary_fresh = profile_id != "default" && {
-                            let prof_cur = Self::get_profile_current_path(profile_id, game_id, &loc.id);
-                            !prof_cur.exists() || calculate_tree_hash(&prof_cur).map(|h| h.file_count == 0).unwrap_or(true)
-                        };
-
-                        let needs_adoption = cur_th.file_count == 0
-                            || !default_cur.exists()
-                            || (is_secondary_fresh && os_th.file_count >= cur_th.file_count);
-
-                        if needs_adoption {
-                            let _ = fs::create_dir_all(&default_cur);
                             let _ = copy_dir_recursive(&loc.os_path, &default_cur);
                             let _ = flush_file_or_dir_buffers(&default_cur);
 
@@ -203,10 +195,45 @@ impl TransactionCoordinator {
                     }
                 }
             }
+        } else {
+            // If this profile is the currently active profile and its `profile_cur` is empty while `os_path` has files
+            // AND this profile's DB state is NOT explicitly 'empty' (e.g. game was played outside Nexus by the active user),
+            // sync `os_path` into `profile_id`'s `profile_cur` so external progress by the active user isn't lost on launch.
+            let profile_state: Option<String> = conn
+                .query_row(
+                    "SELECT state FROM profile_game_saves WHERE profile_id = ?1 AND game_id = ?2",
+                    params![profile_id, game_id],
+                    |row| row.get(0),
+                )
+                .ok();
+
+            if profile_state.as_deref() != Some("empty") {
+                for loc in &locations {
+                    let prof_cur = Self::get_profile_current_path(profile_id, game_id, &loc.id);
+                    let prof_has_files = prof_cur.exists()
+                        && calculate_tree_hash(&prof_cur)
+                            .map(|h| h.file_count > 0)
+                            .unwrap_or(false);
+                    if !prof_has_files && loc.os_path.exists() {
+                        if let Ok(os_th) = calculate_tree_hash(&loc.os_path) {
+                            if os_th.file_count > 0 {
+                                if loc.os_path.is_file() {
+                                    if let Some(parent) = prof_cur.parent() {
+                                        let _ = fs::create_dir_all(parent);
+                                    }
+                                } else {
+                                    let _ = fs::create_dir_all(&prof_cur);
+                                }
+                                let _ = copy_dir_recursive(&loc.os_path, &prof_cur);
+                                let _ = flush_file_or_dir_buffers(&prof_cur);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // 2. Preflight & Snapshot:
-        // Create safety snapshot of whatever is currently on OS path (or profile current)
         let mut snapshot_targets = Vec::new();
         for loc in &locations {
             let cur_th = calculate_tree_hash(&loc.os_path)?;
@@ -219,12 +246,29 @@ impl TransactionCoordinator {
             .collect();
 
         JournalManager::update_operation_state(conn, &op_id, "preflight_verified")?;
-        SnapshotEngine::create_snapshot(profile_id, game_id, "Pre-Launch Safety Snapshot", false, &ref_targets)?;
+        if let Err(e) = SnapshotEngine::create_snapshot(profile_id, game_id, "Pre-Launch Safety Snapshot", false, &ref_targets) {
+            log::warn!("Non-fatal pre-launch snapshot warning for {}: {}", game_id, e);
+        }
         JournalManager::update_operation_state(conn, &op_id, "snapshot_created")?;
         JournalManager::update_operation_state(conn, &op_id, "snapshot_verified")?;
 
+        // Fast-path: if every location in profile_cur already has the exact same tree hash as live os_path,
+        // skip destructive staging/commit replacement so open/locked save files are never disturbed!
+        let all_already_in_sync = locations.iter().enumerate().all(|(idx, loc)| {
+            let profile_cur = Self::get_profile_current_path(profile_id, game_id, &loc.id);
+            let live_hash = &snapshot_targets[idx].2;
+            if let Ok(prof_th) = calculate_tree_hash(&profile_cur) {
+                prof_th.hash == *live_hash
+            } else {
+                false
+            }
+        });
+        if all_already_in_sync {
+            let _ = JournalManager::update_operation_state(conn, &op_id, "completed");
+            return Ok(op_id);
+        }
+
         // 3. Staging:
-        // Copy each location's profile current save to staging
         for (i, loc) in locations.iter().enumerate() {
             let profile_cur = Self::get_profile_current_path(profile_id, game_id, &loc.id);
             let staging = Self::get_staging_path(profile_id, game_id, &op_id, &loc.id);
@@ -242,25 +286,29 @@ impl TransactionCoordinator {
 
             if profile_cur.exists() {
                 let th = calculate_tree_hash(&profile_cur)?;
-                verify_disk_space(&staging, th.total_size)?;
-                copy_dir_recursive(&profile_cur, &staging)?;
-                flush_file_or_dir_buffers(&staging)?;
+                if th.file_count > 0 {
+                    verify_disk_space(&staging, th.total_size)?;
+                    copy_dir_recursive(&profile_cur, &staging)?;
+                    flush_file_or_dir_buffers(&staging)?;
 
-                let staged_th = calculate_tree_hash(&staging)?;
-                if staged_th.hash != th.hash {
-                    let err_msg = format!(
-                        "Staged hash mismatch for location {}: expected {}, got {}",
-                        loc.id, th.hash, staged_th.hash
-                    );
-                    let _ = JournalManager::update_operation_error(conn, &op_id, "STAGING_VERIFICATION_FAILED", &err_msg);
-                    let _ = Self::rollback_operation(conn, &op_id);
-                    let staging_root = Self::get_staging_root(profile_id, game_id, &op_id);
-                    let _ = remove_path_all_with_retry(&staging_root);
-                    return Err(SaveManagerError::StagingVerificationFailed(err_msg));
+                    let staged_th = calculate_tree_hash(&staging)?;
+                    if staged_th.hash != th.hash {
+                        let err_msg = format!(
+                            "Staged hash mismatch for location {}: expected {}, got {}",
+                            loc.id, th.hash, staged_th.hash
+                        );
+                        let _ = JournalManager::update_operation_error(conn, &op_id, "STAGING_VERIFICATION_FAILED", &err_msg);
+                        let _ = Self::rollback_operation(conn, &op_id);
+                        let staging_root = Self::get_staging_root(profile_id, game_id, &op_id);
+                        let _ = remove_path_all_with_retry(&staging_root);
+                        return Err(SaveManagerError::StagingVerificationFailed(err_msg));
+                    }
+                    JournalManager::update_location_staged_hash(conn, &op_id, &loc.id, &staged_th.hash)?;
+                } else {
+                    fs::create_dir_all(&staging)?;
+                    JournalManager::update_location_staged_hash(conn, &op_id, &loc.id, "empty")?;
                 }
-                JournalManager::update_location_staged_hash(conn, &op_id, &loc.id, &staged_th.hash)?;
             } else {
-                // Empty profile save -> ensure empty staging
                 fs::create_dir_all(&staging)?;
                 JournalManager::update_location_staged_hash(conn, &op_id, &loc.id, "empty")?;
             }
@@ -352,21 +400,23 @@ impl TransactionCoordinator {
             }
             (fc, sz)
         };
+        let new_state = if file_count > 0 { "ready" } else { "empty" };
 
         conn.execute(
             "INSERT INTO profile_game_saves (profile_id, game_id, current_path, last_synced_at, file_count, save_size_bytes, state)
-             VALUES (?1, ?2, ?3, datetime('now'), ?4, ?5, 'ready')
+             VALUES (?1, ?2, ?3, datetime('now'), ?4, ?5, ?6)
              ON CONFLICT(profile_id, game_id) DO UPDATE SET
              last_synced_at = datetime('now'),
              file_count = ?4,
              save_size_bytes = ?5,
-             state = 'ready'",
+             state = ?6",
             params![
                 profile_id,
                 game_id,
                 Self::get_profile_current_path(profile_id, game_id, &locations[0].id).to_string_lossy(),
                 file_count,
                 save_size_bytes,
+                new_state,
             ],
         )?;
 
@@ -389,7 +439,6 @@ impl TransactionCoordinator {
         let op_id = JournalManager::create_operation(conn, "sync_exit", Some(game_id), Some(profile_id))?;
         JournalManager::update_operation_state(conn, &op_id, "validated")?;
 
-        // 1. Check if OS saves have changed
         let mut any_changed = false;
         let mut os_hashes = Vec::new();
 
@@ -407,25 +456,23 @@ impl TransactionCoordinator {
         if !any_changed {
             let total_file_count: usize = os_hashes.iter().map(|(_, th, _)| th.file_count).sum();
             let total_size_bytes: u64 = os_hashes.iter().map(|(_, th, _)| th.total_size).sum();
+            let state_str = if total_file_count > 0 { "ready" } else { "empty" };
 
-            // Unchanged: update timestamp, count, size, and complete
             conn.execute(
                 "UPDATE profile_game_saves
                  SET last_synced_at = datetime('now'),
                      file_count = ?3,
                      save_size_bytes = ?4,
-                     state = 'ready'
+                     state = ?5
                  WHERE profile_id = ?1 AND game_id = ?2",
-                params![profile_id, game_id, total_file_count as i64, total_size_bytes as i64],
+                params![profile_id, game_id, total_file_count as i64, total_size_bytes as i64, state_str],
             )?;
             JournalManager::update_operation_state(conn, &op_id, "completed")?;
             return Ok(op_id);
         }
 
-        // 2. Preflight & Snapshot:
         JournalManager::update_operation_state(conn, &op_id, "preflight_verified")?;
 
-        // Snapshot current verified profile saves before updating
         let mut snapshot_targets = Vec::new();
         for (i, loc) in locations.iter().enumerate() {
             let profile_cur = Self::get_profile_current_path(profile_id, game_id, &loc.id);
@@ -438,11 +485,12 @@ impl TransactionCoordinator {
             .map(|(id, p, h)| (*id, p.as_path(), h.as_str()))
             .collect();
 
-        SnapshotEngine::create_snapshot(profile_id, game_id, "Post-Exit Safety Snapshot", false, &ref_targets)?;
+        if let Err(e) = SnapshotEngine::create_snapshot(profile_id, game_id, "Post-Exit Safety Snapshot", false, &ref_targets) {
+            log::warn!("Non-fatal post-exit snapshot warning for {}: {}", game_id, e);
+        }
         JournalManager::update_operation_state(conn, &op_id, "snapshot_created")?;
         JournalManager::update_operation_state(conn, &op_id, "snapshot_verified")?;
 
-        // 3. Staging:
         for (i, loc) in locations.iter().enumerate() {
             let staging = Self::get_staging_path(profile_id, game_id, &op_id, &loc.id);
             let backup = Self::get_backup_path(profile_id, game_id, &op_id, &loc.id);
@@ -486,7 +534,6 @@ impl TransactionCoordinator {
         JournalManager::update_operation_state(conn, &op_id, "staging_created")?;
         JournalManager::update_operation_state(conn, &op_id, "staging_verified")?;
 
-        // 4. Commit to profile current save paths:
         JournalManager::update_operation_state(conn, &op_id, "commit_started")?;
 
         let mut commit_failed = false;
@@ -520,7 +567,6 @@ impl TransactionCoordinator {
 
         JournalManager::update_operation_state(conn, &op_id, "commit_completed")?;
 
-        // 5. Post-commit verification:
         let mut total_file_count = 0usize;
         let mut total_size_bytes = 0u64;
         let mut combined_hash = String::new();
@@ -558,7 +604,6 @@ impl TransactionCoordinator {
 
         JournalManager::update_operation_state(conn, &op_id, "final_verified")?;
 
-        // 6. Cleanup Staging & Prune Snapshots
         let staging_root = get_nexus_profiles_root()
             .join(profile_id)
             .join("games")
@@ -568,7 +613,6 @@ impl TransactionCoordinator {
         let _ = remove_path_all_with_retry(&staging_root);
         let _ = SnapshotEngine::prune_snapshots(conn, profile_id, game_id);
 
-        // 7. Update DB metadata
         let content_hash = if combined_hash.is_empty() {
             "empty".to_string()
         } else {
@@ -577,23 +621,25 @@ impl TransactionCoordinator {
             hasher.update(combined_hash.as_bytes());
             hex::encode(hasher.finalize())
         };
+        let state_str = if total_file_count > 0 { "ready" } else { "empty" };
 
         conn.execute(
             "INSERT INTO profile_game_saves (profile_id, game_id, current_path, last_synced_at, file_count, save_size_bytes, content_hash, state)
-             VALUES (?1, ?2, ?3, datetime('now'), ?4, ?5, ?6, 'ready')
+             VALUES (?1, ?2, ?3, datetime('now'), ?4, ?5, ?6, ?7)
              ON CONFLICT(profile_id, game_id) DO UPDATE SET
              last_synced_at = datetime('now'),
              file_count = ?4,
              save_size_bytes = ?5,
              content_hash = ?6,
-             state = 'ready'",
+             state = ?7",
             params![
                 profile_id,
                 game_id,
                 Self::get_profile_current_path(profile_id, game_id, &locations[0].id).to_string_lossy(),
                 total_file_count as i64,
                 total_size_bytes as i64,
-                content_hash
+                content_hash,
+                state_str
             ],
         )?;
 
@@ -606,21 +652,11 @@ impl TransactionCoordinator {
         JournalManager::update_operation_state(conn, op_id, "rollback_required")?;
         let locations = JournalManager::get_operation_locations(conn, op_id)?;
 
-        // Journal ops whose commit targets the PROFILE dir (sync_exit,
-        // restore_snapshot) must roll back to the profile dir, not the OS
-        // path — restoring the OS path here would overwrite fresh game
-        // progress with stale profile data.
         let (op_type, profile_id, game_id): (String, Option<String>, Option<String>) = conn
             .query_row(
                 "SELECT operation_type, profile_id, game_id FROM save_operations WHERE id = ?1",
                 params![op_id],
-                |r| {
-                    Ok((
-                        r.get(0)?,
-                        r.get(1)?,
-                        r.get(2)?,
-                    ))
-                },
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .unwrap_or_default();
 
@@ -636,16 +672,16 @@ impl TransactionCoordinator {
                                 TransactionCoordinator::get_profile_current_path(pid, gid, &loc.location_id)
                             })
                         } else {
-                        conn.query_row(
-                            "SELECT path FROM game_save_locations WHERE id = ?1",
-                            params![loc.location_id],
-                            |row| {
-                                let p: String = row.get(0)?;
-                                Ok(expand_save_path(&p))
-                            },
-                        )
-                        .ok()
-                    };
+                            conn.query_row(
+                                "SELECT path FROM game_save_locations WHERE id = ?1",
+                                params![loc.location_id],
+                                |row| {
+                                    let p: String = row.get(0)?;
+                                    Ok(expand_save_path(&p))
+                                },
+                            )
+                            .ok()
+                        };
 
                     if let Some(target) = target_path {
                         if let Err(e) = safe_replace_dir(&backup_path, &target, None) {
@@ -719,7 +755,6 @@ impl TransactionCoordinator {
         let op_id = JournalManager::create_operation(conn, "restore_snapshot", Some(game_id), Some(profile_id))?;
         let locations = Self::get_enabled_save_locations(conn, game_id)?;
 
-        // Preflight safety snapshot of existing profile current saves
         let mut cur_targets = Vec::new();
         for loc in &locations {
             let profile_cur = Self::get_profile_current_path(profile_id, game_id, &loc.id);
@@ -732,7 +767,6 @@ impl TransactionCoordinator {
             .collect();
         SnapshotEngine::create_snapshot(profile_id, game_id, "Pre-Restore Safety Snapshot", false, &ref_targets)?;
 
-        // Staging from snapshot
         for loc in &locations {
             let staging = Self::get_staging_path(profile_id, game_id, &op_id, &loc.id);
             let backup = Self::get_backup_path(profile_id, game_id, &op_id, &loc.id);
@@ -746,16 +780,13 @@ impl TransactionCoordinator {
                 Some(&staging.to_string_lossy()),
             )?;
 
-            // Robust matching of snapshot location:
             let mut src_loc: Option<PathBuf> = None;
 
-            // 1. Direct location ID match
             let direct = snap_dir.join(&loc.id);
             if direct.exists() {
                 src_loc = Some(direct);
             }
 
-            // 2. Match via snapshot.json original_path
             if src_loc.is_none() {
                 if let Some(ref meta) = snap_meta {
                     for loc_meta in &meta.locations {
@@ -775,7 +806,6 @@ impl TransactionCoordinator {
                 }
             }
 
-            // 3. Fallback: Check any directory inside snap_dir that contains save files
             if src_loc.is_none() {
                 if let Ok(entries) = fs::read_dir(&snap_dir) {
                     let subdirs: Vec<_> = entries
@@ -804,7 +834,6 @@ impl TransactionCoordinator {
             }
         }
 
-        // FAIL-SAFE CHECK: Abort if snapshot had data but staging extracted 0 files
         let expected_size = snap_meta.as_ref().map(|m| m.total_size_bytes).unwrap_or(0);
         let mut staging_has_files = false;
         for loc in &locations {
@@ -823,7 +852,6 @@ impl TransactionCoordinator {
             ));
         }
 
-        // Commit staging to profile current
         JournalManager::update_operation_state(conn, &op_id, "commit_started")?;
 
         let active_id: String = conn
@@ -852,7 +880,6 @@ impl TransactionCoordinator {
                 combined_hash.push_str(&th.hash);
             }
 
-            // If the restored profile is currently active in Nexus, commit directly to OS path as well
             if profile_id == active_id {
                 if loc.os_path.exists() {
                     remove_path_all_with_retry(&loc.os_path)?;
@@ -935,6 +962,12 @@ impl TransactionCoordinator {
             let src_cur = Self::get_profile_current_path(src_profile_id, game_id, &loc.id);
             let dst_cur = Self::get_profile_current_path(dst_profile_id, game_id, &loc.id);
 
+            // If source profile is currently active and its profile vault hasn't been synced yet, sync from OS path first
+            if src_profile_id == active_id && !src_cur.exists() && loc.os_path.exists() {
+                let _ = copy_dir_recursive(&loc.os_path, &src_cur);
+                let _ = flush_file_or_dir_buffers(&src_cur);
+            }
+
             if src_cur.exists() {
                 let th = calculate_tree_hash(&src_cur)?;
                 verify_disk_space(&dst_cur, th.total_size)?;
@@ -944,7 +977,6 @@ impl TransactionCoordinator {
                 total_size += th.total_size;
                 combined_hash.push_str(&th.hash);
 
-                // If cloned destination is currently active, mirror to OS save path as well
                 if dst_profile_id == active_id {
                     if loc.os_path.exists() {
                         remove_path_all_with_retry(&loc.os_path)?;
@@ -996,10 +1028,10 @@ impl TransactionCoordinator {
         Ok(op_id)
     }
 
-    /// Synchronizes all managed games from the old active profile to the new active profile on disk.
-    /// When switching profiles, safely saves whatever is on disk to old_profile_id,
-    /// Efficiently swaps disk saves between profiles for games that have isolated saves in Nexus.
-    /// Does not touch or wipe games that only exist on disk and were never played by the target profile.
+    /// Synchronizes all managed games from `old_profile_id` to `new_profile_id` on disk.
+    /// 1. Safely backs up whatever is currently on `loc.os_path` into `old_profile_id`'s vault and verifies the backup.
+    /// 2. Places `new_profile_id`'s saves onto `loc.os_path`, or clears `loc.os_path` (once the backup in `old_profile_id`
+    ///    is verified) if `new_profile_id` has no saves for that game — guaranteeing strict per-user save isolation!
     pub fn swap_all_games_to_profile(
         conn: &Connection,
         old_profile_id: &str,
@@ -1009,7 +1041,6 @@ impl TransactionCoordinator {
             return Ok(());
         }
 
-        // Swap games where at least one profile has recorded saves OR enabled save locations exist
         let mut stmt = conn
             .prepare(
                 "SELECT DISTINCT game_id FROM profile_game_saves
@@ -1031,22 +1062,19 @@ impl TransactionCoordinator {
             for loc in locations {
                 let old_prof_cur = Self::get_profile_current_path(old_profile_id, &gid, &loc.id);
                 let new_prof_cur = Self::get_profile_current_path(new_profile_id, &gid, &loc.id);
+                let was_file = loc.os_path.is_file();
 
-                // 1. Back up current disk saves into old_profile's path
+                // 1. Back up current disk saves into old_profile's vault
+                let mut backup_verified = true;
                 if loc.os_path.exists() {
-                    let has_os_files = if loc.os_path.is_file() {
-                        true
-                    } else if loc.os_path.is_dir() {
-                        match fs::read_dir(&loc.os_path) {
-                            Ok(mut r) => r.next().is_some(),
-                            Err(_) => false,
-                        }
-                    } else {
-                        false
-                    };
+                    let mut os_seen = HashSet::new();
+                    let (os_fc, _) = scan_path_file_stats(&loc.os_path, &mut os_seen);
 
-                    if has_os_files {
-                        if loc.os_path.is_file() {
+                    if os_fc > 0 {
+                        if old_prof_cur.exists() {
+                            let _ = remove_path_all_with_retry(&old_prof_cur);
+                        }
+                        if was_file {
                             if let Some(parent) = old_prof_cur.parent() {
                                 let _ = fs::create_dir_all(parent);
                             }
@@ -1054,31 +1082,37 @@ impl TransactionCoordinator {
                             let _ = fs::create_dir_all(&old_prof_cur);
                         }
                         let _ = copy_dir_recursive(&loc.os_path, &old_prof_cur);
+                        let _ = flush_file_or_dir_buffers(&old_prof_cur);
 
                         let mut seen = HashSet::new();
                         let (fc, sz) = scan_path_file_stats(&old_prof_cur, &mut seen);
-                        let _ = conn.execute(
-                            "INSERT INTO profile_game_saves (profile_id, game_id, current_path, last_synced_at, file_count, save_size_bytes, state)
-                             VALUES (?1, ?2, ?3, datetime('now'), ?4, ?5, 'ready')
-                             ON CONFLICT(profile_id, game_id) DO UPDATE SET
-                             last_synced_at = datetime('now'),
-                             file_count = ?4,
-                             save_size_bytes = ?5,
-                             state = 'ready'",
-                            params![
-                                old_profile_id,
-                                gid,
-                                old_prof_cur.to_string_lossy(),
-                                fc,
-                                sz,
-                            ],
-                        );
+                        backup_verified = fc >= os_fc && fc > 0;
+
+                        if backup_verified {
+                            let _ = conn.execute(
+                                "INSERT INTO profile_game_saves (profile_id, game_id, current_path, last_synced_at, file_count, save_size_bytes, state)
+                                 VALUES (?1, ?2, ?3, datetime('now'), ?4, ?5, 'ready')
+                                 ON CONFLICT(profile_id, game_id) DO UPDATE SET
+                                 last_synced_at = datetime('now'),
+                                 file_count = ?4,
+                                 save_size_bytes = ?5,
+                                 state = 'ready'",
+                                params![
+                                    old_profile_id,
+                                    gid,
+                                    old_prof_cur.to_string_lossy(),
+                                    fc,
+                                    sz,
+                                ],
+                            );
+                        }
                     }
                 }
 
-                // Robust lookup of new_prof_cur:
-                // If new_prof_cur does not exist or has no files, check if there are saves in an alternate current location
-                let actual_new_cur = if new_prof_cur.exists() && (new_prof_cur.is_file() || SaveDetector::dir_has_files(&new_prof_cur)) {
+                // 2. Locate new_profile's saves
+                let actual_new_cur = if new_prof_cur.exists()
+                    && (new_prof_cur.is_file() || SaveDetector::dir_has_files(&new_prof_cur))
+                {
                     new_prof_cur.clone()
                 } else {
                     let recorded_path: Option<String> = conn
@@ -1119,17 +1153,11 @@ impl TransactionCoordinator {
                     new_prof_cur.clone()
                 };
 
-                // 2. Put new_profile's saves onto loc.os_path.
-                // If new_profile does not have saves for this game, clear loc.os_path
-                // so the new profile starts clean and does NOT inherit old_profile's saves!
                 let has_new_files = if actual_new_cur.exists() {
                     if actual_new_cur.is_file() {
                         true
                     } else if actual_new_cur.is_dir() {
-                        match fs::read_dir(&actual_new_cur) {
-                            Ok(mut r) => r.next().is_some(),
-                            Err(_) => false,
-                        }
+                        SaveDetector::dir_has_files(&actual_new_cur)
                     } else {
                         false
                     }
@@ -1150,6 +1178,7 @@ impl TransactionCoordinator {
                         let _ = fs::create_dir_all(&loc.os_path);
                     }
                     let _ = copy_dir_recursive(&actual_new_cur, &loc.os_path);
+                    let _ = flush_file_or_dir_buffers(&loc.os_path);
 
                     let mut seen = HashSet::new();
                     let (fc, sz) = scan_path_file_stats(&actual_new_cur, &mut seen);
@@ -1171,9 +1200,16 @@ impl TransactionCoordinator {
                     );
                 } else {
                     // Target profile has no saves for this game:
-                    // DO NOT wipe the disk! Keep existing saves safe and intact.
-                    // If target profile actually launches this game later, prepare_game_saves
-                    // will safely back up current progress to default, snapshot, and isolate cleanly.
+                    // Once we have verified that `old_profile_id`'s saves are safely backed up in `old_prof_cur`,
+                    // clear `loc.os_path` so `new_profile_id` starts with an isolated clean save directory
+                    // and never inherits or reports `old_profile_id`'s saves!
+                    if backup_verified && loc.os_path.exists() {
+                        let _ = remove_path_all_with_retry(&loc.os_path);
+                        if !was_file {
+                            let _ = fs::create_dir_all(&loc.os_path);
+                        }
+                    }
+
                     let _ = conn.execute(
                         "INSERT INTO profile_game_saves (profile_id, game_id, current_path, last_synced_at, file_count, save_size_bytes, state)
                          VALUES (?1, ?2, ?3, datetime('now'), 0, 0, 'empty')

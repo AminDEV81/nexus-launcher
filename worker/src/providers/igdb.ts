@@ -4,12 +4,13 @@ import { getSteamMetacriticScore } from './steam'
 
 const IGDB_BASE = 'https://api.igdb.com/v4'
 const STANDALONE_TYPES = '(0, 8, 9, 10, 4)'
+const SEARCH_TYPES = '(0, 2, 3, 4, 8, 9, 10, 11)'
 
 const FIELDS_LIST =
-  'fields name, summary, first_release_date, game_type, cover.image_id, screenshots.image_id, total_rating_count, aggregated_rating, hypes, genres.name, platforms.name'
+  'fields name, summary, first_release_date, game_type, cover.image_id, screenshots.image_id, total_rating_count, aggregated_rating, total_rating, rating, hypes, genres.name, platforms.name'
 
 const FIELDS_DETAILS =
-  'fields name, summary, first_release_date, game_type, cover.image_id, screenshots.image_id, total_rating_count, aggregated_rating, hypes, genres.name, platforms.name, involved_companies.developer, involved_companies.publisher, involved_companies.company.name, videos.video_id, videos.name, external_games.external_game_source, external_games.category, external_games.uid'
+  'fields name, summary, first_release_date, game_type, cover.image_id, screenshots.image_id, total_rating_count, aggregated_rating, total_rating, rating, hypes, genres.name, platforms.name, involved_companies.developer, involved_companies.publisher, involved_companies.company.name, videos.video_id, videos.name, external_games.external_game_source, external_games.category, external_games.uid'
 
 function makeImageUrl(imageId: string | undefined, size: string): string | null {
   if (!imageId) return null
@@ -39,6 +40,15 @@ function normalizeGame(item: any): HubGame {
     ? item.platforms.map((p: any) => p.name).filter(Boolean)
     : []
 
+  const rawRating =
+    typeof item.aggregated_rating === 'number'
+      ? item.aggregated_rating
+      : typeof item.total_rating === 'number'
+        ? item.total_rating
+        : typeof item.rating === 'number'
+          ? item.rating
+          : null
+
   return {
     igdb_id: item.id,
     name: item.name || '',
@@ -47,7 +57,7 @@ function normalizeGame(item: any): HubGame {
     game_type: item.game_type ?? null,
     cover_url: makeImageUrl(coverImageId, 'cover_big'),
     backdrop_url: backdropUrl,
-    rating: typeof item.aggregated_rating === 'number' ? Math.round(item.aggregated_rating) : null,
+    rating: rawRating !== null ? Math.round(rawRating) : null,
     rating_count: item.total_rating_count ?? null,
     hypes: item.hypes ?? null,
     genres,
@@ -96,19 +106,15 @@ export async function fetchFeed(
 
   switch (normFeed) {
     case 'new_releases':
-      // Banner & New Releases: High-hype trending games released in the last 90 days
       query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date < ${now} & first_release_date > ${ninetyDaysAgo} & (hypes > 2 | total_rating_count > 10); sort hypes desc; limit 24; offset ${offset};`
       break
     case 'coming_soon':
-      // Upcoming releases soonest first
       query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date > ${now} & hypes > 1; sort first_release_date asc; limit 24; offset ${offset};`
       break
     case 'top_rated':
-      // Acclaimed masterpieces with over 75 ratings and verified covers
       query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date < ${now} & first_release_date > ${threeYearsAgo} & total_rating_count > 75; sort total_rating_count desc; limit 24; offset ${offset};`
       break
     case 'recommended':
-      // User's genres if passed, or top popular masterpieces
       if (genresParam && genresParam.trim()) {
         const cleanGenres = genresParam.replace(/[^0-9,]/g, '')
         query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & genres = (${cleanGenres}) & first_release_date < ${now} & total_rating_count > 30; sort total_rating_count desc; limit 24; offset ${offset};`
@@ -132,7 +138,24 @@ export interface SearchGamesOptions {
   release?: string
   minRating?: number
   sort?: string
+  gameCategory?: string
+  gameMode?: string
   env: Env
+}
+
+function buildNameWildcardClause(cleanQ: string): string | null {
+  const stopWords = new Set(['the', 'a', 'an', 'of', 'and'])
+  const tokens = cleanQ
+    .split(/[\s\-:'’/&]+/)
+    .map((w) => w.replace(/[^a-zA-Z0-9]/g, ''))
+    .filter(Boolean)
+
+  if (tokens.length === 0) return null
+  const meaningful = tokens.filter(
+    (w) => !stopWords.has(w.toLowerCase()) && (w.length >= 2 || /^\d+$/.test(w)),
+  )
+  const chosen = (meaningful.length > 0 ? meaningful : tokens).slice(0, 5)
+  return chosen.map((w) => `name ~ *"${w}"*`).join(' & ')
 }
 
 export async function searchGames(
@@ -155,7 +178,18 @@ export async function searchGames(
     }
   }
 
-  const { queryText, offset = 0, genreIds, platformIds, release, minRating, sort, env } = opts
+  const {
+    queryText,
+    offset = 0,
+    genreIds,
+    platformIds,
+    release,
+    minRating,
+    sort,
+    gameCategory,
+    gameMode,
+    env,
+  } = opts
   if (!env) throw new Error('ENV_MISSING')
   const cleanQ = queryText.replace(/["\\]/g, '').trim()
   const now = Math.floor(Date.now() / 1000)
@@ -165,17 +199,41 @@ export async function searchGames(
     (platformIds && platformIds.length > 0) ||
     release ||
     minRating != null ||
-    sort,
+    sort ||
+    (gameCategory && gameCategory !== 'all') ||
+    (gameMode && gameMode !== 'all'),
   )
 
   if (hasFilters) {
-    const conditions = [`game_type = ${STANDALONE_TYPES}`, 'cover != null']
-    if (cleanQ) conditions.push(`name ~ *"${cleanQ}"*`)
+    let typeClause = `game_type = ${SEARCH_TYPES}`
+    if (gameCategory === 'main') typeClause = 'game_type = 0'
+    else if (gameCategory === 'remake') typeClause = 'game_type = (8, 9)'
+    else if (gameCategory === 'expansion') typeClause = 'game_type = (2, 4, 10)'
+
+    const conditions = [typeClause, 'cover != null']
+    if (cleanQ) {
+      const wc = buildNameWildcardClause(cleanQ)
+      if (wc) conditions.push(wc)
+    }
     if (genreIds && genreIds.length > 0) {
-      conditions.push(`genres = [${genreIds.join(',')}]`)
+      if (genreIds.length === 1) {
+        conditions.push(`genres = (${genreIds[0]})`)
+      } else {
+        conditions.push(`genres = [${genreIds.join(',')}]`)
+      }
     }
     if (platformIds && platformIds.length > 0) {
-      conditions.push(`platforms = (${platformIds.join(',')})`)
+      if (platformIds.length === 1) {
+        conditions.push(`platforms = (${platformIds[0]})`)
+      } else {
+        conditions.push(`platforms = [${platformIds.join(',')}]`)
+      }
+    }
+    if (gameMode) {
+      if (gameMode === 'singleplayer') conditions.push('game_modes = (1)')
+      else if (gameMode === 'multiplayer') conditions.push('game_modes = (2, 5)')
+      else if (gameMode === 'coop') conditions.push('game_modes = (3)')
+      else if (gameMode === 'splitscreen') conditions.push('game_modes = (4)')
     }
     if (minRating != null) {
       conditions.push(
@@ -186,12 +244,12 @@ export async function searchGames(
       if (release === 'upcoming') {
         conditions.push(`first_release_date > ${now}`)
       } else if (release === 'new') {
-        conditions.push(`first_release_date > ${now - 90 * 86400} & first_release_date < ${now}`)
+        conditions.push(`first_release_date > ${now - 90 * 86400} & first_release_date <= ${now}`)
       } else if (release === 'last-year') {
-        conditions.push(`first_release_date > ${now - 365 * 86400} & first_release_date < ${now}`)
+        conditions.push(`first_release_date > ${now - 365 * 86400} & first_release_date <= ${now}`)
       } else if (release === 'last-3-years') {
         conditions.push(
-          `first_release_date > ${now - 3 * 365 * 86400} & first_release_date < ${now}`,
+          `first_release_date > ${now - 3 * 365 * 86400} & first_release_date <= ${now}`,
         )
       } else if (release.startsWith('-')) {
         const to = parseInt(release.replace('-', ''), 10)
@@ -227,30 +285,54 @@ export async function searchGames(
     }
 
     let sortOrder = 'total_rating_count desc'
-    if (sort === 'rating') sortOrder = 'aggregated_rating desc'
-    else if (sort === 'newest') sortOrder = 'first_release_date desc'
-    else if (sort === 'oldest') sortOrder = 'first_release_date asc'
-    else if (sort === 'name') sortOrder = 'name asc'
-    else if (release === 'upcoming') sortOrder = 'first_release_date asc'
-    else if (release === 'new') sortOrder = 'first_release_date desc'
+    if (sort === 'rating') {
+      sortOrder = 'total_rating desc'
+      conditions.push('(aggregated_rating != null | total_rating != null) & total_rating_count >= 5')
+    } else if (sort === 'hypes') {
+      sortOrder = 'hypes desc'
+      conditions.push('hypes != null')
+    } else if (sort === 'newest') {
+      sortOrder = 'first_release_date desc'
+      if (release !== 'upcoming') {
+        conditions.push(`first_release_date != null & first_release_date <= ${now}`)
+      }
+    } else if (sort === 'oldest') {
+      sortOrder = 'first_release_date asc'
+      conditions.push('first_release_date != null')
+    } else if (sort === 'name') {
+      sortOrder = 'name asc'
+    } else if (release === 'upcoming') {
+      sortOrder = 'first_release_date asc'
+    } else if (release === 'new') {
+      sortOrder = 'hypes desc'
+    }
 
-    const query = `${FIELDS_LIST}; where ${conditions.join(' & ')}; sort ${sortOrder}; limit 24; offset ${offset};`
+    const query = `${FIELDS_LIST}; where ${conditions.join(' & ')}; sort ${sortOrder}; limit 36; offset ${offset};`
     const raw = await queryIgdb('games', query, env)
     return raw.map(normalizeGame)
   }
 
   if (cleanQ.length >= 2) {
-    // 1. First attempt: standard exact search with cover != null
-    const searchQuery = `search "${cleanQ}"; ${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null; limit 24; offset ${offset};`
-    const searchRaw = await queryIgdb('games', searchQuery, env)
-    if (searchRaw && searchRaw.length > 0) {
-      return searchRaw.map(normalizeGame)
+    const wc = buildNameWildcardClause(cleanQ)
+    const searchQuery = `search "${cleanQ}"; ${FIELDS_LIST}; where game_type = ${SEARCH_TYPES} & cover != null; limit 30; offset ${offset};`
+    if (wc) {
+      const wildcardQuery = `${FIELDS_LIST}; where game_type = ${SEARCH_TYPES} & cover != null & ${wc}; sort total_rating_count desc; limit 24; offset ${offset};`
+      const [wildRaw, searchRaw] = await Promise.all([
+        queryIgdb('games', wildcardQuery, env).catch(() => []),
+        queryIgdb('games', searchQuery, env).catch(() => []),
+      ])
+      const seen = new Set<number>()
+      const merged: HubGame[] = []
+      for (const item of [...wildRaw, ...searchRaw]) {
+        if (item && typeof item.id === 'number' && !seen.has(item.id)) {
+          seen.add(item.id)
+          merged.push(normalizeGame(item))
+        }
+      }
+      return merged
     }
-
-    // 2. Fallback: wildcard name match sorted by popularity
-    const fallbackQuery = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & name ~ *"${cleanQ}"*; sort total_rating_count desc; limit 24; offset ${offset};`
-    const fallbackRaw = await queryIgdb('games', fallbackQuery, env)
-    return fallbackRaw.map(normalizeGame)
+    const searchRaw = await queryIgdb('games', searchQuery, env)
+    return (searchRaw || []).map(normalizeGame)
   }
 
   return []
@@ -338,7 +420,7 @@ export async function getPlatforms(
 }
 
 export async function getSimilarGames(igdbId: number, env: Env): Promise<HubGame[]> {
-  const query = `fields similar_games.id, similar_games.name, similar_games.summary, similar_games.first_release_date, similar_games.game_type, similar_games.cover.image_id, similar_games.screenshots.image_id, similar_games.total_rating_count, similar_games.aggregated_rating, similar_games.hypes, similar_games.genres.name, similar_games.platforms.name, genres.id; where id = ${igdbId};`
+  const query = `fields similar_games.id, similar_games.name, similar_games.summary, similar_games.first_release_date, similar_games.game_type, similar_games.cover.image_id, similar_games.screenshots.image_id, similar_games.total_rating_count, similar_games.aggregated_rating, similar_games.total_rating, similar_games.hypes, similar_games.genres.name, similar_games.platforms.name, genres.id; where id = ${igdbId};`
 
   const raw = await queryIgdb('games', query, env)
   const item = raw[0]
@@ -360,7 +442,6 @@ export async function getSimilarGames(igdbId: number, env: Env): Promise<HubGame
     }
   }
 
-  // Augment with popular games from the same genres if fewer than 10
   const genreIds: number[] = Array.isArray(item.genres)
     ? item.genres.map((g: any) => g.id).filter((id: any) => typeof id === 'number')
     : []

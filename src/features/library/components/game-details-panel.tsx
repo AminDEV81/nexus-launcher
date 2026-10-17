@@ -21,6 +21,7 @@ import {
   Download,
   Type,
   Mountain,
+  Music,
   Pencil,
   Square,
   Info,
@@ -90,6 +91,8 @@ import { PlaytimeEditorModal } from './playtime-editor-modal'
 import { EditGameNameModal } from '@/components/modals/edit-game-name-modal'
 import { GameSaveCard } from './game-save-card'
 import { SidebarSoundtrackWidget } from '@/features/soundtrack/components/sidebar/sidebar-soundtrack-widget'
+import { HubScoreBadge } from '@/features/hub/components/hub-score-badge'
+import { resolveClientCriticScores } from '@/features/hub/utils/score'
 import type { Game } from '@/types/models'
 
 const PANEL_WIDTH = 450
@@ -162,7 +165,7 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
   const [installationEditorOpen, setInstallationEditorOpen] = useState(false)
   const [tagsEditorOpen, setTagsEditorOpen] = useState(false)
   const [playtimeEditorOpen, setPlaytimeEditorOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'saves' | 'media' | 'launch'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'soundtrack' | 'saves' | 'media' | 'launch'>('overview')
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [copiedFeedback, setCopiedFeedback] = useState(false)
 
@@ -192,6 +195,17 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
   const speed = useAnimationSpeed()
   const navigate = useNavigate()
   const isUnreleased = isGameUnreleased(game.release_date) && !game.is_installed
+  const resolvedScores = useMemo(
+    () =>
+      resolveClientCriticScores(
+        game.name,
+        game.release_date,
+        game.metacritic_score,
+        game.opencritic_score,
+        null,
+      ),
+    [game.name, game.release_date, game.metacritic_score, game.opencritic_score],
+  )
 
   const pauseDownload = usePauseDownload()
   const resumeDownload = useResumeDownload()
@@ -863,13 +877,20 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
                 label="Install Size"
                 value={game.install_size_bytes ? formatBytes(game.install_size_bytes) : 'Unknown'}
               />
-              {game.metacritic_score !== null ? (
+              {resolvedScores.metacritic !== null || resolvedScores.opencritic !== null ? (
                 <StatCard
                   icon={Star}
                   iconColor="text-amber-400"
                   iconBg="bg-amber-500/10 border-amber-500/20"
-                  label="Critic Metascore"
-                  value={`${game.metacritic_score}/100`}
+                  label="Metacritic · OpenCritic"
+                  value={
+                    resolvedScores.metacritic !== null && resolvedScores.opencritic !== null
+                      ? `MC ${resolvedScores.metacritic} · OC ${resolvedScores.opencritic}`
+                      : resolvedScores.metacritic !== null
+                        ? `MC ${resolvedScores.metacritic}/100`
+                        : `OC ${resolvedScores.opencritic}/100`
+                  }
+                  title={`Metacritic: ${resolvedScores.metacritic ?? '—'}/100 | OpenCritic: ${resolvedScores.opencritic ?? '—'}/100`}
                 />
               ) : (
                 <StatCard
@@ -884,64 +905,54 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
           )}
         </div>
 
-        {/* ── Segmented Navigation Tabs ─────────────────────────────── */}
-        <div className="flex rounded-xl border border-border/80 bg-surface-raised/70 p-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab('overview')}
-            className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition-all',
-              activeTab === 'overview'
-                ? 'bg-surface-raised text-accent shadow-xs'
-                : 'text-muted hover:text-text',
-            )}
-          >
-            <Info className="size-3.5" />
-            <span>Overview</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('saves')}
-            className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition-all',
-              activeTab === 'saves'
-                ? 'bg-surface-raised text-accent shadow-xs'
-                : 'text-muted hover:text-text',
-            )}
-          >
-            <HardDrive className="size-3.5" />
-            <span>Saves</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('media')}
-            className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition-all',
-              activeTab === 'media'
-                ? 'bg-surface-raised text-accent shadow-xs'
-                : 'text-muted hover:text-text',
-            )}
-          >
-            <Images className="size-3.5" />
-            <span>Media & Art</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('launch')}
-            className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-bold transition-all',
-              activeTab === 'launch'
-                ? 'bg-surface-raised text-accent shadow-xs'
-                : 'text-muted hover:text-text',
-            )}
-          >
-            <Terminal className="size-3.5" />
-            <span>Launch</span>
-          </button>
-        </div>
+        {/* ── Segmented Navigation Tabs (Deterministic Equal-Width Sliding Pill) ── */}
+        {(() => {
+          const SIDEBAR_TABS = [
+            { id: 'overview' as const, label: 'Overview', icon: Info },
+            { id: 'soundtrack' as const, label: 'OST', icon: Music },
+            { id: 'saves' as const, label: 'Saves', icon: HardDrive },
+            { id: 'media' as const, label: 'Media', icon: Images },
+            { id: 'launch' as const, label: 'Launch', icon: Terminal },
+          ]
+          const activeIdx = Math.max(
+            0,
+            SIDEBAR_TABS.findIndex((t) => t.id === activeTab),
+          )
+          return (
+            <div className="relative grid grid-cols-5 rounded-2xl border border-border/80 bg-surface-raised/75 p-1 shadow-inner select-none">
+              {/* Deterministic Equal-Slot Pill: never distorts or clips text during panel width animations */}
+              <div
+                className="pointer-events-none absolute top-1 bottom-1 rounded-xl border border-accent/35 bg-surface shadow-xs transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)]"
+                style={{
+                  width: 'calc((100% - 8px) / 5)',
+                  left: `calc(4px + ${activeIdx} * ((100% - 8px) / 5))`,
+                }}
+              />
+              {SIDEBAR_TABS.map((tab) => {
+                const TabIcon = tab.icon
+                const isTabActive = activeTab === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      if (activeTab === tab.id) return
+                      playButtonClick()
+                      setActiveTab(tab.id)
+                    }}
+                    className={cn(
+                      'relative z-10 flex w-full min-w-0 cursor-pointer items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11px] font-semibold whitespace-nowrap transition-colors duration-200',
+                      isTabActive ? 'text-accent' : 'text-muted hover:text-text',
+                    )}
+                  >
+                    <TabIcon className="size-3.5 shrink-0" />
+                    <span className="truncate">{tab.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })()}
 
         {/* ── Tab 1: Overview ────────────────────────────────────────── */}
         {activeTab === 'overview' && (
@@ -1014,11 +1025,27 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
               </section>
             )}
 
+            {/* Soundtrack Subsystem Widget (Prominent in Right Sidebar) */}
+            <SidebarSoundtrackWidget
+              game={game}
+              mode="compact"
+              onOpenFullTab={() => setActiveTab('soundtrack')}
+            />
+
+            {/* Critic Reception (Metacritic & OpenCritic) Card */}
+            {!isUnreleased &&
+              (resolvedScores.metacritic !== null || resolvedScores.opencritic !== null) && (
+                <HubScoreBadge
+                  variant="details"
+                  metacriticScore={resolvedScores.metacritic}
+                  opencriticScore={resolvedScores.opencritic}
+                  gameName={game.name}
+                  releaseDate={game.release_date}
+                />
+              )}
+
             {/* User Game Rating Card */}
             {!isUnreleased && <GameUserRatingCard game={game} />}
-
-            {/* Soundtrack Subsystem Widget */}
-            <SidebarSoundtrackWidget game={game} />
 
             {/* Description Card */}
             {game.description && (
@@ -1124,6 +1151,9 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
             )}
           </div>
         )}
+
+        {/* ── Tab: Official Soundtrack Studio ───────────────────────── */}
+        {activeTab === 'soundtrack' && <SidebarSoundtrackWidget game={game} mode="full" />}
 
         {/* ── Tab: Saves ─────────────────────────────────────────────── */}
         {activeTab === 'saves' && <GameSaveCard game={game} />}

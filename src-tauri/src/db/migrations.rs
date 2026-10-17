@@ -35,6 +35,8 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (19, include_str!("./sql/0019_game_memory.sql")),
     (20, include_str!("./sql/0020_download_auto_extract.sql")),
     (21, include_str!("./sql/0021_overlay_config.sql")),
+    (22, include_str!("./sql/0022_reset_wrong_soundtrack_cache.sql")),
+    (23, include_str!("./sql/0023_preserve_download_history.sql")),
 ];
 
 pub fn run(conn: &mut Connection) -> AppResult<()> {

@@ -51,7 +51,7 @@ import {
   useLiveSystemMetrics,
   useSystemSpecs,
 } from '@/features/settings/hooks/use-system-specs'
-import { BoosterScanDial, HudCorners } from './booster-scan-dial'
+import { BoosterScanDial, HudCorners, ReactorTelemetryPills } from './booster-scan-dial'
 import { SystemTweaksTab } from './system-tweaks-tab'
 import { playBoostCharge, playBoostComplete, playButtonClick } from '@/lib/sound-engine'
 import type { BoostReport } from '@/services/booster'
@@ -279,12 +279,15 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
   return (
     <div
       className={cn(
-        'relative flex flex-col gap-6',
-        standalonePage ? 'h-full overflow-y-auto px-6 pb-10 pt-6 lg:px-8' : 'px-6 pb-8 pt-6 lg:px-8',
+        'relative w-full',
+        standalonePage
+          ? 'h-full overflow-y-auto overflow-x-hidden px-6 pb-12 pt-6 lg:px-8'
+          : 'px-6 pb-8 pt-6 lg:px-8',
       )}
     >
+      <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-6">
       {/* ── Top Command Header ──────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-3xl border border-accent/25 bg-gradient-to-br from-surface-raised/90 via-surface/90 to-bg p-6 shadow-card">
+      <div className="relative shrink-0 overflow-hidden rounded-3xl border border-accent/25 bg-gradient-to-br from-surface-raised/90 via-surface/90 to-bg p-6 shadow-card">
         <div
           className="pointer-events-none absolute -right-20 -top-24 size-80 rounded-full opacity-50 blur-3xl"
           style={{
@@ -534,93 +537,85 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
         </div>
       </div>
 
-      {/* ── Sub-Navigation Tabs ─────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              playButtonClick()
-              setActiveTab('reactor')
-            }}
-            className={cn(
-              'flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all',
-              activeTab === 'reactor'
-                ? 'bg-accent text-white shadow-md shadow-accent/25'
-                : 'border border-border/70 bg-surface/70 text-muted hover:bg-surface-raised hover:text-text',
-            )}
-          >
-            <Rocket className="size-3.5" />
-            <span>Reactor &amp; Loadout</span>
-            <span
-              className={cn(
-                'rounded-md px-1.5 py-0.2 font-mono text-[10px]',
-                activeTab === 'reactor' ? 'bg-white/20 text-white' : 'bg-surface-raised text-subtle',
-              )}
-            >
-              {moduleCount}/{BOOSTER_MODULES.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              playButtonClick()
-              setActiveTab('processes')
-            }}
-            className={cn(
-              'flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all',
-              activeTab === 'processes'
-                ? 'bg-accent text-white shadow-md shadow-accent/25'
-                : 'border border-border/70 bg-surface/70 text-muted hover:bg-surface-raised hover:text-text',
-            )}
-          >
-            <Activity className="size-3.5" />
-            <span>Process &amp; RAM Killer</span>
-            <span
-              className={cn(
-                'rounded-md px-1.5 py-0.2 font-mono text-[10px]',
-                activeTab === 'processes'
-                  ? 'bg-white/20 text-white'
-                  : apps.length > 0
-                    ? 'bg-amber-500/20 text-amber-400'
-                    : 'bg-surface-raised text-subtle',
-              )}
-            >
-              {apps.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              playButtonClick()
-              setActiveTab('tweaks')
-            }}
-            className={cn(
-              'flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all',
-              activeTab === 'tweaks'
-                ? 'bg-accent text-white shadow-md shadow-accent/25'
-                : 'border border-border/70 bg-surface/70 text-muted hover:bg-surface-raised hover:text-text',
-            )}
-          >
-            <Zap className="size-3.5" />
-            <span>Deep OS &amp; Kernel Tweaks</span>
-            <span
-              className={cn(
-                'rounded-md px-1.5 py-0.2 font-mono text-[10px]',
-                activeTab === 'tweaks'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-emerald-500/15 text-emerald-400',
-              )}
-            >
-              {tweakStatus?.optimization_score ?? 0}%
-            </span>
-          </button>
+      {/* ── Sub-Navigation Tabs (Smooth Spring Morphing) ────────────────── */}
+      <div className="relative z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3.5">
+        <div className="inline-flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/80 bg-surface/85 p-1.5 shadow-inner backdrop-blur-md">
+          {(
+            [
+              {
+                id: 'reactor' as const,
+                label: 'Reactor & Loadout',
+                icon: Rocket,
+                badge: `${moduleCount}/${BOOSTER_MODULES.length}`,
+                badgeTone: 'default',
+              },
+              {
+                id: 'processes' as const,
+                label: 'Process & RAM Killer',
+                icon: Activity,
+                badge: `${apps.length}`,
+                badgeTone: apps.length > 0 ? 'amber' : 'default',
+              },
+              {
+                id: 'tweaks' as const,
+                label: 'Deep OS & Kernel Tweaks',
+                icon: Zap,
+                badge: `${tweakStatus?.optimization_score ?? 0}%`,
+                badgeTone: 'emerald',
+              },
+            ]
+          ).map((tab) => {
+            const TabIcon = tab.icon
+            const isTabActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  if (activeTab === tab.id) return
+                  playButtonClick()
+                  setActiveTab(tab.id)
+                }}
+                className={cn(
+                  'relative flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors duration-200 select-none',
+                  isTabActive ? 'text-white' : 'text-muted hover:text-text',
+                )}
+              >
+                {isTabActive && (
+                  <motion.span
+                    layoutId="booster-active-tab-pill"
+                    transition={{
+                      type: 'spring',
+                      stiffness: 420,
+                      damping: 32,
+                      mass: 0.75,
+                    }}
+                    className="absolute inset-0 rounded-xl bg-gradient-to-r from-accent to-accent-hover shadow-md shadow-accent/30"
+                  />
+                )}
+                <TabIcon className="relative z-10 size-3.5" />
+                <span className="relative z-10">{tab.label}</span>
+                <span
+                  className={cn(
+                    'relative z-10 rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold transition-colors',
+                    isTabActive
+                      ? 'bg-white/20 text-white'
+                      : tab.badgeTone === 'amber'
+                        ? 'bg-amber-500/20 text-amber-400'
+                        : tab.badgeTone === 'emerald'
+                          ? 'bg-emerald-500/15 text-emerald-400'
+                          : 'bg-surface-raised text-subtle',
+                  )}
+                >
+                  {tab.badge}
+                </span>
+              </button>
+            )
+          })}
         </div>
 
         {/* Active Preset Pill */}
-        <div className="hidden items-center gap-2 font-mono text-xs text-subtle sm:flex">
+        <div className="hidden items-center gap-2 rounded-xl border border-border/70 bg-surface/70 px-3 py-1.5 font-mono text-xs text-subtle sm:flex">
           <Sliders className="size-3.5 text-accent" />
           <span>Active Profile:</span>
           <strong className="uppercase text-accent">
@@ -629,9 +624,18 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
         </div>
       </div>
 
-      {/* ── TAB 1: REACTOR & LOADOUT ────────────────────────────────────── */}
-      {activeTab === 'reactor' && (
-        <div className="flex flex-col gap-6">
+      {/* ── ANIMATED TAB STAGE (Isolated & Clipped — Zero Upward Overlap) ── */}
+      <div className="relative isolate shrink-0 overflow-hidden">
+      <AnimatePresence mode="wait" initial={false}>
+        {activeTab === 'reactor' && (
+          <motion.div
+            key="booster-tab-reactor"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 * speed, ease: 'easeOut' }}
+            className="flex flex-col gap-6"
+          >
           {/* Reactor Core + Optimization Profiles Grid */}
           <div className="grid gap-5 lg:grid-cols-[minmax(300px,0.95fr)_minmax(0,1.25fr)]">
             {/* Left: Reactor Core Chamber */}
@@ -645,7 +649,7 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
                 </span>
               </div>
 
-              <div className="my-4">
+              <div className="my-2">
                 <BoosterScanDial
                   phase={phase}
                   progress={animatePct}
@@ -658,7 +662,9 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
                 />
               </div>
 
-              <div className="w-full max-w-xs">
+              <div className="w-full max-w-sm">
+                <ReactorTelemetryPills phase={phase} moduleCount={moduleCount} />
+                <div className="mt-3" />
                 <div className="mb-1.5 flex items-center justify-between font-mono text-[10px] font-bold tracking-[0.2em] text-subtle">
                   <span>OVERDRIVE CHARGE</span>
                   <span
@@ -739,22 +745,37 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
                     const Icon = preset.icon
                     const isSelected = activePreset === preset.id
                     return (
-                      <button
+                      <motion.button
                         key={preset.id}
                         type="button"
+                        whileTap={{ scale: 0.99 }}
                         onClick={() => applyPreset(preset.id)}
                         className={cn(
-                          'flex items-start justify-between gap-3 rounded-2xl border p-3.5 text-left transition-all cursor-pointer',
+                          'relative flex items-start justify-between gap-3 overflow-hidden rounded-2xl border p-3.5 text-left transition-colors duration-200 cursor-pointer',
                           isSelected
-                            ? 'border-accent bg-accent/10 shadow-sm ring-1 ring-accent/30'
+                            ? 'border-accent text-text shadow-sm'
                             : 'border-border/80 bg-surface/60 hover:border-accent/40 hover:bg-surface-raised',
                         )}
                       >
-                        <div className="flex items-start gap-3">
+                        {isSelected && (
+                          <motion.span
+                            key="booster-active-preset-bg"
+                            transition={{
+                              type: 'spring',
+                              stiffness: 400,
+                              damping: 32,
+                              mass: 0.75,
+                            }}
+                            className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-accent/15 via-accent/8 to-transparent ring-1 ring-accent/35"
+                          />
+                        )}
+                        <div className="relative z-10 flex items-start gap-3">
                           <span
                             className={cn(
-                              'flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors',
-                              isSelected ? 'bg-accent text-white' : 'bg-surface-raised text-subtle',
+                              'flex size-9 shrink-0 items-center justify-center rounded-xl transition-all duration-200',
+                              isSelected
+                                ? 'bg-accent text-white shadow-[0_0_12px_var(--nx-accent)]'
+                                : 'bg-surface-raised text-subtle',
                             )}
                           >
                             <Icon className="size-4.5" />
@@ -764,7 +785,7 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
                               <span className="text-xs font-bold text-text">{preset.label}</span>
                               <span
                                 className={cn(
-                                  'rounded px-1.5 py-0.5 font-mono text-[9px] font-black',
+                                  'rounded px-1.5 py-0.5 font-mono text-[9px] font-bold transition-colors',
                                   isSelected
                                     ? 'bg-accent text-white'
                                     : 'bg-surface-raised text-subtle',
@@ -781,15 +802,15 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
 
                         <span
                           className={cn(
-                            'mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border',
+                            'relative z-10 mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border transition-all duration-200',
                             isSelected
-                              ? 'border-accent bg-accent text-white'
+                              ? 'border-accent bg-accent text-white scale-105'
                               : 'border-border bg-surface',
                           )}
                         >
                           {isSelected && <Check className="size-3" strokeWidth={3} />}
                         </span>
-                      </button>
+                      </motion.button>
                     )
                   })}
                 </div>
@@ -1042,12 +1063,19 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
               )
             })}
           </div>
-        </div>
-      )}
+        </motion.div>
+        )}
 
-      {/* ── TAB 2: PROCESS & RAM KILLER ─────────────────────────────────── */}
-      {activeTab === 'processes' && (
-        <div className="flex flex-col gap-5">
+        {/* ── TAB 2: PROCESS & RAM KILLER ─────────────────────────────────── */}
+        {activeTab === 'processes' && (
+          <motion.div
+            key="booster-tab-processes"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 * speed, ease: 'easeOut' }}
+            className="flex flex-col gap-5"
+          >
           {/* Action Control Header */}
           <div className="flex flex-col gap-4 rounded-3xl border border-border/80 bg-surface/70 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -1097,28 +1125,44 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
 
           {/* Category Filters */}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="inline-flex flex-wrap items-center gap-1 rounded-2xl border border-border/80 bg-surface/75 p-1">
               {[
                 { id: 'all', label: `All Detected (${apps.length})` },
                 { id: 'browser', label: 'Browsers' },
                 { id: 'chat_media', label: 'Chat & Media' },
                 { id: 'cloud_sync', label: 'Cloud Sync' },
                 { id: 'utility', label: 'Utilities' },
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setProcCategoryFilter(cat.id)}
-                  className={cn(
-                    'rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
-                    procCategoryFilter === cat.id
-                      ? 'bg-accent text-white shadow-xs'
-                      : 'border border-border/70 bg-surface/60 text-muted hover:text-text',
-                  )}
-                >
-                  {cat.label}
-                </button>
-              ))}
+              ].map((cat) => {
+                const isCatActive = procCategoryFilter === cat.id
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      playButtonClick()
+                      setProcCategoryFilter(cat.id)
+                    }}
+                    className={cn(
+                      'relative cursor-pointer rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors duration-200',
+                      isCatActive ? 'text-white' : 'text-muted hover:text-text',
+                    )}
+                  >
+                    {isCatActive && (
+                      <motion.span
+                        key="booster-proc-filter-pill"
+                        transition={{
+                          type: 'spring',
+                          stiffness: 420,
+                          damping: 32,
+                          mass: 0.7,
+                        }}
+                        className="absolute inset-0 rounded-xl bg-accent shadow-xs"
+                      />
+                    )}
+                    <span className="relative z-10">{cat.label}</span>
+                  </button>
+                )
+              })}
             </div>
 
             {excludedNames.length > 0 && (
@@ -1278,11 +1322,24 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
               })}
             </div>
           )}
-        </div>
-      )}
+          </motion.div>
+        )}
 
-      {/* ── TAB 3: DEEP OS & KERNEL TWEAKS ──────────────────────────────── */}
-      {activeTab === 'tweaks' && <SystemTweaksTab />}
+        {/* ── TAB 3: DEEP OS & KERNEL TWEAKS ──────────────────────────────── */}
+        {activeTab === 'tweaks' && (
+          <motion.div
+            key="booster-tab-tweaks"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 * speed, ease: 'easeOut' }}
+          >
+            <SystemTweaksTab />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      </div>
+      </div>
     </div>
   )
 }

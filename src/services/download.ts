@@ -7,6 +7,8 @@ export type DownloadStatus =
 export interface DownloadInfo {
   id: string
   game_id: string
+  game_name?: string | null
+  cover_url?: string | null
   url: string
   save_path: string
   file_path: string | null

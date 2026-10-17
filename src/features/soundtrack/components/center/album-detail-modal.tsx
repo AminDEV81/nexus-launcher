@@ -5,7 +5,9 @@ import { assetUrl } from '@/lib/asset-url'
 import { playButtonClick } from '@/lib/sound-engine'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { useSoundtrackPlayer } from '../../hooks/use-soundtrack-player'
+import { deriveGameIdentityFromAlbum } from '../../store/soundtrack-store'
 import { TrackRow } from './track-row'
+import { resolveAlbumCoverFallback } from '../../services/curated-soundtracks'
 import type { SoundtrackAlbumWithTracks, SoundtrackTrack } from '../../types'
 
 interface AlbumDetailModalProps {
@@ -51,13 +53,13 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
 
   function handlePlayAll() {
     playButtonClick()
-    void playAlbum(album, tracks, 0)
+    void playAlbum(album, tracks, 0, deriveGameIdentityFromAlbum(album))
   }
 
   function handleShuffle() {
     playButtonClick()
     const randomIdx = Math.floor(Math.random() * tracks.length)
-    void playAlbum(album, tracks, randomIdx)
+    void playAlbum(album, tracks, randomIdx, deriveGameIdentityFromAlbum(album))
   }
 
   const durationStr = formatTotalDuration(album.total_duration_ms)
@@ -95,9 +97,9 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
           <div className="relative flex flex-col sm:flex-row items-center sm:items-end gap-6 border-b border-border/80 bg-gradient-to-b from-surface-raised/60 via-surface/80 to-surface p-6 sm:p-8">
             {/* Artwork */}
             <div className="relative size-40 sm:size-48 shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-surface-raised shadow-card">
-              {assetUrl(album.cover_url) ? (
+              {(assetUrl(album.cover_url) || resolveAlbumCoverFallback(album.title)) ? (
                 <img
-                  src={assetUrl(album.cover_url) ?? ''}
+                  src={assetUrl(album.cover_url) || resolveAlbumCoverFallback(album.title) || ''}
                   alt={album.title}
                   className="size-full object-cover"
                 />
@@ -149,7 +151,7 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
                   type="button"
                   onClick={() => {
                     playButtonClick()
-                    void toggleFavorite('album', album.id)
+                    void toggleFavorite('album', album.id, { album, tracks })
                   }}
                   className={`flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-bold transition-all ${
                     isFavorite
@@ -196,6 +198,7 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
                       key={track.id}
                       track={track}
                       album={album}
+                      game={deriveGameIdentityFromAlbum(album)}
                       index={idx}
                       allTracks={tracks}
                     />

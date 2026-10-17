@@ -84,6 +84,13 @@ impl LaunchTracker {
             .expect("launch tracker mutex poisoned")
             .remove(game_id);
     }
+
+    pub fn is_running(&self, game_id: &str) -> bool {
+        self.running
+            .lock()
+            .expect("launch tracker mutex poisoned")
+            .contains_key(game_id)
+    }
 }
 
 #[tauri::command]
@@ -516,38 +523,23 @@ pub async fn launch_game(
         let game_id_c = game_id.clone();
         let active_profile_id_c = active_profile_id.clone();
 
-        let tx_id = tokio::task::spawn_blocking(move || {
+        let tx_id = match tokio::task::spawn_blocking(move || {
             let db = app_c.state::<Database>();
             let conn = db.connection.lock().expect("db mutex poisoned");
             TransactionCoordinator::prepare_game_saves(&conn, &active_profile_id_c, &game_id_c)
         })
         .await
-        .map_err(|e| {
-            tracker.finish(&game_id);
-            if should_boost {
-                let _ = app.emit(
-                    "launch-boost-failed",
-                    serde_json::json!({
-                        "game_id": &game_id,
-                        "error": format!("Task execution failed: {}", e),
-                    }),
-                );
+        {
+            Ok(Ok(id)) => id,
+            Ok(Err(err)) => {
+                log::warn!("Non-fatal save preparation warning for {}: {}", game_id, err);
+                String::new()
             }
-            AppError::Other(format!("Task execution failed: {}", e))
-        })?
-        .map_err(|err| {
-            tracker.finish(&game_id);
-            if should_boost {
-                let _ = app.emit(
-                    "launch-boost-failed",
-                    serde_json::json!({
-                        "game_id": &game_id,
-                        "error": format!("Failed to prepare game saves: {}", err),
-                    }),
-                );
+            Err(e) => {
+                log::warn!("Non-fatal save preparation task join warning for {}: {}", game_id, e);
+                String::new()
             }
-            AppError::Other(format!("Failed to prepare game saves: {}", err))
-        })?;
+        };
 
         // Register session inside the lock to prevent a profile switch from
         // sneaking in between save preparation and session registration.
@@ -1032,6 +1024,343 @@ fn record_session(
     if let Err(err) = result {
         log::error!("failed to record playtime session for {game_id} (profile: {profile_id}): {err}");
     }
+}
+
+
+#[derive(Clone, Serialize)]
+struct ExternalGameDetectedPayload {
+    game_id: String,
+    game_name: String,
+    pid: u32,
+}
+
+const IGNORED_EXTERNAL_EXES: &[&str] = &[
+    "explorer.exe",
+    "cmd.exe",
+    "powershell.exe",
+    "pwsh.exe",
+    "conhost.exe",
+    "steam.exe",
+    "steamwebhelper.exe",
+    "steamservice.exe",
+    "epicgameslauncher.exe",
+    "galaxyclient.exe",
+    "ubisoftconnect.exe",
+    "eadesktop.exe",
+    "origin.exe",
+    "battle.net.exe",
+    "riotclientservices.exe",
+    "unins000.exe",
+    "uninstall.exe",
+    "setup.exe",
+    "crashhandler.exe",
+    "crashhandler64.exe",
+    "unitycrashhandler64.exe",
+    "unitycrashhandler32.exe",
+    "crs-handler.exe",
+    "vc_redist.x64.exe",
+    "vc_redist.x86.exe",
+    "dxsetup.exe",
+];
+
+/// Attaches playtime & save tracking to an installed library game that the user
+/// launched manually outside Nexus Launcher (e.g., from Desktop, Explorer, or Steam).
+/// Returns `true` if a new session was attached, or `false` if the game was already being tracked.
+pub fn attach_external_game_if_not_running(
+    app: &AppHandle,
+    game_id: &str,
+    pid: u32,
+    exe_name_override: Option<String>,
+) -> bool {
+    let tracker = app.state::<LaunchTracker>();
+    if !tracker.try_start(game_id) {
+        return false;
+    }
+
+    let session_mgr = app.state::<SessionManager>();
+    if session_mgr.get_session_by_game(game_id).is_some() {
+        tracker.finish(game_id);
+        return false;
+    }
+
+    let db = app.state::<Database>();
+    let target = match fetch_launch_target(&db, game_id) {
+        Ok(t) => t,
+        Err(_) => {
+            tracker.finish(game_id);
+            return false;
+        }
+    };
+
+    let active_profile_id = {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        conn.query_row(
+            "SELECT value FROM settings WHERE key = 'active_profile_id'",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .unwrap_or_else(|_| "default".to_string())
+    };
+
+    tracker.set_pid(game_id, pid);
+
+    let session = ActiveGameSession {
+        session_id: Uuid::new_v4().to_string(),
+        game_id: game_id.to_string(),
+        profile_id: active_profile_id.clone(),
+        process_id: pid,
+        started_at: Utc::now().to_rfc3339(),
+        save_transaction_id: format!("ext_{}", Uuid::new_v4()),
+    };
+    let _ = session_mgr.register_session(session);
+
+    let exe_name = exe_name_override.or_else(|| {
+        target
+            .executable_path
+            .as_deref()
+            .and_then(|path| Path::new(path).file_name())
+            .map(|name| name.to_string_lossy().to_string())
+    });
+
+    let _ = app.emit(
+        "external-game-detected",
+        ExternalGameDetectedPayload {
+            game_id: game_id.to_string(),
+            game_name: target.name.clone(),
+            pid,
+        },
+    );
+    let _ = app.emit("game-launched", game_id);
+
+    let app_clone = app.clone();
+    let gid = game_id.to_string();
+    let post_cmd = target.post_launch_command;
+    tauri::async_runtime::spawn(async move {
+        track_external_session(app_clone, gid, active_profile_id, pid, exe_name, post_cmd).await;
+    });
+
+    true
+}
+
+async fn track_external_session(
+    app: AppHandle,
+    game_id: String,
+    session_profile_id: String,
+    pid: u32,
+    exe_name: Option<String>,
+    post_launch_command: Option<String>,
+) {
+    let mut system = System::new_all();
+    let started_at = Utc::now();
+    let sys_pid = Pid::from_u32(pid);
+
+    loop {
+        tokio::time::sleep(POLL_INTERVAL).await;
+
+        system.refresh_processes(ProcessesToUpdate::Some(&[sys_pid]), true);
+        let still_running = match system.process(sys_pid) {
+            None => false,
+            Some(process) => match exe_name.as_deref() {
+                Some(expected) => process
+                    .name()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case(expected),
+                None => true,
+            },
+        };
+
+        if !still_running {
+            break;
+        }
+
+        let elapsed = (Utc::now() - started_at).num_seconds().max(0);
+        let _ = app.emit(
+            "playtime-updated",
+            PlaytimeUpdatedPayload {
+                game_id: game_id.clone(),
+                elapsed_seconds: elapsed,
+            },
+        );
+    }
+
+    // Synchronize saves after external game exit for the profile that was active
+    {
+        let locks = app.state::<SaveManagerLocks>();
+        let (_global, _game) = locks.acquire_game_transaction_locks(&game_id).await;
+        let app_c = app.clone();
+        let game_id_c = game_id.clone();
+        let session_profile_c = session_profile_id.clone();
+
+        let _ = tokio::task::spawn_blocking(move || {
+            let db = app_c.state::<Database>();
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            let _ = TransactionCoordinator::sync_game_saves_after_exit(
+                &conn,
+                &session_profile_c,
+                &game_id_c,
+            );
+        })
+        .await;
+    }
+
+    app.state::<SessionManager>().remove_session(&game_id);
+
+    let ended_at = Utc::now();
+    let duration_seconds = (ended_at - started_at).num_seconds().max(0);
+    record_session(
+        &app,
+        &game_id,
+        &session_profile_id,
+        started_at,
+        ended_at,
+        duration_seconds,
+    );
+
+    if let Some(hook) = post_launch_command.filter(|value| !value.trim().is_empty()) {
+        run_hook(&hook);
+    }
+
+    let _ = app.emit(
+        "game-exited",
+        GameExitedPayload {
+            game_id: game_id.clone(),
+            duration_seconds,
+        },
+    );
+    app.state::<LaunchTracker>().finish(&game_id);
+}
+
+/// Background watcher that periodically checks if any installed library game has been
+/// launched externally outside Nexus Launcher, and automatically attaches playtime & save tracking.
+pub fn start_external_game_detector(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        // Wait briefly after app boot before starting background external detection
+        tokio::time::sleep(Duration::from_secs(4)).await;
+
+        loop {
+            tokio::time::sleep(Duration::from_secs(4)).await;
+
+            // Collect installed candidate games that are not currently running in LaunchTracker
+            let candidates: Vec<(String, Option<String>, Option<String>)> = {
+                let db = app.state::<Database>();
+                let tracker = app.state::<LaunchTracker>();
+                let Ok(conn) = db.connection.lock() else {
+                    continue;
+                };
+                let Ok(mut stmt) = conn.prepare(
+                    "SELECT id, executable_path, install_path
+                     FROM games
+                     WHERE is_installed = 1
+                       AND COALESCE(is_memory, 0) = 0
+                       AND (executable_path IS NOT NULL OR install_path IS NOT NULL)",
+                ) else {
+                    continue;
+                };
+                let rows = stmt
+                    .query_map([], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, Option<String>>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                        ))
+                    })
+                    .ok();
+                match rows {
+                    Some(iter) => iter
+                        .filter_map(|r| r.ok())
+                        .filter(|(id, _, _)| !tracker.is_running(id))
+                        .collect(),
+                    None => Vec::new(),
+                }
+            };
+
+            if candidates.is_empty() {
+                continue;
+            }
+
+            let detected = tokio::task::spawn_blocking(move || {
+                let mut sys = System::new();
+                sys.refresh_processes(ProcessesToUpdate::All, true);
+
+                let mut matches: Vec<(String, u32, String)> = Vec::new();
+
+                for (game_id, exe_opt, install_opt) in &candidates {
+                    let expected_exe_name = exe_opt
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .and_then(|p| Path::new(p).file_name())
+                        .map(|n| n.to_string_lossy().to_lowercase())
+                        .filter(|n| !IGNORED_EXTERNAL_EXES.contains(&n.as_str()));
+
+                    let expected_full_exe = exe_opt
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(|p| p.replace('/', "\\").to_lowercase());
+
+                    let expected_install_dir = install_opt
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(|p| {
+                            let norm = p.replace('/', "\\").to_lowercase();
+                            norm.trim_end_matches('\\').to_string()
+                        });
+
+                    for proc in sys.processes().values() {
+                        let proc_name = proc.name().to_string_lossy().to_string();
+                        let proc_name_low = proc_name.to_lowercase();
+                        if IGNORED_EXTERNAL_EXES.contains(&proc_name_low.as_str()) {
+                            continue;
+                        }
+
+                        let mut is_match = false;
+                        if let Some(ref exp_name) = expected_exe_name {
+                            if &proc_name_low == exp_name {
+                                is_match = true;
+                            }
+                        }
+
+                        if !is_match {
+                            if let Some(proc_exe) = proc.exe() {
+                                let proc_exe_norm =
+                                    proc_exe.to_string_lossy().replace('/', "\\").to_lowercase();
+                                if let Some(ref exp_full) = expected_full_exe {
+                                    if &proc_exe_norm == exp_full {
+                                        is_match = true;
+                                    }
+                                }
+                                if !is_match {
+                                    if let Some(ref inst_dir) = expected_install_dir {
+                                        if !inst_dir.is_empty()
+                                            && proc_exe_norm.starts_with(inst_dir)
+                                            && proc_exe_norm[inst_dir.len()..].starts_with('\\')
+                                        {
+                                            is_match = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if is_match {
+                            matches.push((game_id.clone(), proc.pid().as_u32(), proc_name));
+                            break;
+                        }
+                    }
+                }
+
+                matches
+            })
+            .await
+            .unwrap_or_default();
+
+            for (game_id, pid, exe_name) in detected {
+                attach_external_game_if_not_running(&app, &game_id, pid, Some(exe_name));
+            }
+        }
+    });
 }
 
 #[cfg(test)]

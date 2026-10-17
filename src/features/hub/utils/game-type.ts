@@ -32,6 +32,18 @@ export function getGameTypeInfo(gameType?: number | null): GameTypeInfo | null {
         bg: 'bg-indigo-600',
         badgeBg: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30',
       }
+    case 2:
+      return {
+        label: 'Expansion',
+        bg: 'bg-fuchsia-600',
+        badgeBg: 'bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/30',
+      }
+    case 3:
+      return {
+        label: 'Bundle',
+        bg: 'bg-teal-600',
+        badgeBg: 'bg-teal-500/20 text-teal-300 border border-teal-500/30',
+      }
     default:
       return null
   }

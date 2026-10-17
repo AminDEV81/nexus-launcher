@@ -5,15 +5,8 @@ export type SortOption = 'custom' | 'name' | 'recently-played' | 'recently-added
 export type ViewMode = 'grid' | 'list'
 
 export type PlaytimeTierId = 'unplayed' | 'under-2h' | '2h-10h' | '10h-50h' | '50h-plus'
+export type InstallStatusFilter = 'all' | 'installed' | 'not_installed'
 
-/** Epic 12's advanced filter panel. Every field is a Set so multiple
- *  values (e.g. two genres) combine with OR within the field, while
- *  different fields combine with AND — "RPG or Strategy, and only
- *  Windows, from 2020" rather than an all-or-nothing match. Empty Set
- *  means "no filter on this field", not "match nothing".
- *
- *  `tags` holds tag *ids* (not names) so renaming a tag never orphans a
- *  persisted/active filter selection. */
 export type FilterField = 'genres' | 'platforms' | 'developers' | 'years' | 'tags' | 'playtime'
 
 export interface AdvancedFilters {
@@ -25,6 +18,8 @@ export interface AdvancedFilters {
   tags: Set<string>
   playtime: Set<PlaytimeTierId>
   favoritesOnly: boolean
+  installStatus: InstallStatusFilter
+  minScore: number | null
 }
 
 function emptyFilters(): AdvancedFilters {
@@ -37,6 +32,8 @@ function emptyFilters(): AdvancedFilters {
     tags: new Set(),
     playtime: new Set(),
     favoritesOnly: false,
+    installStatus: 'all',
+    minScore: null,
   }
 }
 
@@ -50,7 +47,9 @@ export function isFiltersEmpty(filters: AdvancedFilters): boolean {
     filters.yearRange.to === null &&
     filters.tags.size === 0 &&
     filters.playtime.size === 0 &&
-    !filters.favoritesOnly
+    !filters.favoritesOnly &&
+    filters.installStatus === 'all' &&
+    filters.minScore === null
   )
 }
 
@@ -64,6 +63,8 @@ interface LibraryUiState {
   filters: AdvancedFilters
   toggleFilter: (field: FilterField, value: string) => void
   toggleFavoritesOnly: () => void
+  setInstallStatus: (status: InstallStatusFilter) => void
+  setMinScore: (score: number | null) => void
   setYearRange: (from: number | null, to: number | null) => void
   clearFilters: () => void
   customOrder: string[]
@@ -74,11 +75,6 @@ interface LibraryUiState {
   reorderWishlistGames: (activeId: string, overId: string, allIds?: string[]) => void
 }
 
-/**
- * `search`/`sort`/`filters` are intentionally NOT persisted across sessions,
- * but `viewMode` (grid vs list), `customOrder` (library arrangement),
- * and `wishlistCustomOrder` (wishlist arrangement) are persistent user preferences.
- */
 export const useLibraryUiStore = create<LibraryUiState>()(
   persist(
     (set) => ({
@@ -103,6 +99,20 @@ export const useLibraryUiStore = create<LibraryUiState>()(
             favoritesOnly: !state.filters.favoritesOnly,
           },
         })),
+      setInstallStatus: (installStatus) =>
+        set((state) => ({
+          filters: {
+            ...state.filters,
+            installStatus,
+          },
+        })),
+      setMinScore: (minScore) =>
+        set((state) => ({
+          filters: {
+            ...state.filters,
+            minScore,
+          },
+        })),
       setYearRange: (from, to) =>
         set((state) => ({
           filters: {
@@ -118,7 +128,6 @@ export const useLibraryUiStore = create<LibraryUiState>()(
           let currentOrder =
             state.customOrder.length > 0 ? [...state.customOrder] : allIds ? [...allIds] : []
           if (allIds && allIds.length > 0) {
-            // Merge any missing games into currentOrder
             const existingSet = new Set(currentOrder)
             const missing = allIds.filter((id) => !existingSet.has(id))
             if (missing.length > 0) {

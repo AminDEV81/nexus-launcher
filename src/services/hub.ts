@@ -8,6 +8,25 @@ import type {
   HubSearchFilters,
 } from '@/types/models'
 
+export interface SteamTrailerMovie {
+  id: number
+  name: string
+  thumbnail: string | null
+  mp4_max: string | null
+  mp4_480: string | null
+  webm_max: string | null
+  hls_url: string | null
+}
+
+export interface ResolvedTrailerStream {
+  is_age_restricted: boolean
+  direct_stream_url: string | null
+  stream_format: string | null
+  stream_source: string | null
+  fallback_video_id: string | null
+  steam_movies: SteamTrailerMovie[]
+}
+
 /** Game Hub API — every list is fetched live from IGDB (the image URLs
  *  point at IGDB's CDN) and nothing is downloaded locally until a game
  *  is actually added to the library. */
@@ -25,6 +44,12 @@ export function getHubTopRated() {
 
 export function getHubRecommended() {
   return call<HubGame[]>('get_hub_recommended')
+}
+
+/** Clears cached hub feeds/rotations in SQLite and advances the rotation seed
+ *  so all shelves and searches pull fresh live data immediately. */
+export function refreshHubCatalog() {
+  return call<number>('refresh_hub_catalog')
 }
 
 /** Matches the `limit` baked into `search_hub_games` on the Rust side —
@@ -72,6 +97,20 @@ export function addGameToWishlist(igdbId: number) {
   return call<Game>('add_game_to_wishlist', { igdbId })
 }
 
+export function resolveHubTrailerStream(params: {
+  gameName: string
+  steamAppId?: string | null
+  videoId: string
+  trailerName?: string | null
+}) {
+  return call<ResolvedTrailerStream>('resolve_hub_trailer_stream', {
+    gameName: params.gameName,
+    steamAppId: params.steamAppId ?? null,
+    videoId: params.videoId,
+    trailerName: params.trailerName ?? null,
+  })
+}
+
 export function openGoogleAuthWindow() {
   return call<void>('open_google_auth_window')
 }
@@ -88,6 +127,25 @@ export function mountEmbeddedTrailer(
   height: number,
 ) {
   return call<void>('mount_embedded_trailer', { videoId, x, y, width, height })
+}
+
+export function mountEmbeddedGoogleAuth(
+  videoId: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  return call<void>('mount_embedded_google_auth', { videoId, x, y, width, height })
+}
+
+export function updateEmbeddedTrailerBounds(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  return call<void>('update_embedded_trailer_bounds', { x, y, width, height })
 }
 
 export function unmountEmbeddedTrailer() {

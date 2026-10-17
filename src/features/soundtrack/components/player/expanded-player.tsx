@@ -24,6 +24,7 @@ import { playButtonClick } from '@/lib/sound-engine'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { assetUrl } from '@/lib/asset-url'
 import { useSoundtrackPlayer } from '../../hooks/use-soundtrack-player'
+import { cleanGameTitleFromAlbumTitle } from '../../store/soundtrack-store'
 import { AudioVisualizer } from './audio-visualizer'
 import { QueueDrawer } from './queue-drawer'
 
@@ -389,8 +390,16 @@ export function ExpandedPlayer() {
                   {currentTrack.title}
                 </h1>
 
-                <p className="mt-1.5 text-sm sm:text-base font-semibold text-accent">
-                  {currentGame?.title || currentAlbum?.title}
+                <p
+                  key={currentAlbum?.id || currentGame?.gameId || currentTrack.id}
+                  className="mt-1.5 text-sm sm:text-base font-semibold text-accent"
+                >
+                  {(currentAlbum &&
+                    (!currentGame ||
+                      (currentAlbum.game_id && currentGame.gameId !== currentAlbum.game_id)))
+                    ? cleanGameTitleFromAlbumTitle(currentAlbum.title)
+                    : currentGame?.title ||
+                      (currentAlbum ? cleanGameTitleFromAlbumTitle(currentAlbum.title) : '')}
                 </p>
 
                 {currentTrack.artist && (

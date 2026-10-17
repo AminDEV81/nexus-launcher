@@ -35,6 +35,7 @@ import { useSettings, useSetSetting } from '@/features/settings/hooks/use-settin
 import { Switch } from '@/features/settings/components/appearance-panel'
 import { useGames, useLaunchGame } from '@/features/library/hooks/use-games'
 import { findLibraryEntry } from '@/features/hub/utils/in-library'
+import { buildCoverFallbackChain } from '@/features/hub/utils/cover-fallback'
 import {
   useStartGameDownload,
   useStartRawDownload,
@@ -84,12 +85,20 @@ export function StartDownloadModal() {
   }, [settings?.download_auto_extract])
 
   useEffect(() => {
-    if (open) return
-    setGame(null)
-    setRawMode(false)
-    setUrl('')
-    setSavePath('')
-  }, [open])
+    if (!open) {
+      setGame(null)
+      setRawMode(false)
+      setUrl('')
+      setSavePath('')
+      return
+    }
+    // Auto-fill default destination folder so the user can start downloading immediately after pasting a link
+    setSavePath((current) => {
+      if (current.trim().length > 0) return current
+      const savedDir = settings?.default_download_path?.trim()
+      return savedDir && savedDir.length > 0 ? savedDir : 'C:\\NexusGames'
+    })
+  }, [open, settings?.default_download_path])
 
   // Opened for a known game (uninstalled library card / hub / details panel): skip the search.
   useEffect(() => {
@@ -410,20 +419,7 @@ function ResultCard({
           : 'border-border/80 bg-surface hover:border-accent/60 hover:bg-accent/5 hover:shadow-md hover:shadow-accent/5 hover:scale-[1.01] active:scale-[0.99] cursor-pointer',
       )}
     >
-      {game.cover_url ? (
-        <div className="relative h-20 w-15 shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-border group-hover:ring-accent/40 transition-all">
-          <img
-            src={game.cover_url}
-            alt=""
-            className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
-          />
-        </div>
-      ) : (
-        <div className="flex h-20 w-15 shrink-0 items-center justify-center rounded-xl bg-surface-raised text-subtle ring-1 ring-border/60">
-          <Gamepad2 className="size-6 opacity-40" />
-        </div>
-      )}
+      <FallbackCoverThumb game={game} className="h-20 w-15 rounded-xl" />
 
       <div className="min-w-0 flex-1">
         <p
@@ -604,10 +600,8 @@ function UrlStep({
           <ArrowLeft className="size-4" />
         </button>
 
-        {game?.cover_url ? (
-          <div className="relative size-16 shrink-0 overflow-hidden rounded-xl shadow-xs ring-1 ring-border">
-            <img src={game.cover_url} alt="" className="size-full object-cover" />
-          </div>
+        {game ? (
+          <FallbackCoverThumb game={game} className="size-16 rounded-xl" />
         ) : (
           <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-accent/10 text-accent ring-1 ring-accent/25">
             <Download className="size-6" />
@@ -1060,6 +1054,7 @@ function UrlStep({
               try {
                 const selected = await openDirectoryDialog({ directory: true })
                 if (selected && typeof selected === 'string') {
+                  setSetting.mutate({ key: 'default_download_path', value: selected })
                   if (game?.name) {
                     const safeName = game.name.replace(/[<>:"/\\|?*]/g, '-').trim()
                     const normalized = selected.replace(/[\\/]$/, '')
@@ -1223,6 +1218,49 @@ function UrlStep({
           )}
         </button>
       </div>
+    </div>
+  )
+}
+
+
+function FallbackCoverThumb({ game, className }: { game: HubGame; className?: string }) {
+  const candidates = useMemo(
+    () => buildCoverFallbackChain(game.cover_url, game.backdrop_url),
+    [game.cover_url, game.backdrop_url],
+  )
+  const [idx, setIdx] = useState(0)
+  useEffect(() => {
+    setIdx(0)
+  }, [game.igdb_id, game.cover_url, game.backdrop_url])
+
+  const src = candidates[idx] ?? null
+  if (!src) {
+    return (
+      <div
+        className={cn(
+          'flex shrink-0 items-center justify-center bg-surface-raised text-subtle ring-1 ring-border/60',
+          className,
+        )}
+      >
+        <Gamepad2 className="size-6 opacity-50" />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={cn(
+        'relative shrink-0 overflow-hidden shadow-xs ring-1 ring-border group-hover:ring-accent/40 transition-all',
+        className,
+      )}
+    >
+      <img
+        src={src}
+        alt={game.name}
+        onError={() => setIdx((i) => i + 1)}
+        className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
+        loading="lazy"
+      />
     </div>
   )
 }

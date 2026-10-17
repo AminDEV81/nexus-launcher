@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Dices } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { useUiStore } from '@/store/ui-store'
 import { useLibraryUiStore } from '../store/library-ui-store'
@@ -12,6 +13,8 @@ import { GameList } from '../components/game-list'
 import { GameContextMenu } from '../components/game-context-menu'
 import { LibraryEmptyState } from '../components/library-empty-state'
 import { LibrarySkeleton } from '../components/library-skeleton'
+import { SmartRouletteModal } from '../components/smart-roulette-modal'
+import { playButtonClick } from '@/lib/sound-engine'
 import type { Game } from '@/types/models'
 
 interface LibraryViewProps {
@@ -21,26 +24,11 @@ interface LibraryViewProps {
   emptyIcon: LucideIcon
   emptyTitle: string
   emptyDescription: string
-  /** Only the main "Library" view offers Add Game / Scan shortcuts from
-   *  its empty state — an empty Favorites/Hidden/collection view isn't
-   *  "you have no games", it's "none of your games match this filter
-   *  yet". */
   showEmptyActions?: boolean
   onBack?: () => void
   toolbarActions?: ReactNode
 }
 
-/**
- * The actual toolbar + grid/list + context-menu body shared by every
- * library-shaped view — the five scoped `LibraryPage` routes and the
- * collection detail page alike. Takes `games`/`isPending` as props
- * rather than fetching them itself so each caller can source that list
- * however makes sense for it (`useFilteredGames(scope)` vs.
- * `useFilteredCollectionGames(collectionId)`) while sharing everything
- * else — the toolbar, advanced filters, empty state, grid/list toggle,
- * and right-click menu, which would otherwise have to be duplicated
- * and would inevitably drift between the two.
- */
 export function LibraryView({
   games,
   isPending,
@@ -55,17 +43,13 @@ export function LibraryView({
   const selectedId = useUiStore((s) => s.selectedGameId)
   const selectGame = useUiStore((s) => s.selectGame)
   const viewMode = useLibraryUiStore((s) => s.viewMode)
+  const [rouletteOpen, setRouletteOpen] = useState(false)
 
   const [contextMenu, setContextMenu] = useState<{
     gameId: string
     position: { x: number; y: number }
   } | null>(null)
 
-  // Look the game up live from `games` on every render instead of
-  // freezing the object clicked at menu-open time — otherwise a
-  // mutation (e.g. toggling Live Cover) doesn't reflect in the menu
-  // until it's closed and reopened, making "Enable"/"Disable" look
-  // like they do nothing or the same thing.
   const contextMenuGame = contextMenu
     ? (games.find((game) => game.id === contextMenu.gameId) ?? null)
     : null
@@ -78,6 +62,26 @@ export function LibraryView({
     setContextMenu({ gameId: game.id, position: { x: event.clientX, y: event.clientY } })
   }
 
+  const combinedActions = (
+    <div className="flex items-center gap-2">
+      {games.length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            playButtonClick()
+            setRouletteOpen(true)
+          }}
+          title="Smart Game Roulette & Mood Matcher — Let Nexus pick what to play tonight"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent/12 px-3 py-1.5 text-xs font-extrabold text-accent shadow-2xs transition-all hover:bg-accent hover:text-white active:scale-95 cursor-pointer"
+        >
+          <Dices className="size-3.5" />
+          <span className="hidden sm:inline">Game Roulette</span>
+        </button>
+      )}
+      {toolbarActions}
+    </div>
+  )
+
   return (
     <div className="flex h-full flex-col">
       <LibraryToolbar
@@ -85,7 +89,7 @@ export function LibraryView({
         count={games.length}
         onBack={onBack}
         filtersSlot={<AdvancedFiltersPanel />}
-        actions={toolbarActions}
+        actions={combinedActions}
       />
 
       <div className="min-h-0 flex-1">
@@ -98,42 +102,36 @@ export function LibraryView({
             description={emptyDescription}
             showActions={showEmptyActions}
           />
+        ) : viewMode === 'grid' ? (
+          <motion.div
+            key="grid"
+            initial={{ opacity: 0.9, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.14 * speed, ease: 'easeOut' }}
+            className="h-full"
+          >
+            <GameGrid
+              games={games}
+              selectedId={selectedId}
+              onSelect={selectGame}
+              onContextMenu={handleContextMenu}
+            />
+          </motion.div>
         ) : (
-          <AnimatePresence mode="wait" initial={false}>
-            {viewMode === 'grid' ? (
-              <motion.div
-                key="grid"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.18 * speed, ease: [0.16, 1, 0.3, 1] }}
-                className="h-full"
-              >
-                <GameGrid
-                  games={games}
-                  selectedId={selectedId}
-                  onSelect={selectGame}
-                  onContextMenu={handleContextMenu}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="list"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.18 * speed, ease: [0.16, 1, 0.3, 1] }}
-                className="h-full"
-              >
-                <GameList
-                  games={games}
-                  selectedId={selectedId}
-                  onSelect={selectGame}
-                  onContextMenu={handleContextMenu}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <motion.div
+            key="list"
+            initial={{ opacity: 0.9, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.14 * speed, ease: 'easeOut' }}
+            className="h-full"
+          >
+            <GameList
+              games={games}
+              selectedId={selectedId}
+              onSelect={selectGame}
+              onContextMenu={handleContextMenu}
+            />
+          </motion.div>
         )}
       </div>
 
@@ -141,6 +139,12 @@ export function LibraryView({
         game={contextMenuGame}
         position={contextMenu?.position ?? null}
         onClose={() => setContextMenu(null)}
+      />
+
+      <SmartRouletteModal
+        open={rouletteOpen}
+        onClose={() => setRouletteOpen(false)}
+        games={games}
       />
     </div>
   )

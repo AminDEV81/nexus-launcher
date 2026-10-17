@@ -12,6 +12,10 @@ import {
   Gauge,
   Gamepad2,
   Layers,
+  HardDrive,
+  Network,
+  History,
+  FolderArchive,
 } from 'lucide-react'
 import { useGames } from '@/features/library/hooks/use-games'
 import { useSettings, useSetSetting } from '@/features/settings/hooks/use-settings'
@@ -47,6 +51,22 @@ const SPEED_LIMITS = [
   { label: '50 MB/s Limit', value: '52428800' },
 ]
 
+const STREAM_COUNTS = [
+  { label: '6x Streams', value: '6' },
+  { label: '8x Streams', value: '8' },
+  { label: '12x Streams', value: '12' },
+  { label: '24x Streams', value: '24' },
+  { label: '32x Streams', value: '32' },
+]
+
+function formatBytesSummary(b: number) {
+  if (!b || b <= 0) return '0 B'
+  const k = 1024
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.min(Math.floor(Math.log(b) / Math.log(k)), units.length - 1)
+  return `${(b / k ** i).toFixed(i >= 3 ? 2 : 1)} ${units[i]}`
+}
+
 export default function DownloadsPage() {
   const { data: downloads = [], isLoading } = useDownloads()
   const openModal = useStartDownloadModalStore((s) => s.open)
@@ -69,7 +89,9 @@ export default function DownloadsPage() {
   const [queueAction, setQueueAction] = useState<QueueActionType | null>(null)
 
   const currentSpeedLimit = settings?.download_speed_limit || '0'
+  const currentStreams = settings?.download_streams || '8'
   const isGamingMode = settings?.download_gaming_mode !== 'false'
+  const isAutoExtract = settings?.download_auto_extract !== 'false'
   const isSchedulerActive = settings?.download_scheduler_enabled === 'true'
 
   const gamesById = useMemo(() => new Map(games.map((g) => [g.id, g])), [games])
@@ -78,6 +100,7 @@ export default function DownloadsPage() {
     const game = gamesById.get(d.game_id)
     const name =
       game?.name ??
+      d.game_name ??
       d.file_path?.split(/[\\/]/).pop() ??
       d.url.split('/').pop()?.split('?')[0] ??
       'Download'
@@ -136,10 +159,11 @@ export default function DownloadsPage() {
       downloads.filter((d) => {
         if (!search) return true
         const needle = search.toLowerCase()
+        const resolvedName = (gamesById.get(d.game_id)?.name ?? d.game_name ?? '').toLowerCase()
         return (
           d.url.toLowerCase().includes(needle) ||
           (d.file_path ?? '').toLowerCase().includes(needle) ||
-          (gamesById.get(d.game_id)?.name.toLowerCase().includes(needle) ?? false)
+          resolvedName.includes(needle)
         )
       }),
     [downloads, search, gamesById],
@@ -198,7 +222,6 @@ export default function DownloadsPage() {
         if (rawParts.length === 1) {
           items.push({ type: 'single', download: rawParts[0] })
         } else {
-          // Sort parts numerically (Part 1, Part 2, Part 3...)
           const parts = [...rawParts].sort((a, b) => {
             const nameA = a.file_path ?? a.url
             const nameB = b.file_path ?? b.url
@@ -209,17 +232,17 @@ export default function DownloadsPage() {
           const game = gamesById.get(first.game_id)
           const gameName =
             game?.name ??
+            first.game_name ??
             first.file_path
               ?.split(/[\\/]/)
               .pop()
               ?.replace(/\.part\d+.*/i, '') ??
             'Multi-Part Download'
-          const coverUrl = game?.cover_path ?? null
+          const coverUrl = game?.cover_path ?? first.cover_url ?? null
           const totalBytes = parts.reduce((acc, p) => acc + (p.total_bytes || 0), 0)
           const downloadedBytes = parts.reduce((acc, p) => acc + (p.downloaded_bytes || 0), 0)
           const speedBps = parts.reduce((acc, p) => acc + (p.speed_bps || 0), 0)
 
-          // Master bundle status: extracting > downloading > failed > queued > paused > completed
           let status: GroupedDownloadItem['status'] = 'completed'
           if (parts.some((p) => p.status === 'extracting')) {
             status = 'extracting'
@@ -247,7 +270,7 @@ export default function DownloadsPage() {
               downloadedBytes,
               speedBps,
               status,
-              isInstalled: game?.is_installed,
+              isInstalled: game?.is_installed && !game?.is_memory,
               savePath: first.save_path,
             },
           })
@@ -312,36 +335,73 @@ export default function DownloadsPage() {
   const pausedCount = pausedGrouped.length
   const resumableCount = pausedCount + queuedCount
 
+  const aggregateSpeedBps = useMemo(
+    () =>
+      downloads.reduce((acc, d) => acc + (d.status === 'downloading' ? d.speed_bps || 0 : 0), 0),
+    [downloads],
+  )
+
+  const totalBytesDownloaded = useMemo(
+    () => downloads.reduce((acc, d) => acc + (d.downloaded_bytes || 0), 0),
+    [downloads],
+  )
+
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      {/* Header */}
-      <div className="shrink-0 px-8 pb-3 pt-6">
+    <div className="flex h-full flex-col overflow-hidden bg-bg text-text">
+      {/* Header & Power Control Deck */}
+      <div className="shrink-0 border-b border-border/70 bg-surface/65 px-8 pb-4 pt-6 backdrop-blur-md">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="flex size-11 items-center justify-center rounded-2xl bg-accent/15 text-accent shadow-sm ring-1 ring-accent/30">
-              <Download className="size-5.5" />
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-accent/20 via-accent/10 to-transparent text-accent shadow-sm ring-1 ring-accent/35">
+              <Download className="size-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-text">Downloads</h1>
-              <p className="text-xs text-subtle">
-                {activeCount > 0 ? `${activeCount} downloading now` : 'All tasks up to date'}
-                {queuedCount > 0 ? ` · ${queuedCount} in queue` : ''}
-                {completedCount > 0 ? ` · ${completedCount} completed` : ''}
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-2xl font-black tracking-tight text-text">
+                  Download Manager &amp; History
+                </h1>
+                <span className="rounded-full border border-accent/30 bg-accent/10 px-2.5 py-0.5 font-mono text-[10px] font-bold text-accent">
+                  {currentStreams}x HTTP RANGE TURBO
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-muted">
+                {activeCount > 0 ? `${activeCount} active transfer(s)` : 'All transfers idle'}
+                {queuedCount > 0 ? ` · ${queuedCount} queued` : ''}
+                {completedCount > 0 ? ` · ${completedCount} preserved in download history` : ''}
               </p>
             </div>
           </div>
 
           {/* Quick IDM Power Toolbar */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Parallel Streams Selector */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 py-1.5 shadow-xs">
+              <Network className="size-3.5 text-accent" />
+              <select
+                value={currentStreams}
+                onChange={(e) =>
+                  setSetting.mutate({ key: 'download_streams', value: e.target.value })
+                }
+                className="bg-transparent text-xs font-bold text-text focus:outline-none cursor-pointer"
+                title="Number of simultaneous HTTP Range connections per file"
+              >
+                {STREAM_COUNTS.map((opt) => (
+                  <option key={opt.value} value={opt.value} className="bg-surface text-text">
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Speed Limiter */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface/60 px-2.5 py-1.5 shadow-sm">
+            <div className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface px-2.5 py-1.5 shadow-xs">
               <Gauge className="size-3.5 text-accent" />
               <select
                 value={currentSpeedLimit}
                 onChange={(e) =>
                   setSetting.mutate({ key: 'download_speed_limit', value: e.target.value })
                 }
-                className="bg-transparent text-xs font-semibold text-text focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs font-bold text-text focus:outline-none cursor-pointer"
                 title="Throttle max aggregate download bandwidth"
               >
                 {SPEED_LIMITS.map((opt) => (
@@ -352,15 +412,36 @@ export default function DownloadsPage() {
               </select>
             </div>
 
+            {/* Auto-Extract Toggle */}
+            <button
+              type="button"
+              onClick={() =>
+                setSetting.mutate({
+                  key: 'download_auto_extract',
+                  value: isAutoExtract ? 'false' : 'true',
+                })
+              }
+              className={cn(
+                'flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer',
+                isAutoExtract
+                  ? 'border-accent/45 bg-accent/10 text-accent'
+                  : 'border-border/80 bg-surface text-subtle hover:text-text',
+              )}
+              title="Automatically unpack .zip, .rar & .7z archives after download finishes"
+            >
+              <FolderArchive className="size-3.5" />
+              <span>{isAutoExtract ? 'Auto-Extract ON' : 'Auto-Extract OFF'}</span>
+            </button>
+
             {/* Smart Scheduler Button */}
             <button
               type="button"
               onClick={() => setSchedulerOpen(true)}
               className={cn(
-                'flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition-all',
+                'flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer',
                 isSchedulerActive
-                  ? 'border-accent/50 bg-accent/15 text-accent font-bold ring-1 ring-accent/30'
-                  : 'border-border/80 bg-surface/60 text-subtle hover:text-text hover:bg-surface-raised',
+                  ? 'border-accent/50 bg-accent/15 text-accent ring-1 ring-accent/30'
+                  : 'border-border/80 bg-surface text-subtle hover:text-text hover:bg-surface-raised',
               )}
               title="Smart Night Scheduler & Auto-Shutdown"
             >
@@ -378,10 +459,10 @@ export default function DownloadsPage() {
                 })
               }
               className={cn(
-                'flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold shadow-sm transition-all',
+                'flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer',
                 isGamingMode
-                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-bold'
-                  : 'border-border/80 bg-surface/60 text-subtle hover:text-text',
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : 'border-border/80 bg-surface text-subtle hover:text-text',
               )}
               title="Auto-pause downloads while playing games to prevent lag"
             >
@@ -391,12 +472,72 @@ export default function DownloadsPage() {
 
             {/* New Download Button */}
             <button
+              type="button"
               onClick={() => openModal()}
-              className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-lg shadow-accent/20 transition-all hover:bg-accent-hover active:scale-95"
+              className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-md shadow-accent/25 transition-all hover:bg-accent-hover active:scale-95 cursor-pointer"
             >
               <Plus className="size-4" />
               <span>New Download</span>
             </button>
+          </div>
+        </div>
+
+        {/* Live Telemetry Summary Strip */}
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="flex items-center gap-3 rounded-2xl border border-border/75 bg-surface px-3.5 py-2.5 shadow-xs">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+              <Gauge className="size-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                Live Bandwidth
+              </div>
+              <div className="truncate font-mono text-sm font-black text-text">
+                {aggregateSpeedBps > 0 ? `${formatBytesSummary(aggregateSpeedBps)}/s` : 'Idle (0 B/s)'}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-2xl border border-border/75 bg-surface px-3.5 py-2.5 shadow-xs">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-500 dark:text-emerald-400">
+              <HardDrive className="size-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                Total Transferred
+              </div>
+              <div className="truncate font-mono text-sm font-black text-text">
+                {formatBytesSummary(totalBytesDownloaded)}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-2xl border border-border/75 bg-surface px-3.5 py-2.5 shadow-xs">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500 dark:text-amber-400">
+              <Layers className="size-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                Queue &amp; Active
+              </div>
+              <div className="truncate font-mono text-sm font-black text-text">
+                {activeCount} Active · {queuedCount} Queued
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-2xl border border-border/75 bg-surface px-3.5 py-2.5 shadow-xs">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-500 dark:text-cyan-400">
+              <History className="size-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                Download History
+              </div>
+              <div className="truncate font-mono text-sm font-black text-text">
+                {completedCount} Completed
+              </div>
+            </div>
           </div>
         </div>
 
@@ -415,18 +556,18 @@ export default function DownloadsPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search downloads by game, filename or URL…"
-              className="w-full rounded-xl border border-border bg-bg/80 py-2 pl-9.5 pr-4 text-xs text-text placeholder:text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/40"
+              placeholder="Search download history by game title, filename, or URL…"
+              className="w-full rounded-xl border border-border bg-surface py-2 pl-9.5 pr-4 text-xs text-text placeholder:text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Batch Queue Controls (Pause All, Resume All, Resume One by One, Cancel All) */}
+            {/* Batch Queue Controls */}
             {activeCount > 0 && (
               <button
                 type="button"
                 onClick={() => setQueueAction('pause_all')}
-                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-subtle hover:text-accent hover:border-accent/40 transition-colors"
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-bold text-subtle hover:text-accent hover:border-accent/40 transition-colors cursor-pointer"
                 title="Pause all active downloads"
               >
                 <PauseCircle className="size-3.5 text-accent" />
@@ -435,21 +576,21 @@ export default function DownloadsPage() {
             )}
 
             {resumableCount > 0 && (
-              <div className="flex items-center rounded-xl border border-border bg-surface shadow-sm overflow-hidden p-0.5">
+              <div className="flex items-center rounded-xl border border-border bg-surface shadow-xs overflow-hidden p-0.5">
                 <button
                   type="button"
                   onClick={() => setQueueAction('resume_all')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-subtle hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors rounded-lg"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-subtle hover:text-emerald-500 hover:bg-emerald-500/10 transition-colors rounded-lg cursor-pointer"
                   title="Resume all paused and queued downloads simultaneously"
                 >
-                  <PlayCircle className="size-3.5 text-emerald-400" />
+                  <PlayCircle className="size-3.5 text-emerald-500" />
                   <span>Resume All</span>
                 </button>
                 <div className="h-4 w-px bg-border/80" />
                 <button
                   type="button"
                   onClick={() => setQueueAction('resume_sequential')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-subtle hover:text-accent hover:bg-accent/10 transition-colors rounded-lg"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-subtle hover:text-accent hover:bg-accent/10 transition-colors rounded-lg cursor-pointer"
                   title="Queue downloads sequentially (One by One)"
                 >
                   <Layers className="size-3.5 text-accent" />
@@ -468,45 +609,47 @@ export default function DownloadsPage() {
                   }
                 }}
                 disabled={remove.isPending}
-                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-subtle hover:text-emerald-400 hover:border-emerald-500/40 transition-colors"
-                title="Clear finished downloads from list (keeps all game files on disk)"
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-bold text-subtle hover:text-emerald-500 hover:border-emerald-500/40 transition-colors cursor-pointer"
+                title="Clear finished downloads from history list (keeps all game files on disk)"
               >
-                <CheckCircle2 className="size-3.5 text-emerald-400" />
-                <span>Clear Completed ({completedCount})</span>
+                <CheckCircle2 className="size-3.5 text-emerald-500" />
+                <span>Clear History ({completedCount})</span>
               </button>
             )}
 
-            {downloads.length > 0 && (
+            {(activeCount > 0 || queuedCount > 0 || pausedCount > 0) && (
               <button
                 type="button"
                 onClick={() => setQueueAction('cancel_all')}
-                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-subtle hover:text-red-400 hover:border-red-500/40 transition-colors"
-                title="Cancel and clear entire queue"
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs font-bold text-subtle hover:text-rose-500 hover:border-rose-500/40 transition-colors cursor-pointer"
+                title="Cancel all active/queued downloads"
               >
-                <XCircle className="size-3.5 text-red-400" />
-                <span>Cancel All</span>
+                <XCircle className="size-3.5 text-rose-500" />
+                <span>Cancel Active</span>
               </button>
             )}
 
             {/* Filter Chips */}
-            <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface/60 p-1">
+            <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface p-1">
               <button
+                type="button"
                 onClick={() => setTab('all')}
                 className={cn(
-                  'rounded-lg px-3 py-1 text-xs font-semibold transition-colors',
+                  'rounded-lg px-3 py-1 text-xs font-bold transition-colors cursor-pointer',
                   tab === 'all'
-                    ? 'bg-surface-raised text-text shadow-sm'
+                    ? 'bg-accent text-white shadow-xs'
                     : 'text-subtle hover:text-text',
                 )}
               >
                 All ({allGrouped.length})
               </button>
               <button
+                type="button"
                 onClick={() => setTab('active')}
                 className={cn(
-                  'rounded-lg px-3 py-1 text-xs font-semibold transition-colors',
+                  'rounded-lg px-3 py-1 text-xs font-bold transition-colors cursor-pointer',
                   tab === 'active'
-                    ? 'bg-accent/20 text-accent shadow-sm'
+                    ? 'bg-accent/20 text-accent shadow-xs'
                     : 'text-subtle hover:text-text',
                 )}
               >
@@ -514,11 +657,12 @@ export default function DownloadsPage() {
               </button>
               {queuedCount > 0 && (
                 <button
+                  type="button"
                   onClick={() => setTab('queued')}
                   className={cn(
-                    'rounded-lg px-3 py-1 text-xs font-semibold transition-colors',
+                    'rounded-lg px-3 py-1 text-xs font-bold transition-colors cursor-pointer',
                     tab === 'queued'
-                      ? 'bg-amber-500/20 text-amber-400 shadow-sm'
+                      ? 'bg-amber-500/20 text-amber-500 dark:text-amber-400 shadow-xs'
                       : 'text-subtle hover:text-text',
                   )}
                 >
@@ -527,11 +671,12 @@ export default function DownloadsPage() {
               )}
               {pausedCount > 0 && (
                 <button
+                  type="button"
                   onClick={() => setTab('paused')}
                   className={cn(
-                    'rounded-lg px-3 py-1 text-xs font-semibold transition-colors',
+                    'rounded-lg px-3 py-1 text-xs font-bold transition-colors cursor-pointer',
                     tab === 'paused'
-                      ? 'bg-surface-raised text-text shadow-sm'
+                      ? 'bg-surface-raised text-text shadow-xs'
                       : 'text-subtle hover:text-text',
                   )}
                 >
@@ -539,15 +684,16 @@ export default function DownloadsPage() {
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => setTab('completed')}
                 className={cn(
-                  'rounded-lg px-3 py-1 text-xs font-semibold transition-colors',
+                  'rounded-lg px-3 py-1 text-xs font-bold transition-colors cursor-pointer',
                   tab === 'completed'
-                    ? 'bg-emerald-500/20 text-emerald-400 shadow-sm'
+                    ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 shadow-xs'
                     : 'text-subtle hover:text-text',
                 )}
               >
-                Completed ({completedCount})
+                History ({completedCount})
               </button>
             </div>
           </div>
@@ -555,24 +701,26 @@ export default function DownloadsPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-8 pb-8">
+      <div className="flex-1 overflow-y-auto px-8 pb-8 pt-5">
         {isLoading ? (
           <div className="flex items-center justify-center py-20 text-sm text-subtle">
-            Loading downloads…
+            Loading downloads &amp; history…
           </div>
         ) : downloads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="mb-4 flex size-18 items-center justify-center rounded-3xl bg-surface border border-border shadow-inner">
               <Package className="size-9 text-subtle/60" />
             </div>
-            <p className="text-base font-bold text-text">No active downloads</p>
+            <p className="text-base font-bold text-text">No downloads or history yet</p>
             <p className="mt-1 max-w-sm text-xs text-subtle">
-              Search a game on IGDB or paste a direct download link to start a multi-connection
-              download.
+              Search a game on IGDB or paste direct download links to start a high-speed
+              multi-connection download. Completed downloads stay preserved here in your history even
+              if you remove a game from the Library.
             </p>
             <button
+              type="button"
               onClick={() => openModal()}
-              className="mt-5 flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow transition-all hover:bg-accent-hover"
+              className="mt-5 flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow transition-all hover:bg-accent-hover cursor-pointer"
             >
               <Plus className="size-4" />
               <span>Start New Download</span>
@@ -585,7 +733,7 @@ export default function DownloadsPage() {
             {/* 1. Active Downloads Section */}
             {(tab === 'all' || tab === 'active') && activeGrouped.length > 0 && (
               <Section
-                title="Active Downloads"
+                title="Active Transfers"
                 count={activeCount}
                 icon={<PlayCircle className="size-3.5 text-accent" />}
               >
@@ -623,12 +771,12 @@ export default function DownloadsPage() {
               </Section>
             )}
 
-            {/* 2. Queued Downloads Section (Waiting for turn) */}
+            {/* 2. Queued Downloads Section */}
             {(tab === 'all' || tab === 'queued') && queuedGrouped.length > 0 && (
               <Section
-                title="In Queue (Waiting for Turn)"
+                title="In Queue (Sequential Order)"
                 count={queuedCount}
-                icon={<Clock className="size-3.5 text-amber-400" />}
+                icon={<Clock className="size-3.5 text-amber-500" />}
               >
                 {queuedGrouped.map((entry) =>
                   entry.type === 'group' ? (
@@ -667,7 +815,7 @@ export default function DownloadsPage() {
             {/* 3. Paused / Stopped Downloads Section */}
             {(tab === 'all' || tab === 'paused') && pausedGrouped.length > 0 && (
               <Section
-                title="Paused / Incomplete"
+                title="Paused & Resumable"
                 count={pausedCount}
                 icon={<PauseCircle className="size-3.5 text-subtle" />}
               >
@@ -705,12 +853,12 @@ export default function DownloadsPage() {
               </Section>
             )}
 
-            {/* 4. Completed Section */}
+            {/* 4. Completed / Download History Section */}
             {(tab === 'all' || tab === 'completed') && completedGrouped.length > 0 && (
               <Section
-                title="Completed & Installed"
+                title="Download History (Completed & Preserved)"
                 count={completedCount}
-                icon={<CheckCircle2 className="size-3.5 text-emerald-400" />}
+                icon={<CheckCircle2 className="size-3.5 text-emerald-500" />}
               >
                 {completedGrouped.map((entry) =>
                   entry.type === 'group' ? (
@@ -765,7 +913,7 @@ export default function DownloadsPage() {
             ? activeCount
             : queueAction === 'resume_all' || queueAction === 'resume_sequential'
               ? resumableCount
-              : downloads.length
+              : activeCount + queuedCount + pausedCount
         }
         onClose={() => setQueueAction(null)}
         onConfirm={handleConfirmQueueAction}
@@ -791,11 +939,11 @@ function Section({
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 text-xs font-bold text-subtle uppercase tracking-wider">
+      <div className="flex items-center gap-2 text-xs font-extrabold text-subtle uppercase tracking-wider">
         {icon}
         <span>{title}</span>
         {count !== undefined && (
-          <span className="rounded-md bg-surface-raised px-1.5 py-0.5 font-mono text-[10px] text-text">
+          <span className="rounded-md border border-border/80 bg-surface-raised px-2 py-0.5 font-mono text-[10px] font-bold text-text">
             {count}
           </span>
         )}

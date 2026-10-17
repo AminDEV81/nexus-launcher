@@ -132,6 +132,7 @@ pub fn run() {
             app.manage(commands::download::DownloadState::default());
             app.manage(commands::soundtrack::SoundtrackDownloadState::default());
             app.manage(commands::overlay::OverlayState::new());
+            app.manage(commands::dualsense::DualSenseEngineState::new());
             // The hotkey manager lives in managed state so saving the
             // overlay config can re-register a changed hotkey at runtime.
             app.manage(commands::overlay::GlobalHotkeyManager::new());
@@ -141,6 +142,7 @@ pub fn run() {
                 .start(app.handle().clone(), initial_hotkey);
             let game_watcher = commands::overlay::AutoGameWatcher::new();
             game_watcher.start(app.handle().clone());
+            commands::launch::start_external_game_detector(app.handle().clone());
             // Download tasks die with the process — orphaned mid-flight
             // rows become resumable paused entries (see download.rs).
             commands::download::recover_orphaned_downloads(app.handle());
@@ -247,6 +249,7 @@ pub fn run() {
             commands::hub::get_hub_coming_soon,
             commands::hub::get_hub_top_rated,
             commands::hub::get_hub_recommended,
+            commands::hub::refresh_hub_catalog,
             commands::hub::search_hub_games,
             commands::hub::list_hub_genres,
             commands::hub::list_hub_platforms,
@@ -255,9 +258,12 @@ pub fn run() {
             commands::hub::get_hub_similar_games,
             commands::hub::add_game_from_hub,
             commands::hub::add_game_to_wishlist,
+            commands::hub::resolve_hub_trailer_stream,
             commands::hub::open_google_auth_window,
             commands::hub::open_trailer_window,
             commands::hub::mount_embedded_trailer,
+            commands::hub::mount_embedded_google_auth,
+            commands::hub::update_embedded_trailer_bounds,
             commands::hub::unmount_embedded_trailer,
             paths::is_portable_mode,
             commands::import::resolve_shortcut,
@@ -337,6 +343,7 @@ pub fn run() {
             commands::steam_price::get_steam_game_price,
             commands::steam_price::get_steam_regional_prices,
             commands::soundtrack::soundtrack_resolve_game,
+            commands::soundtrack::soundtrack_clear_game,
             commands::soundtrack::soundtrack_get_album,
             commands::soundtrack::soundtrack_get_all_albums,
             commands::soundtrack::soundtrack_save_album,
@@ -369,6 +376,14 @@ pub fn run() {
             commands::overlay::push_overlay_notification,
             commands::cleanup::scan_cleanup_targets,
             commands::cleanup::execute_cleanup,
+            commands::dualsense::dualsense_get_state,
+            commands::dualsense::dualsense_select_slot,
+            commands::dualsense::dualsense_set_xbox_emulation,
+            commands::dualsense::dualsense_update_config,
+            commands::dualsense::dualsense_set_virtual_override,
+            commands::dualsense::dualsense_scan_devices,
+            commands::dualsense::dualsense_trigger_rumble_test,
+            commands::dualsense::dualsense_install_driver,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

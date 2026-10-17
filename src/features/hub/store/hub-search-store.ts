@@ -27,6 +27,14 @@ interface HubSearchState extends HubSearchFilters {
   setMinRating: (minRating: number | null) => void
   sort: string | null
   setSort: (sort: string | null) => void
+  gameCategory: string | null
+  setGameCategory: (category: string | null) => void
+  gameMode: string | null
+  setGameMode: (mode: string | null) => void
+  onlyReleased: boolean
+  setOnlyReleased: (onlyReleased: boolean) => void
+  hideInLibrary: boolean
+  setHideInLibrary: (hideInLibrary: boolean) => void
   clearFilters: () => void
 }
 
@@ -85,7 +93,7 @@ export const useHubSearchStore = create<HubSearchState>((set) => ({
       set({ release: null, yearFrom: null, yearTo: null })
       return
     }
-    if (release.includes('-')) {
+    if (release.includes('-') && !release.startsWith('last-')) {
       const [f, t] = release.split('-')
       const from = parseInt(f, 10)
       const to = parseInt(t, 10)
@@ -111,10 +119,9 @@ export const useHubSearchStore = create<HubSearchState>((set) => ({
       set({ yearFrom: null, yearTo: null, release: null })
       return
     }
-    // Retain from and to exactly as entered — do NOT swap them in state so inputs never jump!
     let releaseStr: string | null = null
-    const validFrom = from !== null && from >= 1970 && from <= 2030
-    const validTo = to !== null && to >= 1970 && to <= 2030
+    const validFrom = from !== null && from >= 1970 && from <= 2035
+    const validTo = to !== null && to >= 1970 && to <= 2035
 
     if (validFrom && validTo) {
       const minYear = Math.min(from, to)
@@ -132,6 +139,14 @@ export const useHubSearchStore = create<HubSearchState>((set) => ({
   setMinRating: (minRating) => set({ minRating }),
   sort: null,
   setSort: (sort) => set({ sort }),
+  gameCategory: null,
+  setGameCategory: (gameCategory) => set({ gameCategory }),
+  gameMode: null,
+  setGameMode: (gameMode) => set({ gameMode }),
+  onlyReleased: false,
+  setOnlyReleased: (onlyReleased) => set({ onlyReleased }),
+  hideInLibrary: false,
+  setHideInLibrary: (hideInLibrary) => set({ hideInLibrary }),
   clearFilters: () =>
     set({
       genreId: null,
@@ -143,5 +158,9 @@ export const useHubSearchStore = create<HubSearchState>((set) => ({
       yearTo: null,
       minRating: null,
       sort: null,
+      gameCategory: null,
+      gameMode: null,
+      onlyReleased: false,
+      hideInLibrary: false,
     }),
 }))

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bookmark,
@@ -7,6 +7,7 @@ import {
   Clock,
   Download,
   Eye,
+  Flame,
   Gamepad2,
   Loader2,
   Plus,
@@ -17,8 +18,10 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useStartDownloadModalStore } from '@/features/downloads/store/start-download-modal-store'
 import { useAddGameFromHub, useAddGameToWishlist } from '../hooks/use-hub'
+import { useHubSearchStore } from '../store/hub-search-store'
 import { useGames, useRestoreGameFromMemory } from '@/features/library/hooks/use-games'
 import { findLibraryEntry } from '../utils/in-library'
+import { buildCoverFallbackChain } from '../utils/cover-fallback'
 import { useUiStore } from '@/store/ui-store'
 import { localDateKey } from '@/features/library/utils/format'
 import { getGameTypeInfo } from '../utils/game-type'
@@ -38,6 +41,25 @@ export interface HubGameCardProps {
   similarityReason?: string
   breakdownChips?: string[]
   className?: string
+}
+
+function compactPlatformLabels(platforms?: string[]): string[] {
+  if (!platforms || platforms.length === 0) return []
+  const out = new Set<string>()
+  for (const p of platforms) {
+    const low = p.toLowerCase()
+    if (low.includes('windows') || low === 'pc') out.add('PC')
+    else if (low.includes('playstation 5') || low === 'ps5') out.add('PS5')
+    else if (low.includes('playstation 4') || low === 'ps4') out.add('PS4')
+    else if (low.includes('xbox series')) out.add('XSX')
+    else if (low.includes('xbox one')) out.add('XONE')
+    else if (low.includes('switch 2')) out.add('SW2')
+    else if (low.includes('switch')) out.add('NSW')
+    else if (low.includes('linux')) out.add('Linux')
+    else if (low.includes('mac')) out.add('Mac')
+    if (out.size >= 3) break
+  }
+  return Array.from(out)
 }
 
 export function HubGameCard({
@@ -63,17 +85,73 @@ export function HubGameCard({
 
   const isUnreleased = Boolean(game.release_date && game.release_date > localDateKey())
   const typeInfo = getGameTypeInfo(game.game_type)
+  const activeGenreIds = useHubSearchStore((s) => s.genreIds)
+
+  const coverCandidates = useMemo(
+    () => buildCoverFallbackChain(game.cover_url, game.backdrop_url),
+    [game.cover_url, game.backdrop_url],
+  )
+  const [coverIdx, setCoverIdx] = useState(0)
+
+  useEffect(() => {
+    setCoverIdx(0)
+  }, [game.igdb_id, game.cover_url, game.backdrop_url])
+
+  const activeCoverUrl = coverCandidates[coverIdx] ?? null
+
+  const displayGenresText = useMemo(() => {
+    if (!game.genres || game.genres.length === 0) return 'Game'
+    const matchId = (gg: string, gid: number): boolean => {
+      const low = gg.trim().toLowerCase()
+      switch (gid) {
+        case 2: return low === 'point-and-click' || low === 'point and click'
+        case 4: return low === 'fighting'
+        case 5: return low === 'shooter'
+        case 7: return low === 'music'
+        case 8: return low === 'platform' || low === 'platformer'
+        case 9: return low === 'puzzle'
+        case 10: return low === 'racing'
+        case 11: return low.includes('real time strategy') || low === 'rts'
+        case 12: return low.includes('role-playing') || low === 'rpg'
+        case 13: return low === 'simulator' || low === 'simulation'
+        case 14: return low === 'sport' || low === 'sports'
+        case 15: return low === 'strategy'
+        case 16: return low.includes('turn-based strategy') || low === 'tbs'
+        case 24: return low === 'tactical'
+        case 25: return low.includes('hack and slash') || low.includes("beat 'em up")
+        case 26: return low.includes('quiz') || low.includes('trivia')
+        case 30: return low === 'pinball'
+        case 31: return low === 'adventure'
+        case 32: return low === 'indie'
+        case 33: return low === 'arcade'
+        case 34: return low === 'visual novel'
+        case 35: return low.includes('card') || low.includes('board')
+        case 36: return low === 'moba'
+        default: return false
+      }
+    }
+    const sorted = [...game.genres].sort((a, b) => {
+      const aMatch = activeGenreIds.some((id) => matchId(a, id)) ? 1 : 0
+      const bMatch = activeGenreIds.some((id) => matchId(b, id)) ? 1 : 0
+      return bMatch - aMatch
+    })
+    const maxShow = Math.max(3, activeGenreIds.length)
+    const shown = sorted.slice(0, maxShow)
+    const extra = sorted.length - shown.length
+    return extra > 0 ? `${shown.join(' · ')} +${extra}` : shown.join(' · ')
+  }, [game.genres, activeGenreIds])
 
   const libraryEntry = useMemo(() => findLibraryEntry(games, game), [games, game])
   const isMem = Boolean(inMemory || (libraryEntry && libraryEntry.is_memory))
   const installed = Boolean(!isMem && (isInstalled || (libraryEntry && libraryEntry.is_installed)))
   const inLib = Boolean(!isMem && inLibrary)
   const inWish = Boolean(!isMem && inWishlist)
+  const platformChips = useMemo(() => compactPlatformLabels(game.platforms), [game.platforms])
 
   return (
     <div
       className={cn(
-        'group/card relative flex h-full flex-col overflow-hidden rounded-2xl border border-border/80 bg-surface/90 shadow-sm transition-all duration-300 hover:-translate-y-2 hover:border-accent/70 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.7),0_0_20px_-4px_var(--nx-accent)]',
+        'group/card relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface/95 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-accent/70 hover:shadow-[0_18px_36px_-12px_rgba(0,0,0,0.65),0_0_20px_-6px_var(--nx-accent)]',
         className,
       )}
     >
@@ -81,57 +159,74 @@ export function HubGameCard({
       <div className="pointer-events-none absolute inset-0 z-10 rounded-2xl ring-1 ring-inset ring-white/15 opacity-0 transition-opacity duration-300 group-hover/card:opacity-100" />
 
       {/* Cover Image Container with 3:4 Aspect Ratio */}
-      <div className="relative aspect-[3/4] w-full shrink-0 overflow-hidden bg-surface-raised">
-        {game.cover_url ? (
+      <div
+        onClick={() => navigate(`/hub/${game.igdb_id}`)}
+        className="relative aspect-[3/4] w-full shrink-0 cursor-pointer overflow-hidden bg-surface-raised"
+      >
+        {activeCoverUrl ? (
           <img
-            src={game.cover_url}
+            src={activeCoverUrl}
             alt={game.name}
             loading="lazy"
             draggable={false}
+            onError={() => {
+              setCoverIdx((prev) => prev + 1)
+            }}
             className="size-full object-cover transition-transform duration-700 ease-out group-hover/card:scale-108"
           />
         ) : (
-          <span className="flex size-full items-center justify-center bg-surface-raised text-subtle">
-            <Gamepad2 className="size-10 opacity-40" />
-          </span>
+          <div className="flex size-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-surface-raised via-surface to-accent/15 p-4 text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl border border-accent/30 bg-accent/10 text-accent shadow-inner">
+              <Gamepad2 className="size-6" />
+            </div>
+            <span className="line-clamp-3 text-xs font-extrabold tracking-tight text-text/90">
+              {game.name}
+            </span>
+            <span className="rounded-md border border-border/70 bg-surface/80 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-wider text-subtle">
+              {displayGenresText}
+            </span>
+          </div>
         )}
 
+        {/* Subtle Bottom Vignette for readability */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+
         {/* Top Badges */}
-        <div className="absolute inset-x-2 top-2 z-10 flex items-center justify-between gap-1 pointer-events-none">
+        <div className="absolute inset-x-2.5 top-2.5 z-10 flex items-start justify-between gap-1 pointer-events-none">
           <div className="flex flex-wrap items-center gap-1">
             {/* Status Badge */}
             {installed ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-emerald-400/40 backdrop-blur-md">
                 <Check className="size-3" strokeWidth={3} />
                 <span>Installed</span>
               </span>
             ) : isMem ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-600/90 border border-amber-400/40 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-600/95 border border-amber-400/40 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-md">
                 <RotateCcw className="size-2.5" />
                 <span>In Memory</span>
               </span>
             ) : inLib ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-700/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-700/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-emerald-400/30 backdrop-blur-md">
                 <Check className="size-3" strokeWidth={3} />
                 <span>In Library</span>
               </span>
             ) : inWish ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-accent px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-accent/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-white/20 backdrop-blur-md">
                 <Bookmark className="size-3" />
                 <span>Wishlist</span>
               </span>
             ) : isUnreleased ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-cyan-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-cyan-600/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-cyan-300/30 backdrop-blur-md">
                 <Clock className="size-2.5" />
                 <span>Upcoming</span>
               </span>
             ) : null}
 
-            {/* Game Type Badge (Remake / Remaster / Expanded / Standalone) */}
+            {/* Game Type Badge (Remake / Remaster / Expanded / Standalone / Expansion) */}
             {typeInfo && (
               <span
                 className={cn(
-                  'inline-flex items-center rounded-lg px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm ring-1 ring-white/20',
+                  'inline-flex items-center rounded-lg px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm ring-1 ring-white/20 backdrop-blur-md',
                   typeInfo.bg,
                 )}
               >
@@ -140,8 +235,8 @@ export function HubGameCard({
             )}
           </div>
 
-          {/* Right badges: Nexus Match & Critic Score */}
-          <div className="flex items-center gap-1">
+          {/* Right badges: Nexus Match & Critic/IGDB Score */}
+          <div className="flex flex-col items-end gap-1">
             {nexusMatch !== undefined && nexusMatch > 0 && (
               <span
                 title={
@@ -152,15 +247,44 @@ export function HubGameCard({
                 className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-1.5 py-0.5 text-[9px] font-black tracking-wide text-white shadow-sm ring-1 ring-white/20"
               >
                 <Sparkles className="size-2.5 fill-current text-violet-200" />
-                <span>{nexusMatch}% MATCH</span>
+                <span>{nexusMatch}%</span>
               </span>
             )}
-            <HubScoreBadge variant="card" metacriticScore={libraryEntry?.metacritic_score} />
+            <HubScoreBadge
+              variant="card"
+              metacriticScore={game.metacritic_score ?? libraryEntry?.metacritic_score}
+              opencriticScore={game.opencritic_score ?? libraryEntry?.opencritic_score}
+              igdbRating={game.rating}
+              gameName={game.name}
+              releaseDate={game.release_date}
+            />
           </div>
         </div>
 
+        {/* Bottom-left Platform & Hype micro-badges (visible when not hovered) */}
+        {(platformChips.length > 0 || (game.hypes && game.hypes >= 25)) && (
+          <div className="pointer-events-none absolute inset-x-2.5 bottom-2 z-10 flex items-center justify-between gap-1 transition-opacity duration-200 group-hover/card:opacity-0">
+            <div className="flex items-center gap-1">
+              {platformChips.map((plat) => (
+                <span
+                  key={plat}
+                  className="rounded-md border border-white/15 bg-black/65 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-white/90 backdrop-blur-sm"
+                >
+                  {plat}
+                </span>
+              ))}
+            </div>
+            {game.hypes != null && game.hypes >= 25 && (
+              <span className="inline-flex items-center gap-0.5 rounded-md border border-amber-400/30 bg-black/65 px-1.5 py-0.5 text-[9px] font-bold text-amber-300 backdrop-blur-sm">
+                <Flame className="size-2.5 fill-current text-amber-400" />
+                <span>{game.hypes}</span>
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Quick Action Overlay (Reveals smoothly on hover) */}
-        <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black/95 via-black/50 to-transparent p-3 opacity-0 transition-opacity duration-200 group-hover/card:opacity-100">
+        <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black/95 via-black/55 to-transparent p-3 opacity-0 transition-opacity duration-200 group-hover/card:opacity-100">
           <div className="flex items-center gap-1.5">
             {/* If In Memory: Direct Restore */}
             {isMem && libraryEntry ? (
@@ -192,9 +316,10 @@ export function HubGameCard({
                   if (libraryEntry) selectGame(libraryEntry.id)
                   navigate('/')
                 }}
-                className="flex size-9 flex-1 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-md transition-all hover:bg-emerald-500 hover:scale-105 active:scale-95"
+                className="flex size-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-white shadow-md transition-all hover:bg-emerald-500 hover:scale-105 active:scale-95"
               >
                 <Gamepad2 className="size-4" />
+                <span className="text-xs font-bold">Play</span>
               </button>
             ) : (
               /* Download Button (released games that are NOT installed) */
@@ -209,12 +334,13 @@ export function HubGameCard({
                       gameId: libraryEntry?.id,
                       igdbId: game.igdb_id,
                       name: game.name,
-                      coverUrl: game.cover_url,
+                      coverUrl: activeCoverUrl ?? game.cover_url,
                     })
                   }}
-                  className="flex size-9 flex-1 items-center justify-center rounded-xl bg-accent text-white shadow-md transition-all hover:bg-accent-hover hover:scale-105 active:scale-95"
+                  className="flex size-9 flex-1 items-center justify-center gap-1.5 rounded-xl bg-accent text-white shadow-md transition-all hover:bg-accent-hover hover:scale-105 active:scale-95"
                 >
-                  <Download className="size-4" />
+                  <Download className="size-3.5" />
+                  <span className="text-xs font-bold">Get</span>
                 </button>
               )
             )}
@@ -232,7 +358,7 @@ export function HubGameCard({
                 className="flex size-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-accent/50 bg-accent/30 text-white shadow-sm transition-all hover:bg-accent hover:border-accent hover:scale-105 active:scale-95 cursor-pointer backdrop-blur-md"
               >
                 <BookmarkCheck className="size-3.5 text-accent-hover shrink-0" />
-                <span className="text-xs font-bold truncate">Wishlisted</span>
+                <span className="text-xs font-bold truncate">Saved</span>
               </button>
             )}
 
@@ -284,7 +410,10 @@ export function HubGameCard({
               type="button"
               title="View Game Details"
               aria-label={`View details for ${game.name}`}
-              onClick={() => navigate(`/hub/${game.igdb_id}`)}
+              onClick={(e) => {
+                e.stopPropagation()
+                navigate(`/hub/${game.igdb_id}`)
+              }}
               className="flex size-9 items-center justify-center rounded-xl border border-white/20 bg-black/75 text-white shadow-sm transition-all hover:bg-black/90 hover:scale-105 active:scale-95"
             >
               <Eye className="size-4" />
@@ -306,26 +435,16 @@ export function HubGameCard({
           >
             {game.name}
           </div>
-          <div className="mt-1.5 flex items-center justify-between gap-1.5 text-[11px] text-subtle">
+          <div className="mt-1.5 flex items-start justify-between gap-1.5 text-[11px] text-subtle">
             <span
-              className="truncate font-medium text-text/80"
+              className="line-clamp-2 font-medium text-text/85 leading-snug"
               title={game.genres && game.genres.length > 0 ? game.genres.join(', ') : 'Game'}
             >
-              {game.genres && game.genres.length > 0 ? game.genres.join(' · ') : 'Game'}
+              {displayGenresText}
             </span>
             <div className="flex items-center gap-1 shrink-0">
-              {typeInfo && (
-                <span
-                  className={cn(
-                    'rounded px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider',
-                    typeInfo.badgeBg,
-                  )}
-                >
-                  {typeInfo.label}
-                </span>
-              )}
               {game.release_date && (
-                <span className="rounded bg-surface-raised px-1.5 py-0.2 font-mono text-[10px] font-semibold text-subtle">
+                <span className="rounded-md border border-border/60 bg-surface-raised px-1.5 py-0.5 font-mono text-[10px] font-semibold text-subtle">
                   {game.release_date.slice(0, 4)}
                 </span>
               )}

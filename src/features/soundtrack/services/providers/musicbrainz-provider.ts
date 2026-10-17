@@ -1,4 +1,4 @@
-import { BaseSoundtrackProvider } from './base-provider'
+import { BaseSoundtrackProvider, scoreAlbumMatchForGame } from './base-provider'
 import type {
   GameIdentity,
   ProviderCapabilities,
@@ -55,8 +55,10 @@ export class MusicBrainzProvider extends BaseSoundtrackProvider {
   }
 
   public async getAlbums(game: GameIdentity): Promise<SoundtrackAlbum[]> {
-    const query = encodeURIComponent(`${this.cleanTitle(game.title)} soundtrack`)
-    const url = `https://musicbrainz.org/ws/2/release?query=${query}&limit=6&fmt=json`
+    const coreTitle = this.cleanTitle(game.title)
+    if (!coreTitle) return []
+    const query = encodeURIComponent(`"${coreTitle}" AND (soundtrack OR score OR ost)`)
+    const url = `https://musicbrainz.org/ws/2/release?query=${query}&limit=10&fmt=json`
 
     try {
       const resp = await this.fetchWithTimeout(url, { headers: this.headers }, 6000)
@@ -65,7 +67,13 @@ export class MusicBrainzProvider extends BaseSoundtrackProvider {
       const data = (await resp.json()) as { releases?: MBRelease[] }
       if (!data.releases || data.releases.length === 0) return []
 
-      return data.releases.map((rel) => {
+      const verified = data.releases
+        .map((rel) => ({ rel, score: scoreAlbumMatchForGame(rel.title, game.title) }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 4)
+
+      return verified.map(({ rel }) => {
         const artist = rel['artist-credit']?.map((a) => a.name).join(', ') || null
         const coverUrl = `https://coverartarchive.org/release/${rel.id}/front-500`
 

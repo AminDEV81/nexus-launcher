@@ -25,5 +25,9 @@ import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
  * preserve.
  */
 export function useAnimationSpeed(): number {
-  return useAppearanceSettingsStore((s) => s.animationSpeed)
+  const animationSpeed = useAppearanceSettingsStore((s) => s.animationSpeed)
+  const reduceMotion = useAppearanceSettingsStore((s) => s.reduceMotion)
+  const gpuEcoMode = useAppearanceSettingsStore((s) => s.gpuEcoMode)
+  if (reduceMotion || gpuEcoMode) return 0
+  return animationSpeed
 }

@@ -38,6 +38,7 @@ import { useGlobalClickSound } from '@/hooks/use-global-click-sound'
 import { useWindowCloseIntercept } from '@/hooks/use-window-close-intercept'
 import { usePlaytimeTracking } from '@/hooks/use-playtime-tracking'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
+import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
 import { useWindowFillsScreen } from '@/hooks/use-window-maximized'
 import { queryClient } from '@/app/query-client'
 import { gamesKey } from '@/features/library/hooks/use-games'
@@ -48,20 +49,6 @@ import { useUpdaterStore } from '@/store/updater-store'
 import { markLaunchSuccessful } from '@/services/health-guard'
 import { cn } from '@/lib/utils'
 
-/**
- * Root layout for every route. Owns the pieces that exist regardless of
- * which page is active: the custom title bar, the invisible resize
- * handles, the sidebar, the ambient background, the Add Game modal, the
- * startup splash, the close-confirmation flow, and the startup fade-in.
- *
- * `relative` + `rounded-xl` + `overflow-hidden` here matters beyond
- * styling: the window itself is fully transparent (`transparent: true`
- * in tauri.conf.json), so *this* div is what actually paints the visible
- * rounded card — and its `overflow-hidden` is what clips `AmbientBackground`,
- * `Modal`, `StartupSplash`, and `ClosingOverlay` (all absolutely
- * positioned children) to that same rounded shape instead of letting
- * them spill into the transparent corners.
- */
 export function AppShell() {
   useWindowDragDropImport()
   useMetadataUpdatedListener()
@@ -87,32 +74,24 @@ export function AppShell() {
     void loadProfiles(true)
   }, [loadProfiles])
 
-  // First-run onboarding sits above everything once the splash is gone,
-  // until the user finishes or skips it (`onboarded` setting). While
-  // settings are still loading it stays hidden so an existing user never
-  // sees a flash of the wizard.
+  // Failsafe timer so StartupSplash can never stay stuck if an animation callback is skipped
+  useEffect(() => {
+    if (!showSplash) return
+    const timer = window.setTimeout(() => setShowSplash(false), 2600)
+    return () => window.clearTimeout(timer)
+  }, [showSplash])
+
   const { data: settings } = useSettings()
   const [onboardingDismissed, setOnboardingDismissed] = useState(false)
   const showOnboarding =
     !showSplash && !onboardingDismissed && settings !== undefined && settings.onboarded !== '1'
 
-  // The splash's own animation is already cheap (compositor-only
-  // transform/opacity, no animated filters — see startup-splash.tsx),
-  // but it was still visibly dropping frames because the *library
-  // route* was mounting and rendering behind it at the same time: the
-  // full games list arriving, a virtualized grid measuring its
-  // container, and a card per visible game each running its own
-  // IntersectionObserver. That's real synchronous main-thread work
-  // competing with the splash's frames, invisible to profiling the
-  // splash's own CSS in isolation.
-  //
-  // Fetching still starts immediately (prefetching into the query
-  // cache costs nothing render-wise — it's just an IPC call resolving
-  // in the background), so the data is already there the instant the
-  // splash finishes; only the *mounting* of the actual grid/cards is
-  // deferred until then.
   useEffect(() => {
-    queryClient.prefetchQuery({ queryKey: gamesKey, queryFn: () => listGames() })
+    void queryClient.prefetchQuery({ queryKey: gamesKey, queryFn: () => listGames() })
+    void queryClient.prefetchQuery({
+      queryKey: ['games', 'default'],
+      queryFn: () => listGames('default'),
+    })
   }, [])
 
   // Auto-Update system initialization, launch health registration, and background check
@@ -125,12 +104,10 @@ export function AppShell() {
       const ver = useUpdaterStore.getState().currentVersion
       await markLaunchSuccessful(ver)
 
-      // Check on startup with slight delay (1.8s) so splash/shell mounts smoothly
       startupTimer = window.setTimeout(() => {
         void useUpdaterStore.getState().checkUpdates(false, true)
       }, 1800)
 
-      // Periodic background check every 2 hours while launcher is running
       intervalId = window.setInterval(
         () => {
           void useUpdaterStore.getState().checkUpdates(false, false)
@@ -151,15 +128,12 @@ export function AppShell() {
     <div
       className={cn(
         'relative flex h-screen flex-col overflow-hidden bg-bg',
-        // Rounded card, border, and shadow belong to the floating
-        // window only — maximized/fullscreen must sit square against
-        // the screen edges (see use-window-maximized.ts). The window
-        // itself is transparent (`transparent: true`), so this div is
-        // what paints the visible rounded card.
         !fillsScreen && 'rounded-xl border border-border shadow-elevated',
       )}
     >
-      <AmbientBackground paused={showSplash || isGateOpen} />
+      {useAppearanceSettingsStore((s) => s.ambientBackground && !s.gpuEcoMode) && (
+        <AmbientBackground paused={showSplash || isGateOpen} />
+      )}
       <ResizeHandles />
       <TitleBar />
       <RecoveryBanner />
@@ -171,21 +145,16 @@ export function AppShell() {
           className="min-h-0 min-w-0 flex-1 flex flex-col"
           initial={{ opacity: 0, scale: 0.99 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.35 * speed, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.25 * speed, ease: [0.16, 1, 0.3, 1] }}
         >
-          {/* Page-level boundary: a crash inside any route (stats, hub,
-            settings) shows a compact fallback while the rest of the
-            shell — sidebar, details panel — keeps working. */}
-          {!showSplash && (
-            <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-              <div className="flex-1 min-h-0 overflow-hidden">
-                <ErrorBoundary label="This page" compact>
-                  <AnimatedOutlet />
-                </ErrorBoundary>
-              </div>
-              <MiniPlayer />
+          <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <ErrorBoundary label="This page" compact>
+                <AnimatedOutlet />
+              </ErrorBoundary>
             </div>
-          )}
+            <MiniPlayer />
+          </div>
         </motion.main>
 
         <ErrorBoundary label="The details panel" compact>
@@ -206,11 +175,6 @@ export function AppShell() {
       <ExpandedPlayer />
       <UpdateModal />
 
-      {/* Nested features (notably the game details panel) portal their
-          dialogs here. Keeping this host inside the rounded shell lets those
-          dialogs use the whole app window without escaping its corners.
-          Elevated to z-[150] so confirmation dialogs sit cleanly above
-          the full-screen profile selection (z-[100]). */}
       <div id="modal-host" className="pointer-events-none absolute inset-0 z-[150]" />
 
       {showSplash && <StartupSplash onDone={() => setShowSplash(false)} />}

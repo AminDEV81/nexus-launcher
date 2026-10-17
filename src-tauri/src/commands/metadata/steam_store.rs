@@ -2,14 +2,6 @@ use crate::error::{AppError, AppResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// Steam's storefront endpoint (the same data the public store page
-/// shows: genres, description, developers, publishers, release date,
-/// Metacritic score, screenshots, system requirements) is open to
-/// everyone — no API key, no OAuth. It only covers games that actually
-/// have a Steam listing, so this is scoped to games with a `steam_app_id`
-/// (set automatically by Epic 5's Steam scan, or whenever a game happens
-/// to match one on SteamGridDB/IGDB), but for those games it needs zero
-/// configuration — a real alternative to IGDB, not a workaround of it.
 const API_BASE: &str = "https://store.steampowered.com/api/appdetails";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -32,7 +24,19 @@ pub struct SystemRequirements {
     pub recommended: Option<SystemRequirementDetail>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SteamTrailerMovie {
+    pub id: i64,
+    pub name: String,
+    pub thumbnail: Option<String>,
+    pub mp4_max: Option<String>,
+    pub mp4_480: Option<String>,
+    pub webm_max: Option<String>,
+    pub hls_url: Option<String>,
+}
+
 pub struct SteamAppDetails {
+    pub name: Option<String>,
     pub description: Option<String>,
     pub developer: Option<String>,
     pub publisher: Option<String>,
@@ -41,6 +45,8 @@ pub struct SteamAppDetails {
     pub metacritic_score: Option<i64>,
     /// Full-resolution screenshot URLs, already in display order.
     pub screenshot_urls: Vec<String>,
+    /// Official uncensored Steam HD trailer movies (MP4/WebM/HLS).
+    pub movies: Vec<SteamTrailerMovie>,
     pub system_requirements: Option<SystemRequirements>,
 }
 
@@ -51,6 +57,10 @@ pub async fn get_app_details(
     let response = client
         .get(API_BASE)
         .query(&[("appids", steam_app_id), ("l", "english")])
+        .header(
+            reqwest::header::COOKIE,
+            "birthtime=0; mature_content=1; lastagecheckage=1-January-1990; wants_mature_content=1",
+        )
         .send()
         .await
         .map_err(|err| AppError::Other(format!("Steam store request failed: {err}")))?;
@@ -70,8 +80,6 @@ pub async fn get_app_details(
         .and_then(Value::as_bool)
         .unwrap_or(false);
     if !success {
-        // Not every appid is a real store listing (some are tools, dedicated
-        // servers, or delisted) — that's a normal "nothing here", not an error.
         return Ok(None);
     }
 
@@ -82,7 +90,23 @@ pub async fn get_app_details(
     Ok(Some(parse_app_details(data)))
 }
 
+fn normalize_https(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if let Some(rest) = trimmed.strip_prefix("http://") {
+        format!("https://{rest}")
+    } else {
+        trimmed.to_string()
+    }
+}
+
 fn parse_app_details(data: &Value) -> SteamAppDetails {
+    let name = data
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+
     let description = data
         .get("short_description")
         .and_then(Value::as_str)
@@ -137,6 +161,62 @@ fn parse_app_details(data: &Value) -> SteamAppDetails {
         })
         .unwrap_or_default();
 
+    let movies = data
+        .get("movies")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| {
+                    let id = item.get("id").and_then(Value::as_i64).unwrap_or(0);
+                    let name = item
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or("Official Steam Trailer")
+                        .trim()
+                        .to_string();
+                    let thumbnail = item
+                        .get("thumbnail")
+                        .and_then(Value::as_str)
+                        .map(normalize_https);
+                    let mp4_max = item
+                        .get("mp4")
+                        .and_then(|m| m.get("max"))
+                        .and_then(Value::as_str)
+                        .map(normalize_https);
+                    let mp4_480 = item
+                        .get("mp4")
+                        .and_then(|m| m.get("480"))
+                        .and_then(Value::as_str)
+                        .map(normalize_https);
+                    let webm_max = item
+                        .get("webm")
+                        .and_then(|m| m.get("max").or_else(|| m.get("480")))
+                        .and_then(Value::as_str)
+                        .map(normalize_https);
+                    let hls_url = item
+                        .get("hls_h264")
+                        .or_else(|| item.get("dash_h264"))
+                        .and_then(Value::as_str)
+                        .map(normalize_https);
+
+                    if mp4_max.is_none() && mp4_480.is_none() && webm_max.is_none() && hls_url.is_none() {
+                        return None;
+                    }
+                    Some(SteamTrailerMovie {
+                        id,
+                        name,
+                        thumbnail,
+                        mp4_max,
+                        mp4_480,
+                        webm_max,
+                        hls_url,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
     let (min_req, rec_req) = if let Some(req_obj) = data.get("pc_requirements").and_then(Value::as_object) {
         let min = req_obj
             .get("minimum")
@@ -161,6 +241,7 @@ fn parse_app_details(data: &Value) -> SteamAppDetails {
     };
 
     SteamAppDetails {
+        name,
         description,
         developer,
         publisher,
@@ -168,6 +249,7 @@ fn parse_app_details(data: &Value) -> SteamAppDetails {
         genres,
         metacritic_score,
         screenshot_urls,
+        movies,
         system_requirements,
     }
 }
@@ -323,11 +405,6 @@ fn join_strings(items: &[Value]) -> String {
         .join(", ")
 }
 
-/// Steam's store date is a human-readable, locale-formatted string (e.g.
-/// "21 Nov, 2019"), unlike IGDB's clean `YYYY-MM-DD` — parsed into the
-/// same format so both sources sort/display consistently. Falls back to
-/// the original string if the format doesn't match what Steam usually
-/// sends (still better than dropping the date entirely).
 fn parse_steam_date(raw: &str) -> String {
     chrono::NaiveDate::parse_from_str(raw, "%e %b, %Y")
         .map(|date| date.format("%Y-%m-%d").to_string())

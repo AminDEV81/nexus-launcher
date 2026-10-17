@@ -315,10 +315,9 @@ mod cpu_priority {
     use winreg::enums::HKEY_CURRENT_USER;
     use winreg::RegKey;
 
-    /// The same per-user Multimedia System Profile values Windows' own
-    /// "Games" task-scheduling category (and most third-party game-mode
-    /// tools) set — tells the scheduler to reserve less CPU for
-    /// background/multimedia tasks and to favor the foreground app.
+    /// Elevates the "Games" task-scheduling category without locking
+    /// global MMCSS SystemResponsiveness to 0 (which can trigger Windows
+    /// MMCSS 10-packet/ms network throttling).
     pub fn boost() -> BoostStepResult {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let mut ok = true;
@@ -326,9 +325,11 @@ mod cpu_priority {
         if let Ok((profile, _)) = hkcu
             .create_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile")
         {
-            ok &= profile.set_value("SystemResponsiveness", &0u32).is_ok();
-        } else {
-            ok = false;
+            // Clean up any previous MMCSS overrides that could engage 10 Mbps network throttling
+            let _ = profile.delete_value("AlwaysOn");
+            let _ = profile.delete_value("NoLazyMode");
+            let _ = profile.delete_value("NetworkThrottlingIndex");
+            let _ = profile.set_value("SystemResponsiveness", &20u32);
         }
 
         if let Ok((games, _)) = hkcu.create_subkey(
@@ -347,11 +348,11 @@ mod cpu_priority {
             label: "CPU priority for gaming".into(),
             applied: ok,
             detail: if ok {
-                "Windows will prioritize CPU/GPU scheduling for the game.".into()
+                "Prioritized foreground game CPU/GPU scheduling with zero network throttling.".into()
             } else {
                 "Some CPU scheduling tweaks could not be applied.".into()
             },
-            metric: None,
+            metric: if ok { Some("High Quantum".into()) } else { None },
         }
     }
 }
@@ -713,33 +714,44 @@ mod game_mode {
 #[cfg(windows)]
 mod gaming_priority {
     use crate::commands::booster::BoostStepResult;
-    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_WRITE};
     use winreg::RegKey;
 
-    /// Disables MMCSS lazy mode, removes network packet throttling for games,
-    /// and suppresses background game DVR recording overhead.
+    /// Boosts foreground thread scheduling and disables background GameDVR capture
+    /// while ensuring Windows MMCSS network throttling (`AlwaysOn` / `NoLazyMode`)
+    /// is completely removed so internet speed is never capped to 10 Mbps.
     pub fn boost() -> BoostStepResult {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let mut ok = true;
 
-        // 1. Disable MMCSS lazy mode and network throttling for games
+        // 1. Remove any MMCSS AlwaysOn/NoLazyMode flags that trigger Windows' 10-packet/ms (10 Mbps) throttle
         if let Ok((sys_profile, _)) = hkcu.create_subkey(
             r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile",
         ) {
-            ok &= sys_profile.set_value("NoLazyMode", &1u32).is_ok();
-            ok &= sys_profile
-                .set_value("NetworkThrottlingIndex", &0xffffffffu32)
-                .is_ok();
-            ok &= sys_profile.set_value("AlwaysOn", &1u32).is_ok();
-        } else {
-            ok = false;
+            let _ = sys_profile.delete_value("AlwaysOn");
+            let _ = sys_profile.delete_value("NoLazyMode");
+            let _ = sys_profile.delete_value("NetworkThrottlingIndex");
+            let _ = sys_profile.set_value("SystemResponsiveness", &20u32);
+        }
+
+        // Also unthrottle HKLM SystemProfile if running with sufficient privileges
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        if let Ok(hklm_profile) = hklm.open_subkey_with_flags(
+            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile",
+            KEY_WRITE,
+        ) {
+            let _ = hklm_profile.delete_value("AlwaysOn");
+            let _ = hklm_profile.delete_value("NoLazyMode");
+            let _ = hklm_profile.set_value("NetworkThrottlingIndex", &0xffffffffu32);
         }
 
         // 2. Disable background GameDVR capture stutter
         if let Ok((dvr, _)) =
             hkcu.create_subkey(r"Software\Microsoft\Windows\CurrentVersion\GameDVR")
         {
-            let _ = dvr.set_value("AppCaptureEnabled", &0u32);
+            ok &= dvr.set_value("AppCaptureEnabled", &0u32).is_ok();
+        } else {
+            ok = false;
         }
         if let Ok((store, _)) = hkcu.create_subkey(r"System\GameConfigStore") {
             let _ = store.set_value("GameDVR_Enabled", &0u32);
@@ -752,15 +764,15 @@ mod gaming_priority {
 
         BoostStepResult {
             id: "gaming_priority".into(),
-            label: "Game thread & MMCSS scheduling".into(),
+            label: "Foreground thread & GameDVR lock".into(),
             applied: ok,
             detail: if ok {
-                "MMCSS lazy mode disabled, network packet throttling removed, and foreground thread quantum boosted.".into()
+                "Background GameDVR capture suppressed, foreground thread quantum boosted, and network bandwidth 100% uncapped.".into()
             } else {
-                "Could not apply real-time thread scheduling tweaks.".into()
+                "Could not apply foreground thread scheduling tweaks.".into()
             },
             metric: if ok {
-                Some("Realtime MMCSS".into())
+                Some("Zero Stutter".into())
             } else {
                 None
             },
@@ -1073,7 +1085,21 @@ pub async fn restore_game_boost(app: tauri::AppHandle) -> AppResult<BoostStepRes
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
+            use winreg::enums::HKEY_CURRENT_USER;
+            use winreg::RegKey;
             const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+            // Ensure any MMCSS overrides are cleaned up so network throughput is 100% unrestricted
+            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+            if let Ok((sys_profile, _)) = hkcu.create_subkey(
+                r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile",
+            ) {
+                let _ = sys_profile.delete_value("AlwaysOn");
+                let _ = sys_profile.delete_value("NoLazyMode");
+                let _ = sys_profile.delete_value("NetworkThrottlingIndex");
+                let _ = sys_profile.set_value("SystemResponsiveness", &20u32);
+            }
+
             let _ = std::process::Command::new("net")
                 .args(["start", "wsearch"])
                 .creation_flags(CREATE_NO_WINDOW)

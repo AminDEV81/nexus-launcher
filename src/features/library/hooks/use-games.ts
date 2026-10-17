@@ -14,12 +14,33 @@ export const gameKey = (id: string, profileId?: string) =>
   profileId ? (['games', profileId, id] as const) : (['games', id] as const)
 
 export function useGames(profileId?: string) {
+  const queryClient = useQueryClient()
   const activeProfileId = useProfileStore((s) => s.activeProfile?.id)
-  const targetId = profileId ?? activeProfileId
+  const targetId = profileId ?? activeProfileId ?? 'default'
 
   return useQuery({
     queryKey: profileGamesKey(targetId),
     queryFn: () => gamesService.listGames(targetId),
+    placeholderData: (previousData) => {
+      if (previousData && previousData.length > 0) {
+        return previousData.map((g) => ({
+          ...g,
+          total_playtime_seconds: 0,
+          last_played_at: null,
+        }))
+      }
+      const queries = queryClient.getQueriesData<Game[]>({ queryKey: gamesKey })
+      for (const [, list] of queries) {
+        if (Array.isArray(list) && list.length > 0) {
+          return list.map((g) => ({
+            ...g,
+            total_playtime_seconds: 0,
+            last_played_at: null,
+          }))
+        }
+      }
+      return undefined
+    },
   })
 }
 

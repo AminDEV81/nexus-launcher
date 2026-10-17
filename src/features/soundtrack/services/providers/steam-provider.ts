@@ -1,4 +1,4 @@
-import { BaseSoundtrackProvider } from './base-provider'
+import { BaseSoundtrackProvider, scoreAlbumMatchForGame } from './base-provider'
 import type {
   GameIdentity,
   ProviderCapabilities,
@@ -55,17 +55,15 @@ export class SteamSoundtrackProvider extends BaseSoundtrackProvider {
       const data = JSON.parse(text) as { items?: SteamStoreSearchItem[] }
       if (!data.items || data.items.length === 0) return []
 
-      const soundtrackItems = data.items.filter((item) => {
+      const targetItems = data.items.filter((item) => {
         const lower = item.name.toLowerCase()
-        return (
+        const isOst =
           lower.includes('soundtrack') ||
           lower.includes('ost') ||
           lower.includes('score') ||
           lower.includes('music')
-        )
+        return isOst && scoreAlbumMatchForGame(item.name, game.title) > 0
       })
-
-      const targetItems = soundtrackItems.length > 0 ? soundtrackItems : data.items.slice(0, 3)
 
       const albums: SoundtrackAlbum[] = []
       for (const item of targetItems.slice(0, 4)) {

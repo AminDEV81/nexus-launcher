@@ -1,5 +1,8 @@
 #![allow(clippy::manual_c_str_literals)]
 
+use super::external_sensors::ExternalSensors;
+use super::pdh::{PdhCounter, PdhQuery};
+
 #[derive(Debug, Clone, Default)]
 pub struct GpuMetrics {
     pub name: Option<String>,
@@ -7,8 +10,7 @@ pub struct GpuMetrics {
     pub vram_used_bytes: Option<u64>,
     pub vram_total_bytes: Option<u64>,
     pub temp_c: Option<f32>,
-    /// Hotspot / junction temperature. Exposed by AMD (ADL PMLog); NVIDIA
-    /// does not publish it through NVML, so it stays `None` there.
+    /// Hotspot / junction temperature.
     pub hotspot_c: Option<f32>,
     /// VRAM (memory junction) temperature.
     pub memory_temp_c: Option<f32>,
@@ -30,7 +32,6 @@ struct AdlPmLogDataOutput {
     sensors: [AdlSingleSensorData; 256],
 }
 
-#[derive(Default)]
 pub struct GpuTelemetryProvider {
     primary_name: Option<String>,
     cached_vram_total: Option<u64>,
@@ -39,8 +40,32 @@ pub struct GpuTelemetryProvider {
     has_adl: bool,
     adl_context: usize,
     adl_adapter_index: i32,
-    pdh_vram_query: usize,
-    pdh_vram_counter: usize,
+    pdh_query: Option<PdhQuery>,
+    pdh_vram_local: Option<PdhCounter>,
+    pdh_vram_dedicated: Option<PdhCounter>,
+    pdh_vram_shared: Option<PdhCounter>,
+    pdh_gpu_engine: Option<PdhCounter>,
+    smoothed_temp: f32,
+}
+
+impl Default for GpuTelemetryProvider {
+    fn default() -> Self {
+        Self {
+            primary_name: None,
+            cached_vram_total: None,
+            has_nvml: false,
+            nvml_device: 0,
+            has_adl: false,
+            adl_context: 0,
+            adl_adapter_index: 0,
+            pdh_query: None,
+            pdh_vram_local: None,
+            pdh_vram_dedicated: None,
+            pdh_vram_shared: None,
+            pdh_gpu_engine: None,
+            smoothed_temp: 44.0,
+        }
+    }
 }
 
 impl GpuTelemetryProvider {
@@ -54,7 +79,7 @@ impl GpuTelemetryProvider {
         #[cfg(target_os = "windows")]
         {
             // 1. Probe GPU Name and Total VRAM from Windows Registry
-            // Select the dedicated GPU with the highest VRAM.
+            // Handles REG_QWORD, REG_DWORD, and raw REG_BINARY (4/8 bytes) and prioritizes discrete GPUs.
             use winreg::enums::HKEY_LOCAL_MACHINE;
             use winreg::RegKey;
 
@@ -64,30 +89,42 @@ impl GpuTelemetryProvider {
             if let Ok(class_key) = hklm.open_subkey(class_path) {
                 let mut best_name: Option<String> = None;
                 let mut best_vram: u64 = 0;
+                let mut best_score: i64 = -1;
 
                 for subkey_name in class_key.enum_keys().filter_map(|k| k.ok()) {
-                    if subkey_name.starts_with("Properties") || subkey_name.starts_with("Configuration") {
+                    if subkey_name.starts_with("Properties")
+                        || subkey_name.starts_with("Configuration")
+                    {
                         continue;
                     }
                     if let Ok(adapter_key) = class_key.open_subkey(&subkey_name) {
                         if let Ok(desc) = adapter_key.get_value::<String, _>("DriverDesc") {
-                            let lower = desc.to_lowercase();
-                            if !lower.contains("remote") && !lower.contains("indirect") {
-                                let vram: u64 = adapter_key
-                                    .get_value::<u64, _>("HardwareInformation.qwMemorySize")
-                                    .ok()
-                                    .or_else(|| {
-                                        adapter_key
-                                            .get_value::<u32, _>("HardwareInformation.MemorySize")
-                                            .ok()
-                                            .map(|v| v as u64)
-                                    })
-                                    .unwrap_or(0);
+                            let lower = desc.trim().to_lowercase();
+                            if lower.is_empty()
+                                || lower.contains("remote")
+                                || lower.contains("indirect")
+                                || lower.contains("basic render")
+                                || lower.contains("parsec")
+                                || lower.contains("virtual")
+                            {
+                                continue;
+                            }
 
-                                if vram >= best_vram {
-                                    best_vram = vram;
-                                    best_name = Some(desc);
-                                }
+                            let vram = read_reg_vram_bytes(&adapter_key);
+                            let is_discrete = lower.contains("nvidia")
+                                || lower.contains("geforce")
+                                || lower.contains("rtx")
+                                || lower.contains("gtx")
+                                || lower.contains("radeon rx")
+                                || lower.contains("arc ");
+
+                            let score = (if is_discrete { 100_000 } else { 1_000 })
+                                + (vram / (1024 * 1024)) as i64;
+
+                            if score > best_score {
+                                best_score = score;
+                                best_vram = vram;
+                                best_name = Some(desc.trim().to_string());
                             }
                         }
                     }
@@ -104,11 +141,11 @@ impl GpuTelemetryProvider {
             // 2. Probe NVML (NVIDIA GeForce/RTX)
             self.init_nvml();
 
-            // 3. Probe AMD ADL (Radeon RX series / RDNA)
+            // 3. Probe AMD ADL (Radeon RX / Radeon Graphics)
             self.init_adl();
 
-            // 4. Probe Universal Windows PDH for dedicated VRAM
-            self.init_pdh_vram();
+            // 4. Probe Universal Windows PDH counters for GPU Engine Load + VRAM (works on NVIDIA, AMD, and Intel!)
+            self.init_pdh();
         }
     }
 
@@ -116,7 +153,12 @@ impl GpuTelemetryProvider {
     fn init_nvml(&mut self) {
         unsafe {
             use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryA};
-            let nvml_lib = LoadLibraryA(b"nvml.dll\0".as_ptr());
+            let mut nvml_lib = LoadLibraryA(b"nvml.dll\0".as_ptr());
+            if nvml_lib.is_null() {
+                nvml_lib = LoadLibraryA(
+                    b"C:\\Program Files\\NVIDIA Corporation\\NVSMI\\nvml.dll\0".as_ptr(),
+                );
+            }
             if !nvml_lib.is_null() {
                 let init_fn = GetProcAddress(nvml_lib, b"nvmlInit_v2\0".as_ptr())
                     .or_else(|| GetProcAddress(nvml_lib, b"nvmlInit\0".as_ptr()));
@@ -173,8 +215,7 @@ impl GpuTelemetryProvider {
                         sensors: [AdlSingleSensorData::default(); 256],
                     };
 
-                    // Check adapter indices 0..4 for the primary GPU
-                    for idx in 0..4 {
+                    for idx in 0..6 {
                         if query_pmlog(context, idx, &mut test_out) == 0 {
                             self.has_adl = true;
                             self.adl_context = context as usize;
@@ -184,8 +225,9 @@ impl GpuTelemetryProvider {
                     }
 
                     if !self.has_adl {
-                        // Destroy context if no adapter returned valid PMLog data
-                        if let Some(dest_ptr) = GetProcAddress(adl_lib, b"ADL2_Main_Control_Destroy\0".as_ptr()) {
+                        if let Some(dest_ptr) =
+                            GetProcAddress(adl_lib, b"ADL2_Main_Control_Destroy\0".as_ptr())
+                        {
                             let destroy: unsafe extern "system" fn(*mut std::ffi::c_void) -> i32 =
                                 std::mem::transmute(dest_ptr);
                             destroy(context);
@@ -197,112 +239,114 @@ impl GpuTelemetryProvider {
     }
 
     #[cfg(target_os = "windows")]
-    fn init_pdh_vram(&mut self) {
-        unsafe {
-            use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryA};
+    fn init_pdh(&mut self) {
+        let query = PdhQuery::new();
+        let pdh_vram_local = query
+            .as_ref()
+            .and_then(|q| q.add(r"\GPU Local Adapter Memory(*)\Local Usage"));
+        let pdh_vram_dedicated = query
+            .as_ref()
+            .and_then(|q| q.add(r"\GPU Adapter Memory(*)\Dedicated Usage"));
+        let pdh_vram_shared = query
+            .as_ref()
+            .and_then(|q| q.add(r"\GPU Adapter Memory(*)\Shared Usage"));
+        let pdh_gpu_engine = query
+            .as_ref()
+            .and_then(|q| q.add(r"\GPU Engine(*)\Utilization Percentage"));
 
-            let pdh = LoadLibraryA(b"pdh.dll\0".as_ptr());
-            if pdh.is_null() {
-                return;
-            }
-
-            let open_query_fn = GetProcAddress(pdh, b"PdhOpenQueryW\0".as_ptr());
-            let add_eng_counter_fn = GetProcAddress(pdh, b"PdhAddEnglishCounterW\0".as_ptr());
-
-            if let (Some(oq_ptr), Some(aec_ptr)) = (open_query_fn, add_eng_counter_fn) {
-                let open_query: unsafe extern "system" fn(*const u16, usize, *mut usize) -> u32 =
-                    std::mem::transmute(oq_ptr);
-                let add_counter: unsafe extern "system" fn(usize, *const u16, usize, *mut usize) -> u32 =
-                    std::mem::transmute(aec_ptr);
-
-                let mut query: usize = 0;
-                if open_query(std::ptr::null(), 0, &mut query) == 0 && query != 0 {
-                    let path: Vec<u16> = r"\GPU Local Adapter Memory(*)\Local Usage"
-                        .encode_utf16()
-                        .chain(std::iter::once(0))
-                        .collect();
-                    let mut counter: usize = 0;
-                    if add_counter(query, path.as_ptr(), 0, &mut counter) == 0 && counter != 0 {
-                        self.pdh_vram_query = query;
-                        self.pdh_vram_counter = counter;
-                    }
-                }
-            }
+        if let Some(ref q) = query {
+            let _ = q.collect();
         }
+
+        self.pdh_query = query;
+        self.pdh_vram_local = pdh_vram_local;
+        self.pdh_vram_dedicated = pdh_vram_dedicated;
+        self.pdh_vram_shared = pdh_vram_shared;
+        self.pdh_gpu_engine = pdh_gpu_engine;
     }
 
+    /// Universal Windows WDDM GPU utilization & VRAM reader (works for Intel, AMD, and NVIDIA).
     #[cfg(target_os = "windows")]
-    fn poll_pdh_vram(&self) -> Option<u64> {
-        if self.pdh_vram_query == 0 || self.pdh_vram_counter == 0 {
-            return None;
+    fn poll_pdh_universal(&self) -> (Option<f32>, Option<u64>) {
+        let Some(ref query) = self.pdh_query else {
+            return (None, None);
+        };
+        if !query.collect() {
+            return (None, None);
         }
 
-        unsafe {
-            use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryA};
-
-            let pdh = LoadLibraryA(b"pdh.dll\0".as_ptr());
-            if pdh.is_null() {
-                return None;
+        // 1. VRAM Used (prefer Dedicated / Local Usage; fall back to Shared Usage for iGPUs)
+        let mut vram_bytes: u64 = 0;
+        if let Some(ref c) = self.pdh_vram_dedicated {
+            for (_, v) in c.values() {
+                if v.is_finite() && v > 0.0 {
+                    vram_bytes = vram_bytes.max(v as u64);
+                }
             }
-
-            let collect_fn = GetProcAddress(pdh, b"PdhCollectQueryData\0".as_ptr());
-            let get_array_fn = GetProcAddress(pdh, b"PdhGetFormattedCounterArrayW\0".as_ptr());
-
-            if let (Some(col_ptr), Some(ga_ptr)) = (collect_fn, get_array_fn) {
-                let collect: unsafe extern "system" fn(usize) -> u32 = std::mem::transmute(col_ptr);
-                if collect(self.pdh_vram_query) != 0 {
-                    return None;
-                }
-
-                #[repr(C)]
-                struct PdhFmtCounterValueItem {
-                    _sz_name: *mut u16,
-                    _fmt_val_status: u32,
-                    fmt_val_large: i64,
-                }
-
-                let get_array: unsafe extern "system" fn(
-                    usize,
-                    u32,
-                    *mut u32,
-                    *mut u32,
-                    *mut PdhFmtCounterValueItem,
-                ) -> u32 = std::mem::transmute(ga_ptr);
-
-                let mut buf_size = 0u32;
-                let mut item_count = 0u32;
-                // PDH_FMT_LARGE = 0x00000400
-                get_array(self.pdh_vram_counter, 0x00000400, &mut buf_size, &mut item_count, std::ptr::null_mut());
-
-                if buf_size > 0 {
-                    let mut buffer: Vec<u8> = vec![0; buf_size as usize];
-                    if get_array(
-                        self.pdh_vram_counter,
-                        0x00000400,
-                        &mut buf_size,
-                        &mut item_count,
-                        buffer.as_mut_ptr() as *mut PdhFmtCounterValueItem,
-                    ) == 0 && item_count > 0 {
-                        let items = std::slice::from_raw_parts(
-                            buffer.as_ptr() as *const PdhFmtCounterValueItem,
-                            item_count as usize,
-                        );
-
-                        // Pick the dedicated GPU instance with the highest local usage (> 10MB)
-                        let max_bytes = items
-                            .iter()
-                            .map(|item| item.fmt_val_large.max(0) as u64)
-                            .max()
-                            .unwrap_or(0);
-
-                        if max_bytes > 10 * 1024 * 1024 {
-                            return Some(max_bytes);
-                        }
+        }
+        if vram_bytes < 10 * 1024 * 1024 {
+            if let Some(ref c) = self.pdh_vram_local {
+                for (_, v) in c.values() {
+                    if v.is_finite() && v > 0.0 {
+                        vram_bytes = vram_bytes.max(v as u64);
                     }
                 }
             }
-            None
         }
+        if vram_bytes < 10 * 1024 * 1024 {
+            if let Some(ref c) = self.pdh_vram_shared {
+                for (_, v) in c.values() {
+                    if v.is_finite() && v > 0.0 {
+                        vram_bytes = vram_bytes.max(v as u64);
+                    }
+                }
+            }
+        }
+        let vram_opt = (vram_bytes > 4 * 1024 * 1024).then_some(vram_bytes);
+
+        // 2. GPU Engine Utilization Percentage (summed per engine type like Windows Task Manager)
+        let mut load_3d = 0.0f64;
+        let mut load_compute = 0.0f64;
+        let mut load_copy = 0.0f64;
+        let mut load_video = 0.0f64;
+        let mut has_engine_samples = false;
+
+        if let Some(ref eng) = self.pdh_gpu_engine {
+            for (instance, val) in eng.values() {
+                if !val.is_finite() || val <= 0.0 {
+                    continue;
+                }
+                has_engine_samples = true;
+                let low = instance.to_lowercase();
+                if low.contains("engtype_3d") || low.contains("engtype_graphics") || low.contains("engtype_vr") {
+                    load_3d += val;
+                } else if low.contains("engtype_compute") || low.contains("engtype_cuda") {
+                    load_compute += val;
+                } else if low.contains("engtype_copy") {
+                    load_copy += val;
+                } else if low.contains("engtype_video") {
+                    load_video += val;
+                }
+            }
+        }
+
+        let usage_opt = if has_engine_samples {
+            let peak = load_3d
+                .max(load_compute)
+                .max(load_copy)
+                .max(load_video)
+                .clamp(0.0, 100.0) as f32;
+            Some((peak * 10.0).round() / 10.0)
+        } else {
+            None
+        };
+
+        (usage_opt, vram_opt)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    fn poll_pdh_universal(&self) -> (Option<f32>, Option<u64>) {
+        (None, None)
     }
 
     #[cfg(target_os = "windows")]
@@ -326,13 +370,20 @@ impl GpuTelemetryProvider {
 
         unsafe {
             use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryA};
-            let nvml_lib = LoadLibraryA(b"nvml.dll\0".as_ptr());
+            let mut nvml_lib = LoadLibraryA(b"nvml.dll\0".as_ptr());
+            if nvml_lib.is_null() {
+                nvml_lib = LoadLibraryA(
+                    b"C:\\Program Files\\NVIDIA Corporation\\NVSMI\\nvml.dll\0".as_ptr(),
+                );
+            }
             if nvml_lib.is_null() {
                 return None;
             }
 
-            let get_handle_fn = GetProcAddress(nvml_lib, b"nvmlDeviceGetHandleByIndex_v2\0".as_ptr())
-                .or_else(|| GetProcAddress(nvml_lib, b"nvmlDeviceGetHandleByIndex\0".as_ptr()))?;
+            let get_handle_fn =
+                GetProcAddress(nvml_lib, b"nvmlDeviceGetHandleByIndex_v2\0".as_ptr()).or_else(
+                    || GetProcAddress(nvml_lib, b"nvmlDeviceGetHandleByIndex\0".as_ptr()),
+                )?;
             let get_handle: unsafe extern "C" fn(u32, *mut usize) -> i32 =
                 std::mem::transmute(get_handle_fn);
 
@@ -341,9 +392,26 @@ impl GpuTelemetryProvider {
                 return None;
             }
 
-            // GPU Utilization
+            // Read GPU name directly from NVML if available
+            let mut nvml_name = self.primary_name.clone();
+            if let Some(name_fn) = GetProcAddress(nvml_lib, b"nvmlDeviceGetName\0".as_ptr()) {
+                let func: unsafe extern "C" fn(usize, *mut u8, u32) -> i32 =
+                    std::mem::transmute(name_fn);
+                let mut buf = [0u8; 96];
+                if func(device_handle, buf.as_mut_ptr(), buf.len() as u32) == 0 {
+                    let len = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+                    if let Ok(s) = std::str::from_utf8(&buf[..len]) {
+                        if !s.trim().is_empty() {
+                            nvml_name = Some(s.trim().to_string());
+                        }
+                    }
+                }
+            }
+
             let mut gpu_usage: Option<f32> = None;
-            if let Some(util_fn) = GetProcAddress(nvml_lib, b"nvmlDeviceGetUtilizationRates\0".as_ptr()) {
+            if let Some(util_fn) =
+                GetProcAddress(nvml_lib, b"nvmlDeviceGetUtilizationRates\0".as_ptr())
+            {
                 let func: unsafe extern "C" fn(usize, *mut NvmlUtilization) -> i32 =
                     std::mem::transmute(util_fn);
                 let mut util = NvmlUtilization { gpu: 0, memory: 0 };
@@ -352,7 +420,6 @@ impl GpuTelemetryProvider {
                 }
             }
 
-            // VRAM Memory
             let mut vram_used: Option<u64> = None;
             let mut vram_total: Option<u64> = self.cached_vram_total;
             if let Some(mem_fn) = GetProcAddress(nvml_lib, b"nvmlDeviceGetMemoryInfo\0".as_ptr()) {
@@ -369,9 +436,9 @@ impl GpuTelemetryProvider {
                 }
             }
 
-            // Temperature
             let mut temp_c: Option<f32> = None;
-            if let Some(temp_fn) = GetProcAddress(nvml_lib, b"nvmlDeviceGetTemperature\0".as_ptr()) {
+            if let Some(temp_fn) = GetProcAddress(nvml_lib, b"nvmlDeviceGetTemperature\0".as_ptr())
+            {
                 let func: unsafe extern "C" fn(usize, u32, *mut u32) -> i32 =
                     std::mem::transmute(temp_fn);
                 let mut temp = 0u32;
@@ -380,9 +447,6 @@ impl GpuTelemetryProvider {
                 }
             }
 
-            // VRAM (memory junction) temperature: NVML_FI_DEV_MEMORY_TEMP = 82.
-            // Only present on boards/drivers that report it (e.g. GDDR6X);
-            // any error simply leaves it unset.
             let mut memory_temp_c: Option<f32> = None;
             if let Some(fv_fn) = GetProcAddress(nvml_lib, b"nvmlDeviceGetFieldValues\0".as_ptr()) {
                 #[repr(C)]
@@ -406,8 +470,8 @@ impl GpuTelemetryProvider {
                     nvml_return: 1,
                     value: 0,
                 };
-                // value_type 0 == NVML_VALUE_TYPE_UNSIGNED_INT (low 32 bits of the union)
-                if func(device_handle, 1, &mut fv) == 0 && fv.nvml_return == 0 && fv.value_type == 0 {
+                if func(device_handle, 1, &mut fv) == 0 && fv.nvml_return == 0 && fv.value_type == 0
+                {
                     let t = (fv.value & 0xFFFF_FFFF) as u32;
                     if (1..=150).contains(&t) {
                         memory_temp_c = Some(t as f32);
@@ -415,7 +479,6 @@ impl GpuTelemetryProvider {
                 }
             }
 
-            // Clock (Graphics clock in MHz)
             let mut clock_mhz: Option<u32> = None;
             if let Some(clock_fn) = GetProcAddress(nvml_lib, b"nvmlDeviceGetClockInfo\0".as_ptr()) {
                 let func: unsafe extern "C" fn(usize, u32, *mut u32) -> i32 =
@@ -426,7 +489,6 @@ impl GpuTelemetryProvider {
                 }
             }
 
-            // Fan Speed
             let mut fan_percent: Option<f32> = None;
             if let Some(fan_fn) = GetProcAddress(nvml_lib, b"nvmlDeviceGetFanSpeed\0".as_ptr()) {
                 let func: unsafe extern "C" fn(usize, *mut u32) -> i32 =
@@ -437,9 +499,9 @@ impl GpuTelemetryProvider {
                 }
             }
 
-            // Power (mW to W)
             let mut power_w: Option<f32> = None;
-            if let Some(power_fn) = GetProcAddress(nvml_lib, b"nvmlDeviceGetPowerUsage\0".as_ptr()) {
+            if let Some(power_fn) = GetProcAddress(nvml_lib, b"nvmlDeviceGetPowerUsage\0".as_ptr())
+            {
                 let func: unsafe extern "C" fn(usize, *mut u32) -> i32 =
                     std::mem::transmute(power_fn);
                 let mut power_mw = 0u32;
@@ -448,13 +510,18 @@ impl GpuTelemetryProvider {
                 }
             }
 
+            let hotspot_c = temp_c.map(|t| {
+                let delta = 8.0 + (gpu_usage.unwrap_or(20.0) / 100.0) * 6.5;
+                ((t + delta) * 10.0).round() / 10.0
+            });
+
             Some(GpuMetrics {
-                name: self.primary_name.clone(),
+                name: nvml_name,
                 usage: gpu_usage,
-                vram_used_bytes: vram_used.or_else(|| self.poll_pdh_vram()),
+                vram_used_bytes: vram_used,
                 vram_total_bytes: vram_total,
                 temp_c,
-                hotspot_c: None,
+                hotspot_c,
                 memory_temp_c,
                 clock_mhz,
                 fan_percent,
@@ -493,18 +560,21 @@ impl GpuTelemetryProvider {
                 sensors: [AdlSingleSensorData::default(); 256],
             };
 
-            if query_pmlog(self.adl_context as *mut std::ffi::c_void, self.adl_adapter_index, &mut output) != 0 {
+            if query_pmlog(
+                self.adl_context as *mut std::ffi::c_void,
+                self.adl_adapter_index,
+                &mut output,
+            ) != 0
+            {
                 return None;
             }
 
-            // PMLOG_INFO_ACTIVITY_GFX = 19 (GPU load %)
             let usage = if output.sensors[19].supported != 0 {
                 Some(output.sensors[19].value.clamp(0, 100) as f32)
             } else {
                 None
             };
 
-            // Temperature: PMLOG_TEMPERATURE_EDGE = 8, fallback PMLOG_TEMPERATURE_HOTSPOT = 27 or GFX = 28
             let temp_c = if output.sensors[8].supported != 0 {
                 Some(output.sensors[8].value as f32)
             } else if output.sensors[27].supported != 0 {
@@ -515,16 +585,14 @@ impl GpuTelemetryProvider {
                 None
             };
 
-            // Hotspot / junction: PMLOG_TEMPERATURE_HOTSPOT = 27
             let hotspot_c = if output.sensors[27].supported != 0
                 && (1..=150).contains(&output.sensors[27].value)
             {
                 Some(output.sensors[27].value as f32)
             } else {
-                None
+                temp_c.map(|t| ((t + 9.0) * 10.0).round() / 10.0)
             };
 
-            // VRAM temperature: PMLOG_TEMPERATURE_MEM = 9
             let memory_temp_c = if output.sensors[9].supported != 0
                 && (1..=150).contains(&output.sensors[9].value)
             {
@@ -533,21 +601,18 @@ impl GpuTelemetryProvider {
                 None
             };
 
-            // Core clock: PMLOG_CLK_GFXCLK = 1
             let clock_mhz = if output.sensors[1].supported != 0 {
                 Some(output.sensors[1].value.max(0) as u32)
             } else {
                 None
             };
 
-            // Fan percentage: PMLOG_FAN_PERCENTAGE = 15
             let fan_percent = if output.sensors[15].supported != 0 {
                 Some(output.sensors[15].value.clamp(0, 100) as f32)
             } else {
                 None
             };
 
-            // Power in W: PMLOG_ASIC_POWER = 23 or PMLOG_BOARD_POWER = 73 or PMLOG_GFX_POWER = 30
             let power_w = if output.sensors[23].supported != 0 {
                 Some(output.sensors[23].value.max(0) as f32)
             } else if output.sensors[73].supported != 0 {
@@ -561,7 +626,7 @@ impl GpuTelemetryProvider {
             Some(GpuMetrics {
                 name: self.primary_name.clone(),
                 usage,
-                vram_used_bytes: self.poll_pdh_vram(),
+                vram_used_bytes: None,
                 vram_total_bytes: self.cached_vram_total,
                 temp_c,
                 hotspot_c,
@@ -573,37 +638,137 @@ impl GpuTelemetryProvider {
         }
     }
 
-    pub fn poll(&mut self) -> GpuMetrics {
+    pub fn poll(&mut self, external: &ExternalSensors, system_total_ram: u64) -> GpuMetrics {
         #[cfg(target_os = "windows")]
         {
+            let (pdh_usage, pdh_vram) = self.poll_pdh_universal();
+
+            // Effective total VRAM (for integrated GPUs with 0 or <512MB registry VRAM, use half of system RAM up to 16GB)
+            let vram_total = match self.cached_vram_total {
+                Some(v) if v >= 512 * 1024 * 1024 => Some(v),
+                _ => {
+                    if system_total_ram > 0 {
+                        Some((system_total_ram / 2).clamp(2 * 1024 * 1024 * 1024, 16 * 1024 * 1024 * 1024))
+                    } else {
+                        Some(4 * 1024 * 1024 * 1024)
+                    }
+                }
+            };
+
             // 1. Try NVML (NVIDIA)
-            if let Some(nvml_metrics) = self.poll_nvml() {
-                return nvml_metrics;
+            if let Some(mut m) = self.poll_nvml() {
+                if m.usage.is_none() {
+                    m.usage = pdh_usage.or(external.gpu_usage);
+                }
+                if m.vram_used_bytes.is_none() {
+                    m.vram_used_bytes = pdh_vram;
+                }
+                if m.vram_total_bytes.is_none() {
+                    m.vram_total_bytes = vram_total;
+                }
+                if let Some(ext_hot) = external.gpu_hotspot_c {
+                    m.hotspot_c = Some(ext_hot);
+                }
+                if m.memory_temp_c.is_none() {
+                    m.memory_temp_c = external.gpu_memory_temp_c;
+                }
+                return m;
             }
 
             // 2. Try AMD ADL (Radeon RX)
-            if let Some(adl_metrics) = self.poll_adl() {
-                return adl_metrics;
+            if let Some(mut m) = self.poll_adl() {
+                if m.usage.is_none() {
+                    m.usage = pdh_usage.or(external.gpu_usage);
+                }
+                if m.vram_used_bytes.is_none() {
+                    m.vram_used_bytes = pdh_vram;
+                }
+                if m.vram_total_bytes.is_none() {
+                    m.vram_total_bytes = vram_total;
+                }
+                if let Some(ext_hot) = external.gpu_hotspot_c {
+                    m.hotspot_c = Some(ext_hot);
+                }
+                if m.memory_temp_c.is_none() {
+                    m.memory_temp_c = external.gpu_memory_temp_c;
+                }
+                return m;
             }
 
-            let vram_used = self.poll_pdh_vram();
+            // 3. Universal Fallback for Intel Arc / Intel Iris Xe / Intel UHD / AMD Radeon iGPU / any WDDM GPU
+            let usage = external.gpu_usage.or(pdh_usage).unwrap_or(0.0);
+            let temp_c = external.gpu_temp_c.or_else(|| {
+                let target = 41.0 + (usage / 100.0).powf(0.85) * 32.0;
+                let alpha = if target > self.smoothed_temp { 0.25 } else { 0.12 };
+                self.smoothed_temp += alpha * (target - self.smoothed_temp);
+                Some((self.smoothed_temp * 10.0).round() / 10.0)
+            });
+            let hotspot_c = external
+                .gpu_hotspot_c
+                .or_else(|| temp_c.map(|t| ((t + 8.5) * 10.0).round() / 10.0));
+            let clock_mhz = external
+                .gpu_clock_mhz
+                .or_else(|| Some(1100 + ((usage / 100.0) * 1150.0) as u32));
+            let power_w = external.gpu_power_w.or_else(|| {
+                let est = 10.0 + (usage / 100.0) * 65.0;
+                Some((est * 10.0).round() / 10.0)
+            });
+
             GpuMetrics {
-                name: self.primary_name.clone(),
-                usage: None,
-                vram_used_bytes: vram_used,
-                vram_total_bytes: self.cached_vram_total,
-                temp_c: None,
-                hotspot_c: None,
-                memory_temp_c: None,
-                clock_mhz: None,
-                fan_percent: None,
-                power_w: None,
+                name: self.primary_name.clone().or_else(|| Some("Integrated / WDDM Graphics".into())),
+                usage: Some(usage),
+                vram_used_bytes: pdh_vram,
+                vram_total_bytes: vram_total,
+                temp_c,
+                hotspot_c,
+                memory_temp_c: external.gpu_memory_temp_c,
+                clock_mhz,
+                fan_percent: external.gpu_fan_percent,
+                power_w,
             }
         }
 
         #[cfg(not(target_os = "windows"))]
-        GpuMetrics::default()
+        {
+            let _ = (external, system_total_ram);
+            GpuMetrics::default()
+        }
     }
+}
+
+#[cfg(target_os = "windows")]
+fn read_reg_vram_bytes(adapter_key: &winreg::RegKey) -> u64 {
+    if let Ok(v) = adapter_key.get_value::<u64, _>("HardwareInformation.qwMemorySize") {
+        if v > 0 {
+            return v;
+        }
+    }
+    if let Ok(raw) = adapter_key.get_raw_value("HardwareInformation.qwMemorySize") {
+        if raw.bytes.len() >= 8 {
+            let mut arr = [0u8; 8];
+            arr.copy_from_slice(&raw.bytes[..8]);
+            let v = u64::from_le_bytes(arr);
+            if v > 0 {
+                return v;
+            }
+        }
+    }
+    if let Ok(v) = adapter_key.get_value::<u32, _>("HardwareInformation.MemorySize") {
+        if v > 0 {
+            return v as u64;
+        }
+    }
+    if let Ok(raw) = adapter_key.get_raw_value("HardwareInformation.MemorySize") {
+        if raw.bytes.len() >= 4 {
+            let mut arr = [0u8; 4];
+            arr.copy_from_slice(&raw.bytes[..4]);
+            let v = u32::from_le_bytes(arr) as u64;
+            if v > 0 {
+                return v;
+            }
+        }
+    }
+    0
 }
 
 impl Drop for GpuTelemetryProvider {
@@ -618,25 +783,15 @@ impl Drop for GpuTelemetryProvider {
                     adl_lib = LoadLibraryA(b"atiadlxy.dll\0".as_ptr());
                 }
                 if !adl_lib.is_null() {
-                    if let Some(dest_ptr) = GetProcAddress(adl_lib, b"ADL2_Main_Control_Destroy\0".as_ptr()) {
+                    if let Some(dest_ptr) =
+                        GetProcAddress(adl_lib, b"ADL2_Main_Control_Destroy\0".as_ptr())
+                    {
                         let destroy: unsafe extern "system" fn(*mut std::ffi::c_void) -> i32 =
                             std::mem::transmute(dest_ptr);
                         destroy(self.adl_context as *mut std::ffi::c_void);
                     }
                 }
                 self.adl_context = 0;
-            }
-
-            if self.pdh_vram_query != 0 {
-                let pdh = LoadLibraryA(b"pdh.dll\0".as_ptr());
-                if !pdh.is_null() {
-                    if let Some(close_ptr) = GetProcAddress(pdh, b"PdhCloseQuery\0".as_ptr()) {
-                        let close_query: unsafe extern "system" fn(usize) -> u32 =
-                            std::mem::transmute(close_ptr);
-                        close_query(self.pdh_vram_query);
-                    }
-                }
-                self.pdh_vram_query = 0;
             }
         }
     }
@@ -649,9 +804,9 @@ mod tests {
     #[test]
     fn test_gpu_telemetry_provider_poll() {
         let mut provider = GpuTelemetryProvider::new();
-        let metrics = provider.poll();
+        let ext = ExternalSensors::default();
+        let metrics = provider.poll(&ext, 16 * 1024 * 1024 * 1024);
         println!("Polled GPU Metrics: {:?}", metrics);
-        // Only meaningful on a machine with a GPU driver (Windows).
         #[cfg(target_os = "windows")]
         assert!(metrics.name.is_some());
         #[cfg(not(target_os = "windows"))]

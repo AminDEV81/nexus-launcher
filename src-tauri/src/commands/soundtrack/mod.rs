@@ -23,6 +23,12 @@ const MAX_HTTP_TEXT_BYTES: usize = 5 * 1024 * 1024;
 const ALLOWED_SOUNDTRACK_HOSTS: &[&str] = &[
     "downloads.khinsider.com",
     "vgmtreasurechest.com",
+    "vgmsite.com",
+    "vgmdownloads.com",
+    "itunes.apple.com",
+    "mzstatic.com",
+    "deezer.com",
+    "dzcdn.net",
     "musicbrainz.org",
     "coverartarchive.org",
     "archive.org",
@@ -94,6 +100,15 @@ pub fn soundtrack_resolve_game(
 ) -> AppResult<Vec<SoundtrackAlbumWithTracks>> {
     let conn = db.connection.lock().expect("db mutex poisoned");
     db::get_albums_for_game(&conn, &game_id)
+}
+
+#[tauri::command]
+pub fn soundtrack_clear_game(
+    game_id: String,
+    db: State<'_, Database>,
+) -> AppResult<()> {
+    let conn = db.connection.lock().expect("db mutex poisoned");
+    db::clear_game_soundtracks(&conn, &game_id)
 }
 
 #[tauri::command]

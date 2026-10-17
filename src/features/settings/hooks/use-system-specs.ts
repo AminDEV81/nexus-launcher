@@ -15,14 +15,17 @@ export function useSystemSpecs() {
   })
 }
 
+import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
+
 export function useLiveSystemMetrics() {
   const windowActive = useWindowActive()
+  const gpuEcoMode = useAppearanceSettingsStore((s) => s.gpuEcoMode)
 
   return useQuery({
     queryKey: liveMetricsQueryKey,
     queryFn: getLiveMetrics,
-    refetchInterval: windowActive ? 2000 : false,
-    staleTime: 1500,
+    refetchInterval: windowActive ? (gpuEcoMode ? 4500 : 2500) : false,
+    staleTime: 2000,
     refetchOnWindowFocus: true,
   })
 }

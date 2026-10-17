@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowRight,
   ArrowUpCircle,
+  ChevronRight,
   Cpu,
   DatabaseBackup,
   KeyRound,
@@ -44,7 +45,11 @@ export type SettingsSectionId =
 
 interface SectionMeta {
   id: SettingsSectionId
-  category: 'Interface & Behavior' | 'Gaming & Hardware' | 'Integrations & Media' | 'Data & Maintenance'
+  category:
+    | 'Interface & Behavior'
+    | 'Gaming & Hardware'
+    | 'Integrations & Media'
+    | 'Data & Maintenance'
   label: string
   shortDesc: string
   description: string
@@ -155,9 +160,7 @@ interface SearchableSettingItem {
   sectionId: SettingsSectionId
 }
 
-/** Comprehensive index of every individual option across all 9 panels so users never lose a setting. */
 const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
-  // Appearance
   {
     title: 'Dark Mode / Light Mode',
     detail: 'Switch between deep obsidian dark theme and high-contrast light theme',
@@ -194,7 +197,6 @@ const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
     keywords: 'sound audio click mute sfx effects chime',
     sectionId: 'appearance',
   },
-  // Launcher & Downloads (Performance)
   {
     title: 'Parallel Download Streams (6x to 32x Turbo)',
     detail: 'Configure simultaneous HTTP Range connections for maximum download speed',
@@ -231,7 +233,6 @@ const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
     keywords: 'gpu eco mode 60 fps cap framerate lock reduce motion ambient glow battery',
     sectionId: 'performance',
   },
-  // Game Booster & OS Tweaks
   {
     title: 'Game Booster & Auto-Boost on Launch',
     detail: '1-click hardware optimization, Esports/Streamer presets, and automatic boost before games',
@@ -262,14 +263,12 @@ const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
     keywords: 'shader cache directx nvidia amd stutter restore point backup windows',
     sectionId: 'booster',
   },
-  // System Specs
   {
     title: 'Hardware Specifications & Live CPU/RAM Telemetry',
     detail: 'Inspect CPU cores/clock, GPU VRAM/driver, RAM usage, SSD/HDD space, and copy report',
     keywords: 'system specs hardware cpu gpu vram ram disk ssd motherboard monitor',
     sectionId: 'system_specs',
   },
-  // Storefront & API Keys (Metadata)
   {
     title: 'Nexus Cloud vs. Personal IGDB & SteamGridDB API Keys',
     detail: 'Use zero-config Nexus Cloud or enter custom Twitch/IGDB and SteamGridDB credentials',
@@ -288,28 +287,24 @@ const SEARCHABLE_SETTINGS: SearchableSettingItem[] = [
     keywords: 'youtube google login sign in trailer age restricted 18+',
     sectionId: 'metadata',
   },
-  // Soundtrack
   {
     title: 'Soundtrack Audio Visualizer & Offline Download Folder',
     detail: 'Switch between Off, Minimal Bars, and Reactive Wave visualizer or change OST folder',
     keywords: 'soundtrack ost music visualizer folder directory download khinsider',
     sectionId: 'soundtrack',
   },
-  // Backup
   {
     title: 'Export & Restore Library Backup (.json)',
     detail: 'Back up or restore all games, collections, tags, profiles, play sessions, and settings',
     keywords: 'backup export import restore database sqlite json save',
     sectionId: 'backup',
   },
-  // Cleanup
   {
     title: 'Storage Cleaner (Orphaned Saves, Snapshots & Artwork Cache)',
     detail: 'Scan and delete leftover files from deleted games and old save snapshots',
     keywords: 'cleanup cleaner storage disk space orphaned saves snapshots artwork cache',
     sectionId: 'cleanup',
   },
-  // Updates
   {
     title: 'Software Updates & Version Check',
     detail: 'Check GitHub Releases for new Nexus Launcher versions and toggle auto-check',
@@ -329,11 +324,12 @@ const QUICK_JUMP_CHIPS: Array<{ label: string; sectionId: SettingsSectionId; ico
 
 export function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const initialSection = (searchParams.get('section') as SettingsSectionId) || 'appearance'
-  const [activeSection, setActiveSection] = useState<SettingsSectionId>(
-    SECTIONS.some((s) => s.id === initialSection) ? initialSection : 'appearance',
-  )
+  const sectionParam = searchParams.get('section') as SettingsSectionId | null
+  const initialSection =
+    sectionParam && SECTIONS.some((s) => s.id === sectionParam) ? sectionParam : 'appearance'
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>(initialSection)
   const [searchQuery, setSearchQuery] = useState('')
+  const mainScrollRef = useRef<HTMLElement | null>(null)
 
   const speed = useAnimationSpeed()
   const updaterStatus = useUpdaterStore((s) => s.status)
@@ -341,17 +337,20 @@ export function SettingsPage() {
   const themeMode = useThemeStore((s) => s.mode)
 
   useEffect(() => {
-    const param = searchParams.get('section') as SettingsSectionId | null
-    if (param && SECTIONS.some((s) => s.id === param) && param !== activeSection) {
-      setActiveSection(param)
+    if (sectionParam && SECTIONS.some((s) => s.id === sectionParam)) {
+      setActiveSection((prev) => (prev === sectionParam ? prev : sectionParam))
     }
-  }, [searchParams, activeSection])
+  }, [sectionParam])
 
   function handleSelectSection(id: SettingsSectionId) {
+    if (id === activeSection && !searchQuery) return
     playButtonClick()
     setActiveSection(id)
     setSearchQuery('')
     setSearchParams({ section: id }, { replace: true })
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
+    }
   }
 
   const active = SECTIONS.find((section) => section.id === activeSection) ?? SECTIONS[0]
@@ -369,38 +368,38 @@ export function SettingsPage() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-bg">
       {/* ── Top Control Center Header with Instant Search ────────────────── */}
-      <header className="relative shrink-0 border-b border-border bg-surface/40 px-6 pb-5 pt-6 lg:px-8">
+      <header className="relative shrink-0 border-b border-border bg-surface/65 px-6 pb-5 pt-6 lg:px-8">
         <div
           className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full"
           style={{
             background:
-              'radial-gradient(circle, color-mix(in srgb, var(--nx-accent) 12%, transparent) 0%, transparent 70%)',
+              'radial-gradient(circle, color-mix(in srgb, var(--nx-accent) 14%, transparent) 0%, transparent 70%)',
           }}
         />
 
         <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="mb-1.5 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-accent">
+            <div className="mb-1.5 flex items-center gap-2 font-mono text-[11px] font-extrabold uppercase tracking-[0.2em] text-accent">
               <Sparkles className="size-3.5" />
-              <span>Nexus Control Center // Unified Configuration</span>
+              <span>Nexus Control Center // System Configuration</span>
             </div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-black tracking-tight text-text sm:text-3xl">Settings</h1>
-              <span className="rounded-full border border-border/80 bg-surface-raised px-2.5 py-0.5 font-mono text-[11px] font-semibold text-subtle">
-                v{currentVersion || '0.6.0'} • {themeMode === 'dark' ? 'Dark' : 'Light'}
+              <span className="rounded-full border border-border bg-surface-raised px-3 py-0.5 font-mono text-xs font-bold text-text/90 shadow-2xs">
+                v{currentVersion || '0.6.0'} • {themeMode === 'dark' ? 'Dark Theme' : 'Light Theme'}
               </span>
             </div>
           </div>
 
           {/* Instant Settings Search Box */}
-          <div className="relative w-full lg:w-96">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-subtle" />
+          <div className="relative w-full lg:w-[420px]">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-accent" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Find any setting (e.g. FPS, Font, Steam region, RAM, Backup)..."
-              className="w-full rounded-2xl border border-border/90 bg-surface pl-10 pr-9 py-2.5 text-xs font-medium text-text placeholder:text-subtle shadow-inner outline-none transition-all focus:border-accent focus:ring-2 focus:ring-accent/20"
+              placeholder="Search any setting (e.g. FPS, Font, Steam region, RAM, Backup)..."
+              className="w-full rounded-2xl border border-border bg-surface pl-10 pr-9 py-2.5 text-xs font-bold text-text placeholder:font-medium placeholder:text-subtle shadow-xs outline-none transition-all focus:border-accent focus:ring-2 focus:ring-accent/25"
             />
             {searchQuery && (
               <button
@@ -416,8 +415,8 @@ export function SettingsPage() {
 
         {/* Quick-Access Jump Bar */}
         <div className="relative mt-4 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wider text-subtle">
-            Quick Jump:
+          <span className="shrink-0 font-mono text-[11px] font-extrabold uppercase tracking-wider text-text/80">
+            Quick Access:
           </span>
           {QUICK_JUMP_CHIPS.map((chip) => {
             const ChipIcon = chip.icon
@@ -428,14 +427,29 @@ export function SettingsPage() {
                 type="button"
                 onClick={() => handleSelectSection(chip.sectionId)}
                 className={cn(
-                  'flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all cursor-pointer',
+                  'relative flex shrink-0 items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-bold tracking-tight transition-colors duration-200 cursor-pointer select-none',
                   isSelected
-                    ? 'border-accent bg-accent text-white shadow-xs'
-                    : 'border-border/80 bg-surface/80 text-muted hover:border-accent/40 hover:bg-surface-raised hover:text-text',
+                    ? 'border-accent text-white'
+                    : 'border-border bg-surface text-text/90 hover:border-accent/50 hover:bg-surface-raised hover:text-text',
                 )}
               >
-                <ChipIcon className="size-3.5" />
-                <span>{chip.label}</span>
+                {isSelected && (
+                  <motion.span
+                    layoutId="settings-quick-chip-bg"
+                    transition={{
+                      type: 'spring',
+                      stiffness: 420,
+                      damping: 32,
+                      mass: 0.75,
+                    }}
+                    className="absolute inset-0 rounded-xl bg-accent shadow-sm shadow-accent/30"
+                  />
+                )}
+                <ChipIcon
+                  className={cn('relative z-10 size-3.5', isSelected ? 'text-white' : 'text-accent')}
+                  strokeWidth={2.25}
+                />
+                <span className="relative z-10">{chip.label}</span>
               </button>
             )
           })}
@@ -449,17 +463,20 @@ export function SettingsPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.15 * speed }}
-              className="mt-3 max-h-72 overflow-y-auto rounded-2xl border border-accent/40 bg-surface/95 p-3 shadow-2xl backdrop-blur-xl"
+              className="mt-3 max-h-72 overflow-y-auto rounded-2xl border border-accent/50 bg-surface p-3.5 shadow-2xl backdrop-blur-xl"
             >
-              <div className="mb-2 flex items-center justify-between px-2 font-mono text-[10px] font-bold uppercase tracking-wider text-subtle">
+              <div className="mb-2.5 flex items-center justify-between px-2 font-mono text-[11px] font-bold uppercase tracking-wider text-text/85">
                 <span>Matching Settings ({searchResults.length})</span>
-                <span>Click any item to open its panel</span>
+                <span>Click any option to jump directly</span>
               </div>
 
               {searchResults.length === 0 ? (
-                <div className="py-6 text-center text-xs text-muted">
+                <div className="py-6 text-center text-xs font-semibold text-muted">
                   No setting matched &ldquo;{searchQuery}&rdquo;. Try keywords like{' '}
-                  <strong className="text-text">theme, font, download, booster, ram, region, backup</strong>.
+                  <strong className="font-bold text-text">
+                    theme, font, download, booster, ram, region, backup
+                  </strong>
+                  .
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -471,20 +488,20 @@ export function SettingsPage() {
                         key={item.title}
                         type="button"
                         onClick={() => handleSelectSection(item.sectionId)}
-                        className="group flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-surface-raised/60 p-3 text-left transition-all hover:border-accent hover:bg-accent/10 cursor-pointer"
+                        className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-surface-raised/80 p-3 text-left transition-all hover:border-accent hover:bg-accent/10 cursor-pointer"
                       >
                         <div className="flex items-start gap-3 min-w-0">
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
-                            <SecIcon className="size-4" />
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/15 text-accent">
+                            <SecIcon className="size-4" strokeWidth={2.25} />
                           </span>
                           <div className="min-w-0">
-                            <div className="truncate text-xs font-bold text-text group-hover:text-accent">
+                            <div className="truncate text-[13px] font-bold text-text group-hover:text-accent">
                               {item.title}
                             </div>
-                            <div className="mt-0.5 line-clamp-1 text-[11px] text-muted">
+                            <div className="mt-0.5 line-clamp-1 text-[11px] font-medium text-muted">
                               {item.detail}
                             </div>
-                            <div className="mt-1 inline-flex items-center gap-1 rounded bg-surface px-1.5 py-0.5 font-mono text-[9px] font-bold text-accent">
+                            <div className="mt-1 inline-flex items-center gap-1 rounded-md border border-accent/25 bg-surface px-1.5 py-0.5 font-mono text-[9.5px] font-bold text-accent">
                               {sec.category} → {sec.label}
                             </div>
                           </div>
@@ -502,14 +519,19 @@ export function SettingsPage() {
 
       {/* ── Main Categorized Layout ──────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col gap-5 p-5 lg:flex-row lg:p-7">
-        {/* Left Categorized Navigation Sidebar */}
-        <nav className="flex shrink-0 gap-2 overflow-x-auto lg:w-72 lg:flex-col lg:gap-4 lg:overflow-y-auto lg:pr-1">
+        {/* Left Categorized Navigation Sidebar with Bold Typography & Smooth Morphing */}
+        <nav className="flex shrink-0 gap-2.5 overflow-x-auto lg:w-[304px] lg:flex-col lg:gap-4 lg:overflow-y-auto lg:pr-1.5 select-none">
           {CATEGORIES.map((categoryName) => {
             const groupSections = SECTIONS.filter((s) => s.category === categoryName)
             return (
               <div key={categoryName} className="flex shrink-0 gap-2 lg:flex-col lg:gap-1.5">
-                <div className="hidden items-center justify-between px-3 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-subtle lg:flex">
-                  <span>{categoryName}</span>
+                {/* Category Header */}
+                <div className="hidden items-center gap-2 px-2 pb-1 lg:flex">
+                  <span className="h-3.5 w-1.5 rounded-full bg-accent" />
+                  <span className="text-[11px] font-black uppercase tracking-[0.15em] text-text/85">
+                    {categoryName}
+                  </span>
+                  <div className="h-px flex-1 bg-border/80" />
                 </div>
 
                 {groupSections.map((section) => {
@@ -525,53 +547,97 @@ export function SettingsPage() {
                       type="button"
                       onClick={() => handleSelectSection(section.id)}
                       className={cn(
-                        'group relative flex min-w-[200px] items-center gap-3 rounded-2xl border px-3.5 py-2.5 text-left transition-all lg:min-w-0 cursor-pointer',
+                        'group relative flex min-w-[225px] items-center gap-3 overflow-hidden rounded-2xl border px-3.5 py-3 text-left transition-colors duration-200 lg:min-w-0 cursor-pointer',
                         isActive
-                          ? 'border-accent/45 bg-accent/12 text-text shadow-[0_8px_24px_color-mix(in_srgb,var(--color-accent)_14%,transparent)]'
-                          : 'border-transparent text-muted hover:border-border/80 hover:bg-surface-raised/70 hover:text-text',
+                          ? 'border-accent/65 text-text shadow-sm'
+                          : 'border-border/85 bg-surface/80 text-text/95 hover:border-accent/45 hover:bg-surface-raised hover:text-text',
                       )}
                     >
+                      {isActive && (
+                        <>
+                          <motion.span
+                            layoutId="settings-active-card-bg"
+                            transition={{
+                              type: 'spring',
+                              stiffness: 420,
+                              damping: 34,
+                              mass: 0.75,
+                            }}
+                            className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-r from-accent/18 via-accent/10 to-transparent"
+                          />
+                          <motion.span
+                            layoutId="settings-active-pill"
+                            transition={{
+                              type: 'spring',
+                              stiffness: 420,
+                              damping: 34,
+                              mass: 0.75,
+                            }}
+                            className="pointer-events-none absolute inset-y-2 left-0 w-1.5 rounded-r-full bg-accent shadow-[0_0_12px_var(--nx-accent)]"
+                          />
+                        </>
+                      )}
+
                       <span
                         className={cn(
-                          'flex size-9 shrink-0 items-center justify-center rounded-xl transition-colors',
+                          'relative z-10 flex size-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-200',
                           isActive
-                            ? 'bg-accent text-white shadow-[0_0_12px_var(--nx-accent)]'
-                            : 'bg-surface-raised text-subtle group-hover:text-text',
+                            ? 'border-accent bg-accent text-white shadow-[0_0_14px_var(--nx-accent)]'
+                            : 'border-border bg-surface-raised text-accent group-hover:border-accent/45 group-hover:bg-accent/15',
                         )}
                       >
-                        <Icon className="size-4" />
+                        <Icon className="size-4.5" strokeWidth={2.35} />
                       </span>
 
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center justify-between gap-1 text-xs font-bold">
-                          <span className="truncate">{section.label}</span>
+                      <span className="relative z-10 min-w-0 flex-1">
+                        <span className="flex items-center justify-between gap-1.5">
+                          <span
+                            className={cn(
+                              'truncate text-[13.5px] tracking-tight transition-colors',
+                              isActive
+                                ? 'font-extrabold text-accent'
+                                : 'font-bold text-text group-hover:text-accent',
+                            )}
+                          >
+                            {section.label}
+                          </span>
                           {section.badge && (
                             <span
                               className={cn(
-                                'rounded px-1.5 py-px font-mono text-[9px] font-black',
+                                'shrink-0 rounded-md px-1.5 py-0.5 font-mono text-[9.5px] font-black tracking-wider',
                                 isActive
-                                  ? 'bg-accent text-white'
-                                  : 'bg-accent/15 text-accent',
+                                  ? 'bg-accent text-white shadow-xs'
+                                  : 'border border-accent/35 bg-accent/15 text-accent',
                               )}
                             >
                               {section.badge}
                             </span>
                           )}
                           {hasUpdate && (
-                            <span className="size-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff] animate-pulse" />
+                            <span className="size-2.5 shrink-0 rounded-full bg-cyan-400 shadow-[0_0_8px_#00f0ff] animate-pulse" />
                           )}
                         </span>
-                        <span className="mt-0.5 block truncate text-[11px] text-subtle">
+                        <span
+                          className={cn(
+                            'mt-0.5 block truncate text-[11px] font-semibold transition-colors',
+                            isActive
+                              ? 'text-text/85'
+                              : 'text-muted group-hover:text-text/80',
+                          )}
+                        >
                           {section.shortDesc}
                         </span>
                       </span>
 
-                      {isActive && (
-                        <motion.span
-                          layoutId="settings-active-pill"
-                          className="absolute inset-y-2.5 left-0 w-1 rounded-r-full bg-accent"
-                        />
-                      )}
+                      <ChevronRight
+                        className={cn(
+                          'relative z-10 size-4 shrink-0 transition-all duration-200',
+                          isActive
+                            ? 'translate-x-0 text-accent opacity-100'
+                            : '-translate-x-1 text-subtle opacity-60 group-hover:translate-x-0 group-hover:text-accent group-hover:opacity-100',
+                        )}
+                        strokeWidth={2.4}
+                      />
                     </button>
                   )
                 })}
@@ -582,40 +648,46 @@ export function SettingsPage() {
 
         {/* Right Active Panel Container */}
         <main
+          ref={mainScrollRef}
           className={cn(
-            'min-h-0 min-w-0 flex-1 overflow-y-auto rounded-3xl border shadow-card',
+            'min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] rounded-3xl border shadow-card transition-colors duration-200',
             activeSection === 'booster'
-              ? 'border-accent/25 bg-bg'
-              : 'border-border/80 bg-surface/45 p-6 lg:p-8',
+              ? 'border-accent/35 bg-bg'
+              : 'border-border bg-surface/65',
           )}
         >
-          {activeSection !== 'booster' && (
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border/70 pb-5">
-              <div className="flex items-center gap-3.5">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-accent/15 text-accent ring-1 ring-accent/30">
-                  <active.icon className="size-5.5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-accent">
-                      {active.category}
-                    </span>
-                  </div>
-                  <h2 className="text-xl font-bold tracking-tight text-text">{active.label}</h2>
-                  <p className="mt-0.5 text-xs text-muted">{active.description}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={activeSection}
-              initial={{ opacity: 0, y: 4 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.14 * speed, ease: 'easeOut' }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18 * speed, ease: [0.22, 1, 0.36, 1] }}
+              className={cn(activeSection !== 'booster' && 'p-6 lg:p-8')}
             >
+              {activeSection !== 'booster' && (
+                <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-5">
+                  <div className="flex items-center gap-4">
+                    <div className="flex size-12 items-center justify-center rounded-2xl border border-accent/35 bg-accent/15 text-accent shadow-xs">
+                      <active.icon className="size-5.5" strokeWidth={2.35} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-[10px] font-extrabold uppercase tracking-wider text-accent">
+                          {active.category}
+                        </span>
+                      </div>
+                      <h2 className="mt-1 text-xl font-black tracking-tight text-text sm:text-2xl">
+                        {active.label}
+                      </h2>
+                      <p className="mt-0.5 text-xs font-semibold text-muted">
+                        {active.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {activeSection === 'appearance' && <AppearancePanel />}
               {activeSection === 'performance' && <PerformancePanel />}
               {activeSection === 'booster' && <BoosterPanel />}

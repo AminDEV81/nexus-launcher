@@ -153,6 +153,16 @@ async fn apply_igdb_text_metadata(
 
     let genres_json = serde_json::to_string(&details.genres).unwrap_or_else(|_| "[]".into());
     let platforms_json = serde_json::to_string(&details.platforms).unwrap_or_else(|_| "[]".into());
+    let resolved_scores = crate::services::scores::resolve_critic_scores_live(
+        db,
+        http,
+        &details.name,
+        details.release_date.as_deref(),
+        None,
+        None,
+        details.critic_score,
+    )
+    .await;
 
     let conn = db.connection.lock().expect("db mutex poisoned");
     conn.execute(
@@ -165,8 +175,10 @@ async fn apply_igdb_text_metadata(
             platforms = ?6,
             trailer_url = COALESCE(?7, trailer_url),
             background_path = COALESCE(?8, background_path),
-            igdb_id = ?9
-         WHERE id = ?10",
+            igdb_id = ?9,
+            metacritic_score = COALESCE(?10, metacritic_score),
+            opencritic_score = COALESCE(?11, opencritic_score)
+         WHERE id = ?12",
         rusqlite::params![
             details.description,
             details.developer,
@@ -177,6 +189,8 @@ async fn apply_igdb_text_metadata(
             details.trailer_url,
             background_path,
             igdb_id,
+            resolved_scores.metacritic,
+            resolved_scores.opencritic,
             game_id,
         ],
     )?;
@@ -271,6 +285,17 @@ async fn auto_fetch_steam_store_text(
     }
 
     let genres_json = serde_json::to_string(&details.genres).unwrap_or_else(|_| "[]".into());
+    let (_, game_name) = get_game_lookup_fields(db, game_id);
+    let resolved_scores = crate::services::scores::resolve_critic_scores_live(
+        db,
+        http,
+        &game_name,
+        details.release_date.as_deref(),
+        details.metacritic_score,
+        None,
+        None,
+    )
+    .await;
 
     let conn = db.connection.lock().expect("db mutex poisoned");
     let changed = conn
@@ -281,18 +306,17 @@ async fn auto_fetch_steam_store_text(
                 publisher = COALESCE(publisher, ?3),
                 release_date = COALESCE(release_date, ?4),
                 genres = CASE WHEN genres = '[]' THEN ?5 ELSE genres END,
-                -- Steam-first: the store returns the *real* Metacritic
-                -- score, so whenever it has one it wins over IGDB's own
-                -- critic aggregate (the IGDB writer is fill-only).
-                metacritic_score = COALESCE(?6, metacritic_score)
-             WHERE id = ?7",
+                metacritic_score = COALESCE(?6, metacritic_score),
+                opencritic_score = COALESCE(?7, opencritic_score)
+             WHERE id = ?8",
             rusqlite::params![
                 details.description,
                 details.developer,
                 details.publisher,
                 details.release_date,
                 genres_json,
-                details.metacritic_score,
+                resolved_scores.metacritic.or(details.metacritic_score),
+                resolved_scores.opencritic,
                 game_id,
             ],
         )
@@ -532,6 +556,33 @@ async fn auto_fetch_one(app: &AppHandle, game_id: &str, game_name: &str) {
             auto_fetch_steamgriddb_artwork(app, &db, &http.0, sgdb_key, game_id, game_name).await;
     }
 
+    // Ensure Metacritic & OpenCritic scores are always resolved and persisted
+    let live_scores = crate::services::scores::resolve_critic_scores_live(
+        &db,
+        &http.0,
+        game_name,
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
+    if live_scores.metacritic.is_some() || live_scores.opencritic.is_some() {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        let changed = conn
+            .execute(
+                "UPDATE games SET
+                    metacritic_score = COALESCE(metacritic_score, ?1),
+                    opencritic_score = COALESCE(opencritic_score, ?2)
+                 WHERE id = ?3",
+                rusqlite::params![live_scores.metacritic, live_scores.opencritic, game_id],
+            )
+            .unwrap_or(0);
+        if changed > 0 {
+            updated = true;
+        }
+    }
+
     if updated {
         let _ = app.emit("metadata-updated", game_id);
     }
@@ -653,7 +704,16 @@ pub(crate) async fn apply_hub_details_to_game(
 
     let genres_json = serde_json::to_string(&details.game.genres).unwrap_or_else(|_| "[]".into());
     let platforms_json = serde_json::to_string(&details.game.platforms).unwrap_or_else(|_| "[]".into());
-    let score = details.metacritic_score.or(details.game.rating);
+    let resolved_scores = crate::services::scores::resolve_critic_scores_live(
+        db,
+        http,
+        &details.game.name,
+        details.game.release_date.as_deref(),
+        details.metacritic_score.or(details.game.metacritic_score),
+        details.opencritic_score.or(details.game.opencritic_score),
+        details.game.rating,
+    )
+    .await;
 
     {
         let conn = db.connection.lock().expect("db mutex poisoned");
@@ -668,8 +728,9 @@ pub(crate) async fn apply_hub_details_to_game(
                 trailer_url = COALESCE(?7, trailer_url),
                 background_path = COALESCE(?8, background_path),
                 igdb_id = COALESCE(?9, igdb_id),
-                metacritic_score = COALESCE(?10, metacritic_score)
-             WHERE id = ?11",
+                metacritic_score = COALESCE(?10, metacritic_score),
+                opencritic_score = COALESCE(?11, opencritic_score)
+             WHERE id = ?12",
             rusqlite::params![
                 details.game.summary,
                 details.developer,
@@ -680,7 +741,8 @@ pub(crate) async fn apply_hub_details_to_game(
                 details.trailer_url,
                 background_path,
                 details.game.igdb_id,
-                score,
+                resolved_scores.metacritic,
+                resolved_scores.opencritic,
                 game_id,
             ],
         )?;

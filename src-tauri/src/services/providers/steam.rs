@@ -1,30 +1,11 @@
 use super::models::UnifiedArtwork;
 use super::traits::ArtworkProvider;
 use crate::error::AppResult;
+use crate::services::scores::normalize_game_title;
 use serde_json::Value;
 
 pub struct SteamArtworkProvider {
     http: reqwest::Client,
-}
-
-fn clean_title(title: &str) -> String {
-    let lower = title.to_lowercase();
-    let words_to_remove = [
-        "edition", "deluxe", "complete", "remastered", "goty", "repack", "fitgirl", "dodi",
-    ];
-    let mut words: Vec<&str> = lower.split_whitespace().collect();
-    words.retain(|w| {
-        let cleaned = w.trim_matches(|c: char| !c.is_alphanumeric());
-        !words_to_remove.contains(&cleaned) && !cleaned.starts_with('v')
-    });
-    let joined = words.join(" ");
-    joined
-        .chars()
-        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
-        .collect::<String>()
-        .split_whitespace()
-        .collect::<Vec<&str>>()
-        .join(" ")
 }
 
 impl SteamArtworkProvider {
@@ -33,7 +14,7 @@ impl SteamArtworkProvider {
     }
 
     pub async fn resolve_app_id(&self, name: &str) -> Option<String> {
-        let clean_q = clean_title(name);
+        let clean_q = normalize_game_title(name);
         if clean_q.is_empty() {
             return None;
         }
@@ -50,17 +31,35 @@ impl SteamArtworkProvider {
         let json: Value = res.json().await.ok()?;
         let items = json.get("items").and_then(Value::as_array)?;
 
+        // Pass 1: exact normalized title match (after stripping edition/remaster noise)
         for item in items {
             if let Some(cand_name) = item.get("name").and_then(Value::as_str) {
-                let clean_cand = clean_title(cand_name);
-                if clean_cand == clean_q
-                    || (clean_cand.starts_with(&clean_q) && clean_q.len() >= 4)
-                    || (clean_q.starts_with(&clean_cand) && clean_cand.len() >= 4)
-                {
+                let clean_cand = normalize_game_title(cand_name);
+                if clean_cand == clean_q {
                     return item.get("id").and_then(|id| id.as_i64()).map(|id| id.to_string());
                 }
             }
         }
+
+        // Pass 2: allow candidate to have an edition suffix only if the extra words are not numbers/sequels
+        for item in items {
+            if let Some(cand_name) = item.get("name").and_then(Value::as_str) {
+                let clean_cand = normalize_game_title(cand_name);
+                if let Some(rest) = clean_cand.strip_prefix(&clean_q) {
+                    let rest_trimmed = rest.trim();
+                    let is_sequel = rest_trimmed.starts_with(|c: char| c.is_ascii_digit())
+                        || matches!(
+                            rest_trimmed,
+                            "ii" | "iii" | "iv" | "v" | "vi" | "vii" | "viii" | "2" | "3" | "4"
+                                | "ragnarok" | "rebirth" | "village"
+                        );
+                    if !rest_trimmed.is_empty() && !is_sequel && clean_q.len() >= 5 {
+                        return item.get("id").and_then(|id| id.as_i64()).map(|id| id.to_string());
+                    }
+                }
+            }
+        }
+
         None
     }
 }

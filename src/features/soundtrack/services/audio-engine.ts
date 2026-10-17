@@ -2,7 +2,13 @@ import { convertFileSrc } from '@tauri-apps/api/core'
 import type { PlaybackSource } from '../types'
 
 export type AudioPlaybackState =
-  'idle' | 'loading' | 'playing' | 'paused' | 'buffering' | 'ended' | 'error'
+  | 'idle'
+  | 'loading'
+  | 'playing'
+  | 'paused'
+  | 'buffering'
+  | 'ended'
+  | 'error'
 
 export interface AudioEngineEvents {
   onStateChange?: (state: AudioPlaybackState) => void
@@ -13,16 +19,16 @@ export interface AudioEngineEvents {
 
 export class NexusAudioEngine {
   private audio: HTMLAudioElement | null = null
-  private audioCtx: AudioContext | null = null
-  private analyser: AnalyserNode | null = null
-  private sourceNode: MediaElementAudioSourceNode | null = null
+  private preloadAudio: HTMLAudioElement | null = null
+  private preloadedUrl: string | null = null
   private ytIframe: HTMLIFrameElement | null = null
+  private ytIframeReady = false
   private ytMessageListenerAttached = false
   private ytCurrentTime = 0
   private ytDuration = 0
   private ytPollTimer: ReturnType<typeof setInterval> | null = null
-  private ytTickerTimer: ReturnType<typeof setInterval> | null = null
-  private ytFallbackTimer: ReturnType<typeof setTimeout> | null = null
+  private ytPlayConfirmResolver: (() => void) | null = null
+  private ytPlayConfirmRejecter: ((err: Error) => void) | null = null
   private playbackSessionId = 0
   private state: AudioPlaybackState = 'idle'
   private currentSource: PlaybackSource | null = null
@@ -36,13 +42,21 @@ export class NexusAudioEngine {
     }
   }
 
+  private getEffectiveVolume(): number {
+    if (this.muted) return 0
+    const v = Number.isFinite(this.volume) ? this.volume : 0.8
+    return Math.max(0, Math.min(1, v <= 0 ? 0.8 : v))
+  }
+
   private initAudio() {
     if (this.audio) return
     if (typeof Audio === 'undefined') return
 
     this.audio = new Audio()
     this.audio.preload = 'auto'
-    this.audio.volume = this.muted ? 0 : this.volume
+    this.audio.muted = this.muted
+    this.audio.volume = this.getEffectiveVolume()
+    ;(this.audio as HTMLAudioElement & { referrerPolicy?: string }).referrerPolicy = 'no-referrer'
 
     this.audio.addEventListener('play', () => {
       if (this.currentSource?.type !== 'youtube') {
@@ -129,12 +143,13 @@ export class NexusAudioEngine {
     const iframe = document.createElement('iframe')
     iframe.id = 'nexus-audio-yt-player'
     iframe.style.position = 'fixed'
-    iframe.style.top = '-9999px'
-    iframe.style.left = '-9999px'
-    iframe.style.width = '10px'
-    iframe.style.height = '10px'
-    iframe.style.opacity = '0'
+    iframe.style.bottom = '0px'
+    iframe.style.right = '0px'
+    iframe.style.width = '1px'
+    iframe.style.height = '1px'
+    iframe.style.opacity = '0.01'
     iframe.style.pointerEvents = 'none'
+    iframe.style.zIndex = '-1'
     iframe.allow = 'autoplay; encrypted-media'
     document.body.appendChild(iframe)
     this.ytIframe = iframe
@@ -157,12 +172,21 @@ export class NexusAudioEngine {
 
           // 1. Handshake
           if (raw.event === 'initialDelivery' || raw.event === 'onReady') {
+            this.ytIframeReady = true
             this.ytIframe?.contentWindow?.postMessage('{"event":"listening"}', '*')
             this.ytIframe?.contentWindow?.postMessage(
               JSON.stringify({
                 event: 'command',
+                func: 'unMute',
+                args: [],
+              }),
+              '*',
+            )
+            this.ytIframe?.contentWindow?.postMessage(
+              JSON.stringify({
+                event: 'command',
                 func: 'setVolume',
-                args: [this.muted ? 0 : this.volume * 100],
+                args: [Math.round(this.getEffectiveVolume() * 100)],
               }),
               '*',
             )
@@ -183,6 +207,12 @@ export class NexusAudioEngine {
 
             if (stateVal === 1) {
               this.setState('playing')
+              if (this.ytPlayConfirmResolver) {
+                const r = this.ytPlayConfirmResolver
+                this.ytPlayConfirmResolver = null
+                this.ytPlayConfirmRejecter = null
+                r()
+              }
             } else if (stateVal === 2) {
               this.setState('paused')
             } else if (stateVal === 3) {
@@ -195,58 +225,56 @@ export class NexusAudioEngine {
             }
           }
 
-          // 3. infoDelivery events (composite object or scalar command response)
+          // 3. infoDelivery events (real YouTube time/duration updates only!)
           if (raw.event === 'infoDelivery') {
             const info = raw.info
-            if (info !== undefined && info !== null) {
-              if (typeof info === 'object') {
-                if (typeof info.currentTime === 'number') {
-                  this.ytCurrentTime = info.currentTime
-                  if (info.currentTime > 0 && this.state !== 'paused' && this.state !== 'ended') {
-                    this.setState('playing')
-                  }
-                }
-                if (typeof info.duration === 'number' && info.duration > 0) {
-                  this.ytDuration = info.duration
-                }
-                if (typeof info.playerState === 'number') {
-                  if (info.playerState === 1) {
-                    this.setState('playing')
-                  } else if (info.playerState === 2) {
-                    this.setState('paused')
-                  } else if (info.playerState === 3) {
-                    if (this.ytCurrentTime === 0) {
-                      this.setState('buffering')
-                    }
-                  } else if (info.playerState === 0) {
-                    this.setState('ended')
-                    this.events.onTrackEnded?.()
-                  }
-                }
-                this.events.onTimeUpdate?.(this.ytCurrentTime, this.ytDuration)
-              } else if (typeof info === 'number') {
-                if (info === 1 && this.state !== 'playing') {
+            if (info !== undefined && info !== null && typeof info === 'object') {
+              if (typeof info.currentTime === 'number' && info.currentTime > 0) {
+                this.ytCurrentTime = info.currentTime
+                if (this.state !== 'paused' && this.state !== 'ended') {
                   this.setState('playing')
-                } else if (info === 2 && this.state === 'playing') {
+                  if (this.ytPlayConfirmResolver) {
+                    const r = this.ytPlayConfirmResolver
+                    this.ytPlayConfirmResolver = null
+                    this.ytPlayConfirmRejecter = null
+                    r()
+                  }
+                }
+              }
+              if (typeof info.duration === 'number' && info.duration > 0) {
+                this.ytDuration = info.duration
+              }
+              if (typeof info.playerState === 'number') {
+                if (info.playerState === 1) {
+                  this.setState('playing')
+                  if (this.ytPlayConfirmResolver) {
+                    const r = this.ytPlayConfirmResolver
+                    this.ytPlayConfirmResolver = null
+                    this.ytPlayConfirmRejecter = null
+                    r()
+                  }
+                } else if (info.playerState === 2) {
                   this.setState('paused')
-                } else if (info === 0) {
+                } else if (info.playerState === 0) {
                   this.setState('ended')
                   this.events.onTrackEnded?.()
-                } else if (info > 3) {
-                  if (this.ytDuration > 0 && info <= this.ytDuration) {
-                    this.ytCurrentTime = info
-                  } else if (this.ytDuration === 0) {
-                    this.ytDuration = info
-                  }
-                  this.events.onTimeUpdate?.(this.ytCurrentTime, this.ytDuration)
                 }
+              }
+              if (this.ytCurrentTime > 0) {
+                this.events.onTimeUpdate?.(this.ytCurrentTime, this.ytDuration)
               }
             }
           }
 
-          // 4. Playback error from embed
+          // 4. Playback error from embed (e.g. Error 150 restricted music embed)
           if (raw.event === 'onError') {
             this.setState('error')
+            if (this.ytPlayConfirmRejecter) {
+              const rej = this.ytPlayConfirmRejecter
+              this.ytPlayConfirmResolver = null
+              this.ytPlayConfirmRejecter = null
+              rej(new Error('YouTube embed playback restricted'))
+            }
             this.events.onError?.('Track playback failed in embed')
           }
         } catch {
@@ -263,45 +291,12 @@ export class NexusAudioEngine {
   }
 
   public getAnalyser(): AnalyserNode | null {
-    // Web Audio CORS limitation:
-    // createMediaElementSource on cross-origin streams without CORS headers
-    // silences audio or causes playback failures in WebView2 / Chromium.
-    // Therefore, only connect AnalyserNode to local files. Remote streams use dynamic visualizer fallback.
-    if (this.currentSource?.type !== 'local') {
-      return null
-    }
-
-    if (this.analyser) return this.analyser
-    if (!this.audio || typeof window === 'undefined') return null
-
-    try {
-      const AudioContextClass =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-      if (!AudioContextClass) return null
-
-      if (!this.audioCtx) {
-        this.audioCtx = new AudioContextClass()
-      }
-
-      if (this.audioCtx.state === 'suspended') {
-        void this.audioCtx.resume().catch(() => undefined)
-      }
-
-      if (!this.sourceNode) {
-        this.sourceNode = this.audioCtx.createMediaElementSource(this.audio)
-        this.analyser = this.audioCtx.createAnalyser()
-        this.analyser.fftSize = 64
-        this.analyser.smoothingTimeConstant = 0.8
-
-        this.sourceNode.connect(this.analyser)
-        this.analyser.connect(this.audioCtx.destination)
-      }
-
-      return this.analyser
-    } catch {
-      return null
-    }
+    // Never attach createMediaElementSource to this.audio!
+    // In Chromium/WebView2, calling createMediaElementSource(this.audio) permanently
+    // routes the HTMLAudioElement through WebAudio and completely mutes any cross-origin
+    // stream (KHInsider / VGM / CDN) that lacks Access-Control-Allow-Origin headers.
+    // AudioVisualizer automatically renders a smooth reactive wave when getAnalyser() returns null.
+    return null
   }
 
   private setState(state: AudioPlaybackState) {
@@ -323,7 +318,6 @@ export class NexusAudioEngine {
     this.setState('loading')
 
     if (source.type === 'youtube') {
-      // Pause native audio element
       if (this.audio) {
         try {
           this.audio.pause()
@@ -334,61 +328,37 @@ export class NexusAudioEngine {
       }
 
       const iframe = this.getOrCreateYtIframe()
-      if (!iframe) return
+      if (!iframe) {
+        throw new Error('YouTube player unavailable')
+      }
 
       this.ytCurrentTime = 0
       this.ytDuration = 0
       this.events.onTimeUpdate?.(0, 0)
 
       const originParam =
-        typeof window !== 'undefined' && window.location.origin
+        typeof window !== 'undefined' && window.location.origin.startsWith('http')
           ? `&origin=${encodeURIComponent(window.location.origin)}`
           : ''
 
-      if (this.ytIframe && this.ytIframe.src && !this.ytIframe.src.includes('about:blank')) {
+      if (this.ytIframeReady && iframe.src && iframe.src.includes('youtube.com/embed/')) {
         iframe.contentWindow?.postMessage(
           JSON.stringify({
             event: 'command',
             func: 'loadVideoById',
-            args: [source.url],
+            args: [source.url, 0],
           }),
           '*',
         )
-        iframe.contentWindow?.postMessage('{"event":"command","func":"playVideo","args":""}', '*')
+        iframe.contentWindow?.postMessage(
+          '{"event":"command","func":"playVideo","args":""}',
+          '*',
+        )
       } else {
-        iframe.src = `https://www.youtube-nocookie.com/embed/${source.url}?autoplay=1&enablejsapi=1&playsinline=1&controls=0${originParam}`
+        this.ytIframeReady = false
+        iframe.src = `https://www.youtube.com/embed/${source.url}?autoplay=1&enablejsapi=1&playsinline=1&controls=0${originParam}`
       }
 
-      // Smooth time ticker for YouTube playback (250ms interval)
-      if (this.ytTickerTimer) {
-        clearInterval(this.ytTickerTimer)
-      }
-      this.ytTickerTimer = setInterval(() => {
-        if (this.playbackSessionId !== sessionId) return
-        if (this.currentSource?.type === 'youtube' && this.state === 'playing') {
-          this.ytCurrentTime += 0.25
-          if (this.ytDuration > 0 && this.ytCurrentTime >= this.ytDuration) {
-            this.setState('ended')
-            this.events.onTrackEnded?.()
-          } else {
-            this.events.onTimeUpdate?.(this.ytCurrentTime, this.ytDuration)
-          }
-        }
-      }, 250)
-
-      // Fallback timer: if embed autoplay starts without explicit postMessage, transition to playing
-      if (this.ytFallbackTimer) clearTimeout(this.ytFallbackTimer)
-      this.ytFallbackTimer = setTimeout(() => {
-        if (
-          this.playbackSessionId === sessionId &&
-          this.currentSource?.type === 'youtube' &&
-          this.state === 'loading'
-        ) {
-          this.setState('playing')
-        }
-      }, 1500)
-
-      // Active polling for metadata/listening handshake
       if (this.ytPollTimer) clearInterval(this.ytPollTimer)
       this.ytPollTimer = setInterval(() => {
         if (this.playbackSessionId !== sessionId) return
@@ -403,18 +373,31 @@ export class NexusAudioEngine {
             '*',
           )
         }
-      }, 1000)
+      }, 600)
+
+      // Wait for real confirmation that YouTube actually started playing audio;
+      // if blocked/restricted within 3.8s, reject so store fails over to direct audio stream!
+      await new Promise<void>((resolve, reject) => {
+        this.ytPlayConfirmResolver = resolve
+        this.ytPlayConfirmRejecter = reject
+        setTimeout(() => {
+          if (this.ytPlayConfirmRejecter) {
+            this.ytPlayConfirmResolver = null
+            this.ytPlayConfirmRejecter = null
+            reject(new Error('YouTube embed timed out or blocked'))
+          }
+        }, 5500)
+      })
       return
     }
 
-    // Handle stream or local audio
+    // Handle direct HTTP stream (.mp3 / .m4a / .ogg) or local audio file
     if (this.ytIframe) {
       try {
         this.ytIframe.contentWindow?.postMessage(
           '{"event":"command","func":"pauseVideo","args":""}',
           '*',
         )
-        this.ytIframe.src = 'about:blank'
       } catch {
         // ignore
       }
@@ -423,19 +406,14 @@ export class NexusAudioEngine {
       clearInterval(this.ytPollTimer)
       this.ytPollTimer = null
     }
-    if (this.ytTickerTimer) {
-      clearInterval(this.ytTickerTimer)
-      this.ytTickerTimer = null
-    }
-    if (this.ytFallbackTimer) {
-      clearTimeout(this.ytFallbackTimer)
-      this.ytFallbackTimer = null
-    }
+    this.ytPlayConfirmResolver = null
+    this.ytPlayConfirmRejecter = null
 
     this.initAudio()
-    if (!this.audio) return
+    if (!this.audio) {
+      throw new Error('HTML5 Audio element unavailable')
+    }
 
-    // Clean pause of any previous playback
     try {
       this.audio.pause()
       this.audio.currentTime = 0
@@ -450,12 +428,11 @@ export class NexusAudioEngine {
       resolvedUrl = convertFileSrc(source.url)
     }
 
-    // Resume AudioContext if suspended (for local files)
-    if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      void this.audioCtx.resume().catch(() => undefined)
-    }
-
+    // Ensure audio element is unmuted and has audible volume
+    this.audio.muted = this.muted
+    this.audio.volume = this.getEffectiveVolume()
     this.audio.src = resolvedUrl
+    this.audio.load()
 
     try {
       const playPromise = this.audio.play()
@@ -463,15 +440,15 @@ export class NexusAudioEngine {
         await playPromise
       }
       if (this.playbackSessionId === sessionId) {
+        this.audio.muted = this.muted
+        this.audio.volume = this.getEffectiveVolume()
         this.setState('playing')
       }
     } catch (err: unknown) {
-      // If superseded by a newer track request, ignore
       if (this.playbackSessionId !== sessionId) {
         return
       }
-      // AbortError or NotAllowedError can happen when rapidly skipping tracks; ignore
-      if (err instanceof Error && (err.name === 'AbortError' || err.name === 'NotAllowedError')) {
+      if (err instanceof Error && err.name === 'AbortError') {
         return
       }
       const msg = err instanceof Error ? err.message : 'Playback failed'
@@ -482,10 +459,6 @@ export class NexusAudioEngine {
   }
 
   public pause(): void {
-    if (this.ytFallbackTimer) {
-      clearTimeout(this.ytFallbackTimer)
-      this.ytFallbackTimer = null
-    }
     if (this.currentSource?.type === 'youtube') {
       this.ytIframe?.contentWindow?.postMessage(
         '{"event":"command","func":"pauseVideo","args":""}',
@@ -512,10 +485,9 @@ export class NexusAudioEngine {
     }
 
     if (this.audio && this.audio.paused) {
-      if (this.audioCtx && this.audioCtx.state === 'suspended') {
-        void this.audioCtx.resume().catch(() => undefined)
-      }
       try {
+        this.audio.muted = this.muted
+        this.audio.volume = this.getEffectiveVolume()
         await this.audio.play()
         this.setState('playing')
       } catch (err) {
@@ -552,7 +524,7 @@ export class NexusAudioEngine {
         JSON.stringify({
           event: 'command',
           func: 'setVolume',
-          args: [this.muted ? 0 : this.volume * 100],
+          args: [this.muted ? 0 : Math.round(this.volume * 100)],
         }),
         '*',
       )
@@ -566,7 +538,8 @@ export class NexusAudioEngine {
   public setMuted(muted: boolean): void {
     this.muted = muted
     if (this.audio) {
-      this.audio.volume = muted ? 0 : this.volume
+      this.audio.muted = muted
+      this.audio.volume = muted ? 0 : this.getEffectiveVolume()
     }
     if (this.ytIframe) {
       this.ytIframe.contentWindow?.postMessage(
@@ -581,7 +554,7 @@ export class NexusAudioEngine {
         JSON.stringify({
           event: 'command',
           func: 'setVolume',
-          args: [muted ? 0 : this.volume * 100],
+          args: [muted ? 0 : Math.round(this.getEffectiveVolume() * 100)],
         }),
         '*',
       )
@@ -604,18 +577,12 @@ export class NexusAudioEngine {
 
   public stop(): void {
     this.playbackSessionId++
-    if (this.ytFallbackTimer) {
-      clearTimeout(this.ytFallbackTimer)
-      this.ytFallbackTimer = null
-    }
     if (this.ytPollTimer) {
       clearInterval(this.ytPollTimer)
       this.ytPollTimer = null
     }
-    if (this.ytTickerTimer) {
-      clearInterval(this.ytTickerTimer)
-      this.ytTickerTimer = null
-    }
+    this.ytPlayConfirmResolver = null
+    this.ytPlayConfirmRejecter = null
     if (this.ytIframe) {
       try {
         this.ytIframe.contentWindow?.postMessage(
@@ -636,6 +603,33 @@ export class NexusAudioEngine {
       }
     }
     this.setState('idle')
+  }
+
+  public preloadStream(url: string | null | undefined): void {
+    if (!url || typeof Audio === 'undefined') return
+    if (
+      !url.startsWith('http://') &&
+      !url.startsWith('https://') &&
+      !url.startsWith('asset://')
+    ) {
+      return
+    }
+    if (this.preloadedUrl === url) return
+    try {
+      if (!this.preloadAudio) {
+        this.preloadAudio = new Audio()
+        this.preloadAudio.preload = 'auto'
+        this.preloadAudio.muted = true
+        this.preloadAudio.volume = 0
+        ;(this.preloadAudio as HTMLAudioElement & { referrerPolicy?: string }).referrerPolicy =
+          'no-referrer'
+      }
+      this.preloadedUrl = url
+      this.preloadAudio.src = url
+      this.preloadAudio.load()
+    } catch {
+      // Ignore preload errors
+    }
   }
 }
 

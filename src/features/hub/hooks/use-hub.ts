@@ -1,19 +1,62 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import * as hubService from '@/services/hub'
-import type { HubGame, HubSearchFilters } from '@/types/models'
+import type {
+  HubGame,
+  HubGameDetails,
+  HubGenre,
+  HubPlatform,
+  HubSearchFilters,
+} from '@/types/models'
 
-/**
- * Hub queries poll periodically rather than only on mount: the feed is
- * supposed to stay current ("new games keep showing up") even while the
- * window stays open. 30-minute refetch + refetch-on-focus is plenty —
- * IGDB's catalog doesn't change faster than that, and it keeps us far
- * away from rate limits.
- */
 const HUB_REFRESH = {
-  staleTime: 15 * 60_000,
-  refetchInterval: 30 * 60_000,
-  refetchOnWindowFocus: false,
+  staleTime: 3 * 60_000,
+  refetchInterval: 5 * 60_000,
+  refetchOnWindowFocus: true,
 }
+
+/** Built-in canonical IGDB genres so filter chips render immediately without waiting for network. */
+export const FALLBACK_HUB_GENRES: HubGenre[] = [
+  { id: 31, name: 'Adventure' },
+  { id: 33, name: 'Arcade' },
+  { id: 35, name: 'Card & Board Game' },
+  { id: 4, name: 'Fighting' },
+  { id: 25, name: "Hack and slash/Beat 'em up" },
+  { id: 32, name: 'Indie' },
+  { id: 36, name: 'MOBA' },
+  { id: 7, name: 'Music' },
+  { id: 8, name: 'Platform' },
+  { id: 2, name: 'Point-and-click' },
+  { id: 9, name: 'Puzzle' },
+  { id: 10, name: 'Racing' },
+  { id: 11, name: 'Real Time Strategy (RTS)' },
+  { id: 12, name: 'Role-playing (RPG)' },
+  { id: 5, name: 'Shooter' },
+  { id: 13, name: 'Simulator' },
+  { id: 14, name: 'Sport' },
+  { id: 15, name: 'Strategy' },
+  { id: 24, name: 'Tactical' },
+  { id: 16, name: 'Turn-based strategy (TBS)' },
+  { id: 34, name: 'Visual Novel' },
+]
+
+/** Built-in canonical IGDB platforms so platform pills render immediately. */
+export const FALLBACK_HUB_PLATFORMS: HubPlatform[] = [
+  { id: 6, name: 'PC (Microsoft Windows)', abbreviation: 'PC' },
+  { id: 167, name: 'PlayStation 5', abbreviation: 'PS5' },
+  { id: 48, name: 'PlayStation 4', abbreviation: 'PS4' },
+  { id: 169, name: 'Xbox Series X|S', abbreviation: 'Series X|S' },
+  { id: 49, name: 'Xbox One', abbreviation: 'XONE' },
+  { id: 130, name: 'Nintendo Switch', abbreviation: 'Switch' },
+  { id: 508, name: 'Nintendo Switch 2', abbreviation: 'Switch 2' },
+  { id: 3, name: 'Linux', abbreviation: 'Linux' },
+  { id: 14, name: 'Mac', abbreviation: 'Mac' },
+]
 
 export function useHubNewReleases() {
   return useQuery({
@@ -47,65 +90,183 @@ export function useHubRecommended() {
   })
 }
 
+/**
+ * Fetch all four home shelves in parallel (`newReleases`, `comingSoon`,
+ * `topRated`, `recommended`).
+ */
+export function useHubHomeFeed() {
+  const newReleases = useHubNewReleases()
+  const comingSoon = useHubComingSoon()
+  const topRated = useHubTopRated()
+  const recommended = useHubRecommended()
+  return {
+    newReleases,
+    comingSoon,
+    topRated,
+    recommended,
+  }
+}
+
+export function useRefreshHubCatalog() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => hubService.refreshHubCatalog(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['hub'] })
+    },
+  })
+}
+
+function findCachedHubGame(
+  queryClient: ReturnType<typeof useQueryClient>,
+  igdbId: number,
+): HubGameDetails | undefined {
+  const entries = queryClient.getQueriesData<unknown>({ queryKey: ['hub'] })
+  for (const [, data] of entries) {
+    if (!data) continue
+    if (Array.isArray(data)) {
+      const match = (data as HubGame[]).find((g) => g && g.igdb_id === igdbId)
+      if (match) {
+        return {
+          ...match,
+          genres: match.genres ?? [],
+          platforms: match.platforms ?? [],
+          developer: null,
+          publisher: null,
+          trailer_url: null,
+          videos: [],
+          screenshot_urls: match.backdrop_url ? [match.backdrop_url] : [],
+          metacritic_score: match.metacritic_score ?? null,
+          opencritic_score: match.opencritic_score ?? null,
+          steam_app_id: null,
+          system_requirements: null,
+        }
+      }
+    } else if (
+      typeof data === 'object' &&
+      data !== null &&
+      'pages' in data &&
+      Array.isArray((data as { pages: unknown[] }).pages)
+    ) {
+      for (const page of (data as { pages: HubGame[][] }).pages) {
+        if (!Array.isArray(page)) continue
+        const match = page.find((g) => g && g.igdb_id === igdbId)
+        if (match) {
+          return {
+            ...match,
+            developer: null,
+            publisher: null,
+            trailer_url: null,
+            videos: [],
+            screenshot_urls: match.backdrop_url ? [match.backdrop_url] : [],
+            metacritic_score: match.metacritic_score ?? null,
+            opencritic_score: match.opencritic_score ?? null,
+            steam_app_id: null,
+            system_requirements: null,
+          }
+        }
+      }
+    }
+  }
+  return undefined
+}
+
 export function useHubGameDetails(igdbId: number) {
+  const queryClient = useQueryClient()
   return useQuery({
     queryKey: ['hub', 'game', igdbId],
     queryFn: () => hubService.getHubGameDetails(igdbId),
+    enabled: igdbId > 0,
+    staleTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: () => findCachedHubGame(queryClient, igdbId),
+  })
+}
+
+export function useSimilarHubGames(igdbId: number) {
+  return useQuery({
+    queryKey: ['hub', 'similar', igdbId],
+    queryFn: () => hubService.getHubSimilarGames(igdbId),
+    enabled: igdbId > 0,
     staleTime: 10 * 60_000,
   })
 }
 
-/** Catalog search, paged 24 at a time behind "Load more". Infinite
- *  query (not a plain one) so each loaded page survives remounts —
- *  coming back from a game's page restores every page already fetched,
- *  not just the first. Any active filter/sort also enables it without a
- *  term — a pure browse mode. */
-export function useHubSearch(query: string, filters: HubSearchFilters) {
-  return useInfiniteQuery({
-    queryKey: ['hub', 'search', query, filters],
-    queryFn: ({ pageParam }) => hubService.searchHubGames(query, pageParam, filters),
-    initialPageParam: 0,
-    getNextPageParam: (lastPage: HubGame[], allPages: HubGame[][]) =>
-      lastPage.length < hubService.HUB_SEARCH_PAGE_SIZE
-        ? undefined
-        : allPages.length * hubService.HUB_SEARCH_PAGE_SIZE,
-    enabled:
-      query.trim().length >= 2 ||
+/**
+ * Catalog search, paged 24 at a time behind "Load more".
+ * Runs when either `query` is >= 2 chars OR at least one filter/sort in `filters` is set.
+ */
+export function useHubSearch(query: string, filters: HubSearchFilters = {}) {
+  const trimmed = query.trim()
+  const gIds = filters.genreIds && filters.genreIds.length > 0 ? filters.genreIds : undefined
+  const pIds =
+    filters.platformIds && filters.platformIds.length > 0 ? filters.platformIds : undefined
+  const hasFilter = Boolean(
+    (gIds && gIds.length > 0) ||
       filters.genreId != null ||
-      Boolean(filters.genreIds && filters.genreIds.length > 0) ||
+      (pIds && pIds.length > 0) ||
       filters.platformId != null ||
-      Boolean(filters.platformIds && filters.platformIds.length > 0) ||
-      Boolean(filters.release) ||
+      (filters.release && filters.release.length > 0) ||
       filters.yearFrom != null ||
       filters.yearTo != null ||
       filters.minRating != null ||
-      Boolean(filters.sort),
-    staleTime: 60_000,
+      (filters.sort && filters.sort.length > 0) ||
+      (filters.gameCategory && filters.gameCategory !== 'all') ||
+      (filters.gameMode && filters.gameMode !== 'all') ||
+      filters.onlyReleased,
+  )
+  const enabled = trimmed.length >= 2 || hasFilter
+  const normalizedFilters: HubSearchFilters = {
+    genreId: filters.genreId ?? null,
+    genreIds: gIds,
+    platformId: filters.platformId ?? null,
+    platformIds: pIds,
+    release: filters.release ?? null,
+    yearFrom: filters.yearFrom ?? null,
+    yearTo: filters.yearTo ?? null,
+    minRating: filters.minRating ?? null,
+    sort: filters.sort ?? null,
+    gameCategory: filters.gameCategory ?? null,
+    gameMode: filters.gameMode ?? null,
+    onlyReleased: filters.onlyReleased ?? null,
+  }
+
+  return useInfiniteQuery({
+    queryKey: ['hub', 'search', trimmed.toLowerCase(), normalizedFilters],
+    queryFn: ({ pageParam }) =>
+      hubService.searchHubGames(trimmed, pageParam, normalizedFilters),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage: HubGame[], allPages: HubGame[][]) =>
+      lastPage.length < 16
+        ? undefined
+        : allPages.length * hubService.HUB_SEARCH_PAGE_SIZE,
+    enabled,
+    staleTime: 2 * 60_000,
+    placeholderData: keepPreviousData,
   })
 }
 
-/** IGDB's fixed genre list for the filter chips — cached for the whole
- *  session; the catalog's genre set changes at geological speed. */
+/** IGDB's fixed genre list for the filter chips — with instant fallback. */
 export function useHubGenres() {
   return useQuery({
     queryKey: ['hub', 'genres'],
     queryFn: hubService.listHubGenres,
+    placeholderData: FALLBACK_HUB_GENRES,
     staleTime: 24 * 60 * 60_000,
   })
 }
 
-/** Curated modern platforms for the filter dropdown, same caching. */
+/** Curated modern platforms for the filter dropdown — with instant fallback. */
 export function useHubPlatforms() {
   return useQuery({
     queryKey: ['hub', 'platforms'],
     queryFn: hubService.listHubPlatforms,
+    placeholderData: FALLBACK_HUB_PLATFORMS,
     staleTime: 24 * 60 * 60_000,
   })
 }
 
-/** Full listing behind a shelf's "More" button — paged 24 at a time,
- *  same infinite-query pattern as the search so loaded pages survive
- *  remounts (coming back from a game's page keeps the grid). */
+/** Full listing behind a shelf's "More" button — paged 24 at a time. */
 export function useHubFeed(feed: string, enabled = true) {
   return useInfiniteQuery({
     queryKey: ['hub', 'feed', feed],
@@ -116,7 +277,7 @@ export function useHubFeed(feed: string, enabled = true) {
         ? undefined
         : allPages.length * hubService.HUB_FEED_PAGE_SIZE,
     enabled,
-    staleTime: 15 * 60_000,
+    staleTime: 5 * 60_000,
   })
 }
 
@@ -125,10 +286,8 @@ export function useAddGameFromHub() {
   return useMutation({
     mutationFn: (igdbId: number) => hubService.addGameFromHub(igdbId),
     onSuccess: () => {
-      // The library list is the hub's "in library" source of truth (see
-      // utils/in-library.ts), so refreshing it flips every badge and
-      // the detail page's button in one shot.
       queryClient.invalidateQueries({ queryKey: ['games'] })
+      queryClient.invalidateQueries({ queryKey: ['hub', 'recommended'] })
     },
   })
 }
@@ -139,6 +298,7 @@ export function useAddGameToWishlist() {
     mutationFn: (igdbId: number) => hubService.addGameToWishlist(igdbId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['games'] })
+      queryClient.invalidateQueries({ queryKey: ['hub', 'recommended'] })
     },
   })
 }

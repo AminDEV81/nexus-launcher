@@ -37,6 +37,10 @@ export function resolveGameSoundtracks(gameId: string): Promise<SoundtrackAlbumW
   return call<SoundtrackAlbumWithTracks[]>('soundtrack_resolve_game', { gameId })
 }
 
+export function clearGameSoundtracks(gameId: string): Promise<void> {
+  return call<void>('soundtrack_clear_game', { gameId })
+}
+
 export function getSoundtrackAlbum(albumId: string): Promise<SoundtrackAlbumWithTracks | null> {
   return call<SoundtrackAlbumWithTracks | null>('soundtrack_get_album', { albumId })
 }
@@ -121,6 +125,7 @@ export interface YouTubeTrackResult {
   title: string
   channel: string
   duration_seconds: number | null
+  direct_audio_url?: string | null
 }
 
 export function soundtrackSearchYouTube(query: string, limit = 5): Promise<YouTubeTrackResult[]> {

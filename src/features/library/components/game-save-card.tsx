@@ -13,6 +13,7 @@ import {
   Database,
   Archive,
   Upload,
+  Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Game, GameSaveDetails, DetectedSaveLocation } from '@/types/models'
@@ -86,12 +87,21 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
       setIsLoading(true)
       const data = await saveService.getGameSaveDetails(game.id, activeProfile?.id)
       setDetails(data)
+
+      // If no locations are configured yet, automatically run background save detection
+      if (!data.locations || data.locations.length === 0) {
+        const steamAppId = game.steam_app_id ? parseInt(game.steam_app_id, 10) : undefined
+        const candidates = await saveService
+          .detectGameSaves(game.id, game.name, steamAppId)
+          .catch(() => [])
+        setDetected(filterDuplicateCandidates(candidates, data.locations ?? []))
+      }
     } catch (err) {
       console.error('Failed to load game save details:', err)
     } finally {
       setIsLoading(false)
     }
-  }, [game.id, activeProfile?.id])
+  }, [game.id, game.name, game.steam_app_id, activeProfile?.id])
 
   const handleApplyFromDatabase = async () => {
     try {
@@ -131,9 +141,9 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
       const filtered = filterDuplicateCandidates(candidates, details?.locations ?? [])
       setDetected(filtered)
       if (filtered.length === 0) {
-        toast.info('No new save locations detected automatically.')
+        toast.info('No additional save locations detected on disk.')
       } else {
-        toast.success(`Found ${filtered.length} candidate save locations.`)
+        toast.success(`Found ${filtered.length} candidate save location(s).`)
       }
     } catch {
       toast.error('Failed to detect save locations.')
@@ -158,7 +168,7 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
           (l.resolved_path && normalizePathForFilter(l.resolved_path) === trimmedNorm),
       )
     ) {
-      toast.info('This save location is already added for this game.')
+      toast.info('This save location is already tracked for this game.')
       setShowAddCustom(false)
       setCustomPathInput('')
       return
@@ -166,7 +176,7 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
 
     try {
       await saveService.configureSaveLocation(game.id, trimmed, 'save', true)
-      toast.success('Save location added successfully.')
+      toast.success('Save location added and enabled.')
       setShowAddCustom(false)
       setCustomPathInput('')
       setDetected((prev) =>
@@ -203,7 +213,10 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
   const handleOpenFolder = async (path?: string) => {
     try {
       const target = path || (details?.locations[0]?.resolved_path ?? '')
-      if (!target) return
+      if (!target) {
+        toast.info('Configure or detect a save folder first.')
+        return
+      }
       await saveService.openSaveFolder(target)
     } catch (err) {
       toast.error(`Could not open folder: ${String(err)}`)
@@ -223,174 +236,190 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
   }
 
   const otherProfiles = profiles.filter((p) => p.id !== activeProfile?.id)
+  const activeLocationsCount = details?.locations?.filter((l) => l.is_enabled).length ?? 0
 
   return (
     <div className="flex flex-col gap-4">
-      {/* ── Status Header Card ────────────────────────────────────────── */}
-      <section className="rounded-2xl border border-border/80 bg-surface-raised/80 p-4 shadow-sm">
-        <div className="flex items-start justify-between gap-2.5">
+      {/* ── BOX 1: Save Vault & Backup Command Center (Clean Multi-Row Layout) ── */}
+      <section className="flex flex-col gap-3.5 rounded-2xl border border-border/80 bg-surface-raised/85 p-4 shadow-sm">
+        {/* Row 1: Identity & Status Pill */}
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent border border-accent/20">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-accent/25 bg-accent/15 text-accent shadow-2xs">
               <HardDrive className="size-4.5" />
             </div>
             <div className="min-w-0">
-              <h4 className="text-xs font-bold text-text">Save Data Isolation</h4>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                <span
-                  className="text-[11px] text-subtle truncate max-w-[140px]"
-                  title={activeProfile?.name}
-                >
-                  Profile:{' '}
-                  <span className="font-semibold text-text">
-                    {activeProfile?.name || 'Default'}
-                  </span>
+              <h4 className="text-xs font-bold text-text truncate">Save Vault &amp; Backup</h4>
+              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-subtle truncate">
+                <span>Profile:</span>
+                <span className="font-semibold text-text truncate">
+                  {activeProfile?.name || 'Default'}
                 </span>
-                <span className="text-subtle text-[10px]">•</span>
-                {details?.is_managed ? (
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
-                    <CheckCircle2 className="size-3" />
-                    Managed
-                  </span>
-                ) : (
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-[10px] font-medium text-subtle">
-                    <AlertCircle className="size-3" />
-                    Unmanaged
-                  </span>
-                )}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+          <div className="flex items-center gap-1.5 shrink-0">
+            {details?.is_managed ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/12 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400">
+                <CheckCircle2 className="size-3" />
+                <span>Managed</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-amber-400">
+                <AlertCircle className="size-3" />
+                <span>Unmanaged</span>
+              </span>
+            )}
+
             <button
               type="button"
               onClick={() => void loadData()}
               disabled={isLoading}
               title="Refresh save status"
-              className="flex size-8 items-center justify-center rounded-xl border border-border bg-surface text-muted transition-colors hover:text-text hover:bg-surface-raised cursor-pointer"
+              className="flex size-7 items-center justify-center rounded-lg border border-border bg-surface text-muted transition-colors hover:border-accent/40 hover:text-text cursor-pointer"
             >
-              <RefreshCw className={cn('size-3.5', isLoading && 'animate-spin')} />
+              <RefreshCw className={cn('size-3.5', isLoading && 'animate-spin text-accent')} />
             </button>
-
-            <button
-              type="button"
-              onClick={() => handleOpenBackupModal('backup')}
-              title="Backup game saves to compressed .zip archive"
-              className="flex items-center gap-1 rounded-xl border border-accent/40 bg-accent/10 px-2.5 py-1.5 text-xs font-semibold text-accent transition-colors hover:bg-accent hover:text-white cursor-pointer"
-            >
-              <Archive className="size-3.5" />
-              <span>Backup</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleOpenBackupModal('restore')}
-              title="Restore saves from .zip archive"
-              className="flex items-center gap-1 rounded-xl border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-text transition-colors hover:bg-surface-raised hover:border-accent/40 cursor-pointer"
-            >
-              <Upload className="size-3.5" />
-              <span>Restore</span>
-            </button>
-
-            {details?.is_managed && (
-              <button
-                type="button"
-                onClick={() => openHistoryModal(game.id)}
-                title="View save snapshots"
-                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-text transition-colors hover:bg-surface-raised hover:border-accent/40 cursor-pointer"
-              >
-                <History className="size-3.5 text-accent" />
-                <span>Snapshots</span>
-              </button>
-            )}
           </div>
         </div>
 
-        {/* Save Metrics */}
-        {details?.is_managed && (
-          <div className="mt-3.5 grid grid-cols-3 gap-2 border-t border-border/60 pt-3">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-medium text-subtle">Save Size</span>
-              <span className="text-xs font-bold text-text">
-                {details.save_size_bytes > 0 ? formatBytes(details.save_size_bytes) : '0 B'}
-              </span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-medium text-subtle">Total Files</span>
-              <span className="text-xs font-bold text-text">{details.file_count} files</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-medium text-subtle">Last Synchronized</span>
-              <span
-                className="text-xs font-bold text-text truncate"
-                title={
-                  details.last_synced_at ? formatExactDateTime(details.last_synced_at) : 'Never'
-                }
-              >
-                {details.last_synced_at ? formatRelativeDate(details.last_synced_at) : 'Never'}
-              </span>
-            </div>
+        {/* Row 2: Save Telemetry Strip (3 Equal Mini-Cards) */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="flex flex-col rounded-xl border border-border/70 bg-surface/80 px-3 py-2">
+            <span className="text-[10px] font-medium text-subtle">Save Size</span>
+            <span className="mt-0.5 font-mono text-xs font-bold text-text">
+              {details && details.save_size_bytes > 0
+                ? formatBytes(details.save_size_bytes)
+                : '0 B'}
+            </span>
           </div>
-        )}
+
+          <div className="flex flex-col rounded-xl border border-border/70 bg-surface/80 px-3 py-2">
+            <span className="text-[10px] font-medium text-subtle">Tracked Files</span>
+            <span className="mt-0.5 font-mono text-xs font-bold text-text">
+              {details?.file_count ?? 0} files
+            </span>
+          </div>
+
+          <div className="flex flex-col rounded-xl border border-border/70 bg-surface/80 px-3 py-2">
+            <span className="text-[10px] font-medium text-subtle">Last Synced</span>
+            <span
+              className="mt-0.5 truncate text-xs font-semibold text-text"
+              title={
+                details?.last_synced_at ? formatExactDateTime(details.last_synced_at) : 'Not synced yet'
+              }
+            >
+              {details?.last_synced_at ? formatRelativeDate(details.last_synced_at) : 'Ready'}
+            </span>
+          </div>
+        </div>
+
+        {/* Row 3: Primary Backup, Restore & Snapshots Action Bar */}
+        <div className="grid grid-cols-2 gap-2 pt-0.5 sm:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => handleOpenBackupModal('backup')}
+            title="Export game saves to a compressed .zip archive"
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-semibold text-white shadow-xs transition-all hover:bg-accent-hover active:scale-98 cursor-pointer"
+          >
+            <Archive className="size-3.5 shrink-0" />
+            <span>Backup (.zip)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleOpenBackupModal('restore')}
+            title="Restore game saves from a .zip backup archive"
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-text transition-all hover:border-accent/40 hover:bg-surface-raised active:scale-98 cursor-pointer"
+          >
+            <Upload className="size-3.5 shrink-0 text-emerald-400" />
+            <span>Restore (.zip)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (details?.is_managed) {
+                openHistoryModal(game.id)
+              } else {
+                void handleOpenFolder()
+              }
+            }}
+            title={details?.is_managed ? 'View automatic save snapshots' : 'Open save folder'}
+            className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-text transition-all hover:border-accent/40 hover:bg-surface-raised active:scale-98 cursor-pointer"
+          >
+            {details?.is_managed ? (
+              <>
+                <History className="size-3.5 shrink-0 text-accent" />
+                <span>Snapshots</span>
+              </>
+            ) : (
+              <>
+                <FolderOpen className="size-3.5 shrink-0 text-accent" />
+                <span>Open Folder</span>
+              </>
+            )}
+          </button>
+        </div>
       </section>
 
-      {/* ── Managed Save Locations ────────────────────────────────────── */}
-      <section className="rounded-2xl border border-border/80 bg-surface-raised/80 p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-2 mb-3">
+      {/* ── BOX 2: Save Locations & Smart Database Detector ───────────── */}
+      <section className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-surface-raised/85 p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <FileCheck className="size-4 text-accent shrink-0" />
-            <span className="text-xs font-bold text-text truncate">Save Locations</span>
+            <span className="text-xs font-bold text-text truncate">Tracked Save Paths</span>
             {details?.locations && details.locations.length > 0 && (
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-surface text-muted border border-border/60">
-                {details.locations.filter((l) => l.is_enabled).length}/{details.locations.length}
+              <span className="rounded-md border border-border/70 bg-surface px-1.5 py-0.5 font-mono text-[10px] font-semibold text-accent">
+                {activeLocationsCount}/{details.locations.length}
               </span>
             )}
           </div>
 
-          {/* Clean, un-cramped toolbar that fits sidebar width */}
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={handleApplyFromDatabase}
+              onClick={() => void handleApplyFromDatabase()}
               disabled={isDetecting}
-              title="Apply verified save path from 19,000+ PC games database"
+              title="Auto-detect & apply verified save path from PC game save database"
               className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent transition-colors hover:bg-accent hover:text-white cursor-pointer"
             >
-              <Database className={cn('size-3.5', isDetecting && 'animate-spin')} />
-              <span>Database</span>
+              <Database className={cn('size-3', isDetecting && 'animate-spin')} />
+              <span>Auto-Detect DB</span>
             </button>
 
             <button
               type="button"
-              onClick={handleAutoDetect}
+              onClick={() => void handleAutoDetect()}
               disabled={isDetecting}
-              title="Scan disk for candidate save folders"
-              className="flex size-7 items-center justify-center rounded-lg border border-border bg-surface text-text hover:bg-surface-raised hover:border-accent/40 transition-colors cursor-pointer"
+              title="Deep-scan local disk folders for save files"
+              className="flex size-7 items-center justify-center rounded-lg border border-border bg-surface text-muted hover:border-accent/40 hover:text-text transition-colors cursor-pointer"
             >
-              <RefreshCw className={cn('size-3.5', isDetecting && 'animate-spin')} />
+              <Sparkles className={cn('size-3.5', isDetecting && 'animate-spin text-accent')} />
             </button>
 
             <button
               type="button"
               onClick={() => setShowAddCustom(!showAddCustom)}
-              title="Add custom save folder or file path manually"
+              title="Add custom save directory manually"
               className={cn(
                 'flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors cursor-pointer',
                 showAddCustom
                   ? 'border-accent bg-accent text-white'
-                  : 'border-border bg-surface text-text hover:bg-surface-raised hover:border-accent/40',
+                  : 'border-border bg-surface text-text hover:border-accent/40',
               )}
             >
-              <Plus className="size-3.5" />
-              <span>Path</span>
+              <Plus className="size-3" />
+              <span>Custom</span>
             </button>
           </div>
         </div>
 
-        {/* Add custom path input */}
+        {/* Add Custom Save Path Input */}
         {showAddCustom && (
-          <div className="mb-3 flex flex-col gap-2 rounded-xl border border-accent/30 bg-surface/80 p-3 animate-in fade-in duration-150">
-            <span className="text-[11px] font-bold text-text">
+          <div className="flex flex-col gap-2 rounded-xl border border-accent/35 bg-surface p-3">
+            <span className="text-[11px] font-semibold text-text">
               Enter Save Directory or File Path:
             </span>
             <div className="flex gap-2">
@@ -399,15 +428,20 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
                 placeholder="%USERPROFILE%\Saved Games\..."
                 value={customPathInput}
                 onChange={(e) => setCustomPathInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && customPathInput.trim()) {
+                    void handleAddLocation(customPathInput.trim())
+                  }
+                }}
                 className="flex-1 rounded-lg border border-border bg-bg px-3 py-1.5 text-xs text-text placeholder:text-subtle focus:border-accent focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => void handleAddLocation(customPathInput.trim())}
                 disabled={!customPathInput.trim()}
-                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-bold text-white transition-opacity disabled:opacity-50 hover:bg-accent-hover cursor-pointer"
+                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition-opacity disabled:opacity-50 hover:bg-accent-hover cursor-pointer"
               >
-                Save
+                Add
               </button>
             </div>
             <span className="text-[10px] text-subtle">
@@ -416,46 +450,44 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
           </div>
         )}
 
-        {/* Locations List */}
+        {/* Configured Locations List */}
         {details?.locations && details.locations.length > 0 ? (
           <div className="flex flex-col gap-2">
             {details.locations.map((loc) => (
               <div
                 key={loc.id}
                 className={cn(
-                  'flex flex-col gap-1.5 rounded-xl border p-2.5 transition-colors',
+                  'flex flex-col gap-2 rounded-xl border p-3 transition-colors',
                   loc.is_enabled
-                    ? 'border-border/80 bg-surface/70'
-                    : 'border-border/40 bg-surface/30 opacity-70',
+                    ? 'border-border/85 bg-surface/85'
+                    : 'border-border/40 bg-surface/35 opacity-70',
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className={cn(
-                          'size-2 rounded-full shrink-0',
-                          loc.exists
-                            ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]'
-                            : 'bg-amber-500',
-                        )}
-                        title={loc.exists ? 'Folder exists on disk' : 'Folder not created yet'}
-                      />
-                      <span className="text-xs font-mono font-bold text-text truncate select-all">
-                        {loc.path}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-subtle truncate block font-mono pl-4">
-                      {loc.resolved_path}
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span
+                      className={cn(
+                        'size-2 rounded-full shrink-0',
+                        loc.exists
+                          ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
+                          : 'bg-amber-400',
+                      )}
+                      title={loc.exists ? 'Folder exists on disk' : 'Folder not created yet'}
+                    />
+                    <span
+                      className="truncate font-mono text-xs font-semibold text-text select-all"
+                      title={loc.resolved_path || loc.path}
+                    >
+                      {loc.path}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       type="button"
                       onClick={() => void handleOpenFolder(loc.resolved_path)}
                       title="Open in Windows Explorer"
-                      className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-colors hover:text-text hover:bg-surface-raised cursor-pointer"
+                      className="flex size-7 items-center justify-center rounded-lg border border-border/70 bg-surface-raised text-muted transition-colors hover:text-accent cursor-pointer"
                     >
                       <FolderOpen className="size-3.5" />
                     </button>
@@ -463,100 +495,102 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
                     <button
                       type="button"
                       onClick={() => void handleToggleLocation(loc.id, loc.is_enabled)}
-                      title={
-                        loc.is_enabled
-                          ? 'Tracking active — click to disable'
-                          : 'Tracking disabled — click to enable'
-                      }
                       className={cn(
-                        'h-7 px-2.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer',
+                        'h-7 rounded-lg border px-2 text-[10px] font-semibold transition-colors cursor-pointer',
                         loc.is_enabled
-                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+                          ? 'border-emerald-500/35 bg-emerald-500/12 text-emerald-400'
                           : 'border-border bg-surface text-subtle hover:text-text',
                       )}
                     >
-                      {loc.is_enabled ? 'Active' : 'Disabled'}
+                      {loc.is_enabled ? 'Active' : 'Paused'}
                     </button>
 
                     <button
                       type="button"
                       onClick={() => void handleRemoveLocation(loc.id)}
-                      title="Remove location"
-                      className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-surface text-rose-400 transition-colors hover:bg-rose-500/10 hover:border-rose-500/30 cursor-pointer"
+                      title="Remove save path"
+                      className="flex size-7 items-center justify-center rounded-lg border border-border/70 bg-surface-raised text-rose-400 transition-colors hover:border-rose-500/40 hover:bg-rose-500/10 cursor-pointer"
                     >
                       <Trash2 className="size-3.5" />
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-1 text-[10px] text-subtle border-t border-border/40 pl-4">
+                {loc.resolved_path && loc.resolved_path !== loc.path && (
+                  <div className="truncate rounded-lg bg-surface-raised/60 px-2.5 py-1 font-mono text-[10px] text-subtle select-all">
+                    {loc.resolved_path}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between border-t border-border/40 pt-1.5 text-[10px] text-subtle">
                   <span>
                     Source:{' '}
-                    {loc.detection_source === 'heuristic'
-                      ? 'Database Heuristic'
-                      : loc.detection_source}
+                    <strong className="font-medium text-text/80">
+                      {loc.detection_source === 'heuristic'
+                        ? 'Verified Save DB'
+                        : loc.detection_source}
+                    </strong>
                   </span>
-                  <span>{loc.exists ? '✓ Exists on disk' : '⚠ Waiting for creation'}</span>
+                  <span className={loc.exists ? 'text-emerald-400 font-medium' : 'text-amber-400'}>
+                    {loc.exists ? '✓ Verified on Disk' : '⚠ Created on First Save'}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-border/80 bg-surface/40 p-5 text-center">
-            <span className="text-xs font-semibold text-text block mb-1">
-              No Save Locations Configured
+          <div className="rounded-xl border border-dashed border-border/80 bg-surface/50 p-4 text-center">
+            <span className="text-xs font-semibold text-text block">
+              No Save Path Configured Yet
             </span>
-            <p className="text-[11px] text-subtle leading-relaxed mb-4 max-w-md mx-auto">
-              Save locations for this game are not currently configured. You can automatically set
-              them from the database of 19,000+ PC games or add a custom folder manually.
+            <p className="mt-1 text-[11px] text-subtle leading-relaxed">
+              Click <strong className="text-text">Auto-Detect DB</strong> to configure the verified
+              save directory for {game.name}, or add a custom folder.
             </p>
-            <div className="flex items-center justify-center gap-2">
+            <div className="mt-3 flex items-center justify-center gap-2">
               <button
                 type="button"
-                onClick={handleApplyFromDatabase}
+                onClick={() => void handleApplyFromDatabase()}
                 disabled={isDetecting}
-                className="flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-bold text-white shadow-sm transition-opacity hover:bg-accent-hover disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-accent-hover disabled:opacity-50 cursor-pointer"
               >
                 <Database className={cn('size-3.5', isDetecting && 'animate-spin')} />
-                <span>Apply from Database</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAddCustom(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 py-1.5 text-xs font-semibold text-text hover:bg-surface-raised"
-              >
-                <Plus className="size-3.5" />
-                <span>Add Custom Path</span>
+                <span>Auto-Configure Save Path</span>
               </button>
             </div>
           </div>
         )}
 
-        {/* Detected Suggestions */}
+        {/* Detected Candidate Suggestions */}
         {detected.length > 0 && (
-          <div className="mt-3 border-t border-border/60 pt-3">
-            <span className="text-[11px] font-bold text-text mb-2 block">
-              Detected Suggestions:
-            </span>
+          <div className="border-t border-border/60 pt-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-text">
+                Detected Save Candidates ({detected.length})
+              </span>
+              <span className="text-[10px] text-subtle">Click Track to enable</span>
+            </div>
             <div className="flex flex-col gap-1.5">
-              {detected.map((d, i) => (
+              {detected.slice(0, 5).map((d, i) => (
                 <div
-                  key={i}
+                  key={`${d.path}_${i}`}
                   className={cn(
-                    'flex items-center justify-between gap-2 rounded-lg border p-2 transition-colors',
+                    'flex items-center justify-between gap-2 rounded-xl border p-2.5 transition-colors',
                     d.exists && d.confidence >= 90
-                      ? 'border-emerald-500/40 bg-emerald-500/5'
-                      : 'border-border/60 bg-surface/40',
+                      ? 'border-emerald-500/40 bg-emerald-500/8'
+                      : 'border-border/70 bg-surface/60',
                   )}
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-text font-medium truncate">{d.path}</span>
-                      <span className="rounded-sm bg-accent/15 px-1 py-0.2 text-[9px] font-bold text-accent">
+                    <div className="truncate font-mono text-[11px] font-medium text-text">
+                      {d.path}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <span className="rounded bg-accent/15 px-1.5 py-0.2 font-mono text-[9px] font-semibold text-accent">
                         {d.confidence}% match
                       </span>
                       {d.exists && (
-                        <span className="rounded-sm bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400">
+                        <span className="rounded bg-emerald-500/15 px-1.5 py-0.2 text-[9px] font-semibold text-emerald-400">
                           Found on disk
                         </span>
                       )}
@@ -565,7 +599,7 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
                   <button
                     type="button"
                     onClick={() => void handleAddLocation(d.path)}
-                    className="rounded-md bg-accent/20 border border-accent/30 px-2 py-1 text-[10px] font-bold text-accent hover:bg-accent hover:text-white transition-colors"
+                    className="shrink-0 rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-[10.5px] font-semibold text-accent hover:bg-accent hover:text-white transition-colors cursor-pointer"
                   >
                     Track
                   </button>
@@ -574,48 +608,28 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
             </div>
           </div>
         )}
-      </section>
 
-      {/* ── Profile Save Actions ──────────────────────────────────────── */}
-      <section className="rounded-2xl border border-border/80 bg-surface-raised/80 p-4 shadow-sm">
-        <span className="text-xs font-bold text-text mb-3 block">Profile Save Actions</span>
-        <div className="grid grid-cols-2 gap-2">
+        {/* Quick Utility Footer: Open Folder & Clone Between Profiles */}
+        <div className="flex items-center justify-between gap-2 border-t border-border/50 pt-2.5">
           <button
             type="button"
             onClick={() => void handleOpenFolder()}
-            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-bold text-text transition-all hover:bg-surface-raised hover:border-accent/40 cursor-pointer"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface py-1.5 text-[11px] font-semibold text-text hover:border-accent/40 hover:text-accent transition-colors cursor-pointer"
           >
-            <FolderOpen className="size-4 text-accent" />
-            <span>Open Folder</span>
+            <FolderOpen className="size-3.5 text-accent" />
+            <span>Open Save Folder</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => handleOpenBackupModal('backup')}
-            className="flex items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/10 p-2.5 text-xs font-bold text-accent transition-all hover:bg-accent hover:text-white cursor-pointer"
-          >
-            <Archive className="size-4" />
-            <span>Backup (.zip)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleOpenBackupModal('restore')}
-            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-bold text-text transition-all hover:bg-surface-raised hover:border-accent/40 cursor-pointer"
-          >
-            <Upload className="size-4 text-emerald-400" />
-            <span>Restore (.zip)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowCloneModal(true)}
-            disabled={otherProfiles.length === 0}
-            className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-bold text-text transition-all hover:bg-surface-raised hover:border-accent/40 disabled:opacity-50 cursor-pointer"
-          >
-            <Copy className="size-4 text-violet-400" />
-            <span>Copy Profile</span>
-          </button>
+          {otherProfiles.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowCloneModal(true)}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface py-1.5 text-[11px] font-semibold text-text hover:border-accent/40 hover:text-accent transition-colors cursor-pointer"
+            >
+              <Copy className="size-3.5 text-violet-400" />
+              <span>Clone From Profile</span>
+            </button>
+          )}
         </div>
       </section>
 

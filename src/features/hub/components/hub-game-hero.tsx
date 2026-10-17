@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Gamepad2,
   Globe2,
+  Layers,
   Loader2,
   Play,
   Plus,
@@ -27,6 +28,7 @@ import { useAddGameFromHub, useAddGameToWishlist } from '../hooks/use-hub'
 import { useRestoreGameFromMemory } from '@/features/library/hooks/use-games'
 import { useGameAffinity } from '../hooks/use-personalization'
 import { getGameTypeInfo } from '../utils/game-type'
+import { buildCoverFallbackChain } from '../utils/cover-fallback'
 import { HubScoreBadge } from './hub-score-badge'
 import { HubSteamPriceBadge } from './hub-steam-price-badge'
 import type { Game, HubGameDetails, HubVideo } from '@/types/models'
@@ -44,7 +46,7 @@ interface HubGameHeroProps {
   onOpenRegionalPrice?: () => void
 }
 
-function genreColor(genre: string): string {
+export function genreColor(genre: string): string {
   const hash = genre.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
   const colors = [
     '#6366f1',
@@ -80,8 +82,18 @@ export function HubGameHero({
   const restoreMutation = useRestoreGameFromMemory()
   const affinity = useGameAffinity(game)
 
+  const coverCandidates = useMemo(
+    () => buildCoverFallbackChain(game.cover_url, game.backdrop_url, game.steam_app_id),
+    [game.cover_url, game.backdrop_url, game.steam_app_id],
+  )
+  const [coverIdx, setCoverIdx] = useState(0)
+  useEffect(() => {
+    setCoverIdx(0)
+  }, [game.igdb_id, game.cover_url, game.backdrop_url, game.steam_app_id])
+  const activeCoverUrl = coverCandidates[coverIdx] ?? null
+
   const inMem = Boolean(isMemory || libraryEntry?.is_memory)
-  const backdrop = game.backdrop_url ?? game.screenshot_urls[0] ?? game.cover_url
+  const backdrop = game.backdrop_url ?? game.screenshot_urls[0] ?? activeCoverUrl ?? game.cover_url
   const typeInfo = getGameTypeInfo(game.game_type)
 
   return (
@@ -91,7 +103,7 @@ export function HubGameHero({
       transition={{ duration: 0.28 * speed, ease: [0.16, 1, 0.3, 1] }}
       className="relative overflow-hidden rounded-3xl border border-border shadow-elevated"
     >
-      <div className="relative min-h-[460px] sm:min-h-[500px] lg:min-h-[540px]">
+      <div className="relative flex min-h-[460px] flex-col justify-end pt-24 sm:min-h-[500px] lg:min-h-[540px]">
         {/* Backdrop Image */}
         {backdrop && (
           <img
@@ -103,64 +115,53 @@ export function HubGameHero({
         )}
 
         {/* Cinematic Multilayer Vignettes */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/25" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/40 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent opacity-70" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/95 via-black/70 to-black/25" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent opacity-70" />
 
-        {/* Floating Details Content */}
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-6 p-6 sm:flex-row sm:items-end sm:p-8 lg:p-10">
+        {/* Foreground Details Content (Flex-aligned so content never clips on tall titles/genre lists) */}
+        <div className="relative z-10 flex flex-col gap-6 p-6 sm:flex-row sm:items-end sm:p-8 lg:p-10">
           {/* Cover Art Poster */}
           <div className="group relative w-36 shrink-0 overflow-hidden rounded-2xl border border-white/20 bg-black/50 shadow-2xl shadow-black/80 transition-transform duration-300 sm:w-48 lg:w-56">
-            {game.cover_url ? (
+            {activeCoverUrl ? (
               <img
-                src={game.cover_url}
+                src={activeCoverUrl}
                 alt={game.name}
+                onError={() => setCoverIdx((prev) => prev + 1)}
                 className="aspect-[3/4] w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             ) : (
-              <span className="flex aspect-[3/4] w-full items-center justify-center bg-surface-raised">
-                <Gamepad2 className="size-10 text-subtle" />
+              <span className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-2 bg-surface-raised p-4 text-center">
+                <Gamepad2 className="size-10 text-accent" />
+                <span className="line-clamp-3 text-xs font-extrabold text-text">{game.name}</span>
               </span>
             )}
 
             {/* Cover Top Badges */}
-            <div className="pointer-events-none absolute inset-x-2 top-2 flex items-center justify-between">
-              <div className="flex flex-wrap items-center gap-1">
-                {inMem ? (
-                  <span className="rounded-md bg-amber-500/90 border border-amber-400/40 px-2 py-0.5 text-[9px] font-bold tracking-wider text-black uppercase shadow-sm">
-                    In Memory
-                  </span>
-                ) : isInstalled ? (
-                  <span className="rounded-md bg-emerald-600 px-2 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase shadow-sm">
-                    Installed
-                  </span>
-                ) : isReleased ? (
-                  <span className="rounded-md bg-blue-600 px-2 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase shadow-sm">
-                    Released
-                  </span>
-                ) : (
-                  <span className="rounded-md bg-amber-500 px-2 py-0.5 text-[9px] font-bold tracking-wider text-black uppercase shadow-sm">
-                    Upcoming
-                  </span>
-                )}
-
-                {typeInfo && (
-                  <span
-                    className={cn(
-                      'rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase shadow-sm ring-1 ring-white/20',
-                      typeInfo.bg,
-                    )}
-                  >
-                    {typeInfo.label}
-                  </span>
-                )}
-              </div>
+            <div className="pointer-events-none absolute inset-x-2.5 top-2.5 flex items-center justify-between">
+              {inMem ? (
+                <span className="rounded-md border border-amber-400/40 bg-amber-500/95 px-2 py-0.5 text-[9px] font-bold tracking-wider text-black uppercase shadow-sm">
+                  In Memory
+                </span>
+              ) : isInstalled ? (
+                <span className="rounded-md bg-emerald-600 px-2 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase shadow-sm">
+                  Installed
+                </span>
+              ) : isReleased ? (
+                <span className="rounded-md bg-blue-600/95 px-2 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase shadow-sm">
+                  Released
+                </span>
+              ) : (
+                <span className="rounded-md bg-amber-500 px-2 py-0.5 text-[9px] font-bold tracking-wider text-black uppercase shadow-sm">
+                  Upcoming
+                </span>
+              )}
 
               {allVideos.length > 0 && (
                 <button
                   type="button"
                   onClick={() => onOpenTrailer(0)}
-                  className="pointer-events-auto flex size-7 items-center justify-center rounded-lg bg-red-600 text-white shadow-md transition-transform hover:scale-110 active:scale-95"
+                  className="pointer-events-auto flex size-7 items-center justify-center rounded-lg bg-red-600 text-white shadow-md transition-transform hover:scale-110 active:scale-95 cursor-pointer"
                   title="Play Trailer"
                   aria-label="Play Trailer"
                 >
@@ -170,9 +171,9 @@ export function HubGameHero({
             </div>
           </div>
 
-          {/* Game Text & Actions */}
-          <div className="min-w-0 flex-1">
-            {/* Title & Game Type Badge */}
+          {/* Game Text, Genres & Actions */}
+          <div className="min-w-0 flex-1 space-y-3.5">
+            {/* Title & Game Edition/Type Badge */}
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-black leading-tight tracking-tight text-white drop-shadow-md sm:text-4xl lg:text-5xl">
                 {game.name}
@@ -189,61 +190,20 @@ export function HubGameHero({
               )}
             </div>
 
-            {/* Primary Metas (Release Date, Developer, Critic Scores) */}
-            <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-white/80">
+            {/* Row 1: Release Date, Studio & Live Steam Price */}
+            <div className="flex flex-wrap items-center gap-2.5 text-xs text-white/85">
               {game.release_date && (
-                <span className="inline-flex items-center gap-1.5 font-medium">
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-black/45 px-3 py-1 font-medium backdrop-blur-md">
                   <CalendarDays className="size-3.5 text-accent" />
-                  {formatReleaseDate(game.release_date)}
+                  <span>{formatReleaseDate(game.release_date)}</span>
                 </span>
               )}
 
               {game.developer && (
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-black/45 px-3 py-1 font-medium backdrop-blur-md">
                   <Building2 className="size-3.5 text-white/70" />
                   <span>{game.developer}</span>
                 </span>
-              )}
-
-              {/* Dynamic Metacritic & IGDB Hero Badges */}
-              <HubScoreBadge
-                variant="hero"
-                metacriticScore={game.metacritic_score}
-                igdbRating={game.rating}
-                igdbRatingCount={game.rating_count}
-              />
-
-              {/* Real Nexus Match Taste Badge */}
-              {affinity && (
-                <div
-                  title={
-                    affinity.breakdown?.highlightChips?.length
-                      ? `${affinity.matchPercentage}% Match • ${affinity.breakdown.highlightChips.join(' • ')}`
-                      : affinity.reason
-                  }
-                  className="inline-flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/40 bg-gradient-to-r from-violet-600/35 via-violet-500/20 to-accent/15 px-3 py-1 text-xs shadow-xs backdrop-blur-md"
-                >
-                  <div className="flex items-center gap-1 text-violet-300">
-                    <Sparkles className="size-3.5 fill-current" />
-                    <span className="text-[10px] font-black uppercase tracking-wider">
-                      Nexus Match
-                    </span>
-                  </div>
-                  <span className="font-mono text-xs font-black text-white">
-                    {affinity.matchPercentage}%
-                  </span>
-                  {affinity.breakdown?.highlightChips?.slice(0, 2).map((chip) => (
-                    <span
-                      key={chip}
-                      className="hidden sm:inline-flex items-center rounded-md border border-violet-400/30 bg-violet-500/20 px-1.5 py-0.5 font-mono text-[9px] font-bold text-violet-200"
-                    >
-                      {chip}
-                    </span>
-                  ))}
-                  <span className="hidden md:inline text-[11px] font-medium text-violet-200/90 border-l border-white/20 pl-2">
-                    {affinity.reason}
-                  </span>
-                </div>
               )}
 
               {/* Steam Real-Time Regional Price Badge */}
@@ -256,17 +216,67 @@ export function HubGameHero({
               )}
             </div>
 
-            {/* Genre Tags */}
+            {/* Row 2: Critic Scores (Metacritic + OpenCritic + IGDB) & Nexus Match */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <HubScoreBadge
+                variant="hero"
+                metacriticScore={game.metacritic_score ?? libraryEntry?.metacritic_score}
+                opencriticScore={game.opencritic_score ?? libraryEntry?.opencritic_score}
+                igdbRating={game.rating}
+                igdbRatingCount={game.rating_count}
+                gameName={game.name}
+                releaseDate={game.release_date}
+              />
+
+              {affinity && (
+                <div
+                  title={
+                    affinity.breakdown?.highlightChips?.length
+                      ? `${affinity.matchPercentage}% Match • ${affinity.breakdown.highlightChips.join(' • ')}`
+                      : affinity.reason
+                  }
+                  className="inline-flex flex-wrap items-center gap-2 rounded-xl border border-violet-500/40 bg-gradient-to-r from-violet-600/35 via-violet-500/20 to-accent/15 px-3 py-1 text-xs shadow-xs backdrop-blur-md"
+                >
+                  <div className="flex items-center gap-1 text-violet-300">
+                    <Sparkles className="size-3.5 fill-current" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                      Nexus Match
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs font-black text-white">
+                    {affinity.matchPercentage}%
+                  </span>
+                  {affinity.breakdown?.highlightChips?.slice(0, 2).map((chip) => (
+                    <span
+                      key={chip}
+                      className="hidden sm:inline-flex items-center rounded-md border border-violet-400/30 bg-violet-500/20 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-violet-200"
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Row 3: Complete & Organized Genres Strip */}
             {game.genres.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="mr-1 inline-flex items-center gap-1 text-[10.5px] font-semibold uppercase tracking-wider text-white/65">
+                  <Layers className="size-3 text-accent" />
+                  <span>Genres:</span>
+                </span>
                 {game.genres.map((genre) => {
                   const color = genreColor(genre)
                   return (
                     <span
                       key={genre}
-                      className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white shadow-xs backdrop-blur-sm"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs backdrop-blur-md transition-transform hover:scale-103"
+                      style={{ borderColor: `${color}55` }}
                     >
-                      <span className="size-1.5 rounded-full" style={{ backgroundColor: color }} />
+                      <span
+                        className="size-1.5 rounded-full shrink-0"
+                        style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }}
+                      />
                       <span>{genre}</span>
                     </span>
                   )
@@ -280,13 +290,13 @@ export function HubGameHero({
             )}
 
             {/* Action Buttons Strip */}
-            <div className="mt-6 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 pt-2">
               {/* Primary Watch Trailer Button */}
               {allVideos.length > 0 && (
                 <button
                   type="button"
                   onClick={() => onOpenTrailer(0)}
-                  className="glow-pulse inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition-all hover:bg-red-500 hover:scale-105 active:scale-95"
+                  className="glow-pulse inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition-all hover:bg-red-500 hover:scale-105 active:scale-95 cursor-pointer"
                 >
                   <Play className="size-4 fill-current" />
                   <span>Watch Trailer</span>
@@ -307,10 +317,10 @@ export function HubGameHero({
                       gameId: libraryEntry?.id,
                       igdbId: game.igdb_id,
                       name: game.name,
-                      coverUrl: game.cover_url,
+                      coverUrl: activeCoverUrl ?? game.cover_url,
                     })
                   }}
-                  className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-accent/25 transition-all hover:bg-accent-hover hover:scale-105 active:scale-95"
+                  className="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-accent/25 transition-all hover:bg-accent-hover hover:scale-105 active:scale-95 cursor-pointer"
                 >
                   <Download className="size-4" />
                   <span>Download Game</span>
@@ -340,7 +350,7 @@ export function HubGameHero({
                     navigate('/')
                   }}
                   className={cn(
-                    'inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all hover:scale-105 active:scale-95',
+                    'inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer',
                     isInstalled
                       ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/25'
                       : 'border border-emerald-500/40 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30',
@@ -359,7 +369,7 @@ export function HubGameHero({
                       onError: (mutationError) => toast.error(mutationError.message),
                     })
                   }
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-black/60 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-black/80 hover:scale-105 active:scale-95 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-black/60 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-black/80 hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {addGame.isPending ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -375,7 +385,7 @@ export function HubGameHero({
                 <button
                   type="button"
                   onClick={() => navigate('/wishlist')}
-                  className="inline-flex items-center gap-2 rounded-xl border border-accent/40 bg-accent/20 px-4 py-2.5 text-sm font-bold text-accent transition-colors hover:bg-accent/30"
+                  className="inline-flex items-center gap-2 rounded-xl border border-accent/40 bg-accent/20 px-4 py-2.5 text-sm font-bold text-accent transition-colors hover:bg-accent/30 cursor-pointer"
                 >
                   <Bookmark className="size-4 fill-current" />
                   <span>In Wishlist</span>
@@ -392,7 +402,7 @@ export function HubGameHero({
                       })
                     }
                     className={cn(
-                      'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50',
+                      'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer',
                       isReleased
                         ? 'border border-white/20 bg-black/60 text-white hover:bg-black/80'
                         : 'bg-accent text-white shadow-lg shadow-accent/25 hover:bg-accent-hover',
@@ -414,7 +424,7 @@ export function HubGameHero({
                   type="button"
                   onClick={onOpenRegionalPrice}
                   title="Compare Steam regional prices & discounts (SteamDB style)"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-black/60 px-4 py-2.5 text-sm font-semibold text-white shadow-md backdrop-blur-md transition-all hover:bg-black/80 hover:border-accent hover:scale-105 active:scale-95"
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-black/60 px-4 py-2.5 text-sm font-semibold text-white shadow-md backdrop-blur-md transition-all hover:bg-black/80 hover:border-accent hover:scale-105 active:scale-95 cursor-pointer"
                 >
                   <Globe2 className="size-4 text-accent" />
                   <span>Regional Prices</span>
@@ -464,7 +474,7 @@ function ReleaseCountdown({ releaseDate }: { releaseDate: string }) {
   ]
 
   return (
-    <div className="mt-4 flex flex-col gap-1.5">
+    <div className="mt-2 flex flex-col gap-1.5">
       <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-widest text-amber-400">
         <CalendarDays className="size-3.5 text-amber-400" />
         <span>Releases In</span>

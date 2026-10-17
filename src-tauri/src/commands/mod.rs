@@ -3,6 +3,7 @@ pub mod booster;
 pub mod cleanup;
 pub mod collections;
 pub mod download;
+pub mod dualsense;
 pub mod games;
 pub mod hub;
 pub mod import;

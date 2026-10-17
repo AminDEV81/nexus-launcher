@@ -11,12 +11,17 @@ import {
   Layers,
   Minimize2,
   Type,
+  Bold,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useThemeStore, useActivePalette, PALETTES } from '@/store/theme-store'
 import { useSoundStore } from '@/store/sound-store'
-import { useAppearanceSettingsStore, AVAILABLE_FONTS } from '@/store/appearance-settings-store'
-import type { FontFamilyId } from '@/store/appearance-settings-store'
+import {
+  useAppearanceSettingsStore,
+  AVAILABLE_FONTS,
+  AVAILABLE_FONT_WEIGHTS,
+} from '@/store/appearance-settings-store'
+import type { FontFamilyId, FontWeightPreset } from '@/store/appearance-settings-store'
 import type { PaletteId } from '@/store/theme-store'
 
 /** Individual typographic preview metadata for each supported launcher font */
@@ -91,6 +96,13 @@ const FONT_PREVIEWS: Record<
   },
 }
 
+const FONT_WEIGHT_SAMPLE_STYLES: Record<FontWeightPreset, { weight: number; stroke?: string }> = {
+  light: { weight: 300 },
+  regular: { weight: 400 },
+  bold: { weight: 700 },
+  extrabold: { weight: 900, stroke: '0.35px currentColor' },
+}
+
 /** Swatch colors shown in the picker — mirrors the dark-mode accent values in theme.css */
 const SWATCH_COLORS: Record<PaletteId, { hex: string; gradient: string }> = {
   violet: { hex: '#7c5cff', gradient: 'from-[#7c5cff] to-[#9d85ff]' },
@@ -125,6 +137,8 @@ export function AppearancePanel() {
   const reduceMotion = useAppearanceSettingsStore((s) => s.reduceMotion)
   const fontFamily = useAppearanceSettingsStore((s) => s.fontFamily)
   const setFontFamily = useAppearanceSettingsStore((s) => s.setFontFamily)
+  const fontWeight = useAppearanceSettingsStore((s) => s.fontWeight) || 'regular'
+  const setFontWeight = useAppearanceSettingsStore((s) => s.setFontWeight)
 
   return (
     <div className="flex flex-col gap-6">
@@ -141,7 +155,7 @@ export function AppearancePanel() {
             type="button"
             onClick={() => setMode('dark')}
             className={cn(
-              'group relative flex flex-col items-start rounded-2xl border p-4 text-left transition-all duration-200 shadow-sm',
+              'group relative flex flex-col items-start rounded-2xl border p-4 text-left transition-all duration-200 shadow-sm cursor-pointer',
               mode === 'dark'
                 ? 'border-accent bg-accent/10 shadow-[0_4px_24px_color-mix(in_srgb,var(--color-accent)_15%,transparent)]'
                 : 'border-border/80 bg-surface/70 hover:border-border hover:bg-surface-raised',
@@ -194,7 +208,7 @@ export function AppearancePanel() {
             type="button"
             onClick={() => setMode('light')}
             className={cn(
-              'group relative flex flex-col items-start rounded-2xl border p-4 text-left transition-all duration-200 shadow-sm',
+              'group relative flex flex-col items-start rounded-2xl border p-4 text-left transition-all duration-200 shadow-sm cursor-pointer',
               mode === 'light'
                 ? 'border-accent bg-accent/10 shadow-[0_4px_24px_color-mix(in_srgb,var(--color-accent)_15%,transparent)]'
                 : 'border-border/80 bg-surface/70 hover:border-border hover:bg-surface-raised',
@@ -266,6 +280,81 @@ export function AppearancePanel() {
               onClick={() => setPalette(palette.id)}
             />
           ))}
+        </div>
+      </div>
+
+      {/* 4-Level Font Boldness / Weight Control */}
+      <div className="flex flex-col gap-3.5 rounded-2xl border border-border/80 bg-surface/60 p-4 shadow-sm">
+        <div className="flex items-center justify-between border-b border-border/40 pb-3">
+          <div className="flex items-center gap-2">
+            <Bold className="size-4 text-accent" />
+            <div>
+              <span className="text-sm font-bold text-text">Font Boldness &amp; Stroke Weight</span>
+              <p className="text-[11px] text-muted">
+                Choose from 4 global typography weight levels across all menus, cards, and headers
+              </p>
+            </div>
+          </div>
+          <span className="rounded-lg border border-accent/30 bg-accent/15 px-2.5 py-0.5 font-mono text-xs font-bold text-accent">
+            {AVAILABLE_FONT_WEIGHTS.find((w) => w.id === fontWeight)?.shortLabel ?? 'Regular (400)'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 pt-1">
+          {AVAILABLE_FONT_WEIGHTS.map((preset) => {
+            const isSelected = fontWeight === preset.id
+            const sampleStyle = FONT_WEIGHT_SAMPLE_STYLES[preset.id]
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setFontWeight(preset.id)}
+                className={cn(
+                  'group relative flex flex-col items-start justify-between rounded-xl border p-3.5 text-left transition-all duration-150 cursor-pointer',
+                  isSelected
+                    ? 'border-accent bg-accent/12 ring-1 ring-accent shadow-xs'
+                    : 'border-border/70 bg-surface/70 hover:border-border hover:bg-surface-raised',
+                )}
+              >
+                <div className="flex w-full items-center justify-between gap-2">
+                  <span
+                    className="text-xl text-text group-hover:text-accent transition-colors"
+                    style={{
+                      fontWeight: sampleStyle.weight,
+                      WebkitTextStroke: sampleStyle.stroke,
+                    }}
+                  >
+                    Aa
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="rounded-md border border-border/60 bg-surface px-1.5 py-0.5 font-mono text-[10px] text-subtle">
+                      {preset.numericLabel}
+                    </span>
+                    {isSelected && (
+                      <span className="flex size-4.5 items-center justify-center rounded-full bg-accent text-white shadow-xs">
+                        <Check className="size-2.5" strokeWidth={3} />
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-2">
+                  <div
+                    className="text-xs text-text"
+                    style={{
+                      fontWeight: sampleStyle.weight,
+                      WebkitTextStroke: sampleStyle.stroke,
+                    }}
+                  >
+                    {preset.label}
+                  </div>
+                  <div className="mt-0.5 text-[10.5px] text-muted leading-snug">
+                    {preset.description}
+                  </div>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </div>
 
@@ -521,36 +610,44 @@ function Switch({
   iconOff?: typeof Volume2
 }) {
   return (
-    <button
+    <motion.button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
+      whileTap={{ scale: 0.94 }}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative h-7 w-12 shrink-0 overflow-hidden rounded-full border transition-colors duration-200 shadow-xs',
-        checked ? 'border-accent bg-accent' : 'border-border/80 bg-surface-raised',
+        'group/switch relative flex h-7 w-12.5 shrink-0 cursor-pointer items-center rounded-full border p-0.5 transition-colors duration-300 shadow-xs',
+        checked
+          ? 'justify-end border-accent bg-accent'
+          : 'justify-start border-border/80 bg-surface-raised hover:border-border',
       )}
       style={
         checked
-          ? { boxShadow: '0 0 10px color-mix(in srgb, var(--color-accent) 35%, transparent)' }
+          ? { boxShadow: '0 0 14px color-mix(in srgb, var(--color-accent) 38%, transparent)' }
           : undefined
       }
     >
       <motion.span
-        className="absolute top-1 left-1 flex size-5 items-center justify-center rounded-full bg-white shadow-sm"
-        animate={{ x: checked ? 20 : 0 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+        layout
+        transition={{
+          type: 'spring',
+          stiffness: 520,
+          damping: 32,
+          mass: 0.65,
+        }}
+        className="flex size-5.5 items-center justify-center rounded-full bg-white shadow-md group-active/switch:w-6.5 transition-[width] duration-150"
       >
         {IconOn && IconOff ? (
           checked ? (
-            <IconOn className="size-3 text-accent" strokeWidth={2.5} />
+            <IconOn className="size-3 text-accent" strokeWidth={2.4} />
           ) : (
-            <IconOff className="size-3 text-subtle" strokeWidth={2.5} />
+            <IconOff className="size-3 text-subtle" strokeWidth={2.4} />
           )
         ) : null}
       </motion.span>
-    </button>
+    </motion.button>
   )
 }
 
@@ -574,7 +671,7 @@ function PaletteSwatch({
       title={label}
       aria-label={label}
       className={cn(
-        'flex items-center gap-2.5 rounded-xl border px-3 py-2 transition-all duration-200 shadow-xs',
+        'flex items-center gap-2.5 rounded-xl border px-3 py-2 transition-all duration-200 shadow-xs cursor-pointer',
         active
           ? 'border-accent bg-accent/15 shadow-sm'
           : 'border-border/80 bg-surface hover:border-border hover:bg-surface-raised',

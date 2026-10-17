@@ -29,6 +29,8 @@ import { ModalCloseButton } from '@/components/ui/modal-close-button'
 import { cn } from '@/lib/utils'
 import { useAddGameModalStore } from '../store/add-game-modal-store'
 import { useCreateGame, useGames, useRestoreGameFromMemory } from '../hooks/use-games'
+import { useHubSearch } from '@/features/hub/hooks/use-hub'
+import { buildCoverFallbackChain } from '@/features/hub/utils/cover-fallback'
 import { RestoreFromMemoryModal } from '@/features/memory/components/restore-from-memory-modal'
 import * as gamesService from '@/services/games'
 import type { Game } from '@/types/models'
@@ -176,8 +178,8 @@ export function AddGameModal() {
         name: guessNameFromPath(path),
         installPath: path,
         installSizeBytes,
-        executablePath: candidates.length === 1 ? candidates[0].path : null,
-        candidates: candidates.length === 1 ? [] : candidates,
+        executablePath: candidates[0]?.path ?? null,
+        candidates: candidates.length > 1 ? candidates : [],
       })
       setStep('review')
     } catch (error) {
@@ -298,10 +300,10 @@ export function AddGameModal() {
 
   return (
     <>
-      <Modal open={isOpen} onClose={close} hideCloseButton widthClassName="max-w-2xl">
+      <Modal open={isOpen} onClose={close} hideCloseButton widthClassName="max-w-3xl">
         <div className="relative overflow-hidden bg-surface">
           {/* ── Holographic Mecha Header ──────────────────────────────────────── */}
-          <div className="relative border-b border-border/80 bg-gradient-to-br from-accent/15 via-surface-raised/60 to-surface px-6 sm:px-8 py-5">
+          <div className="relative border-b border-border/80 bg-gradient-to-br from-accent/15 via-surface-raised/60 to-surface px-6 py-4">
             {/* Volumetric Ambient Glow */}
             <div
               className="pointer-events-none absolute -right-12 -top-16 size-48 rounded-full blur-3xl opacity-30"
@@ -369,9 +371,9 @@ export function AddGameModal() {
             </div>
           </div>
 
-          {/* ── Main Body ──────────────────────────────────────────────────────── */}
-          <div className="min-h-[380px] p-6 sm:p-7">
-            <AnimatePresence mode="wait">
+          {/* ── Main Body (Locked Compact Height — Never Stretches on System Scan) ── */}
+          <div className="overflow-hidden px-6 py-5">
+            <AnimatePresence mode="wait" initial={false}>
               {step === 'choose' ? (
                 <motion.div
                   key="choose"
@@ -490,13 +492,13 @@ function ChooseStep({
   onManualEntry,
 }: ChooseStepProps) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {/* 1. Hero Auto-Scan Card with Cybernetic Radar Pulse */}
       <motion.div
         whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.99 }}
         onClick={onAutoScan}
-        className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/15 via-surface-raised/90 to-cyan-500/10 p-4.5 cursor-pointer shadow-[0_0_24px_rgba(124,92,255,0.12)] hover:border-accent hover:shadow-[0_0_32px_rgba(124,92,255,0.25)] transition-all overflow-hidden"
+        className="group relative flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/15 via-surface-raised/90 to-cyan-500/10 px-4 py-3.5 cursor-pointer shadow-[0_0_24px_rgba(124,92,255,0.12)] hover:border-accent hover:shadow-[0_0_32px_rgba(124,92,255,0.25)] transition-all overflow-hidden"
       >
         <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-cyan-400/10 blur-2xl group-hover:bg-cyan-400/20 transition-colors" />
 
@@ -517,8 +519,7 @@ function ChooseStep({
               </span>
             </div>
             <p className="mt-0.5 text-xs text-muted leading-relaxed">
-              Automatically detect games from Steam, Epic, GOG, EA, Ubisoft, Battle.net, Xbox &
-              Amazon
+              Detect installed games across Steam, Epic, GOG, EA, Ubisoft, Xbox &amp; Local Cracked / Repack folders
             </p>
           </div>
         </div>
@@ -532,7 +533,7 @@ function ChooseStep({
       {/* 2. Quick Dropzone Banner */}
       <div
         onClick={onExecutable}
-        className="group relative flex flex-col items-center justify-center gap-2.5 rounded-2xl border-2 border-dashed border-border/90 bg-surface-raised/40 p-5 text-center transition-all cursor-pointer hover:border-accent hover:bg-accent/5 shadow-2xs"
+        className="group relative flex flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-border/90 bg-surface-raised/40 px-4 py-3.5 text-center transition-all cursor-pointer hover:border-accent hover:bg-accent/5 shadow-2xs"
       >
         <span className="flex size-10 items-center justify-center rounded-xl bg-accent/10 text-accent transition-transform group-hover:scale-110 shadow-xs">
           <FolderSearch className="size-5" />
@@ -696,19 +697,19 @@ function SystemScanStep({ onBack, onComplete }: SystemScanStepProps) {
   }
 
   return (
-    <div className="flex flex-col min-h-[380px]">
-      <AnimatePresence mode="wait">
+    <div className="flex h-[420px] max-h-[420px] flex-col overflow-hidden">
+      <AnimatePresence mode="wait" initial={false}>
         {scanMutation.isPending && (
           <motion.div
             key="scanning-radar"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3 * speed }}
-            className="flex min-h-[360px] flex-col items-center justify-center text-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 * speed }}
+            className="flex h-full flex-col items-center justify-center text-center p-2"
           >
             {/* Holographic Circular Radar HUD */}
-            <div className="relative flex size-44 items-center justify-center">
+            <div className="relative flex size-36 items-center justify-center">
               {/* Concentric rings */}
               <div className="absolute inset-0 rounded-full border border-accent/20 [border-style:dashed]" />
               <div className="absolute inset-4 rounded-full border border-cyan-500/20" />
@@ -760,14 +761,14 @@ function SystemScanStep({ onBack, onComplete }: SystemScanStepProps) {
                 <span>Deep Scanning Installed Stores & Registries</span>
               </div>
               <p className="text-xs text-muted max-w-md mx-auto">
-                Querying Steam, Epic Games, GOG, EA App, Ubisoft Connect, Battle.net, Xbox & Amazon
-                Games...
+                Scanning Steam, Epic, GOG, EA, Ubisoft, Xbox &amp; Cracked / Repack Game Folders across all drives...
               </p>
             </div>
 
             {/* Active Platform Indicators */}
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2 max-w-lg">
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 max-w-lg">
               {[
+                { name: 'Cracked / Repacks', color: 'border-rose-500/35 text-rose-400 bg-rose-500/15' },
                 { name: 'Steam', color: 'border-sky-500/30 text-sky-400 bg-sky-500/10' },
                 { name: 'Epic Games', color: 'border-zinc-500/30 text-zinc-300 bg-zinc-500/10' },
                 {
@@ -778,7 +779,6 @@ function SystemScanStep({ onBack, onComplete }: SystemScanStepProps) {
                 { name: 'Ubisoft', color: 'border-blue-500/30 text-blue-400 bg-blue-500/10' },
                 { name: 'Battle.net', color: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10' },
                 { name: 'Xbox', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' },
-                { name: 'Amazon', color: 'border-amber-500/30 text-amber-400 bg-amber-500/10' },
               ].map((p, idx) => (
                 <span
                   key={p.name}
@@ -801,11 +801,11 @@ function SystemScanStep({ onBack, onComplete }: SystemScanStepProps) {
         {result && !scanMutation.isPending && (
           <motion.div
             key="scan-results"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.25 * speed }}
-            className="flex flex-col gap-3.5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 * speed }}
+            className="flex h-full min-h-0 flex-col justify-between gap-2.5 overflow-hidden"
           >
             {result.games.length === 0 ? (
               <div className="flex min-h-[300px] flex-col items-center justify-center p-6 text-center">
@@ -947,8 +947,8 @@ function SystemScanStep({ onBack, onComplete }: SystemScanStepProps) {
                   )}
                 </div>
 
-                {/* Scrollable Game Rows */}
-                <div className="flex max-h-[260px] flex-col gap-1.5 overflow-y-auto pr-1 scrollbar-thin rounded-xl border border-border/70 bg-surface/40 p-1.5">
+                {/* Scrollable Game Rows (Locked inside fixed modal height) */}
+                <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pr-1 scrollbar-thin rounded-xl border border-border/70 bg-surface/40 p-1.5">
                   {filteredGames.length === 0 ? (
                     <div className="p-8 text-center text-xs text-muted">
                       No games match your search query.
@@ -1086,7 +1086,7 @@ function SourceCard({
       whileHover={{ y: -3 }}
       whileTap={{ scale: 0.98 }}
       className={cn(
-        'group relative flex min-h-[168px] flex-col items-start justify-between rounded-2xl border p-4.5 text-left transition-all cursor-pointer shadow-2xs overflow-hidden',
+        'group relative flex min-h-[132px] flex-col items-start justify-between rounded-2xl border p-3.5 text-left transition-all cursor-pointer shadow-2xs overflow-hidden',
         primary
           ? 'border-accent/40 bg-gradient-to-b from-accent/10 to-surface-raised hover:border-accent hover:shadow-[0_0_16px_var(--nx-accent)]/15'
           : 'border-border/80 bg-surface/70 hover:border-accent/40 hover:bg-surface-raised',
@@ -1173,11 +1173,35 @@ function ReviewStep({
     )
   }
 
-  const needsExecutable = draft.candidates.length > 0
+  const [debouncedName, setDebouncedName] = useState(draft.name.trim())
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedName(draft.name.trim()), 200)
+    return () => window.clearTimeout(id)
+  }, [draft.name])
+
+  const igdbPreviewSearch = useHubSearch(debouncedName, {})
+  const topIgdbMatches = useMemo(
+    () => (igdbPreviewSearch.data?.pages.flat() ?? []).slice(0, 4),
+    [igdbPreviewSearch.data],
+  )
+  const primaryMatch = topIgdbMatches[0] ?? null
+  const previewCovers = useMemo(
+    () =>
+      primaryMatch
+        ? buildCoverFallbackChain(primaryMatch.cover_url, primaryMatch.backdrop_url)
+        : [],
+    [primaryMatch],
+  )
+  const [previewCoverIdx, setPreviewCoverIdx] = useState(0)
+  useEffect(() => {
+    setPreviewCoverIdx(0)
+  }, [primaryMatch?.igdb_id])
+
+  const needsExecutable = draft.candidates.length > 0 && !draft.executablePath
   const canSubmit = Boolean(draft.executablePath?.trim() && draft.name.trim()) && !isSaving
 
   return (
-    <div className="flex flex-col gap-4.5">
+    <div className="flex flex-col gap-3">
       {/* 0. Memory Vault Alert Callout */}
       {matchedMemoryGame && (
         <motion.div
@@ -1218,32 +1242,94 @@ function ReviewStep({
         </motion.div>
       )}
 
-      {/* 1. Game Title Input */}
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold uppercase tracking-wider text-text font-mono">
-            Game Name
-          </label>
-          <span className="font-mono text-[10px] text-muted">IGDB MATCH READY</span>
+      {/* 1. Live IGDB Cover Preview & Smart Game Title Input */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-surface-raised/50 p-3.5 shadow-2xs">
+        <div className="flex items-start gap-3.5">
+          {/* Live Matched Cover Poster */}
+          <div className="relative h-24 w-18 shrink-0 overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+            {previewCovers[previewCoverIdx] ? (
+              <img
+                src={previewCovers[previewCoverIdx]}
+                alt={primaryMatch?.name || draft.name}
+                onError={() => setPreviewCoverIdx((i) => i + 1)}
+                className="size-full object-cover"
+              />
+            ) : (
+              <div className="flex size-full flex-col items-center justify-center gap-1 bg-accent/10 p-1.5 text-center text-accent">
+                <Sparkles className="size-5" />
+                <span className="font-mono text-[8px] font-bold uppercase">Auto Art</span>
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1 flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold uppercase tracking-wider text-text font-mono">
+                Game Title (Auto-Detected)
+              </label>
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[9.5px] font-bold text-emerald-400">
+                <Sparkles className="size-2.5" />
+                <span>{primaryMatch ? 'IGDB METADATA LINKED' : 'IGDB AUTO-SYNC'}</span>
+              </span>
+            </div>
+
+            <div className="relative">
+              <input
+                value={draft.name}
+                onChange={(e) => onNameChange(e.target.value)}
+                className="h-10 w-full rounded-xl border border-border/90 bg-surface px-3.5 pr-9 text-sm font-bold text-text shadow-2xs outline-none transition-all placeholder:text-muted/60 focus:border-accent focus:ring-2 focus:ring-accent/20"
+                placeholder="e.g. Cyberpunk 2077, Hades, Elden Ring..."
+                autoFocus
+              />
+              {draft.name && (
+                <button
+                  type="button"
+                  onClick={() => onNameChange('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-text cursor-pointer p-1"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
+
+            {primaryMatch && (
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+                <span className="font-semibold text-text/90 truncate">
+                  {(primaryMatch.genres ?? []).slice(0, 3).join(' · ') || 'PC Game'}
+                </span>
+                {primaryMatch.release_date && (
+                  <span className="rounded border border-border/70 bg-surface px-1.5 py-0.2 font-mono text-[9.5px]">
+                    {primaryMatch.release_date.slice(0, 4)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="relative">
-          <input
-            value={draft.name}
-            onChange={(e) => onNameChange(e.target.value)}
-            className="h-11 w-full rounded-xl border border-border/90 bg-surface px-4 text-sm font-semibold text-text shadow-2xs outline-none transition-all placeholder:text-muted/60 focus:border-accent focus:ring-2 focus:ring-accent/20"
-            placeholder="e.g. Cyberpunk 2077, Hades, Elden Ring..."
-            autoFocus
-          />
-          {draft.name && (
-            <button
-              type="button"
-              onClick={() => onNameChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-text cursor-pointer p-1"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+
+        {/* 1-Click Official IGDB Title Suggestions */}
+        {topIgdbMatches.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2">
+            <span className="font-mono text-[9.5px] font-bold uppercase text-subtle">
+              Quick Match:
+            </span>
+            {topIgdbMatches.map((m) => (
+              <button
+                key={m.igdb_id}
+                type="button"
+                onClick={() => onNameChange(m.name)}
+                className={cn(
+                  'rounded-lg border px-2 py-0.5 text-[10.5px] font-semibold transition-all cursor-pointer truncate max-w-[180px]',
+                  draft.name.trim().toLowerCase() === m.name.trim().toLowerCase()
+                    ? 'border-accent bg-accent/15 text-accent font-bold'
+                    : 'border-border/70 bg-surface text-muted hover:border-accent/40 hover:text-text',
+                )}
+              >
+                {m.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 2. Executable Candidates Selection OR Single Target */}
@@ -1383,34 +1469,54 @@ function ReviewStep({
                   placeholder="e.g. -fullscreen -novid +fps_max 0"
                   className="h-8.5 rounded-lg border border-border bg-surface px-3 font-mono text-xs text-text placeholder:text-muted/60 focus:border-accent focus:outline-none"
                 />
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="font-mono text-[9.5px] text-subtle">Quick Flags:</span>
+                  {['-fullscreen', '-novid', '-dx12', '-dx11', '-windowed'].map((flag) => (
+                    <button
+                      key={flag}
+                      type="button"
+                      onClick={() => {
+                        const cur = (draft.launchArguments ?? '').trim()
+                        if (!cur.includes(flag)) {
+                          onArgsChange(cur ? `${cur} ${flag}` : flag)
+                        }
+                      }}
+                      className="rounded-md border border-border/70 bg-surface-raised px-2 py-0.5 font-mono text-[10px] font-semibold text-muted hover:border-accent/40 hover:text-accent cursor-pointer"
+                    >
+                      + {flag}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Custom Executable Override if manual */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold text-text font-mono">
-                  Executable Path Override
-                </label>
-                <input
-                  type="text"
-                  value={draft.executablePath ?? ''}
-                  onChange={(e) => onExecutableChange(e.target.value)}
-                  placeholder="C:\Games\GameTitle\game.exe"
-                  className="h-8.5 rounded-lg border border-border bg-surface px-3 font-mono text-xs text-text placeholder:text-muted/60 focus:border-accent focus:outline-none"
-                />
-              </div>
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                {/* Custom Executable Override if manual */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold text-text font-mono">
+                    Executable Path Override
+                  </label>
+                  <input
+                    type="text"
+                    value={draft.executablePath ?? ''}
+                    onChange={(e) => onExecutableChange(e.target.value)}
+                    placeholder="C:\Games\GameTitle\game.exe"
+                    className="h-8.5 rounded-lg border border-border bg-surface px-3 font-mono text-xs text-text placeholder:text-muted/60 focus:border-accent focus:outline-none"
+                  />
+                </div>
 
-              {/* Custom Install Directory Override */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold text-text font-mono">
-                  Installation Directory Override
-                </label>
-                <input
-                  type="text"
-                  value={draft.installPath ?? ''}
-                  onChange={(e) => onInstallPathChange(e.target.value)}
-                  placeholder="C:\Games\GameTitle"
-                  className="h-8.5 rounded-lg border border-border bg-surface px-3 font-mono text-xs text-text placeholder:text-muted/60 focus:border-accent focus:outline-none"
-                />
+                {/* Custom Install Directory Override */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold text-text font-mono">
+                    Installation Directory Override
+                  </label>
+                  <input
+                    type="text"
+                    value={draft.installPath ?? ''}
+                    onChange={(e) => onInstallPathChange(e.target.value)}
+                    placeholder="C:\Games\GameTitle"
+                    className="h-8.5 rounded-lg border border-border bg-surface px-3 font-mono text-xs text-text placeholder:text-muted/60 focus:border-accent focus:outline-none"
+                  />
+                </div>
               </div>
             </motion.div>
           )}

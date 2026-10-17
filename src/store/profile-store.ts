@@ -3,6 +3,8 @@ import type { Profile } from '@/types/models'
 import * as profileService from '@/services/profiles'
 import { getSetting } from '@/services/settings'
 import { queryClient } from '@/app/query-client'
+import { useSaveManagerStore } from './save-manager-store'
+import { useUiStore } from './ui-store'
 
 interface ProfileState {
   profiles: Profile[]
@@ -71,7 +73,9 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   selectProfile: async (profileId: string) => {
     if (get().isSwitchingProfile) return
     if (get().activeProfile?.id === profileId) {
-      set({ isGateOpen: false })
+      set({ isGateOpen: false, isManagerModalOpen: false })
+      void queryClient.invalidateQueries({ queryKey: ['games'] })
+      void queryClient.invalidateQueries({ queryKey: ['stats'] })
       return
     }
 
@@ -80,17 +84,28 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       const updated = await profileService.switchProfile(profileId)
       set((s) => ({
         activeProfile: updated,
-        profiles: s.profiles.map((p) => ({
-          ...p,
-          is_active: p.id === profileId,
-        })),
+        profiles: s.profiles.map((p) =>
+          p.id === profileId
+            ? { ...updated, is_active: true }
+            : { ...p, is_active: false },
+        ),
         isGateOpen: false,
+        isManagerModalOpen: false,
         isSwitchingProfile: false,
         switchingProfileId: null,
       }))
-      // Invalidate queries so per-profile playtime and stats update immediately
-      void queryClient.invalidateQueries({ queryKey: ['stats'] })
-      // Refresh profiles to get updated save stats (non-critical, run in background)
+
+      // Clear any stale game selection or save cache and refresh profile-scoped playtime & stats
+      useUiStore.getState().selectGame(null)
+      useSaveManagerStore.getState().resetCache()
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['games'] }),
+        queryClient.invalidateQueries({ queryKey: ['stats'] }),
+        queryClient.invalidateQueries({ queryKey: ['collections'] }),
+        queryClient.invalidateQueries({ queryKey: ['hub', 'feed', 'recommended'] }),
+      ])
+
+      // Refresh profiles list so both old and new profiles reflect exact post-swap save counts & sizes
       void get().loadProfiles(false)
     } catch (err) {
       console.error('Failed to switch profile:', err)
@@ -124,8 +139,10 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     await profileService.deleteProfile(id)
     await get().loadProfiles(false)
     if (wasActive) {
+      useSaveManagerStore.getState().resetCache()
       void queryClient.invalidateQueries({ queryKey: ['stats'] })
       void queryClient.invalidateQueries({ queryKey: ['games'] })
+      void queryClient.invalidateQueries({ queryKey: ['collections'] })
     }
   },
 }))

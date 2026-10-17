@@ -23,17 +23,18 @@ export const CompactBadgeLayout: React.FC<LayoutProps> = ({ metrics, toggles, to
   const color = model.fps.color ?? tokens.accentColor
   const gpu = model.groups.find((g) => g.id === 'gpu')
   const cpu = model.groups.find((g) => g.id === 'cpu')
-  const temp = gpu?.stats.find((s) => s.key === 'temp')
+  const gpuTemp = gpu?.stats.find((s) => s.key === 'temp')
+  const cpuTemp = cpu?.stats.find((s) => s.key === 'temp')
 
   return (
-    <HudPanel tokens={{ ...tokens, cornerStyle: 'pill' }} className="w-fit px-3.5 py-1.5">
+    <HudPanel tokens={{ ...tokens, cornerStyle: 'pill' }} className="w-fit px-4 py-2">
       <div className="flex items-center gap-3">
         <StatusDot color={color} />
         {model.fps.show && (
           <div className="flex items-baseline gap-1">
             <span
-              className={`font-mono text-[20px] font-black tabular-nums leading-none ${tokens.primaryTextColor}`}
-              style={{ color: model.fps.color }}
+              className={`font-mono text-[22px] font-black tabular-nums leading-none ${tokens.primaryTextColor}`}
+              style={{ color: model.fps.color, textShadow: `0 0 12px ${color}66` }}
             >
               {model.fps.text}
             </span>
@@ -55,41 +56,56 @@ export const CompactBadgeLayout: React.FC<LayoutProps> = ({ metrics, toggles, to
             tokens={tokens}
             value={model.fps.frametime.value}
             unit="ms"
-            className="text-[11px]"
+            className="text-[11px] font-semibold"
           />
         )}
-        {gpu?.main && (
-          <span className="flex items-baseline gap-1">
+        {(gpu?.main || gpuTemp) && (
+          <div className="flex items-baseline gap-1.5 border-l border-white/15 pl-3">
             <Label>GPU</Label>
-            <Value
-              tokens={tokens}
-              value={gpu.main.text}
-              unit="%"
-              color={gpu.main.color}
-              className="text-[11px]"
-            />
-          </span>
+            {gpu?.main && (
+              <Value
+                tokens={tokens}
+                value={gpu.main.text}
+                unit="%"
+                color={gpu.main.color}
+                strong
+                className="text-[11.5px] font-bold"
+              />
+            )}
+            {gpuTemp && (
+              <Value
+                tokens={tokens}
+                value={gpuTemp.value}
+                unit="°C"
+                color={gpuTemp.color}
+                className="text-[11px] font-semibold"
+              />
+            )}
+          </div>
         )}
-        {temp && (
-          <Value
-            tokens={tokens}
-            value={temp.value}
-            unit="°C"
-            color={temp.color}
-            className="text-[11px]"
-          />
-        )}
-        {cpu?.main && (
-          <span className="flex items-baseline gap-1">
+        {(cpu?.main || cpuTemp) && (
+          <div className="flex items-baseline gap-1.5 border-l border-white/15 pl-3">
             <Label>CPU</Label>
-            <Value
-              tokens={tokens}
-              value={cpu.main.text}
-              unit="%"
-              color={cpu.main.color}
-              className="text-[11px]"
-            />
-          </span>
+            {cpu?.main && (
+              <Value
+                tokens={tokens}
+                value={cpu.main.text}
+                unit="%"
+                color={cpu.main.color}
+                strong
+                className="text-[11.5px] font-bold"
+              />
+            )}
+            {cpuTemp && (
+              <Value
+                tokens={tokens}
+                value={cpuTemp.value}
+                unit="°C"
+                color={cpuTemp.color}
+                className="text-[11px] font-semibold"
+              />
+            )}
+          </div>
         )}
       </div>
     </HudPanel>

@@ -396,9 +396,35 @@ pub async fn switch_profile(
         .await
         .map_err(|e| format!("Task execution failed: {e}"))?;
 
-        // Swap failed/rolled back — re-read stats so the frontend doesn't
-        // show the new profile as active with stale save numbers.
         swap_result?;
+
+        // Re-read profile stats after swap so the returned Profile has accurate post-swap games_count and total_save_bytes
+        let conn = db.connection.lock().map_err(|e| e.to_string())?;
+        let mut refreshed: Profile = conn
+            .query_row(
+                "SELECT p.id, p.name, p.avatar, p.color, p.created_at, p.updated_at,
+                        (SELECT COUNT(*) FROM profile_game_saves pgs WHERE pgs.profile_id = p.id AND pgs.file_count > 0) AS games_count,
+                        (SELECT COALESCE(SUM(pgs.save_size_bytes), 0) FROM profile_game_saves pgs WHERE pgs.profile_id = p.id) AS total_save_bytes
+                 FROM profiles p WHERE p.id = ?1",
+                params![new_profile_id],
+                |row| {
+                    Ok(Profile {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        avatar: row.get(2)?,
+                        color: row.get(3)?,
+                        created_at: row.get(4)?,
+                        updated_at: row.get(5)?,
+                        is_active: true,
+                        games_count: row.get(6).ok(),
+                        total_save_bytes: row.get(7).ok(),
+                        recent_games: Vec::new(),
+                    })
+                },
+            )
+            .unwrap_or(profile);
+        refreshed.recent_games = get_profile_recent_games(&conn, &refreshed.id);
+        return Ok(refreshed);
     }
 
     Ok(profile)
@@ -416,459 +442,380 @@ pub struct GamingAvatarItem {
     pub tags: Vec<String>,
 }
 
+fn steam_avatar_item(
+    id: &str,
+    name: &str,
+    app_id: u64,
+    subtitle: &str,
+    tags: &[&str],
+) -> GamingAvatarItem {
+    let base = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps";
+    GamingAvatarItem {
+        id: id.to_string(),
+        name: name.to_string(),
+        source: "curated".to_string(),
+        image_url: format!("{base}/{app_id}/library_600x900_2x.jpg"),
+        preview_url: format!("{base}/{app_id}/library_600x900.jpg"),
+        subtitle: Some(subtitle.to_string()),
+        tags: tags.iter().map(|t| (*t).to_string()).collect(),
+    }
+}
+
 fn get_curated_avatars() -> Vec<GamingAvatarItem> {
     vec![
         // Call of Duty & Tactical
-        GamingAvatarItem {
-            id: "curated_ghost".to_string(),
-            name: "Simon \"Ghost\" Riley".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co5v5h.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co5v5h.jpg".to_string(),
-            subtitle: Some("Call of Duty: Modern Warfare II".to_string()),
-            tags: vec!["call of duty".into(), "cod".into(), "mw2".into(), "ghost".into(), "simon riley".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_price".to_string(),
-            name: "Captain John Price".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1x77.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1x77.jpg".to_string(),
-            subtitle: Some("Call of Duty: Modern Warfare".to_string()),
-            tags: vec!["call of duty".into(), "cod".into(), "mw".into(), "price".into(), "captain price".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_soap".to_string(),
-            name: "John \"Soap\" MacTavish".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co2044.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co2044.jpg".to_string(),
-            subtitle: Some("Call of Duty: Modern Warfare 2".to_string()),
-            tags: vec!["call of duty".into(), "cod".into(), "mw2".into(), "soap".into(), "mactavish".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_mason".to_string(),
-            name: "Alex Mason".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co2949.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co2949.jpg".to_string(),
-            subtitle: Some("Call of Duty: Black Ops".to_string()),
-            tags: vec!["call of duty".into(), "cod".into(), "black ops".into(), "mason".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_woods".to_string(),
-            name: "Frank Woods".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co222x.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co222x.jpg".to_string(),
-            subtitle: Some("Call of Duty: Black Ops Cold War".to_string()),
-            tags: vec!["call of duty".into(), "cod".into(), "black ops".into(), "woods".into()],
-        },
+        steam_avatar_item(
+            "curated_ghost",
+            "Simon \"Ghost\" Riley",
+            1938090,
+            "Call of Duty: Modern Warfare II",
+            &["call of duty", "cod", "mw2", "ghost", "simon riley", "shooter"],
+        ),
+        steam_avatar_item(
+            "curated_price",
+            "Captain John Price",
+            2000950,
+            "Call of Duty: Modern Warfare",
+            &["call of duty", "cod", "mw", "price", "captain price", "shooter"],
+        ),
+        steam_avatar_item(
+            "curated_soap",
+            "John \"Soap\" MacTavish",
+            2519060,
+            "Call of Duty: Modern Warfare III",
+            &["call of duty", "cod", "mw3", "soap", "mactavish", "shooter"],
+        ),
+        steam_avatar_item(
+            "curated_mason",
+            "Alex Mason",
+            42700,
+            "Call of Duty: Black Ops",
+            &["call of duty", "cod", "black ops", "mason", "shooter"],
+        ),
+        steam_avatar_item(
+            "curated_woods",
+            "Frank Woods",
+            1985810,
+            "Call of Duty: Black Ops Cold War",
+            &["call of duty", "cod", "black ops", "woods", "shooter"],
+        ),
 
-        // PlayStation Classics
-        GamingAvatarItem {
-            id: "curated_kratos".to_string(),
-            name: "Kratos".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm2zp.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm2zp.jpg".to_string(),
-            subtitle: Some("God of War Ragnarök".to_string()),
-            tags: vec!["god of war".into(), "gow".into(), "kratos".into(), "playstation".into(), "sony".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_atreus".to_string(),
-            name: "Atreus".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co5s5v.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co5s5v.jpg".to_string(),
-            subtitle: Some("God of War".to_string()),
-            tags: vec!["god of war".into(), "gow".into(), "atreus".into(), "loki".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_spiderman".to_string(),
-            name: "Peter Parker (Spider-Man)".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm12k.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm12k.jpg".to_string(),
-            subtitle: Some("Marvel's Spider-Man 2".to_string()),
-            tags: vec!["spider-man".into(), "spiderman".into(), "marvel".into(), "peter parker".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_miles".to_string(),
-            name: "Miles Morales".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co20r8.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co20r8.jpg".to_string(),
-            subtitle: Some("Marvel's Spider-Man: Miles Morales".to_string()),
-            tags: vec!["spider-man".into(), "spiderman".into(), "miles morales".into(), "marvel".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_ellie".to_string(),
-            name: "Ellie Williams".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm64.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm64.jpg".to_string(),
-            subtitle: Some("The Last of Us Part II".to_string()),
-            tags: vec!["the last of us".into(), "tlou".into(), "ellie".into(), "naughty dog".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_joel".to_string(),
-            name: "Joel Miller".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1r7f.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1r7f.jpg".to_string(),
-            subtitle: Some("The Last of Us".to_string()),
-            tags: vec!["the last of us".into(), "tlou".into(), "joel".into(), "naughty dog".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_jinsakai".to_string(),
-            name: "Jin Sakai".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm3s7.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm3s7.jpg".to_string(),
-            subtitle: Some("Ghost of Tsushima".to_string()),
-            tags: vec!["ghost of tsushima".into(), "jin sakai".into(), "samurai".into(), "playstation".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_nate".to_string(),
-            name: "Nathan Drake".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1r77.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1r77.jpg".to_string(),
-            subtitle: Some("Uncharted 4: A Thief's End".to_string()),
-            tags: vec!["uncharted".into(), "nathan drake".into(), "drake".into(), "naughty dog".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_aloy".to_string(),
-            name: "Aloy".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co28rw.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co28rw.jpg".to_string(),
-            subtitle: Some("Horizon Forbidden West".to_string()),
-            tags: vec!["horizon".into(), "aloy".into(), "zero dawn".into(), "guerrilla".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_bloodborne".to_string(),
-            name: "The Good Hunter".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1rba.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1rba.jpg".to_string(),
-            subtitle: Some("Bloodborne".to_string()),
-            tags: vec!["bloodborne".into(), "hunter".into(), "fromsoftware".into(), "souls".into()],
-        },
+        // PlayStation Icons
+        steam_avatar_item(
+            "curated_kratos_rag",
+            "Kratos",
+            2322010,
+            "God of War Ragnarök",
+            &["god of war", "gow", "kratos", "playstation", "sony"],
+        ),
+        steam_avatar_item(
+            "curated_kratos_2018",
+            "Kratos & Atreus",
+            1593500,
+            "God of War",
+            &["god of war", "gow", "atreus", "kratos", "playstation"],
+        ),
+        steam_avatar_item(
+            "curated_spiderman",
+            "Peter Parker (Spider-Man)",
+            1817070,
+            "Marvel's Spider-Man Remastered",
+            &["spider-man", "spiderman", "marvel", "peter parker", "playstation"],
+        ),
+        steam_avatar_item(
+            "curated_miles",
+            "Miles Morales",
+            1817190,
+            "Marvel's Spider-Man: Miles Morales",
+            &["spider-man", "spiderman", "miles morales", "marvel", "playstation"],
+        ),
+        steam_avatar_item(
+            "curated_ellie_joel",
+            "Ellie & Joel",
+            1888930,
+            "The Last of Us Part I",
+            &["the last of us", "tlou", "ellie", "joel", "playstation"],
+        ),
+        steam_avatar_item(
+            "curated_jinsakai",
+            "Jin Sakai (The Ghost)",
+            2215430,
+            "Ghost of Tsushima",
+            &["ghost of tsushima", "jin sakai", "samurai", "playstation"],
+        ),
+        steam_avatar_item(
+            "curated_nate",
+            "Nathan Drake",
+            1659420,
+            "Uncharted: Legacy of Thieves",
+            &["uncharted", "nathan drake", "drake", "playstation"],
+        ),
+        steam_avatar_item(
+            "curated_aloy_fw",
+            "Aloy",
+            2420110,
+            "Horizon Forbidden West",
+            &["horizon", "aloy", "forbidden west", "playstation"],
+        ),
+        steam_avatar_item(
+            "curated_aloy_zd",
+            "Aloy (Seeker)",
+            1151640,
+            "Horizon Zero Dawn",
+            &["horizon", "aloy", "zero dawn", "playstation"],
+        ),
 
-        // Witcher & Cyberpunk (CD Projekt Red)
-        GamingAvatarItem {
-            id: "curated_geralt".to_string(),
-            name: "Geralt of Rivia".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm6a.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm6a.jpg".to_string(),
-            subtitle: Some("The Witcher 3: Wild Hunt".to_string()),
-            tags: vec!["witcher".into(), "witcher 3".into(), "geralt".into(), "cdpr".into(), "rpg".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_ciri".to_string(),
-            name: "Ciri (Cirilla)".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/b2f4qo7yzuzr1ly0swci.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/b2f4qo7yzuzr1ly0swci.jpg".to_string(),
-            subtitle: Some("The Witcher 3: Wild Hunt".to_string()),
-            tags: vec!["witcher".into(), "ciri".into(), "cirilla".into(), "cdpr".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_yennefer".to_string(),
-            name: "Yennefer of Vengerberg".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/uhyat4iaflnxlzcdfxip.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/uhyat4iaflnxlzcdfxip.jpg".to_string(),
-            subtitle: Some("The Witcher 3: Wild Hunt".to_string()),
-            tags: vec!["witcher".into(), "yennefer".into(), "yen".into(), "cdpr".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_triss".to_string(),
-            name: "Triss Merigold".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/jec1fydhokwngsgfypix.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/jec1fydhokwngsgfypix.jpg".to_string(),
-            subtitle: Some("The Witcher 3: Wild Hunt".to_string()),
-            tags: vec!["witcher".into(), "triss".into(), "merigold".into(), "cdpr".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_v".to_string(),
-            name: "V (Mercenary)".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm3s9.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm3s9.jpg".to_string(),
-            subtitle: Some("Cyberpunk 2077".to_string()),
-            tags: vec!["cyberpunk".into(), "cyberpunk 2077".into(), "v".into(), "cdpr".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_johnny".to_string(),
-            name: "Johnny Silverhand".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co2m6b.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co2m6b.jpg".to_string(),
-            subtitle: Some("Cyberpunk 2077".to_string()),
-            tags: vec!["cyberpunk".into(), "johnny".into(), "silverhand".into(), "keanu".into(), "cdpr".into()],
-        },
+        // Witcher, Cyberpunk & CRPG
+        steam_avatar_item(
+            "curated_geralt",
+            "Geralt of Rivia",
+            292030,
+            "The Witcher 3: Wild Hunt",
+            &["witcher", "witcher 3", "geralt", "cdpr", "rpg"],
+        ),
+        steam_avatar_item(
+            "curated_v",
+            "V (Night City Mercenary)",
+            1091500,
+            "Cyberpunk 2077",
+            &["cyberpunk", "cyberpunk 2077", "v", "johnny silverhand", "cdpr"],
+        ),
+        steam_avatar_item(
+            "curated_phantom_liberty",
+            "Songbird & Solomon Reed",
+            2138330,
+            "Cyberpunk 2077: Phantom Liberty",
+            &["cyberpunk", "phantom liberty", "songbird", "cdpr"],
+        ),
+        steam_avatar_item(
+            "curated_bg3",
+            "Astarion & Shadowheart",
+            1086940,
+            "Baldur's Gate 3",
+            &["baldurs gate", "bg3", "astarion", "shadowheart", "rpg"],
+        ),
 
-        // Rockstar Games
-        GamingAvatarItem {
-            id: "curated_arthur".to_string(),
-            name: "Arthur Morgan".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm5q.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm5q.jpg".to_string(),
-            subtitle: Some("Red Dead Redemption 2".to_string()),
-            tags: vec!["red dead".into(), "rdr2".into(), "arthur".into(), "morgan".into(), "rockstar".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_marston".to_string(),
-            name: "John Marston".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1pcy.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1pcy.jpg".to_string(),
-            subtitle: Some("Red Dead Redemption".to_string()),
-            tags: vec!["red dead".into(), "rdr".into(), "john marston".into(), "marston".into(), "rockstar".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_trevor".to_string(),
-            name: "Trevor Philips".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1t1a.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1t1a.jpg".to_string(),
-            subtitle: Some("Grand Theft Auto V".to_string()),
-            tags: vec!["gta".into(), "gta5".into(), "gta v".into(), "trevor".into(), "rockstar".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_michael".to_string(),
-            name: "Michael De Santa".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co2lb7.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co2lb7.jpg".to_string(),
-            subtitle: Some("Grand Theft Auto V".to_string()),
-            tags: vec!["gta".into(), "gta5".into(), "gta v".into(), "michael".into(), "rockstar".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_cj".to_string(),
-            name: "Carl \"CJ\" Johnson".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1x7c.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1x7c.jpg".to_string(),
-            subtitle: Some("GTA: San Andreas".to_string()),
-            tags: vec!["gta".into(), "san andreas".into(), "cj".into(), "carl johnson".into(), "rockstar".into()],
-        },
+        // Rockstar Legends
+        steam_avatar_item(
+            "curated_arthur",
+            "Arthur Morgan",
+            1174180,
+            "Red Dead Redemption 2",
+            &["red dead", "rdr2", "arthur", "morgan", "rockstar"],
+        ),
+        steam_avatar_item(
+            "curated_marston",
+            "John Marston",
+            2668510,
+            "Red Dead Redemption",
+            &["red dead", "rdr", "john marston", "marston", "rockstar"],
+        ),
+        steam_avatar_item(
+            "curated_gtav",
+            "Michael, Franklin & Trevor",
+            271590,
+            "Grand Theft Auto V",
+            &["gta", "gta5", "gta v", "trevor", "michael", "franklin", "rockstar"],
+        ),
+        steam_avatar_item(
+            "curated_cj",
+            "Carl \"CJ\" Johnson",
+            1547000,
+            "GTA: San Andreas",
+            &["gta", "san andreas", "cj", "carl johnson", "rockstar"],
+        ),
 
         // Xbox & Bethesda
-        GamingAvatarItem {
-            id: "curated_masterchief".to_string(),
-            name: "Master Chief (John-117)".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm1b.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm1b.jpg".to_string(),
-            subtitle: Some("Halo Infinite".to_string()),
-            tags: vec!["halo".into(), "master chief".into(), "spartan".into(), "xbox".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_doomguy".to_string(),
-            name: "Doom Slayer".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm2k0.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm2k0.jpg".to_string(),
-            subtitle: Some("DOOM Eternal".to_string()),
-            tags: vec!["doom".into(), "doomguy".into(), "slayer".into(), "id software".into(), "bethesda".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_dragonborn".to_string(),
-            name: "The Dragonborn (Dovahkiin)".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1tnw.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1tnw.jpg".to_string(),
-            subtitle: Some("The Elder Scrolls V: Skyrim".to_string()),
-            tags: vec!["skyrim".into(), "dragonborn".into(), "elder scrolls".into(), "dovahkiin".into(), "bethesda".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_vaultboy".to_string(),
-            name: "Vault Boy".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1x18.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1x18.jpg".to_string(),
-            subtitle: Some("Fallout 4".to_string()),
-            tags: vec!["fallout".into(), "vault boy".into(), "bethesda".into()],
-        },
+        steam_avatar_item(
+            "curated_masterchief",
+            "Master Chief (John-117)",
+            1240440,
+            "Halo Infinite",
+            &["halo", "master chief", "spartan", "xbox"],
+        ),
+        steam_avatar_item(
+            "curated_doomslayer",
+            "Doom Slayer",
+            782330,
+            "DOOM Eternal",
+            &["doom", "doomguy", "slayer", "bethesda", "xbox"],
+        ),
+        steam_avatar_item(
+            "curated_doom_2016",
+            "Praetor Doom Marine",
+            379720,
+            "DOOM (2016)",
+            &["doom", "doomguy", "slayer", "bethesda", "xbox"],
+        ),
+        steam_avatar_item(
+            "curated_dragonborn",
+            "The Dragonborn (Dovahkiin)",
+            489830,
+            "The Elder Scrolls V: Skyrim",
+            &["skyrim", "dragonborn", "elder scrolls", "dovahkiin", "bethesda", "xbox"],
+        ),
+        steam_avatar_item(
+            "curated_fallout",
+            "Brotherhood Power Armor",
+            377160,
+            "Fallout 4",
+            &["fallout", "vault boy", "power armor", "bethesda", "xbox"],
+        ),
 
         // Capcom & Resident Evil
-        GamingAvatarItem {
-            id: "curated_leon".to_string(),
-            name: "Leon S. Kennedy".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm3j.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm3j.jpg".to_string(),
-            subtitle: Some("Resident Evil 4".to_string()),
-            tags: vec!["resident evil".into(), "re4".into(), "leon".into(), "capcom".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_jill".to_string(),
-            name: "Jill Valentine".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1x7i.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1x7i.jpg".to_string(),
-            subtitle: Some("Resident Evil 3".to_string()),
-            tags: vec!["resident evil".into(), "re3".into(), "jill".into(), "capcom".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_dante".to_string(),
-            name: "Dante".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1nvd.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1nvd.jpg".to_string(),
-            subtitle: Some("Devil May Cry 5".to_string()),
-            tags: vec!["devil may cry".into(), "dmc".into(), "dante".into(), "capcom".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_vergil".to_string(),
-            name: "Vergil".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co2k9u.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co2k9u.jpg".to_string(),
-            subtitle: Some("Devil May Cry 5".to_string()),
-            tags: vec!["devil may cry".into(), "dmc".into(), "vergil".into(), "capcom".into()],
-        },
+        steam_avatar_item(
+            "curated_leon",
+            "Leon S. Kennedy",
+            2050650,
+            "Resident Evil 4",
+            &["resident evil", "re4", "leon", "capcom"],
+        ),
+        steam_avatar_item(
+            "curated_jill",
+            "Jill Valentine",
+            952060,
+            "Resident Evil 3",
+            &["resident evil", "re3", "jill", "capcom"],
+        ),
+        steam_avatar_item(
+            "curated_claire_leon",
+            "Leon & Claire Redfield",
+            883710,
+            "Resident Evil 2",
+            &["resident evil", "re2", "claire", "leon", "capcom"],
+        ),
+        steam_avatar_item(
+            "curated_re_village",
+            "Chris Redfield (Hound Wolf)",
+            1196590,
+            "Resident Evil Village",
+            &["resident evil", "re8", "village", "chris", "capcom"],
+        ),
+        steam_avatar_item(
+            "curated_dante",
+            "Dante, Nero & Vergil",
+            601150,
+            "Devil May Cry 5",
+            &["devil may cry", "dmc", "dante", "vergil", "nero", "capcom"],
+        ),
 
-        // Konami & Metal Gear
-        GamingAvatarItem {
-            id: "curated_solid_snake".to_string(),
-            name: "Solid Snake".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm14.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm14.jpg".to_string(),
-            subtitle: Some("Metal Gear Solid".to_string()),
-            tags: vec!["metal gear".into(), "mgs".into(), "snake".into(), "solid snake".into(), "konami".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_raiden".to_string(),
-            name: "Raiden (Cyborg Ninja)".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1x3t.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1x3t.jpg".to_string(),
-            subtitle: Some("Metal Gear Rising: Revengeance".to_string()),
-            tags: vec!["metal gear".into(), "raiden".into(), "ninja".into(), "revengeance".into()],
-        },
-
-        // Soulslike & FromSoftware
-        GamingAvatarItem {
-            id: "curated_tarnished".to_string(),
-            name: "The Tarnished".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co4jni.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co4jni.jpg".to_string(),
-            subtitle: Some("Elden Ring".to_string()),
-            tags: vec!["elden ring".into(), "tarnished".into(), "fromsoftware".into(), "souls".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_malenia".to_string(),
-            name: "Malenia, Blade of Miquella".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co4jne.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co4jne.jpg".to_string(),
-            subtitle: Some("Elden Ring".to_string()),
-            tags: vec!["elden ring".into(), "malenia".into(), "fromsoftware".into(), "souls".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_sekiro".to_string(),
-            name: "Wolf (Sekiro)".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1r76.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1r76.jpg".to_string(),
-            subtitle: Some("Sekiro: Shadows Die Twice".to_string()),
-            tags: vec!["sekiro".into(), "wolf".into(), "fromsoftware".into()],
-        },
+        // Soulslike, Action & Mythology
+        steam_avatar_item(
+            "curated_tarnished",
+            "The Tarnished (Vyke)",
+            1245620,
+            "Elden Ring",
+            &["elden ring", "tarnished", "fromsoftware", "souls"],
+        ),
+        steam_avatar_item(
+            "curated_messmer",
+            "Messmer the Impaler",
+            2778580,
+            "Elden Ring: Shadow of the Erdtree",
+            &["elden ring", "messmer", "malenia", "fromsoftware", "souls"],
+        ),
+        steam_avatar_item(
+            "curated_sekiro",
+            "Wolf (One-Armed Shinobi)",
+            814380,
+            "Sekiro: Shadows Die Twice",
+            &["sekiro", "wolf", "fromsoftware", "souls"],
+        ),
+        steam_avatar_item(
+            "curated_ds3",
+            "Soul of Cinder (Ashen One)",
+            374320,
+            "Dark Souls III",
+            &["dark souls", "ds3", "ashen one", "fromsoftware", "souls"],
+        ),
+        steam_avatar_item(
+            "curated_wukong",
+            "The Destined One (Wukong)",
+            2358720,
+            "Black Myth: Wukong",
+            &["wukong", "black myth", "souls", "action"],
+        ),
 
         // Square Enix & JRPG
-        GamingAvatarItem {
-            id: "curated_cloud".to_string(),
-            name: "Cloud Strife".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm1g.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm1g.jpg".to_string(),
-            subtitle: Some("Final Fantasy VII Remake".to_string()),
-            tags: vec!["final fantasy".into(), "ff7".into(), "cloud".into(), "square enix".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_sephiroth".to_string(),
-            name: "Sephiroth".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co2k0d.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co2k0d.jpg".to_string(),
-            subtitle: Some("Final Fantasy VII Rebirth".to_string()),
-            tags: vec!["final fantasy".into(), "ff7".into(), "sephiroth".into(), "square enix".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_2b".to_string(),
-            name: "YoRHa No. 2 Type B (2B)".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm2k2.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm2k2.jpg".to_string(),
-            subtitle: Some("NieR: Automata".to_string()),
-            tags: vec!["nier".into(), "2b".into(), "automata".into(), "square enix".into()],
-        },
+        steam_avatar_item(
+            "curated_cloud",
+            "Cloud Strife",
+            1462040,
+            "Final Fantasy VII Remake",
+            &["final fantasy", "ff7", "cloud", "square enix"],
+        ),
+        steam_avatar_item(
+            "curated_sephiroth",
+            "Sephiroth & Cloud",
+            2909400,
+            "Final Fantasy VII Rebirth",
+            &["final fantasy", "ff7", "sephiroth", "cloud", "square enix"],
+        ),
+        steam_avatar_item(
+            "curated_clive",
+            "Clive Rosfield (Ifrit)",
+            2515020,
+            "Final Fantasy XVI",
+            &["final fantasy", "ff16", "clive", "square enix"],
+        ),
+        steam_avatar_item(
+            "curated_2b",
+            "YoRHa No.2 Type B (2B)",
+            524220,
+            "NieR:Automata",
+            &["nier", "2b", "automata", "square enix", "final fantasy"],
+        ),
 
-        // Iconic Legends & Retro
-        GamingAvatarItem {
-            id: "curated_link".to_string(),
-            name: "Link".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co5vmg.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co5vmg.jpg".to_string(),
-            subtitle: Some("The Legend of Zelda: Tears of the Kingdom".to_string()),
-            tags: vec!["zelda".into(), "link".into(), "nintendo".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_laracroft".to_string(),
-            name: "Lara Croft".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/cm8.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/cm8.jpg".to_string(),
-            subtitle: Some("Tomb Raider".to_string()),
-            tags: vec!["tomb raider".into(), "lara croft".into(), "lara".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_gordon".to_string(),
-            name: "Gordon Freeman".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1r74.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1r74.jpg".to_string(),
-            subtitle: Some("Half-Life 2".to_string()),
-            tags: vec!["half life".into(), "half-life".into(), "gordon freeman".into(), "valve".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_jinx".to_string(),
-            name: "Jinx".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co3p81.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co3p81.jpg".to_string(),
-            subtitle: Some("League of Legends / Arcane".to_string()),
-            tags: vec!["league of legends".into(), "lol".into(), "arcane".into(), "jinx".into(), "riot".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_tracer".to_string(),
-            name: "Tracer".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co1rcd.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co1rcd.jpg".to_string(),
-            subtitle: Some("Overwatch 2".to_string()),
-            tags: vec!["overwatch".into(), "ow".into(), "tracer".into(), "blizzard".into()],
-        },
-        GamingAvatarItem {
-            id: "curated_scorpion".to_string(),
-            name: "Scorpion".to_string(),
-            source: "curated".to_string(),
-            image_url: "https://images.igdb.com/igdb/image/upload/t_cover_big/co6m8s.jpg".to_string(),
-            preview_url: "https://images.igdb.com/igdb/image/upload/t_thumb/co6m8s.jpg".to_string(),
-            subtitle: Some("Mortal Kombat 1".to_string()),
-            tags: vec!["mortal kombat".into(), "mk".into(), "scorpion".into()],
-        },
+        // Konami, Fighting & Iconic Legends
+        steam_avatar_item(
+            "curated_bigboss",
+            "Venom Snake (Big Boss)",
+            287700,
+            "Metal Gear Solid V: The Phantom Pain",
+            &["metal gear", "mgs", "snake", "big boss", "konami"],
+        ),
+        steam_avatar_item(
+            "curated_raiden",
+            "Raiden (Cyborg Ninja)",
+            235460,
+            "Metal Gear Rising: Revengeance",
+            &["metal gear", "raiden", "ninja", "revengeance"],
+        ),
+        steam_avatar_item(
+            "curated_laracroft",
+            "Lara Croft",
+            750920,
+            "Shadow of the Tomb Raider",
+            &["tomb raider", "lara croft", "lara"],
+        ),
+        steam_avatar_item(
+            "curated_gordon",
+            "Gordon Freeman",
+            220,
+            "Half-Life 2",
+            &["half life", "half-life", "gordon freeman", "valve"],
+        ),
+        steam_avatar_item(
+            "curated_mk1",
+            "Fire God Liu Kang",
+            1971870,
+            "Mortal Kombat 1",
+            &["mortal kombat", "mk1", "liu kang", "scorpion", "sub-zero"],
+        ),
+        steam_avatar_item(
+            "curated_tekken8",
+            "Jin Kazama & Kazuya",
+            1778820,
+            "TEKKEN 8",
+            &["tekken", "jin kazama", "kazuya", "fighting"],
+        ),
+        steam_avatar_item(
+            "curated_batman",
+            "Batman (The Dark Knight)",
+            208650,
+            "Batman: Arkham Knight",
+            &["batman", "arkham", "dc", "dark knight"],
+        ),
     ]
 }
 
@@ -880,36 +827,44 @@ async fn search_steam_store_avatars(
     if sanitized.is_empty() {
         return Vec::new();
     }
-    let query_param = sanitized.replace(' ', "+");
-    let url = format!(
-        "https://store.steampowered.com/api/storesearch/?term={}&l=english&cc=US",
-        query_param
-    );
-
-    let Ok(resp) = client.get(&url).send().await else {
+    let url = "https://store.steampowered.com/api/storesearch/";
+    let Ok(resp) = client
+        .get(url)
+        .query(&[("term", sanitized), ("l", "english"), ("cc", "US")])
+        .send()
+        .await
+    else {
         return Vec::new();
     };
     let Ok(json) = resp.json::<serde_json::Value>().await else {
         return Vec::new();
     };
 
+    let base = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps";
     let mut items = Vec::new();
     if let Some(arr) = json.get("items").and_then(|v| v.as_array()) {
-        for it in arr.iter().take(10) {
+        for it in arr.iter().take(12) {
             let id = it.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
-            let name = it.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let tiny = it.get("tiny_image").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let name = it.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+            let lower = name.to_lowercase();
+            // Skip soundtracks, demos, artbooks, and trial packs so only genuine games appear
+            if lower.contains("soundtrack")
+                || lower.ends_with(" demo")
+                || lower.contains("artbook")
+                || lower.contains("upgrade pack")
+            {
+                continue;
+            }
             if id > 0 && !name.is_empty() {
-                let hero_url = format!(
-                    "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{id}/header.jpg"
-                );
+                let hd_cover = format!("{base}/{id}/library_600x900_2x.jpg");
+                let std_cover = format!("{base}/{id}/library_600x900.jpg");
                 items.push(GamingAvatarItem {
                     id: format!("steam_{id}"),
-                    name: format!("{name} (Steam)"),
+                    name,
                     source: "steam".to_string(),
-                    image_url: hero_url.clone(),
-                    preview_url: if tiny.is_empty() { hero_url } else { tiny },
-                    subtitle: Some("Steam Store".to_string()),
+                    image_url: hd_cover,
+                    preview_url: std_cover,
+                    subtitle: Some("Steam HD Portrait".to_string()),
                     tags: vec!["steam".to_string(), "pc".to_string()],
                 });
             }
@@ -1034,6 +989,7 @@ pub async fn search_gaming_avatars(
     db: State<'_, Database>,
     http: State<'_, crate::commands::metadata::HttpClient>,
     token_cache: State<'_, crate::commands::metadata::IgdbTokenCache>,
+    resolver: State<'_, std::sync::Arc<crate::services::metadata::MetadataProviderResolver>>,
     query: String,
     offset: Option<usize>,
     limit: Option<usize>,
@@ -1054,7 +1010,7 @@ pub async fn search_gaming_avatars(
     let trimmed = query.trim();
     let mut items = Vec::new();
 
-    // 1. Match Curated Heroes
+    // 1. Match Curated High-Resolution Heroes
     let curated = get_curated_avatars();
     let query_lower = trimmed.to_lowercase();
     let mut curated_matches: Vec<GamingAvatarItem> = curated
@@ -1080,29 +1036,23 @@ pub async fn search_gaming_avatars(
         items.push(item);
     }
 
-    // 2. Query IGDB Characters if configured
-    if let (Some(client_id), Some(secret)) = (igdb_client_id, igdb_client_secret) {
-        if let Ok(token) = crate::commands::metadata::igdb::get_access_token(&http.0, &token_cache, &client_id, &secret).await {
-            let igdb_offset = offset_val;
-
-            if let Ok(chars) = crate::commands::metadata::igdb::search_characters(
-                &http.0,
-                &client_id,
-                &token,
-                trimmed,
-                igdb_offset,
-                limit_val,
-            ).await {
-                for c in chars {
-                    if !items.iter().any(|x| x.name.eq_ignore_ascii_case(&c.name)) {
+    // 2. If user is browsing (query empty) and clicked "Load More" past our 48 curated heroes,
+    // pull high-resolution (t_720p) top-rated games from the metadata resolver!
+    if trimmed.is_empty() && items.len() < limit_val {
+        let feed_offset = (offset_val.saturating_sub(24)) as i64;
+        if let Ok(feed_games) = resolver.fetch_feed(&db, "top_rated", feed_offset).await {
+            for g in feed_games {
+                if let Some(cov) = g.cover_url {
+                    let hd_url = cov.replace("/t_cover_big/", "/t_720p/");
+                    if !items.iter().any(|x| x.name.eq_ignore_ascii_case(&g.name)) {
                         items.push(GamingAvatarItem {
-                            id: format!("igdb_{}", c.id),
-                            name: c.name,
+                            id: format!("hub_{}", g.igdb_id),
+                            name: g.name,
                             source: "igdb".to_string(),
-                            image_url: c.image_url,
-                            preview_url: c.thumbnail_url,
-                            subtitle: c.game_name,
-                            tags: Vec::new(),
+                            image_url: hd_url.clone(),
+                            preview_url: cov,
+                            subtitle: g.genres.first().cloned().or_else(|| Some("IGDB HD".into())),
+                            tags: g.genres,
                         });
                     }
                 }
@@ -1110,17 +1060,70 @@ pub async fn search_gaming_avatars(
         }
     }
 
-    // 3. Query Steam Store Search if query is not empty
-    if !trimmed.is_empty() && items.len() < limit_val * 2 {
+    // 3. When searching by keyword, query Steam Store HD Portraits & Metadata Resolver in parallel
+    if !trimmed.is_empty() && items.len() < limit_val {
         let steam_items = search_steam_store_avatars(&http.0, trimmed).await;
         for s in steam_items {
             if !items.iter().any(|x| x.name.eq_ignore_ascii_case(&s.name)) {
                 items.push(s);
             }
         }
+
+        let default_filters = crate::commands::hub::HubSearchFilters::default();
+        if let Ok(hub_games) = resolver
+            .search_games(&db, trimmed, offset_val as i64, &default_filters)
+            .await
+        {
+            for g in hub_games.into_iter().take(12) {
+                if let Some(cov) = g.cover_url {
+                    let hd_url = cov.replace("/t_cover_big/", "/t_720p/");
+                    if !items.iter().any(|x| x.name.eq_ignore_ascii_case(&g.name)) {
+                        items.push(GamingAvatarItem {
+                            id: format!("igdb_game_{}", g.igdb_id),
+                            name: g.name,
+                            source: "igdb".to_string(),
+                            image_url: hd_url,
+                            preview_url: cov,
+                            subtitle: g.genres.first().cloned().or_else(|| Some("IGDB HD".into())),
+                            tags: g.genres,
+                        });
+                    }
+                }
+            }
+        }
     }
 
-    // 4. Query SteamGridDB Icons if query is not empty and key is configured
+    // 4. Query Direct IGDB Characters if custom credentials are configured and query is non-empty
+    if !trimmed.is_empty() {
+        if let (Some(client_id), Some(secret)) = (igdb_client_id, igdb_client_secret) {
+            if let Ok(token) = crate::commands::metadata::igdb::get_access_token(&http.0, &token_cache, &client_id, &secret).await {
+                if let Ok(chars) = crate::commands::metadata::igdb::search_characters(
+                    &http.0,
+                    &client_id,
+                    &token,
+                    trimmed,
+                    offset_val,
+                    limit_val,
+                ).await {
+                    for c in chars {
+                        if !items.iter().any(|x| x.name.eq_ignore_ascii_case(&c.name)) {
+                            items.push(GamingAvatarItem {
+                                id: format!("igdb_{}", c.id),
+                                name: c.name,
+                                source: "igdb".to_string(),
+                                image_url: c.image_url,
+                                preview_url: c.thumbnail_url,
+                                subtitle: c.game_name,
+                                tags: Vec::new(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 5. Query SteamGridDB Icons if query is not empty and key is configured
     if let Some(sgdb_key) = steamgriddb_key {
         if !trimmed.is_empty() {
             if let Ok(icons) = crate::commands::metadata::steamgriddb::search_icons(&http.0, &sgdb_key, trimmed).await {
@@ -1130,9 +1133,9 @@ pub async fn search_gaming_avatars(
                             id: format!("sgdb_{}", icon.id),
                             name: format!("{} Icon", trimmed),
                             source: "steamgriddb".to_string(),
-                            image_url: icon.url,
-                            preview_url: icon.thumbnail_url,
-                            subtitle: Some("SteamGridDB".to_string()),
+                            image_url: icon.url.clone(),
+                            preview_url: icon.url,
+                            subtitle: Some("SteamGridDB HD".to_string()),
                             tags: Vec::new(),
                         });
                     }
@@ -1143,7 +1146,6 @@ pub async fn search_gaming_avatars(
 
     Ok(items)
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -97,3 +97,78 @@
   --nx-font-family: 'Teko', sans-serif;
   font-family: 'Teko', sans-serif;
 }
+
+/* ============================================================================
+   4-LEVEL GLOBAL FONT BOLDNESS / WEIGHT SYSTEM
+   ('light' | 'regular' | 'bold' | 'extrabold')
+   ============================================================================ */
+
+/* Level 1: Light (300-600) */
+html[data-font-weight='light'] body {
+  font-weight: 300;
+}
+html[data-font-weight='light'] .font-normal {
+  font-weight: 300 !important;
+}
+html[data-font-weight='light'] .font-medium {
+  font-weight: 350 !important;
+}
+html[data-font-weight='light'] .font-semibold {
+  font-weight: 450 !important;
+}
+html[data-font-weight='light'] .font-bold {
+  font-weight: 550 !important;
+}
+html[data-font-weight='light'] .font-extrabold,
+html[data-font-weight='light'] .font-black {
+  font-weight: 650 !important;
+}
+
+/* Level 2: Regular (Default 400-800) */
+html[data-font-weight='regular'] body {
+  font-weight: 400;
+}
+
+/* Level 3: Bold (500-900) */
+html[data-font-weight='bold'] body {
+  font-weight: 500;
+}
+html[data-font-weight='bold'] .font-normal {
+  font-weight: 500 !important;
+}
+html[data-font-weight='bold'] .font-medium {
+  font-weight: 600 !important;
+}
+html[data-font-weight='bold'] .font-semibold {
+  font-weight: 700 !important;
+}
+html[data-font-weight='bold'] .font-bold {
+  font-weight: 800 !important;
+}
+html[data-font-weight='bold'] .font-extrabold,
+html[data-font-weight='bold'] .font-black {
+  font-weight: 900 !important;
+  -webkit-text-stroke: 0.15px currentColor;
+}
+
+/* Level 4: Extra Bold (650-900 + crisp stroke reinforcement) */
+html[data-font-weight='extrabold'] body {
+  font-weight: 600;
+  -webkit-text-stroke: 0.2px currentColor;
+}
+html[data-font-weight='extrabold'] .font-normal {
+  font-weight: 600 !important;
+}
+html[data-font-weight='extrabold'] .font-medium {
+  font-weight: 700 !important;
+}
+html[data-font-weight='extrabold'] .font-semibold {
+  font-weight: 800 !important;
+  -webkit-text-stroke: 0.2px currentColor;
+}
+html[data-font-weight='extrabold'] .font-bold,
+html[data-font-weight='extrabold'] .font-extrabold,
+html[data-font-weight='extrabold'] .font-black {
+  font-weight: 900 !important;
+  -webkit-text-stroke: 0.35px currentColor;
+}

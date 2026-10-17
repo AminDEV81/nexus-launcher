@@ -49,26 +49,35 @@ impl SaveDetector {
         let effective_app_id = initial_app_id.or(manifest_result.steam_id);
         candidates.extend(manifest_result.locations);
 
-        // 1. Steam UserData remote path (if app_id provided or detected)
+        // 1. Steam UserData remote path across all common Steam installation drives
         if let Some(app_id) = effective_app_id {
-            let steam_userdata = PathBuf::from("C:\\Program Files (x86)\\Steam\\userdata");
-            if steam_userdata.exists() {
-                if let Ok(entries) = fs::read_dir(&steam_userdata) {
-                    for entry in entries.flatten() {
-                        let remote_path = entry.path().join(app_id.to_string()).join("remote");
-                        let exists = remote_path.exists();
-                        let has_files = exists && Self::is_actual_save_dir(&remote_path);
-                        candidates.push(DetectedSaveLocation {
-                            path: remote_path.to_string_lossy().to_string(),
-                            location_type: "save".to_string(),
-                            confidence: if has_files { 100 } else if exists { 95 } else { 60 },
-                            exists,
-                        });
+            let userdata_roots = [
+                "C:\\Program Files (x86)\\Steam\\userdata",
+                "C:\\Steam\\userdata",
+                "D:\\Steam\\userdata",
+                "E:\\Steam\\userdata",
+                "F:\\Steam\\userdata",
+            ];
+            for root_str in userdata_roots {
+                let steam_userdata = PathBuf::from(root_str);
+                if steam_userdata.exists() {
+                    if let Ok(entries) = fs::read_dir(&steam_userdata) {
+                        for entry in entries.flatten() {
+                            let remote_path = entry.path().join(app_id.to_string()).join("remote");
+                            let exists = remote_path.exists();
+                            let has_files = exists && Self::is_actual_save_dir(&remote_path);
+                            candidates.push(DetectedSaveLocation {
+                                path: remote_path.to_string_lossy().to_string(),
+                                location_type: "save".to_string(),
+                                confidence: if has_files { 100 } else if exists { 95 } else { 60 },
+                                exists,
+                            });
+                        }
                     }
                 }
             }
 
-            // Steam Emulator Paths: RUNE, CODEX, Goldberg, FLT
+            // Steam & Store Emulator Paths: RUNE, CODEX, Goldberg, FLT, TENOKE, EMPRESS, SmartSteamEmu, OnlineFix, SKIDROW
             let emu_candidates = vec![
                 format!("C:\\Users\\Public\\Documents\\Steam\\RUNE\\{}\\remote", app_id),
                 format!("C:\\Users\\Public\\Documents\\Steam\\RUNE\\{}", app_id),
@@ -76,7 +85,11 @@ impl SaveDetector {
                 format!("%LOCALAPPDATA%\\Steam\\CODEX\\{}", app_id),
                 format!("%APPDATA%\\Goldberg SteamEmu Saves\\{}\\remote", app_id),
                 format!("%APPDATA%\\Goldberg SteamEmu Saves\\{}", app_id),
+                format!("%APPDATA%\\SmartSteamEmu\\{}\\remote", app_id),
                 format!("%APPDATA%\\FLT\\{}", app_id),
+                format!("%APPDATA%\\EMPRESS\\{}\\remote\\{}", app_id, app_id),
+                format!("C:\\Users\\Public\\Documents\\EMPRESS\\{}\\remote\\{}", app_id, app_id),
+                format!("%DOCUMENTS%\\SKIDROW\\{}", app_id),
             ];
 
             for raw in emu_candidates {
@@ -234,18 +247,33 @@ impl SaveDetector {
             exists,
         });
 
-        // 8. In-Game Directory Saves (Portable / DRM-free saves, Call of Duty, etc.)
+        // 8. In-Game Directory Saves (Portable / DRM-free saves, Unreal Saved/SaveGames, Call of Duty players, TENOKESaveData, etc.)
         if let Some(exe) = game_exe_path {
-            if let Some(game_dir) = exe.parent() {
+            let mut dirs_to_check = Vec::new();
+            if let Some(p) = exe.parent() {
+                dirs_to_check.push(p);
+            }
+            if let Some(root) = crate::commands::save_manager::manifest::ManifestEngine::resolve_game_root_from_exe(exe) {
+                if !dirs_to_check.contains(&root) {
+                    dirs_to_check.push(root);
+                }
+            }
+            for game_dir in dirs_to_check {
                 for sub in &[
                     "saves",
                     "save",
+                    "Saves",
                     "SaveGames",
+                    "Saved\\SaveGames",
+                    "savedata",
+                    "SaveData",
+                    "TENOKE\\Saves",
                     "Profile",
                     "players",
                     "players2",
                     "profiles",
                     "profile",
+                    "UserData",
                 ] {
                     let sub_p = game_dir.join(sub);
                     if sub_p.is_dir() {
@@ -253,7 +281,7 @@ impl SaveDetector {
                         candidates.push(DetectedSaveLocation {
                             path: sub_p.to_string_lossy().to_string(),
                             location_type: "save".to_string(),
-                            confidence: if has_f { 100 } else { 80 },
+                            confidence: if has_f { 100 } else { 82 },
                             exists: true,
                         });
                     }
@@ -464,7 +492,26 @@ impl SaveDetector {
 
     /// Tries to auto-detect Steam AppId from files near the game executable.
     pub fn detect_steam_app_id_from_exe(exe_path: &Path) -> Option<u32> {
-        let game_dir = exe_path.parent()?;
+        let mut search_roots = Vec::new();
+        if let Some(p) = exe_path.parent() {
+            search_roots.push(p);
+        }
+        if let Some(root) = crate::commands::save_manager::manifest::ManifestEngine::resolve_game_root_from_exe(exe_path) {
+            if !search_roots.contains(&root) {
+                search_roots.push(root);
+            }
+        }
+        for game_dir in &search_roots {
+            let direct_appid = game_dir.join("steam_appid.txt");
+            if let Some(id) = Self::read_appid_from_file(&direct_appid) {
+                return Some(id);
+            }
+            let direct_ini = game_dir.join("steam_emu.ini");
+            if let Some(id) = Self::read_appid_from_ini(&direct_ini) {
+                return Some(id);
+            }
+        }
+        let game_dir = *search_roots.last()?;
 
         // Direct files in game dir
         let direct_appid = game_dir.join("steam_appid.txt");

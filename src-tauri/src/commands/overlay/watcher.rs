@@ -65,6 +65,16 @@ impl AutoGameWatcher {
                     .filter(|p| GameResolver::is_game_like(&known_games, p));
 
                 if let Some(fg) = fg_game {
+                    if let Some((matched_game_id, _)) =
+                        GameResolver::match_known_game(&known_games, &fg)
+                    {
+                        crate::commands::launch::attach_external_game_if_not_running(
+                            &app,
+                            &matched_game_id,
+                            fg.pid,
+                            Some(fg.exe_name.clone()),
+                        );
+                    }
                     active_game_pid = Some(fg.pid);
                     state.foreground_game_pid.store(fg.pid, Ordering::SeqCst);
 

@@ -1,37 +1,72 @@
 use serde::{Deserialize, Serialize};
 
+fn default_one() -> i64 {
+    1
+}
+
+fn default_album_type() -> String {
+    "original_soundtrack".to_string()
+}
+
+fn default_provider_id() -> String {
+    "curated".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SoundtrackAlbum {
     pub id: String,
+    #[serde(default)]
     pub game_id: Option<String>,
     pub title: String,
+    #[serde(default = "default_album_type")]
     pub album_type: String, // original_soundtrack, original_score, radio, gamerip, etc.
+    #[serde(default)]
     pub artist: Option<String>,
+    #[serde(default)]
     pub release_date: Option<String>,
+    #[serde(default)]
     pub cover_url: Option<String>,
+    #[serde(default)]
     pub track_count: i64,
+    #[serde(default)]
     pub total_duration_ms: i64,
+    #[serde(default = "default_provider_id")]
     pub provider_id: String,
+    #[serde(default)]
     pub external_id: Option<String>,
+    #[serde(default)]
     pub created_at: String,
+    #[serde(default)]
     pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SoundtrackTrack {
     pub id: String,
+    #[serde(default)]
     pub album_id: String,
+    #[serde(default = "default_one")]
     pub disc_number: i64,
+    #[serde(default = "default_one")]
     pub track_number: i64,
     pub title: String,
+    #[serde(default)]
     pub artist: Option<String>,
+    #[serde(default)]
     pub duration_ms: i64,
+    #[serde(default)]
     pub preview_url: Option<String>,
+    #[serde(default)]
     pub stream_url: Option<String>,
+    #[serde(default)]
     pub download_url: Option<String>,
+    #[serde(default)]
     pub local_path: Option<String>,
+    #[serde(default = "default_provider_id")]
     pub provider_id: String,
+    #[serde(default)]
     pub external_id: Option<String>,
+    #[serde(default)]
     pub created_at: String,
 }
 
@@ -46,6 +81,7 @@ pub struct SoundtrackFavorite {
     pub id: String,
     pub target_type: String, // track, album
     pub target_id: String,
+    #[serde(default)]
     pub created_at: String,
 }
 

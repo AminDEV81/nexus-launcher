@@ -30,7 +30,17 @@ import { formatElapsed, formatPlaytimeCompact, isGameUnreleased } from '../utils
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { playButtonClick, playCardHover } from '@/lib/sound-engine'
 import { CoverPlaceholder } from './cover-placeholder'
+import { resolveClientCriticScores } from '@/features/hub/utils/score'
 import type { Game } from '@/types/models'
+
+function formatSizeCompact(bytes: number | null | undefined): string | null {
+  if (!bytes || bytes <= 0) return null
+  const gb = bytes / (1024 * 1024 * 1024)
+  if (gb >= 1) return `${gb.toFixed(1)} GB`
+  const mb = bytes / (1024 * 1024)
+  if (mb >= 1) return `${Math.round(mb)} MB`
+  return null
+}
 
 interface GameCardProps {
   game: Game
@@ -71,6 +81,20 @@ export const GameCard = memo(function GameCard({
     !game.is_installed && !game.executable_path && game.source !== 'steam' && !isUnreleased
   const releaseYear = game.release_date ? game.release_date.split('-')[0] : null
   const isWishlist = Boolean(game.is_wishlist)
+  const sizeLabel = useMemo(() => formatSizeCompact(game.install_size_bytes), [game.install_size_bytes])
+
+  const criticScores = useMemo(() => {
+    if (isGameUnreleased(game.release_date)) {
+      return { metacritic: null, opencritic: null }
+    }
+    return resolveClientCriticScores(
+      game.name,
+      game.release_date,
+      game.metacritic_score,
+      game.opencritic_score,
+      null,
+    )
+  }, [game.name, game.release_date, game.metacritic_score, game.opencritic_score])
 
   const tagDots = useMemo(() => {
     if (!tags || game.tag_ids.length === 0) return []
@@ -114,42 +138,41 @@ export const GameCard = memo(function GameCard({
   }
 
   return (
-    <div className="group flex flex-col gap-2.5">
-      {/* Cover Card Poster Container */}
-      <motion.div
-        tabIndex={0}
-        onClick={() => {
-          playButtonClick()
-          onSelect(game.id)
-        }}
-        onContextMenu={(event) => {
-          playButtonClick()
-          onContextMenu(game, event)
-        }}
-        onHoverStart={() => {
-          setHovered(true)
-          playCardHover()
-        }}
-        onHoverEnd={() => setHovered(false)}
-        whileHover={{ y: -8, scale: 1.02 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 26 }}
-        className={cn(
-          'relative aspect-[3/4] cursor-pointer overflow-hidden rounded-2xl border bg-surface/90 transition-all duration-300 select-none shadow-md ring-1 ring-inset ring-white/10',
-          selected
-            ? 'border-accent ring-2 ring-accent shadow-2xl shadow-accent/30'
-            : isRunning
-              ? 'border-emerald-500/60 ring-2 ring-emerald-500/40 shadow-xl shadow-emerald-500/20'
-              : 'border-border/80 hover:border-accent/60 hover:ring-accent/30 hover:shadow-2xl hover:shadow-black/60',
-        )}
-      >
-        {/* Specular top glass rim line */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+    <motion.div
+      tabIndex={0}
+      onClick={() => {
+        playButtonClick()
+        onSelect(game.id)
+      }}
+      onContextMenu={(event) => {
+        playButtonClick()
+        onContextMenu(game, event)
+      }}
+      onHoverStart={() => {
+        setHovered(true)
+        playCardHover()
+      }}
+      onHoverEnd={() => setHovered(false)}
+      whileHover={{ y: -6 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+      className={cn(
+        'group relative flex flex-col overflow-hidden rounded-2xl border bg-surface transition-all duration-200 select-none cursor-pointer shadow-sm',
+        selected
+          ? 'border-accent ring-2 ring-accent/80 shadow-xl shadow-accent/20'
+          : isRunning
+            ? 'border-emerald-500/70 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-500/15'
+            : 'border-border/85 hover:border-accent/55 hover:shadow-xl',
+      )}
+    >
+      {/* Top Specular Rim */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
 
-        {/* Cover Media / Art or Placeholder */}
+      {/* 3:4 Poster Viewport */}
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-surface-raised">
         {cover ? (
           <CoverMedia
             src={cover}
-            className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-106"
+            className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
             isAnimated={game.cover_is_animated}
             animatedEnabled={game.animated_cover_enabled}
             alwaysLive={selected}
@@ -159,30 +182,27 @@ export const GameCard = memo(function GameCard({
           <CoverPlaceholder name={game.name} />
         )}
 
-        {/* Cinematic Top Vignette for Status Badges */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-24 bg-gradient-to-b from-black/85 via-black/35 to-transparent" />
+        {/* Top & Bottom Vignettes for Badge Contrast */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-20 bg-gradient-to-b from-black/80 via-black/25 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-24 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
 
-        {/* Cinematic Bottom Vignette for Tags / Metadata */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] h-28 bg-gradient-to-t from-black/90 via-black/45 to-transparent" />
-
-        {/* Top-Left Badges Deck */}
-        <div className="absolute left-2.5 top-2.5 z-10 flex flex-col items-start gap-1.5 pointer-events-none">
-          {/* Active Download State */}
+        {/* Top-Left Status & Score Badges */}
+        <div className="pointer-events-none absolute left-2.5 top-2.5 z-10 flex flex-col items-start gap-1.5">
           {isDownloading ? (
             <span
               className={cn(
-                'flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] font-black text-white shadow-md',
+                'flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] font-black text-white shadow-sm',
                 activeDownload?.status === 'paused'
-                  ? 'border-amber-400/40 bg-amber-500/90 shadow-amber-500/20'
+                  ? 'border-amber-400/50 bg-amber-600/95'
                   : activeDownload?.status === 'failed'
-                    ? 'border-rose-400/40 bg-rose-500/90 shadow-rose-500/20'
-                    : 'border-accent/40 bg-accent/90 shadow-[0_0_14px_var(--nx-accent)]',
+                    ? 'border-rose-400/50 bg-rose-600/95'
+                    : 'border-accent/50 bg-accent',
               )}
             >
               {activeDownload?.status === 'paused' ? (
-                <Pause className="size-3" />
+                <Pause className="size-2.5" />
               ) : (
-                <Download className="size-3 animate-bounce" />
+                <Download className="size-2.5 animate-bounce" />
               )}
               <span>
                 {activeDownload?.status === 'extracting'
@@ -197,70 +217,29 @@ export const GameCard = memo(function GameCard({
               </span>
             </span>
           ) : isRunning ? (
-            <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/50 bg-emerald-950/90 px-2.5 py-1 font-mono text-[10px] font-bold text-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.35)]">
+            <span className="flex items-center gap-1.5 rounded-full border border-emerald-400/50 bg-emerald-950/90 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-300 shadow-sm">
               <span className="relative flex size-2 items-center justify-center">
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-emerald-400" />
               </span>
-              <span>
-                {elapsedSeconds !== undefined ? formatElapsed(elapsedSeconds) : 'Playing'}
-              </span>
+              <span>{elapsedSeconds !== undefined ? formatElapsed(elapsedSeconds) : 'Playing'}</span>
             </span>
           ) : isWishlist ? (
-            <span className="flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-black/85 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 shadow-sm">
-              <Bookmark className="size-3 fill-amber-400 text-amber-400" />
+            <span className="flex items-center gap-1 rounded-full border border-amber-400/40 bg-black/80 px-2 py-0.5 text-[10px] font-bold text-amber-300 shadow-xs">
+              <Bookmark className="size-2.5 fill-amber-400 text-amber-400" />
               <span>{isUnreleased ? 'Upcoming' : 'Wishlist'}</span>
             </span>
           ) : game.is_installed ? (
-            <span className="flex items-center gap-1.5 rounded-full border border-white/20 bg-black/85 px-2.5 py-0.5 text-[10px] font-bold text-white shadow-sm">
-              <HardDrive className="size-3 text-emerald-400" />
-              <span>Ready</span>
+            <span className="flex items-center gap-1 rounded-full border border-emerald-400/35 bg-black/80 px-2 py-0.5 text-[10px] font-bold text-emerald-300 shadow-xs">
+              <HardDrive className="size-2.5 text-emerald-400" />
+              <span>Installed</span>
             </span>
           ) : null}
 
-          {/* Live Cover Tag */}
           {game.cover_is_animated && (
-            <span className="flex items-center gap-1 rounded-full border border-white/25 bg-gradient-to-r from-accent via-indigo-500 to-accent-hover px-2 py-0.5 font-mono text-[9px] font-black tracking-wider text-white shadow-sm">
+            <span className="flex items-center gap-1 rounded-full border border-white/25 bg-gradient-to-r from-accent to-indigo-500 px-2 py-0.5 font-mono text-[9px] font-black tracking-wider text-white shadow-xs">
               <Sparkles className="size-2.5" />
               <span>LIVE</span>
-            </span>
-          )}
-
-          {/* User Rating or Metacritic Badge */}
-          {game.user_rating && game.user_rating > 0 ? (
-            <span
-              title={`Your Rating: ${game.user_rating}/10`}
-              className="flex items-center gap-1 rounded-full border border-amber-400/40 bg-black/85 px-2 py-0.5 font-mono text-[10px] font-bold text-amber-300 shadow-sm"
-            >
-              <Star className="size-2.5 fill-amber-400 text-amber-400" />
-              <span>{game.user_rating}</span>
-            </span>
-          ) : !isGameUnreleased(game.release_date) &&
-            game.metacritic_score &&
-            game.metacritic_score > 0 ? (
-            <span
-              title={`Metacritic: ${game.metacritic_score}`}
-              className={cn(
-                'rounded-md px-1.5 py-0.5 font-mono text-[9px] font-black text-white shadow-sm ring-1 ring-white/20',
-                game.metacritic_score >= 75
-                  ? 'bg-emerald-600/90'
-                  : game.metacritic_score >= 50
-                    ? 'bg-amber-600/90'
-                    : 'bg-rose-600/90',
-              )}
-            >
-              MC {Math.round(game.metacritic_score)}
-            </span>
-          ) : null}
-
-          {/* Subtle Soundtrack Availability Indicator */}
-          {Boolean(game.steam_app_id || game.igdb_id) && (
-            <span
-              title="Soundtrack available"
-              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold text-accent shadow-sm border border-accent/30 bg-black/85"
-            >
-              <Music className="size-2.5 text-accent" />
-              <span>OST</span>
             </span>
           )}
         </div>
@@ -271,61 +250,112 @@ export const GameCard = memo(function GameCard({
           onClick={handleToggleFavorite}
           aria-label={game.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
           className={cn(
-            'absolute right-2.5 top-2.5 z-10 flex size-8 items-center justify-center rounded-full border transition-all duration-200 shadow-md active:scale-90',
+            'absolute right-2.5 top-2.5 z-20 flex size-7.5 items-center justify-center rounded-full border transition-all duration-200 shadow-sm active:scale-90 cursor-pointer',
             game.is_favorite
-              ? 'border-pink-500/40 bg-pink-500/30 text-pink-400 hover:bg-pink-500/40 hover:border-pink-500/60 shadow-[0_0_12px_rgba(236,72,153,0.35)]'
-              : 'border-white/20 bg-black/70 text-white/70 hover:border-white/40 hover:bg-black/90 hover:text-white hover:scale-110',
+              ? 'border-pink-500/50 bg-pink-500/25 text-pink-400 hover:bg-pink-500/35'
+              : 'border-white/20 bg-black/65 text-white/75 opacity-0 group-hover:opacity-100 hover:border-white/40 hover:bg-black/85 hover:text-white',
           )}
         >
           <Heart
             className={cn(
-              'size-4 transition-transform',
-              game.is_favorite &&
-                'fill-pink-500 text-pink-500 scale-110 drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]',
+              'size-3.5 transition-transform',
+              game.is_favorite && 'fill-pink-500 text-pink-500 scale-110',
             )}
           />
         </button>
 
-        {/* Tag Dots Bottom-Right */}
+        {/* Bottom-Left Critic / User Score Pill on Poster */}
+        <div className="pointer-events-none absolute bottom-2.5 left-2.5 z-10 flex items-center gap-1.5">
+          {game.user_rating && game.user_rating > 0 ? (
+            <span
+              title={`Your Rating: ${game.user_rating}/10`}
+              className="flex items-center gap-1 rounded-md border border-amber-400/40 bg-black/80 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-300 shadow-xs"
+            >
+              <Star className="size-2.5 fill-amber-400 text-amber-400" />
+              <span>{game.user_rating}/10</span>
+            </span>
+          ) : criticScores.metacritic || criticScores.opencritic ? (
+            <div className="inline-flex items-center gap-1 rounded-md bg-black/80 p-0.5 ring-1 ring-white/15 shadow-xs">
+              {criticScores.metacritic && (
+                <span
+                  title={`Metacritic: ${criticScores.metacritic}/100`}
+                  className={cn(
+                    'rounded px-1.5 py-0.5 font-mono text-[9px] font-black text-white',
+                    criticScores.metacritic >= 75
+                      ? 'bg-emerald-600'
+                      : criticScores.metacritic >= 50
+                        ? 'bg-amber-600'
+                        : 'bg-rose-600',
+                  )}
+                >
+                  MC {criticScores.metacritic}
+                </span>
+              )}
+              {criticScores.opencritic && (
+                <span
+                  title={`OpenCritic: ${criticScores.opencritic}/100`}
+                  className={cn(
+                    'rounded px-1.5 py-0.5 font-mono text-[9px] font-black text-white',
+                    criticScores.opencritic >= 84
+                      ? 'bg-[#fc430a]'
+                      : criticScores.opencritic >= 75
+                        ? 'bg-purple-600'
+                        : 'bg-sky-600',
+                  )}
+                >
+                  OC {criticScores.opencritic}
+                </span>
+              )}
+            </div>
+          ) : null}
+
+          {Boolean(game.steam_app_id || game.igdb_id) && (
+            <span
+              title="Soundtrack available"
+              className="flex items-center gap-0.5 rounded-md border border-accent/35 bg-black/80 px-1.5 py-0.5 font-mono text-[9px] font-bold text-accent"
+            >
+              <Music className="size-2.5" />
+              <span>OST</span>
+            </span>
+          )}
+        </div>
+
+        {/* Bottom-Right Tag Dots */}
         {tagDots.length > 0 && (
           <span
             title={tagDots.map((tag) => tag.name).join(', ')}
-            className="absolute bottom-2.5 right-2.5 z-10 flex items-center gap-1.5 rounded-full border border-white/15 bg-black/85 px-2.5 py-1 shadow-md"
+            className="pointer-events-none absolute bottom-2.5 right-2.5 z-10 flex items-center gap-1 rounded-full border border-white/15 bg-black/80 px-2 py-1 shadow-xs"
           >
             {tagDots.slice(0, 4).map((tag) => (
               <span
                 key={tag.id}
-                className="size-2 rounded-full ring-1 ring-black/50 shadow-xs"
+                className="size-2 rounded-full ring-1 ring-black/50"
                 style={{ backgroundColor: tag.color }}
               />
             ))}
           </span>
         )}
 
-        {/* Active Download Slim Bottom Progress Line */}
+        {/* Active Download Slim Progress Line */}
         {isDownloading && (
           <div className="absolute inset-x-0 bottom-0 z-20 h-1.5 bg-black/80">
             <div
               className={cn(
                 'h-full transition-all duration-300',
                 activeDownload?.status === 'paused'
-                  ? 'bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.7)]'
-                  : 'bg-gradient-to-r from-accent via-cyan-400 to-accent shadow-[0_0_10px_var(--nx-accent)]',
+                  ? 'bg-amber-500'
+                  : 'bg-gradient-to-r from-accent via-cyan-400 to-accent',
               )}
               style={{ width: `${downloadPercent}%` }}
             />
           </div>
         )}
 
-        {/* Cinematic Hover Overlay & Center Action Command */}
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-between p-3.5 bg-gradient-to-t from-black/95 via-black/60 to-black/30 opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
-          {/* Top spacer */}
-          <div className="h-6" />
-
-          {/* Center Action Command */}
+        {/* Center Hover Action Overlay */}
+        <div className="absolute inset-0 z-15 flex items-center justify-center bg-black/55 opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto">
           {isUnreleased ? (
-            <div className="flex items-center gap-2 rounded-full border border-amber-400/50 bg-black/90 px-4 py-2 font-mono text-xs font-bold text-amber-300 shadow-2xl">
-              <Calendar className="size-4 text-amber-400" />
+            <div className="flex items-center gap-1.5 rounded-full border border-amber-400/50 bg-black/90 px-3.5 py-1.5 font-mono text-xs font-bold text-amber-300 shadow-lg">
+              <Calendar className="size-3.5 text-amber-400" />
               <span>Coming Soon</span>
             </div>
           ) : (
@@ -339,21 +369,21 @@ export const GameCard = memo(function GameCard({
                   : isDownloading
                     ? 'View Download'
                     : downloadable
-                      ? 'Download'
+                      ? 'Install'
                       : 'Play'
               }
               className={cn(
-                'relative flex items-center justify-center overflow-hidden shadow-2xl transition-all duration-200 active:scale-95 disabled:opacity-60',
+                'relative flex items-center justify-center overflow-hidden shadow-xl transition-all duration-200 active:scale-95 disabled:opacity-60 cursor-pointer',
                 downloadable
-                  ? 'h-11 px-4 gap-2 rounded-2xl border border-accent/70 bg-surface/95 text-text shadow-[0_0_24px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] hover:border-accent hover:shadow-[0_0_35px_color-mix(in_srgb,var(--color-accent)_75%,transparent)] hover:scale-105'
-                  : 'size-14 rounded-full text-white hover:scale-110 ring-2 ring-white/20',
+                  ? 'h-10 px-4 gap-2 rounded-xl border border-accent bg-accent text-white font-bold text-xs hover:scale-105'
+                  : 'size-13 rounded-full text-white hover:scale-110 ring-2 ring-white/25',
                 isRunning
-                  ? 'bg-emerald-600 hover:bg-emerald-500 shadow-[0_0_28px_rgba(16,185,129,0.6)] ring-emerald-400/40'
+                  ? 'bg-emerald-600 hover:bg-emerald-500'
                   : isDownloading
-                    ? 'border border-accent/50 bg-accent text-white shadow-[0_0_28px_var(--nx-accent)] ring-accent/40'
-                    : downloadable
-                      ? ''
-                      : 'bg-gradient-to-br from-accent to-accent-hover shadow-[0_0_32px_var(--nx-accent)] ring-accent/40',
+                    ? 'bg-accent'
+                    : !downloadable
+                      ? 'bg-gradient-to-br from-accent to-accent-hover'
+                      : '',
               )}
             >
               <AnimatePresence mode="wait" initial={false}>
@@ -363,7 +393,7 @@ export const GameCard = memo(function GameCard({
                     initial={{ opacity: 0, scale: 0.7 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.7 }}
-                    transition={{ duration: 0.16 * speed, ease: [0.16, 1, 0.3, 1] }}
+                    transition={{ duration: 0.14 * speed }}
                     className="flex items-center justify-center"
                   >
                     {stopGame.isPending ? (
@@ -378,10 +408,10 @@ export const GameCard = memo(function GameCard({
                     initial={{ opacity: 0, scale: 0.7 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.7 }}
-                    transition={{ duration: 0.16 * speed, ease: [0.16, 1, 0.3, 1] }}
+                    transition={{ duration: 0.14 * speed }}
                     className="flex flex-col items-center justify-center font-mono text-[10px] font-black leading-none text-white"
                   >
-                    <Download className="size-4.5 animate-bounce mb-0.5" />
+                    <Download className="size-4 animate-bounce mb-0.5" />
                     <span>{downloadPercent}%</span>
                   </motion.span>
                 ) : downloadable ? (
@@ -390,13 +420,11 @@ export const GameCard = memo(function GameCard({
                     initial={{ opacity: 0, scale: 0.7 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.7 }}
-                    transition={{ duration: 0.16 * speed, ease: [0.16, 1, 0.3, 1] }}
-                    className="flex items-center gap-2"
+                    transition={{ duration: 0.14 * speed }}
+                    className="flex items-center gap-1.5"
                   >
-                    <div className="flex size-7 items-center justify-center rounded-xl bg-accent text-white shadow-sm ring-1 ring-white/30">
-                      <Download className="size-4 animate-pulse" />
-                    </div>
-                    <span className="font-mono text-xs font-black uppercase tracking-wider text-text">
+                    <Download className="size-4" />
+                    <span className="font-mono text-xs font-extrabold uppercase tracking-wider">
                       Install
                     </span>
                   </motion.div>
@@ -406,98 +434,64 @@ export const GameCard = memo(function GameCard({
                     initial={{ opacity: 0, scale: 0.7 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.7 }}
-                    transition={{ duration: 0.16 * speed, ease: [0.16, 1, 0.3, 1] }}
+                    transition={{ duration: 0.14 * speed }}
                     className="flex items-center justify-center"
                   >
                     {launchGame.isPending ? (
-                      <Loader2 className="size-6 animate-spin" />
+                      <Loader2 className="size-5 animate-spin" />
                     ) : (
-                      <Play className="size-6 translate-x-0.5" fill="currentColor" />
+                      <Play className="size-5 translate-x-0.5" fill="currentColor" />
                     )}
                   </motion.span>
                 )}
               </AnimatePresence>
             </button>
           )}
-
-          {/* Bottom Hover Telemetry Strip */}
-          <div className="flex w-full items-center justify-between font-mono text-[10px] text-white/90">
-            <span
-              title={game.genres.length > 0 ? game.genres.join(', ') : undefined}
-              className="truncate rounded-lg border border-white/10 bg-black/85 px-2 py-0.5 font-bold uppercase"
-            >
-              {game.genres.length > 0 ? game.genres.join(' · ') : isWishlist ? 'Wishlist' : 'Game'}
-            </span>
-            {releaseYear && (
-              <span className="rounded-lg border border-white/10 bg-black/85 px-2 py-0.5">
-                {releaseYear}
-              </span>
-            )}
-          </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Meta Information Below Card */}
-      <div className="flex items-start justify-between gap-1.5 px-0.5">
-        <div
-          onClick={() => {
-            playButtonClick()
-            onSelect(game.id)
-          }}
-          className="min-w-0 flex-1 cursor-pointer select-none"
-        >
-          {/* Game Title */}
-          <div className="truncate text-xs font-bold text-text transition-colors duration-150 group-hover:text-accent tracking-tight">
+      {/* Integrated Card Pedestal Footer (Light & Dark Mode Adaptive) */}
+      <div className="flex flex-col gap-1.5 border-t border-border/60 bg-surface px-3 py-2.5">
+        <div className="flex items-center justify-between gap-1.5">
+          <h3 className="truncate text-xs font-extrabold tracking-tight text-text transition-colors group-hover:text-accent">
             {game.name}
-          </div>
+          </h3>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              playButtonClick()
+              onContextMenu(game, event)
+            }}
+            aria-label="More options"
+            className="flex size-6 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-raised hover:text-text cursor-pointer"
+          >
+            <MoreVertical className="size-3.5" />
+          </button>
+        </div>
 
-          {/* Subtitle / Telemetry */}
-          <div className="mt-1 flex items-center gap-1.5 truncate text-[11px] text-muted">
-            <span className="truncate">
-              {game.developer ||
-                (game.genres.length > 0 ? game.genres[0] : isWishlist ? 'Wishlisted' : 'Game')}
-            </span>
+        <div className="flex items-center justify-between gap-2 text-[10px] text-muted">
+          <span className="truncate font-medium">
+            {game.developer ||
+              (game.genres.length > 0 ? game.genres[0] : isWishlist ? 'Wishlisted' : 'PC Game')}
+          </span>
 
+          <div className="flex shrink-0 items-center gap-1.5">
             {game.total_playtime_seconds > 0 ? (
-              <>
-                <span className="size-1 shrink-0 rounded-full bg-border" />
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold text-accent bg-accent/10 px-1.5 py-0.2 rounded border border-accent/20">
-                  <Clock className="size-2.5" />
-                  <span>{formatPlaytimeCompact(game.total_playtime_seconds)}</span>
-                </span>
-              </>
-            ) : game.is_installed ? (
-              <>
-                <span className="size-1 shrink-0 rounded-full bg-border" />
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                  <span>Installed</span>
-                </span>
-              </>
-            ) : isWishlist && releaseYear ? (
-              <>
-                <span className="size-1 shrink-0 rounded-full bg-border" />
-                <span className="inline-flex items-center gap-1 font-mono text-[10px] text-subtle">
-                  <Calendar className="size-2.5" />
-                  <span>{releaseYear}</span>
-                </span>
-              </>
+              <span className="inline-flex items-center gap-1 rounded-md border border-accent/25 bg-accent/10 px-1.5 py-0.5 font-mono text-[9px] font-bold text-accent">
+                <Clock className="size-2.5" />
+                <span>{formatPlaytimeCompact(game.total_playtime_seconds)}</span>
+              </span>
+            ) : sizeLabel ? (
+              <span className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-raised px-1.5 py-0.5 font-mono text-[9px] font-semibold text-subtle">
+                <span>{sizeLabel}</span>
+              </span>
+            ) : releaseYear ? (
+              <span className="font-mono text-[10px] text-subtle">{releaseYear}</span>
             ) : null}
           </div>
         </div>
-
-        {/* Quick Context Menu Button */}
-        <button
-          type="button"
-          onClick={(event) => {
-            playButtonClick()
-            onContextMenu(game, event)
-          }}
-          aria-label="More options"
-          className="flex size-7 shrink-0 items-center justify-center rounded-xl text-muted transition-all duration-150 hover:bg-surface-raised hover:text-text hover:shadow-sm active:scale-90"
-        >
-          <MoreVertical className="size-3.5" />
-        </button>
       </div>
-    </div>
+    </motion.div>
   )
 })

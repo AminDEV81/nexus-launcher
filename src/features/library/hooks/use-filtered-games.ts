@@ -20,7 +20,6 @@ export function matchesScope(game: Game, scope: LibraryScope): boolean {
   const unreleased = isGameUnreleased(game.release_date) && !game.is_installed
   switch (scope) {
     case 'all':
-      // Wishlist entries and unreleased games belong to the Wishlist view
       return !game.is_hidden && !game.is_wishlist && !unreleased
     case 'recent':
       return !game.is_hidden && game.last_played_at !== null
@@ -46,19 +45,25 @@ export function matchesSearch(game: Game, query: string): boolean {
   )
 }
 
-/** Each field ORs internally (any selected genre matches), all
- *  non-empty fields AND together — see `AdvancedFilters`'s doc comment
- *  for why. `genres`/`platforms` are stored as JSON arrays on `games`,
- *  not normalized columns, so — same reasoning as the rest of this
- *  file — this only makes sense to apply client-side after the full
- *  list is already in memory, not as a SQL WHERE clause. */
 export function matchesFilters(game: Game, filters: AdvancedFilters): boolean {
   if (filters.favoritesOnly && !game.is_favorite) {
     return false
   }
+  if (filters.installStatus === 'installed' && !game.is_installed) {
+    return false
+  }
+  if (filters.installStatus === 'not_installed' && game.is_installed) {
+    return false
+  }
+  if (filters.minScore !== null) {
+    const bestScore = Math.max(game.metacritic_score ?? 0, game.opencritic_score ?? 0)
+    if (bestScore < filters.minScore) {
+      return false
+    }
+  }
   if (
     filters.genres.size > 0 &&
-    ![...filters.genres].every((genre) => game.genres.includes(genre))
+    !game.genres.some((genre) => filters.genres.has(genre))
   ) {
     return false
   }
@@ -100,9 +105,6 @@ export function matchesFilters(game: Game, filters: AdvancedFilters): boolean {
   return true
 }
 
-/** Timestamp columns hold two formats (legacy `YYYY-MM-DD HH:mm:ss` and
- *  RFC 3339 instants) whose lexicographic order does not match their
- *  chronological order — parse before comparing, never `localeCompare`. */
 function chronoDesc(a: string | null | undefined, b: string | null | undefined): number {
   const aMs = a ? (parseStoredUtcDate(a)?.getTime() ?? 0) : 0
   const bMs = b ? (parseStoredUtcDate(b)?.getTime() ?? 0) : 0
@@ -116,9 +118,6 @@ export function compareGames(
   scope: LibraryScope,
   customOrder?: string[],
 ): number {
-  // Recently Played defaults to most-recently-played first regardless of
-  // the global sort control — "sorted alphabetically" would defeat the
-  // point of that view.
   if (scope === 'recent' && sort === 'name') {
     return chronoDesc(a.last_played_at, b.last_played_at)
   }

@@ -1,13 +1,9 @@
 /*
  * Theme foundation.
  *
- * Two modes (dark / light), each independently paired with one of 5
+ * Two modes (dark / light), each independently paired with one of 11
  * accent palettes via `data-palette` on <html> (set from
- * `useThemeStore`, alongside `data-theme`). Every palette rule below
- * only overrides `--nx-accent`/`--nx-accent-hover` — the
- * surface/text/border scale above stays identical across all of them,
- * so switching palettes never looks like a different app, just a
- * different accent color.
+ * `useThemeStore`, alongside `data-theme`).
  *
  * Variables are namespaced `--nx-*` at the implementation level, then
  * re-exposed under Tailwind's `--color-*` namespace via `@theme inline`
@@ -19,46 +15,65 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
-  --nx-bg: #0a0a0e;
-  --nx-surface: #131318;
-  --nx-surface-raised: #1a1a22;
-  --nx-border: #26262f;
+  --nx-bg: #09090e;
+  --nx-surface: #12121a;
+  --nx-surface-raised: #1b1b26;
+  /* Crisp, visible slate-indigo border in Dark mode so card/input/section borders never fade out */
+  --nx-border: #3a3a4e;
 
-  --nx-text: #f2f2f5;
-  --nx-muted: #9a9aa8;
-  --nx-subtle: #616170;
+  --nx-text: #f4f4f8;
+  --nx-muted: #a6a6b8;
+  --nx-subtle: #7c7c92;
 
   --nx-accent: #7c5cff;
   --nx-accent-hover: #8f72ff;
 
-  --nx-shadow-card: 0 8px 24px -8px rgb(0 0 0 / 0.5);
-  --nx-shadow-elevated: 0 16px 48px -12px rgb(0 0 0 / 0.6);
+  --nx-shadow-card: 0 8px 24px -8px rgb(0 0 0 / 0.55);
+  --nx-shadow-elevated: 0 16px 48px -12px rgb(0 0 0 / 0.68);
 }
 
 [data-theme='light'] {
   color-scheme: light;
 
-  --nx-bg: #f5f5f8;
+  --nx-bg: #eef0f6;
   --nx-surface: #ffffff;
-  --nx-surface-raised: #ffffff;
-  --nx-border: #e2e2ea;
+  /* Distinct raised surface in Light mode so buttons/chips/inputs inside white cards have real depth */
+  --nx-surface-raised: #f3f5fb;
+  --nx-border: #c8cedc;
 
-  --nx-text: #16161c;
-  --nx-muted: #55555f;
-  --nx-subtle: #8a8a94;
+  --nx-text: #12131a;
+  --nx-muted: #4b4f62;
+  --nx-subtle: #6e7388;
 
   --nx-accent: #6a4bfa;
   --nx-accent-hover: #5b3ce6;
 
-  --nx-shadow-card: 0 8px 24px -8px rgb(20 20 30 / 0.12);
-  --nx-shadow-elevated: 0 16px 48px -12px rgb(20 20 30 / 0.18);
+  --nx-shadow-card: 0 8px 24px -8px rgb(20 20 35 / 0.12);
+  --nx-shadow-elevated: 0 16px 48px -12px rgb(20 20 35 / 0.18);
 }
 
-/* Palette accents — higher specificity than the base [data-theme] rules
-   above (two attribute selectors vs one), so these win regardless of
-   source order. `violet` intentionally repeats the base --nx-accent
-   values above so "no palette set yet" and "Violet selected" render
-   identically. */
+/* Ensure fractional border-border/* and ring-border/* utilities never become invisible in Dark or Light themes */
+[data-theme='dark'] [class*='border-border/3'],
+[data-theme='dark'] [class*='border-border/4'],
+[data-theme='dark'] [class*='border-border/5'],
+[data-theme='dark'] [class*='border-border/6'] {
+  border-color: color-mix(in srgb, var(--nx-border) 78%, transparent);
+}
+
+[data-theme='dark'] [class*='border-border/7'],
+[data-theme='dark'] [class*='border-border/8'],
+[data-theme='dark'] [class*='border-border/9'] {
+  border-color: color-mix(in srgb, var(--nx-border) 92%, transparent);
+}
+
+[data-theme='light'] [class*='border-border/3'],
+[data-theme='light'] [class*='border-border/4'],
+[data-theme='light'] [class*='border-border/5'],
+[data-theme='light'] [class*='border-border/6'] {
+  border-color: color-mix(in srgb, var(--nx-border) 82%, transparent);
+}
+
+/* Palette accents */
 
 [data-theme='dark'][data-palette='violet'] {
   --nx-accent: #7c5cff;
@@ -169,9 +184,6 @@
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
-/* Lightweight fallback for WebViews without View Transitions. Keep this
-   to paint-affecting color tokens only; animating shadows and SVG paint on
-   every descendant forces expensive redraws during the switch. */
 .theme-transitioning,
 .theme-transitioning * {
   transition:
@@ -180,8 +192,6 @@
     color 260ms ease !important;
 }
 
-/* Chromium/WebView2 handles this as a compositor snapshot crossfade, so it
-   avoids walking and repainting every card independently. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 260ms;
@@ -193,15 +203,18 @@
   transition: none !important;
 }
 
-/*
- * Compact Mode (Settings > Appearance). Nearly every spacing and
- * type-size utility Tailwind generates for this project is rem-based,
- * so scaling the root font-size scales all of them together — padding,
- * gaps, text — without a parallel "compact" variant of every component.
- * 14/16 mirrors roughly what a dedicated compact density preset would
- * hand-tune to (about a 12% reduction), while staying above the point
- * where text starts looking cramped rather than just "tighter".
- */
 html[data-compact='true'] {
   font-size: 14px;
+}
+
+/* Global theme-harmonized select & dropdown styling */
+select {
+  background-color: var(--nx-surface-raised);
+  color: var(--nx-text);
+  border-color: var(--nx-border);
+}
+
+select option {
+  background-color: var(--nx-surface);
+  color: var(--nx-text);
 }

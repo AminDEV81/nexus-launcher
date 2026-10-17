@@ -180,7 +180,7 @@ pub async fn get_game_details(
     igdb_id: i64,
 ) -> AppResult<IgdbGameDetails> {
     let body = format!(
-        "fields name, summary, first_release_date, game_type, genres.name, platforms.name, \
+        "fields name, summary, first_release_date, game_type, genres.name, themes.name, platforms.name, \
          involved_companies.company.name, involved_companies.developer, involved_companies.publisher, \
          cover.image_id, screenshots.image_id, videos.video_id, videos.name, aggregated_rating;\n\
          where id = {igdb_id};"
@@ -218,7 +218,12 @@ fn parse_game_details(entry: &Value) -> IgdbGameDetails {
         .and_then(Value::as_i64)
         .and_then(unix_timestamp_to_date);
 
-    let genres = string_list(entry, "genres");
+    let mut genres = string_list(entry, "genres");
+    for theme in string_list(entry, "themes") {
+        if !genres.iter().any(|g| g.eq_ignore_ascii_case(&theme)) {
+            genres.push(theme);
+        }
+    }
     let platforms = string_list(entry, "platforms");
 
     let (developer, publisher) = involved_companies(entry);
@@ -410,8 +415,8 @@ pub async fn search_characters(
                     results.push(IgdbCharacterResult {
                         id,
                         name,
-                        image_url: format!("https://images.igdb.com/igdb/image/upload/t_cover_big/{img_id}.jpg"),
-                        thumbnail_url: format!("https://images.igdb.com/igdb/image/upload/t_thumb/{img_id}.jpg"),
+                        image_url: format!("https://images.igdb.com/igdb/image/upload/t_720p/{img_id}.jpg"),
+                        thumbnail_url: format!("https://images.igdb.com/igdb/image/upload/t_cover_big/{img_id}.jpg"),
                         game_name,
                     });
                 }

@@ -8,6 +8,8 @@ export interface GamerLevelInfo {
   xpForNextLevel: number
   progressPercent: number
   totalHours: number
+  nextLevelHours: number
+  hoursToNextLevel: number
 }
 
 export interface TimeOfDayBucket {
@@ -21,6 +23,7 @@ export interface TimeOfDayBucket {
 
 export interface CircadianHabits {
   buckets: TimeOfDayBucket[]
+  personaTitle: string
   dominantPersona: {
     title: string
     tag: string
@@ -55,6 +58,9 @@ export function calculateGamerLevel(totalSeconds: number): GamerLevelInfo {
   const xpNeeded = Math.max(1, nextThreshold - prevThreshold)
   const progressPercent = Math.min(100, Math.max(0, Math.round((currentLevelXp / xpNeeded) * 100)))
 
+  const nextLevelHours = Math.max(1, Math.round((nextThreshold / 60) * 10) / 10)
+  const hoursToNextLevel = Math.max(0.1, Math.round(((nextThreshold - totalMinutes) / 60) * 10) / 10)
+
   return {
     level,
     rankTitle: getRankTitle(level),
@@ -62,6 +68,8 @@ export function calculateGamerLevel(totalSeconds: number): GamerLevelInfo {
     xpForNextLevel: xpNeeded,
     progressPercent,
     totalHours,
+    nextLevelHours,
+    hoursToNextLevel,
   }
 }
 
@@ -185,5 +193,5 @@ export function calculateCircadianHabits(sessions: RecentSession[]): CircadianHa
     }
   }
 
-  return { buckets, dominantPersona: persona }
+  return { buckets, personaTitle: persona.title, dominantPersona: persona }
 }

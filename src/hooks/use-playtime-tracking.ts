@@ -18,6 +18,12 @@ interface GameExitedPayload {
   duration_seconds: number
 }
 
+interface ExternalGameDetectedPayload {
+  game_id: string
+  game_name: string
+  pid: number
+}
+
 interface LaunchBoostStartPayload {
   game_id: string
   game_name: string
@@ -43,16 +49,10 @@ interface LaunchBoostCompletePayload {
 
 /**
  * Mounted once at the app root (see `app-shell.tsx`, alongside
- * `useWindowCloseIntercept`). Subscribes to the three events the Rust
- * launch tracker emits and mirrors them into `useLaunchStore`, so the
- * grid card and details panel Play buttons can just read from the
- * store rather than each opening its own listener.
- *
- * Also hydrates from `get_running_games` on mount — the tracker itself
- * lives in the backend, so a frontend reload mid-session shouldn't lose
- * the "Playing…" indicator, even though the frontend obviously won't
- * recover the live elapsed-time count until the next `playtime-updated`
- * tick arrives.
+ * `useWindowCloseIntercept`). Subscribes to the events the Rust
+ * launch tracker and external game detector emit and mirrors them into
+ * `useLaunchStore`, so grid cards, the details panel, and the TitleBar
+ * reflect both launcher-started and externally-started games in real time.
  */
 export function usePlaytimeTracking() {
   const queryClient = useQueryClient()
@@ -66,9 +66,7 @@ export function usePlaytimeTracking() {
         if (!cancelled) useLaunchStore.getState().hydrateRunning(gameIds)
       })
       .catch(() => {
-        // Non-fatal — worst case the "Playing…" badge just doesn't
-        // reappear for a session that was already running before this
-        // reload, which the next launch/exit event corrects anyway.
+        // Non-fatal
       })
 
     listen<LaunchBoostStartPayload>('launch-boost-start', (event) => {
@@ -97,7 +95,6 @@ export function usePlaytimeTracking() {
           genres: g?.genres,
         })
       } else if (state.game) {
-        // Enrich existing state with real backend title and artwork
         useLaunchBoostStore.setState({
           game: {
             ...state.game,
@@ -131,6 +128,13 @@ export function usePlaytimeTracking() {
       }
     }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))
 
+    listen<ExternalGameDetectedPayload>('external-game-detected', (event) => {
+      useLaunchStore.getState().markLaunched(event.payload.game_id)
+      toast.success(
+        `Detected "${event.payload.game_name}" running externally — tracking playtime & saves automatically!`,
+      )
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))
+
     listen<string>('game-launched', (event) => {
       useLaunchStore.getState().markLaunched(event.payload)
       useLaunchBoostStore.getState().onGameLaunched(event.payload)
@@ -143,8 +147,6 @@ export function usePlaytimeTracking() {
     listen<GameExitedPayload>('game-exited', (event) => {
       useLaunchStore.getState().markExited(event.payload.game_id)
       useLaunchBoostStore.getState().close()
-      // Refreshes total_playtime_seconds/last_played_at now that the
-      // backend has written the finished session.
       queryClient.invalidateQueries({ queryKey: ['games'] })
       queryClient.invalidateQueries({ queryKey: ['stats'] })
       queryClient.invalidateQueries({ queryKey: ['collections'] })

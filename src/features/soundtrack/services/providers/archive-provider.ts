@@ -1,4 +1,4 @@
-import { BaseSoundtrackProvider } from './base-provider'
+import { BaseSoundtrackProvider, scoreAlbumMatchForGame } from './base-provider'
 import type {
   DownloadSource,
   GameIdentity,
@@ -58,11 +58,14 @@ export class ArchiveOrgProvider extends BaseSoundtrackProvider {
     const url = `https://archive.org/advancedsearch.php?q=${query}&fl[]=identifier,title,creator,year&rows=6&output=json`
 
     try {
-      const resp = await this.fetchWithTimeout(url, {}, 6000)
-      if (!resp.ok) return []
-
-      const data = (await resp.json()) as { response?: { docs?: ArchiveDoc[] } }
-      const docs = data.response?.docs || []
+      const rawText = await this.fetchHtml(url, undefined, 5000)
+      const data = JSON.parse(rawText) as { response?: { docs?: ArchiveDoc[] } }
+      const docs = (data.response?.docs || [])
+        .map((doc) => ({ doc, score: scoreAlbumMatchForGame(doc.title, game.title) }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 4)
+        .map((item) => item.doc)
 
       return docs.map((doc) => {
         const coverUrl = `https://archive.org/services/img/${doc.identifier}`
@@ -95,10 +98,8 @@ export class ArchiveOrgProvider extends BaseSoundtrackProvider {
     const url = `https://archive.org/metadata/${identifier}`
 
     try {
-      const resp = await this.fetchWithTimeout(url, {}, 8000)
-      if (!resp.ok) return null
-
-      const data = (await resp.json()) as {
+      const rawText = await this.fetchHtml(url, undefined, 5500)
+      const data = JSON.parse(rawText) as {
         metadata?: { title?: string; creator?: string; year?: string }
         files?: ArchiveFile[]
       }
@@ -177,7 +178,7 @@ export class ArchiveOrgProvider extends BaseSoundtrackProvider {
     track: SoundtrackTrack,
     game?: GameIdentity,
   ): Promise<PlaybackSource | null> {
-    if (track.stream_url) {
+    if (track.stream_url && /^https?:\/\//i.test(track.stream_url)) {
       return {
         type: 'stream',
         url: track.stream_url,
@@ -194,17 +195,17 @@ export class ArchiveOrgProvider extends BaseSoundtrackProvider {
           `("${cleanGame}" AND "${cleanTrack}") AND mediatype:audio AND NOT title:(podcast OR interview OR radio)`,
         )
         const url = `https://archive.org/advancedsearch.php?q=${q}&fl[]=identifier,title&rows=3&output=json`
-        const resp = await this.fetchWithTimeout(url, {}, 4000)
-        if (resp.ok) {
-          const data = (await resp.json()) as { response?: { docs?: ArchiveDoc[] } }
+        const rawText = await this.fetchHtml(url, undefined, 4500)
+        if (rawText) {
+          const data = JSON.parse(rawText) as { response?: { docs?: ArchiveDoc[] } }
           for (const doc of data.response?.docs || []) {
-            const metaResp = await this.fetchWithTimeout(
+            const metaText = await this.fetchHtml(
               `https://archive.org/metadata/${doc.identifier}`,
-              {},
-              4000,
+              undefined,
+              4500,
             )
-            if (!metaResp.ok) continue
-            const meta = (await metaResp.json()) as { files?: ArchiveFile[] }
+            if (!metaText) continue
+            const meta = JSON.parse(metaText) as { files?: ArchiveFile[] }
             const match = meta.files?.find((f) => {
               const lowerName = f.name.toLowerCase()
               const lowerTitle = (f.title || '').toLowerCase()

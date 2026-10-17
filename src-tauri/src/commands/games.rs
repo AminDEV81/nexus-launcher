@@ -25,9 +25,12 @@ pub fn list_games(db: State<'_, Database>, profile_id: Option<String>) -> AppRes
         Game::select_columns_with_profile()
     );
     let mut stmt = conn.prepare(&sql)?;
-    let games = stmt
+    let mut games = stmt
         .query_map([&target_profile], Game::from_row)?
         .collect::<Result<Vec<_>, _>>()?;
+    for game in &mut games {
+        crate::services::scores::heal_library_game_scores(&conn, game);
+    }
     Ok(games)
 }
 
@@ -40,13 +43,16 @@ pub fn get_game(db: State<'_, Database>, id: String, profile_id: Option<String>)
         "SELECT {} FROM games WHERE id = ?2",
         Game::select_columns_with_profile()
     );
-    conn.query_row(&sql, rusqlite::params![&target_profile, &id], Game::from_row)
+    let mut game = conn
+        .query_row(&sql, rusqlite::params![&target_profile, &id], Game::from_row)
         .map_err(|err| match err {
             rusqlite::Error::QueryReturnedNoRows => {
                 AppError::NotFound(format!("no game with id {id}"))
             }
             other => AppError::Database(other),
-        })
+        })?;
+    crate::services::scores::heal_library_game_scores(&conn, &mut game);
+    Ok(game)
 }
 
 /// Minimal creation payload. This is the primitive Epic 4's "Add Game"
@@ -126,7 +132,8 @@ pub fn create_game(
     )?;
 
     let sql = format!("SELECT {} FROM games WHERE id = ?1", Game::SELECT_COLUMNS);
-    let game = conn.query_row(&sql, [&id], Game::from_row)?;
+    let mut game = conn.query_row(&sql, [&id], Game::from_row)?;
+    crate::services::scores::heal_library_game_scores(&conn, &mut game);
 
     // Metadata (description, cover, banner, ...) is fetched in the
     // background — Epic 6's pipeline — so adding a game feels instant
@@ -303,8 +310,14 @@ pub fn delete_game(db: State<'_, Database>, id: String) -> AppResult<()> {
     let mut conn = db.connection.lock().expect("db mutex poisoned");
     let tx = conn.transaction()?;
 
-    // 1. Remove from active downloads
-    tx.execute("DELETE FROM downloads WHERE game_id = ?1", [&id])?;
+    // 1. Preserve download history! Snapshot game_name and cover_url onto downloads so removing a game from Library never deletes its download history.
+    let _ = tx.execute(
+        "UPDATE downloads
+         SET game_name = COALESCE(game_name, (SELECT name FROM games WHERE id = ?1)),
+             cover_url = COALESCE(cover_url, (SELECT cover_path FROM games WHERE id = ?1))
+         WHERE game_id = ?1",
+        [&id],
+    );
 
     // 2. Remove from collections
     tx.execute("DELETE FROM collection_games WHERE game_id = ?1", [&id])?;
@@ -377,8 +390,14 @@ pub fn permanently_delete_game(
     // 4. Clean up game save locations
     tx.execute("DELETE FROM game_save_locations WHERE game_id = ?1", [&id])?;
 
-    // 5. Clean up downloads
-    tx.execute("DELETE FROM downloads WHERE game_id = ?1", [&id])?;
+    // 5. Preserve download history even if game is purged from Memory
+    let _ = tx.execute(
+        "UPDATE downloads
+         SET game_name = COALESCE(game_name, (SELECT name FROM games WHERE id = ?1)),
+             cover_url = COALESCE(cover_url, (SELECT cover_path FROM games WHERE id = ?1))
+         WHERE game_id = ?1",
+        [&id],
+    );
 
     // 6. Clean up collection links, tags, cached artwork rows, playtime sessions, and soundtrack records
     tx.execute("DELETE FROM collection_games WHERE game_id = ?1", [&id])?;

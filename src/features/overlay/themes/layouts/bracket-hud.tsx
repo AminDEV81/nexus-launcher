@@ -23,12 +23,12 @@ interface LayoutProps {
 
 const Corner: React.FC<{ pos: string; color: string }> = ({ pos, color }) => (
   <div
-    className={`pointer-events-none absolute h-3.5 w-3.5 ${pos}`}
-    style={{ borderColor: color, filter: `drop-shadow(0 0 3px ${color})` }}
+    className={`pointer-events-none absolute h-4 w-4 ${pos}`}
+    style={{ borderColor: color, filter: `drop-shadow(0 0 4px ${color})` }}
   />
 )
 
-/** Tactical HUD: open corner brackets, segmented LED bars, no solid panel edge. */
+/** Tactical HUD: open corner targeting brackets, segmented LED bars, sci-fi callouts. */
 export const BracketHudLayout: React.FC<LayoutProps> = ({ metrics, toggles, tokens }) => {
   const model = buildHudModel(metrics, toggles, tokens)
   const history = useHistory()
@@ -38,13 +38,25 @@ export const BracketHudLayout: React.FC<LayoutProps> = ({ metrics, toggles, toke
 
   return (
     <div
-      className={`nx-hud-in relative w-[264px] px-4 py-3 ${tokens.bgStyle.replace(/border(-\S+)?/g, '').trim()} ${tokens.fontFamily}`}
-      style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0.62), rgba(0,0,0,0.42))' }}
+      className={`nx-hud-in relative w-[280px] px-4 py-3.5 backdrop-blur-xl ${tokens.bgStyle.replace(/border(-\S+)?/g, '').trim()} ${tokens.fontFamily}`}
+      style={{
+        background:
+          'linear-gradient(180deg, rgba(8,10,16,0.82) 0%, rgba(8,10,16,0.68) 100%)',
+      }}
     >
       <Corner pos="top-0 left-0 border-t-2 border-l-2" color={c} />
       <Corner pos="top-0 right-0 border-t-2 border-r-2" color={c} />
       <Corner pos="bottom-0 left-0 border-b-2 border-l-2" color={c} />
       <Corner pos="bottom-0 right-0 border-b-2 border-r-2" color={c} />
+      {/* Center reticle ticks */}
+      <div
+        className="pointer-events-none absolute top-0 left-1/2 h-[2px] w-8 -translate-x-1/2 opacity-60"
+        style={{ backgroundColor: c }}
+      />
+      <div
+        className="pointer-events-none absolute bottom-0 left-1/2 h-[2px] w-8 -translate-x-1/2 opacity-60"
+        style={{ backgroundColor: c }}
+      />
       {tokens.scanlines && (
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.07]"
@@ -68,7 +80,7 @@ export const BracketHudLayout: React.FC<LayoutProps> = ({ metrics, toggles, toke
             <Value
               tokens={tokens}
               value={model.session.time}
-              className="shrink-0 text-[10px] opacity-75"
+              className="shrink-0 text-[10px] opacity-80"
             />
           </div>
         )}
@@ -77,8 +89,8 @@ export const BracketHudLayout: React.FC<LayoutProps> = ({ metrics, toggles, toke
           <div className="flex items-center justify-between">
             <div className="flex items-baseline gap-1.5">
               <span
-                className={`font-mono text-[40px] font-black tabular-nums leading-none ${tokens.primaryTextColor}`}
-                style={{ color: fps.color, textShadow: `0 0 16px ${fps.color ?? c}88` }}
+                className={`font-mono text-[42px] font-black tabular-nums leading-none ${tokens.primaryTextColor}`}
+                style={{ color: fps.color, textShadow: `0 0 18px ${fps.color ?? c}88` }}
               >
                 {fps.text}
               </span>
@@ -88,7 +100,7 @@ export const BracketHudLayout: React.FC<LayoutProps> = ({ metrics, toggles, toke
               <Sparkline
                 values={history.fps}
                 color={fps.color ?? c}
-                width={64}
+                width={68}
                 height={20}
                 min={Math.max(0, Math.min(...(history.fps.length ? history.fps : [0])) - 5)}
                 max={Math.max(1, ...(history.fps.length ? history.fps : [1])) + 5}
@@ -98,7 +110,8 @@ export const BracketHudLayout: React.FC<LayoutProps> = ({ metrics, toggles, toke
                   tokens={tokens}
                   value={fps.frametime.value}
                   unit="ms"
-                  className="text-[11px]"
+                  strong
+                  className="text-[11px] font-bold"
                 />
               )}
             </div>
@@ -119,24 +132,34 @@ export const BracketHudLayout: React.FC<LayoutProps> = ({ metrics, toggles, toke
           <FrametimeGraph
             history={metrics.frametime_history}
             tokens={tokens}
-            width={232}
+            width={246}
             height={30}
           />
         )}
 
         {model.groups.map((g) => (
-          <div key={g.id} className="flex flex-col gap-1.5">
+          <div
+            key={g.id}
+            className="flex flex-col gap-1.5 border-t border-white/[0.08] pt-2 first:border-t-0 first:pt-0"
+          >
             {g.main && (
               <div className="flex flex-col gap-1">
                 <div className="flex items-baseline justify-between">
-                  <Label>{g.title}</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label>{g.title}</Label>
+                    {g.subtitle && (
+                      <span className="truncate text-[8.5px] font-semibold opacity-55">
+                        {g.subtitle}
+                      </span>
+                    )}
+                  </div>
                   <Value
                     tokens={tokens}
                     value={g.main.text}
                     unit="%"
                     color={g.main.color}
                     strong
-                    className="text-[14px] font-bold"
+                    className="text-[14px] font-black"
                   />
                 </div>
                 <SegmentBar percent={g.main.percent} color={g.main.color} />
@@ -150,25 +173,24 @@ export const BracketHudLayout: React.FC<LayoutProps> = ({ metrics, toggles, toke
                     tokens={tokens}
                     value={g.extra.text}
                     color={g.extra.color}
-                    className="text-[11px]"
+                    strong
+                    className="text-[11px] font-bold"
                   />
                 </div>
                 <SegmentBar percent={g.extra.percent} color={g.extra.color} segments={20} />
               </div>
             )}
             {g.stats.length > 0 && (
-              <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
                 {g.stats.map((s) => (
-                  <span key={s.key} className="flex items-baseline gap-1">
-                    <Label>{g.main || g.extra ? s.label : `${g.title} ${s.label}`}</Label>
-                    <Value
-                      tokens={tokens}
-                      value={s.value}
-                      unit={s.unit}
-                      color={s.color}
-                      className="text-[11px]"
-                    />
-                  </span>
+                  <StatPill
+                    key={s.key}
+                    tokens={tokens}
+                    stat={{
+                      ...s,
+                      label: g.main || g.extra ? s.label : `${g.title} ${s.label}`,
+                    }}
+                  />
                 ))}
               </div>
             )}

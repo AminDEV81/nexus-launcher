@@ -6,7 +6,7 @@ import { CoverArtArchiveProvider } from './providers/cover-art-archive-provider'
 import { ArchiveOrgProvider } from './providers/archive-provider'
 import { SteamSoundtrackProvider } from './providers/steam-provider'
 import { IGDBSoundtrackProvider } from './providers/igdb-soundtrack-provider'
-import { AudiusProvider } from './providers/audius-provider'
+import { AudiusProvider, ItunesAudioProvider } from './providers/audius-provider'
 import { YouTubeDirectProvider } from './providers/youtube-direct-provider'
 import { InvidiousAudioProvider } from './providers/invidious-provider'
 
@@ -21,6 +21,7 @@ export class SoundtrackProviderRegistry {
   constructor() {
     this.register(new LocalSoundtrackProvider())
     this.register(new KHInsiderProvider())
+    this.register(new ItunesAudioProvider())
     this.register(new MusicBrainzProvider())
     this.register(new CoverArtArchiveProvider())
     this.register(new ArchiveOrgProvider())

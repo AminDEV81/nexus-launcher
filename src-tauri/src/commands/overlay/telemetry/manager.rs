@@ -27,8 +27,6 @@ pub struct TelemetryManager {
 
     consumer_count: AtomicUsize,
     frame_running: bool,
-    /// Last game seen in the foreground; kept while its process is alive so
-    /// alt-tabbing doesn't blank the title / session timer.
     sticky_game: Option<ForegroundProcess>,
     last_snapshot: OverlayMetrics,
     last_poll_time: Option<Instant>,
@@ -79,7 +77,6 @@ impl TelemetryManager {
     }
 
     pub fn start_frame_timing(&mut self) {
-        // Idempotent: restarting would wipe the frame history.
         if !self.frame_running {
             self.frame_provider.start();
             self.frame_running = true;
@@ -97,14 +94,14 @@ impl TelemetryManager {
         &mut self,
         known_games: &[(String, String, Option<String>, Option<String>)],
     ) -> OverlayMetrics {
-        // Only refresh CPU and Memory deltas (never reallocates System!)
-        self.system.refresh_cpu_usage();
         self.system.refresh_memory();
 
-        let external = self.external.latest();
-        let cpu = self.cpu_provider.poll(&self.system, external.cpu_temp_c);
-        let gpu = self.gpu_provider.poll();
         let mem = self.memory_provider.poll(&self.system);
+        let external = self.external.latest();
+        let gpu = self.gpu_provider.poll(&external, mem.total_bytes);
+        let cpu = self
+            .cpu_provider
+            .poll(&mut self.system, &external, gpu.temp_c);
         let net = self.network_provider.poll();
         let disk = self.storage_provider.poll();
         let bat = self.battery_provider.poll();
@@ -139,7 +136,6 @@ impl TelemetryManager {
             gpu_vram_used_bytes: gpu.vram_used_bytes,
             gpu_vram_total_bytes: gpu.vram_total_bytes,
             gpu_temp: gpu.temp_c,
-            // NVML has no hotspot; the LibreHardwareMonitor bridge fills that gap.
             gpu_hotspot_temp: gpu.hotspot_c.or(external.gpu_hotspot_c),
             gpu_memory_temp: gpu.memory_temp_c.or(external.gpu_memory_temp_c),
             gpu_clock_mhz: gpu.clock_mhz,
@@ -164,14 +160,11 @@ impl TelemetryManager {
             session_seconds: active_game.as_ref().map(|g| g.session_duration_secs),
         };
 
-        // Cache last snapshot
         self.last_snapshot = snapshot.clone();
 
         snapshot
     }
 
-    /// The foreground process if (and only if) it looks like a game, else
-    /// the last game that is still running.
     fn resolve_game_process(
         &mut self,
         known_games: &[(String, String, Option<String>, Option<String>)],

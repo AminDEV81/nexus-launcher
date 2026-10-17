@@ -97,13 +97,9 @@ pub fn calculate_tree_hash(path: &Path) -> SaveResult<TreeHashResult> {
     }
 
     if path.is_file() {
-        let file_name = path
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| "file".to_string());
         let (file_hash, file_size) = calculate_file_sha256(path)?;
         let mut hasher = Sha256::new();
-        hasher.update(format!("{}:{}:{}\n", file_name, file_size, file_hash).as_bytes());
+        hasher.update(format!("SINGLE_FILE:{}:{}\n", file_size, file_hash).as_bytes());
         return Ok(TreeHashResult {
             hash: hex::encode(hasher.finalize()),
             file_count: 1,

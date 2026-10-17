@@ -50,7 +50,7 @@ export const DEFAULT_CONFIG: OverlayConfig = {
     cpu_usage: true,
     cpu_temp: true,
     cpu_clock: true,
-    cpu_power: false,
+    cpu_power: true,
     cpu_cores: false,
 
     gpu_usage: true,
@@ -60,7 +60,7 @@ export const DEFAULT_CONFIG: OverlayConfig = {
     gpu_memory_temp: false,
     gpu_clock: true,
     gpu_fan: false,
-    gpu_power: false,
+    gpu_power: true,
 
     ram_used: true,
     ram_available: false,
@@ -92,10 +92,6 @@ export const DEFAULT_CONFIG: OverlayConfig = {
   },
 }
 
-/**
- * Merges a (possibly older / partial) config over the defaults so a config
- * saved before a field existed can never crash the overlay renderer.
- */
 export function normalizeConfig(raw: Partial<OverlayConfig> | null | undefined): OverlayConfig {
   return {
     ...DEFAULT_CONFIG,
@@ -248,12 +244,6 @@ function nextHistory(prev: UsageHistory, m: OverlayMetrics): UsageHistory {
 let persistTimer: ReturnType<typeof setTimeout> | undefined
 let persistVersion = 0
 
-/**
- * Debounced save: sliders fire dozens of changes per second, and every
- * save re-applies the window + hotkey in the backend. The backend returns
- * the sanitised config (e.g. an invalid hotkey reverted to the default),
- * which we adopt unless the user has already changed something newer.
- */
 function persistConfig(
   config: OverlayConfig,
   set: (partial: Partial<OverlayStoreState>) => void,
@@ -265,7 +255,6 @@ function persistConfig(
       .then(async (saved) => {
         if (version !== persistVersion) return
         set({ config: normalizeConfig(saved) })
-        // The hotkey thread applies the new binding asynchronously; give it a beat.
         await new Promise((resolve) => setTimeout(resolve, 150))
         if (version !== persistVersion) return
         set({ hotkeyStatus: await getOverlayHotkeyStatus().catch(() => null) })
@@ -373,7 +362,7 @@ export const useOverlayStore = create<OverlayStoreState>((set, get) => ({
     try {
       set({ providerStatus: await getTelemetryStatus() })
     } catch {
-      // Non-fatal: the status panel keeps its last known state.
+      // Non-fatal
     }
   },
 
@@ -381,7 +370,7 @@ export const useOverlayStore = create<OverlayStoreState>((set, get) => ({
     try {
       set({ isLiveWindowOpen: await isOverlayVisible() })
     } catch {
-      // Non-fatal: the button just keeps its last known state.
+      // Non-fatal
     }
   },
 
@@ -395,7 +384,6 @@ export const useOverlayStore = create<OverlayStoreState>((set, get) => ({
   },
 
   sendTestNotification: async (kind = 'info') => {
-    // Notifications only render while the HUD is up, so bring it up first.
     if (!get().isLiveWindowOpen) {
       const opened = await get().toggleLiveWindow(true)
       if (!opened) return
@@ -461,7 +449,6 @@ export const useOverlayStore = create<OverlayStoreState>((set, get) => ({
 
   pollMetrics: async () => {
     if (get().isDemoMode) {
-      // Demo: a gentle random walk so the preview looks alive.
       set((state) => {
         const m = state.metrics
         const walk = (v: number | null, base: number, step: number, lo: number, hi: number) =>
@@ -476,8 +463,11 @@ export const useOverlayStore = create<OverlayStoreState>((set, get) => ({
           frametime_history: hist,
           gpu_usage: Math.round(walk(m.gpu_usage, 78, 10, 40, 99)),
           cpu_usage: Math.round(walk(m.cpu_usage, 34, 10, 12, 80)),
+          cpu_temp: Math.round(walk(m.cpu_temp, 61, 1.8, 48, 78) * 10) / 10,
+          cpu_power_w: Math.round(walk(m.cpu_power_w, 68, 4, 35, 115)),
           gpu_temp: Math.round(walk(m.gpu_temp, 66, 2, 55, 84)),
           gpu_hotspot_temp: Math.round(walk(m.gpu_hotspot_temp, 76, 2, 62, 98)),
+          gpu_power_w: Math.round(walk(m.gpu_power_w, 245, 8, 160, 310)),
           session_seconds: (m.session_seconds ?? 0) + 1,
         }
         return { metrics: next, history: nextHistory(state.history, next) }

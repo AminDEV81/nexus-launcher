@@ -65,12 +65,12 @@ export const BOOSTER_MODULES: BoosterModuleMeta[] = [
   },
   {
     id: 'gaming_priority',
-    label: 'Realtime MMCSS & Network Unthrottle',
+    label: 'Foreground Thread Lock & GameDVR Suppressor',
     description:
-      'Disables MMCSS lazy mode, removes Windows network packet throttling, and suppresses background GameDVR capture.',
+      'Suppresses background GameDVR capture, locks foreground window CPU quantum, and removes Windows 10 Mbps MMCSS network caps.',
     icon: Zap,
     category: 'cpu_kernel',
-    impactBadge: '-Input Lag',
+    impactBadge: '100% Net • -Lag',
     windowsOnly: true,
   },
   {

@@ -16,7 +16,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { assetUrl } from '@/lib/asset-url'
-import { useLaunchGame } from '@/features/library/hooks/use-games'
+import { ArchiveRestore, FolderOpen, Sparkles } from 'lucide-react'
+import { toast } from 'sonner'
+import { useLaunchGame, useRestoreGameFromMemory } from '@/features/library/hooks/use-games'
 import { useLaunchStore } from '@/store/launch-store'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { useSmoothedSpeed } from '../hooks/use-smoothed-speed'
@@ -80,7 +82,9 @@ export function GroupedDownloadCard({
   const [expanded, setExpanded] = useState(false)
   const speed = useAnimationSpeed()
   const launchGame = useLaunchGame()
+  const restoreFromMemory = useRestoreGameFromMemory()
   const runningGameIds = useLaunchStore((s) => s.runningGameIds)
+  const isArchivedInMemory = Boolean(game?.is_memory)
   const isRunning = game ? runningGameIds.has(game.id) : false
 
   const pct = group.totalBytes > 0 ? (group.downloadedBytes / group.totalBytes) * 100 : 0
@@ -175,16 +179,33 @@ export function GroupedDownloadCard({
           </div>
 
           {/* Master Toolbar Actions */}
-          <div className="flex items-center gap-1.5">
-            {done && game?.is_installed && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {done && game?.is_installed && !game.is_memory && (
               <button
                 type="button"
                 onClick={() => game && launchGame.mutate(game.id)}
                 disabled={launchGame.isPending || isRunning}
-                className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-accent-hover active:scale-95 disabled:opacity-60"
+                className="flex items-center gap-1.5 rounded-xl bg-accent px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-accent-hover active:scale-95 disabled:opacity-60 cursor-pointer"
               >
                 <Play className="size-3.5 fill-current" />
                 <span>{isRunning ? 'Running' : 'Play'}</span>
+              </button>
+            )}
+
+            {isArchivedInMemory && game && (
+              <button
+                type="button"
+                onClick={() =>
+                  restoreFromMemory.mutate(game.id, {
+                    onSuccess: () => toast.success(`${game.name} restored to your active Library!`),
+                  })
+                }
+                disabled={restoreFromMemory.isPending}
+                title="Restore this game back to your active Library"
+                className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-xs font-bold text-amber-600 dark:text-amber-300 shadow-xs transition-all hover:bg-amber-500/25 active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <ArchiveRestore className="size-3.5" />
+                <span>Restore to Library</span>
               </button>
             )}
 

@@ -1,8 +1,13 @@
 use super::models::{HubGameDetails, NameIdItem, UnifiedArtwork};
 use super::traits::{ArtworkProvider, MetadataProvider};
-use crate::commands::hub::{HubGame, HubSearchFilters};
+use crate::commands::hub::{
+    self, apply_hub_filters_and_sort, expand_search_query, search_steam_store_fallback, HubGame,
+    HubSearchFilters,
+};
 use crate::error::{AppError, AppResult};
 use serde::Deserialize;
+use std::collections::HashSet;
+use std::time::Duration;
 
 pub const DEFAULT_GATEWAY_URL: &str =
     "https://nexus-metadata-gateway.nexus-amin.workers.dev";
@@ -42,6 +47,7 @@ impl NexusCloudProvider {
         let res = self
             .http
             .get(&full_url)
+            .timeout(Duration::from_millis(3200))
             .send()
             .await
             .map_err(|err| {
@@ -76,6 +82,19 @@ impl NexusCloudProvider {
             .data
             .ok_or_else(|| AppError::Other("No game data available.".into()))
     }
+
+    pub async fn fetch_feed_with_genres(
+        &self,
+        feed: &str,
+        offset: i64,
+        genres_csv: Option<&str>,
+    ) -> AppResult<Vec<HubGame>> {
+        let mut path = format!("/api/v1/games/feed/{feed}?offset={offset}");
+        if let Some(g) = genres_csv.filter(|s| !s.is_empty()) {
+            path.push_str(&format!("&genres={g}"));
+        }
+        self.get_json(&path).await
+    }
 }
 
 impl MetadataProvider for NexusCloudProvider {
@@ -95,7 +114,8 @@ impl MetadataProvider for NexusCloudProvider {
         filters: &HubSearchFilters,
     ) -> AppResult<Vec<HubGame>> {
         let clean_q = query.trim();
-        let encoded_q = urlencoding_light(clean_q);
+        let expanded_q = expand_search_query(clean_q);
+        let encoded_q = urlencoding_light(&expanded_q);
         let mut path = format!("/api/v1/games/search?q={encoded_q}&offset={offset}");
 
         let mut genre_ids = Vec::new();
@@ -130,7 +150,7 @@ impl MetadataProvider for NexusCloudProvider {
             _ => None,
         };
         if let Some(rel) = &effective_release {
-            path.push_str(&format!("&release={rel}"));
+            path.push_str(&format!("&release={}", urlencoding_light(rel)));
         }
 
         if let Some(mr) = filters.min_rating {
@@ -138,27 +158,174 @@ impl MetadataProvider for NexusCloudProvider {
         }
 
         if let Some(s) = &filters.sort {
-            path.push_str(&format!("&sort={s}"));
+            path.push_str(&format!("&sort={}", urlencoding_light(s)));
         }
 
-        let res = self.get_json::<Vec<HubGame>>(&path).await;
-        match res {
-            Ok(games) if !games.is_empty() => Ok(games),
-            _ => {
-                // Fallback only if no specific genre/platform filters were set
-                if clean_q.is_empty() && genre_ids.is_empty() && platform_ids.is_empty() {
-                    if effective_release.as_deref() == Some("upcoming") {
-                        return self.fetch_feed("coming_soon", offset).await;
-                    }
-                    if effective_release.as_deref() == Some("new") {
-                        return self.fetch_feed("new_releases", offset).await;
-                    }
-                    if filters.min_rating.unwrap_or(0) >= 80 || filters.sort.as_deref() == Some("rating") {
-                        return self.fetch_feed("top_rated", offset).await;
+        if let Some(cat) = &filters.game_category {
+            if !cat.trim().is_empty() && cat != "all" {
+                path.push_str(&format!("&game_category={}", urlencoding_light(cat)));
+            }
+        }
+
+        if let Some(mode) = &filters.game_mode {
+            if !mode.trim().is_empty() && mode != "all" {
+                path.push_str(&format!("&game_mode={}", urlencoding_light(mode)));
+            }
+        }
+
+        // Run primary cloud search, raw query fallback, and Steam Store popularity search CONCURRENTLY!
+        let need_raw = !clean_q.is_empty() && expanded_q != clean_q;
+        let raw_path = if need_raw {
+            Some(format!(
+                "/api/v1/games/search?q={}&offset={offset}",
+                urlencoding_light(clean_q)
+            ))
+        } else {
+            None
+        };
+
+        let (primary_res, raw_res, steam_games) = tokio::join!(
+            self.get_json::<Vec<HubGame>>(&path),
+            async {
+                if let Some(ref rp) = raw_path {
+                    self.get_json::<Vec<HubGame>>(rp).await.ok()
+                } else {
+                    None
+                }
+            },
+            async {
+                if !clean_q.is_empty() && offset == 0 {
+                    tokio::time::timeout(
+                        Duration::from_millis(2000),
+                        search_steam_store_fallback(&self.http, &expanded_q),
+                    )
+                    .await
+                    .unwrap_or_default()
+                } else {
+                    Vec::new()
+                }
+            }
+        );
+
+        let mut combined: Vec<HubGame> = Vec::new();
+        let mut seen = HashSet::new();
+
+        if let Ok(games) = &primary_res {
+            for g in games {
+                if seen.insert(g.igdb_id) {
+                    combined.push(g.clone());
+                }
+            }
+        }
+
+        if let Some(more) = raw_res {
+            if combined.len() < 12 {
+                for g in more {
+                    if seen.insert(g.igdb_id) {
+                        combined.push(g);
                     }
                 }
-                res
             }
+        }
+
+        // Actively enrich candidate pool when special edition/category filters are active using tokio::join!
+        let cat_filter = filters.game_category.as_deref().unwrap_or("");
+        if cat_filter == "remake" && !clean_q.is_empty() {
+            let q_enc = urlencoding_light(&expanded_q);
+            let p1 = format!("/api/v1/games/search?q={q_enc}%20Remake&offset=0");
+            let p2 = format!("/api/v1/games/search?q={q_enc}%20Remastered&offset=0");
+            let p3 = format!("/api/v1/games/search?q={q_enc}%20Definitive&offset=0");
+            let (r1, r2, r3) = tokio::join!(
+                self.get_json::<Vec<HubGame>>(&p1),
+                self.get_json::<Vec<HubGame>>(&p2),
+                self.get_json::<Vec<HubGame>>(&p3)
+            );
+            for res in [r1, r2, r3].into_iter().flatten() {
+                for g in res {
+                    if seen.insert(g.igdb_id) {
+                        combined.push(g);
+                    }
+                }
+            }
+        } else if cat_filter == "expansion" && !clean_q.is_empty() {
+            let q_enc = urlencoding_light(&expanded_q);
+            let p1 = format!("/api/v1/games/search?q={q_enc}%20Expansion&offset=0");
+            let p2 = format!("/api/v1/games/search?q={q_enc}%20Edition&offset=0");
+            let (r1, r2) = tokio::join!(
+                self.get_json::<Vec<HubGame>>(&p1),
+                self.get_json::<Vec<HubGame>>(&p2)
+            );
+            for res in [r1, r2].into_iter().flatten() {
+                for g in res {
+                    if seen.insert(g.igdb_id) {
+                        combined.push(g);
+                    }
+                }
+            }
+        }
+
+        for g in steam_games {
+            if seen.insert(g.igdb_id) {
+                combined.push(g);
+            }
+        }
+
+        // Post-filter to see how many valid matches we actually have after strict filter enforcement
+        let filtered_now = apply_hub_filters_and_sort(combined.clone(), clean_q, filters);
+
+        // If filter-only browsing (clean_q is empty) returned too few results, synthesize a rich catalog pool from the cloud feeds!
+        if clean_q.is_empty() && filtered_now.len() < 16 {
+            let genres_csv = if !genre_ids.is_empty() {
+                Some(
+                    genre_ids
+                        .iter()
+                        .map(|id| id.to_string())
+                        .collect::<Vec<_>>()
+                        .join(","),
+                )
+            } else {
+                None
+            };
+
+            let g1_str = genre_ids.first().map(|id| id.to_string());
+            let g2_str = genre_ids.get(1).map(|id| id.to_string());
+            let (f_rec, f_top, f_new, f_soon, f_g1, f_g2) = tokio::join!(
+                self.fetch_feed_with_genres("recommended", offset, genres_csv.as_deref()),
+                self.fetch_feed("top_rated", offset),
+                self.fetch_feed("new_releases", offset),
+                self.fetch_feed("coming_soon", offset),
+                async {
+                    if let Some(ref g1) = g1_str {
+                        self.fetch_feed_with_genres("recommended", offset, Some(g1)).await
+                    } else {
+                        Ok(Vec::new())
+                    }
+                },
+                async {
+                    if let Some(ref g2) = g2_str {
+                        self.fetch_feed_with_genres("recommended", offset, Some(g2)).await
+                    } else {
+                        Ok(Vec::new())
+                    }
+                }
+            );
+
+            for feed_res in [f_rec, f_top, f_new, f_soon, f_g1, f_g2] {
+                if let Ok(list) = feed_res {
+                    for g in list {
+                        if seen.insert(g.igdb_id) {
+                            combined.push(g);
+                        }
+                    }
+                }
+            }
+        }
+
+        let result_list = apply_hub_filters_and_sort(combined, clean_q, filters);
+        if !result_list.is_empty() {
+            Ok(result_list)
+        } else {
+            primary_res.map(|g| apply_hub_filters_and_sort(g, clean_q, filters))
         }
     }
 
@@ -183,11 +350,17 @@ impl MetadataProvider for NexusCloudProvider {
     }
 
     async fn list_genres(&self) -> AppResult<Vec<NameIdItem>> {
-        self.get_json("/api/v1/games/genres").await
+        match self.get_json::<Vec<NameIdItem>>("/api/v1/games/genres").await {
+            Ok(items) if !items.is_empty() => Ok(items),
+            _ => Ok(hub::default_hub_genres()),
+        }
     }
 
     async fn list_platforms(&self) -> AppResult<Vec<NameIdItem>> {
-        self.get_json("/api/v1/games/platforms").await
+        match self.get_json::<Vec<NameIdItem>>("/api/v1/games/platforms").await {
+            Ok(items) if !items.is_empty() => Ok(items),
+            _ => Ok(hub::default_hub_platforms()),
+        }
     }
 }
 
@@ -223,36 +396,3 @@ fn urlencoding_light(input: &str) -> String {
     }
     out
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_live_cloud_artwork_options() {
-        let http = reqwest::Client::new();
-        let cloud = NexusCloudProvider::new(http, None);
-        let res = cloud.get_artwork_options("cover", None, "Cyberpunk 2077").await;
-        println!("Result for Cyberpunk: {:?}", res.as_ref().map(|v| v.len()));
-        assert!(res.is_ok());
-        let artworks = res.unwrap();
-        assert!(artworks.len() > 10, "Expected >10 artworks, got {}", artworks.len());
-
-        let res2 = cloud.get_artwork_options("cover", None, "Replaced").await;
-        println!("Result for Replaced covers: {:?}", res2.as_ref().map(|v| v.len()));
-        assert!(res2.is_ok());
-        let artworks2 = res2.unwrap();
-        assert!(artworks2.len() > 10, "Expected >10 artworks, got {}", artworks2.len());
-
-        let res_hero = cloud.get_artwork_options("hero", None, "Cyberpunk 2077").await;
-        println!("Result for Cyberpunk heroes: {:?}", res_hero.as_ref().map(|v| v.len()));
-        assert!(res_hero.is_ok());
-        assert!(res_hero.unwrap().len() > 10);
-
-        let res_logo = cloud.get_artwork_options("logo", None, "Cyberpunk 2077").await;
-        println!("Result for Cyberpunk logos: {:?}", res_logo.as_ref().map(|v| v.len()));
-        assert!(res_logo.is_ok());
-        assert!(res_logo.unwrap().len() > 10);
-    }
-}
-

@@ -120,7 +120,7 @@ mod imp {
         }
     }
 
-    /// Scans TCP/IP network tweaks (TCP NoDelay and TcpAckFrequency).
+    /// Scans TCP/IP network tweaks (TCPNoDelay without bandwidth-capping TcpAckFrequency).
     pub fn scan_network_tweaks() -> bool {
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
         let Ok(interfaces) = hklm.open_subkey_with_flags(
@@ -136,9 +136,8 @@ mod imp {
         for key_name in interfaces.enum_keys().flatten() {
             if let Ok(subkey) = interfaces.open_subkey_with_flags(&key_name, KEY_READ) {
                 checked += 1;
-                let ack: Result<u32, _> = subkey.get_value("TcpAckFrequency");
                 let nodelay: Result<u32, _> = subkey.get_value("TCPNoDelay");
-                if ack.unwrap_or(0) == 1 && nodelay.unwrap_or(0) == 1 {
+                if nodelay.unwrap_or(0) == 1 {
                     enabled += 1;
                 }
             }
@@ -147,13 +146,14 @@ mod imp {
         checked > 0 && enabled > 0
     }
 
-    /// Applies or reverts TCP NoDelay, TcpAckFrequency, and netsh TCP auto-tuning.
+    /// Applies or reverts low-latency TCP NoDelay & full-bandwidth Receive Window Auto-Tuning
+    /// while removing `TcpAckFrequency` / `AlwaysOn` overrides that cap download speeds to ~10 Mbps.
     pub fn apply_network_tweaks(enable: bool) -> TweakActionResult {
         if !is_elevated() {
             let script = if enable {
-                r#"$interfaces = 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces'; Get-ChildItem $interfaces | ForEach-Object { Set-ItemProperty -Path $_.PSPath -Name TcpAckFrequency -Value 1 -Type DWord -Force; Set-ItemProperty -Path $_.PSPath -Name TCPNoDelay -Value 1 -Type DWord -Force }; netsh int tcp set global autotuninglevel=normal; netsh int tcp set heuristics disabled; netsh int tcp set global rss=enabled; ipconfig /flushdns"#
+                r#"$interfaces = 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces'; Get-ChildItem $interfaces | ForEach-Object { Remove-ItemProperty -Path $_.PSPath -Name TcpAckFrequency -ErrorAction SilentlyContinue; Remove-ItemProperty -Path $_.PSPath -Name TcpDelAckTicks -ErrorAction SilentlyContinue; Set-ItemProperty -Path $_.PSPath -Name TCPNoDelay -Value 1 -Type DWord -Force }; $mmcss = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile'; Set-ItemProperty -Path $mmcss -Name NetworkThrottlingIndex -Value 0xffffffff -Type DWord -Force -ErrorAction SilentlyContinue; Remove-ItemProperty -Path $mmcss -Name AlwaysOn -ErrorAction SilentlyContinue; Remove-ItemProperty -Path $mmcss -Name NoLazyMode -ErrorAction SilentlyContinue; netsh int tcp set global autotuninglevel=normal; netsh int tcp set heuristics default; netsh int tcp set global rss=enabled; ipconfig /flushdns"#
             } else {
-                r#"$interfaces = 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces'; Get-ChildItem $interfaces | ForEach-Object { Remove-ItemProperty -Path $_.PSPath -Name TcpAckFrequency -ErrorAction SilentlyContinue; Remove-ItemProperty -Path $_.PSPath -Name TCPNoDelay -ErrorAction SilentlyContinue }; netsh int tcp set heuristics default; ipconfig /flushdns"#
+                r#"$interfaces = 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces'; Get-ChildItem $interfaces | ForEach-Object { Remove-ItemProperty -Path $_.PSPath -Name TcpAckFrequency -ErrorAction SilentlyContinue; Remove-ItemProperty -Path $_.PSPath -Name TCPNoDelay -ErrorAction SilentlyContinue; Remove-ItemProperty -Path $_.PSPath -Name TcpDelAckTicks -ErrorAction SilentlyContinue }; netsh int tcp set global autotuninglevel=normal; netsh int tcp set heuristics default; ipconfig /flushdns"#
             };
 
             let status = Command::new("powershell.exe")
@@ -171,7 +171,7 @@ mod imp {
                 Ok(s) if s.success() => TweakActionResult {
                     success: true,
                     message: if enable {
-                        "Gaming TCP NoDelay & low-latency network tweaks applied via UAC elevation.".into()
+                        "Low-latency TCP NoDelay & 100% uncapped bandwidth applied via UAC elevation.".into()
                     } else {
                         "Network settings reverted to Windows defaults via UAC elevation.".into()
                     },
@@ -193,31 +193,38 @@ mod imp {
         ) {
             for key_name in interfaces.enum_keys().flatten() {
                 if let Ok(subkey) = interfaces.open_subkey_with_flags(&key_name, KEY_WRITE) {
+                    // Always remove TcpAckFrequency & TcpDelAckTicks so RSC & full Gigabit download speed are never capped
+                    let _ = subkey.delete_value("TcpAckFrequency");
+                    let _ = subkey.delete_value("TcpDelAckTicks");
                     if enable {
-                        let _ = subkey.set_value("TcpAckFrequency", &1u32);
                         let _ = subkey.set_value("TCPNoDelay", &1u32);
-                        let _ = subkey.set_value("TcpDelAckTicks", &0u32);
                     } else {
-                        let _ = subkey.delete_value("TcpAckFrequency");
                         let _ = subkey.delete_value("TCPNoDelay");
-                        let _ = subkey.delete_value("TcpDelAckTicks");
                     }
                 }
             }
         }
 
-        // Run netsh optimization
-        if enable {
-            let _ = Command::new("netsh").args(["int", "tcp", "set", "global", "autotuninglevel=normal"]).creation_flags(CREATE_NO_WINDOW).status();
-            let _ = Command::new("netsh").args(["int", "tcp", "set", "heuristics", "disabled"]).creation_flags(CREATE_NO_WINDOW).status();
-            let _ = Command::new("netsh").args(["int", "tcp", "set", "global", "rss=enabled"]).creation_flags(CREATE_NO_WINDOW).status();
+        // Also ensure MMCSS NetworkThrottlingIndex is uncapped (0xffffffff) and AlwaysOn is removed
+        if let Ok(mmcss) = hklm.open_subkey_with_flags(
+            r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile",
+            KEY_WRITE,
+        ) {
+            let _ = mmcss.delete_value("AlwaysOn");
+            let _ = mmcss.delete_value("NoLazyMode");
+            let _ = mmcss.set_value("NetworkThrottlingIndex", &0xffffffffu32);
         }
+
+        // Run netsh optimization (preserving autotuninglevel=normal and heuristics=default for full download speed)
+        let _ = Command::new("netsh").args(["int", "tcp", "set", "global", "autotuninglevel=normal"]).creation_flags(CREATE_NO_WINDOW).status();
+        let _ = Command::new("netsh").args(["int", "tcp", "set", "heuristics", "default"]).creation_flags(CREATE_NO_WINDOW).status();
+        let _ = Command::new("netsh").args(["int", "tcp", "set", "global", "rss=enabled"]).creation_flags(CREATE_NO_WINDOW).status();
         let _ = Command::new("ipconfig").args(["/flushdns"]).creation_flags(CREATE_NO_WINDOW).status();
 
         TweakActionResult {
             success: true,
             message: if enable {
-                "Gaming TCP NoDelay applied, packet throttling disabled, and DNS cache flushed.".into()
+                "Gaming TCP NoDelay enabled, 10 Mbps MMCSS cap removed, and full bandwidth restored.".into()
             } else {
                 "Network settings restored to Windows defaults.".into()
             },

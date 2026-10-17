@@ -1,8 +1,59 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { FolderSync, HardDrive, Heart, Music, Play, Search, Sparkles } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  Activity,
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  Compass,
+  Disc,
+  Disc3,
+  EyeOff,
+  Flame,
+  FolderSync,
+  Gamepad2,
+  Globe,
+  HardDrive,
+  Headphones,
+  Heart,
+  History,
+  ListMusic,
+  Loader2,
+  Maximize2,
+  Moon,
+  Music,
+  Pause,
+  Play,
+  Radio,
+  RefreshCw,
+  Search,
+  Shuffle,
+  SkipBack,
+  SkipForward,
+  Sparkles,
+  Swords,
+  Trash2,
+  X,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import { assetUrl } from '@/lib/asset-url'
 import { playButtonClick } from '@/lib/sound-engine'
+import { queryClient } from '@/app/query-client'
+import { useAnimationSpeed } from '@/hooks/use-animation-speed'
+import { useGames } from '@/features/library/hooks/use-games'
 import { useSoundtrackPlayer } from '../hooks/use-soundtrack-player'
+import {
+  cleanGameTitleFromAlbumTitle,
+  deriveGameIdentityFromAlbum,
+} from '../store/soundtrack-store'
+import {
+  getAllCuratedSoundtracks,
+  lookupCuratedSoundtrack,
+  resolveAlbumCoverFallback,
+} from '../services/curated-soundtracks'
+import { soundtrackResolver } from '../services/soundtrack-resolver'
 import {
   getAllSoundtrackAlbums,
   getSoundtrackAlbum,
@@ -14,24 +65,512 @@ import {
 import { AlbumCard } from '../components/center/album-card'
 import { TrackRow } from '../components/center/track-row'
 import { AlbumDetailModal } from '../components/center/album-detail-modal'
+import { AudioVisualizer } from '../components/player/audio-visualizer'
 import type { SoundtrackAlbumWithTracks, SoundtrackTrack } from '../types'
-import { toast } from 'sonner'
-import { queryClient } from '@/app/query-client'
-import { assetUrl } from '@/lib/asset-url'
 
-type CenterTab = 'overview' | 'games' | 'favorites' | 'downloaded' | 'all'
+type CenterTab = 'overview' | 'games' | 'radios' | 'favorites' | 'queue' | 'downloaded'
+
+type VibeFilterId =
+  | 'all'
+  | 'boss_action'
+  | 'rpg_fantasy'
+  | 'cyber_scifi'
+  | 'story_emotional'
+  | 'open_world'
+  | 'horror_dark'
+
+const VIBE_FILTERS: Array<{
+  id: VibeFilterId
+  label: string
+  icon: typeof Sparkles
+  keywords: string[]
+}> = [
+  { id: 'all', label: 'All Soundtracks', icon: Sparkles, keywords: [] },
+  {
+    id: 'boss_action',
+    label: 'Action & Boss Themes',
+    icon: Swords,
+    keywords: [
+      'elden ring',
+      'god of war',
+      'dark souls',
+      'sekiro',
+      'wukong',
+      'doom',
+      'devil may cry',
+      'hades',
+      'monster hunter',
+      'bloodborne',
+      'metal gear',
+    ],
+  },
+  {
+    id: 'rpg_fantasy',
+    label: 'RPG & Epic Fantasy',
+    icon: Flame,
+    keywords: [
+      'witcher',
+      'baldur',
+      'skyrim',
+      'final fantasy',
+      'persona',
+      'clair obscur',
+      'metaphor',
+      'dragon',
+      'kingdom come',
+      'zelda',
+      'chrono',
+    ],
+  },
+  {
+    id: 'cyber_scifi',
+    label: 'Cyberpunk & Sci-Fi',
+    icon: Activity,
+    keywords: [
+      'cyberpunk',
+      'mass effect',
+      'halo',
+      'nier',
+      'starfield',
+      'armored core',
+      'death stranding',
+      'control',
+      'half-life',
+      'portal',
+      'helldivers',
+    ],
+  },
+  {
+    id: 'story_emotional',
+    label: 'Emotional & Story',
+    icon: Heart,
+    keywords: [
+      'last of us',
+      'clair obscur',
+      'red dead',
+      'life is strange',
+      'detroit',
+      'undertale',
+      'celeste',
+      'ori',
+      'hollow knight',
+      'disco elysium',
+    ],
+  },
+  {
+    id: 'open_world',
+    label: 'Open World & Horizon',
+    icon: Compass,
+    keywords: [
+      'red dead',
+      'tsushima',
+      'horizon',
+      'witcher',
+      'grand theft auto',
+      'assassin',
+      'zelda',
+      'skyrim',
+      'outer wilds',
+      'stray',
+    ],
+  },
+  {
+    id: 'horror_dark',
+    label: 'Survival & Dark',
+    icon: Moon,
+    keywords: [
+      'silent hill',
+      'resident evil',
+      'alan wake',
+      'dead space',
+      'bloodborne',
+      'lies of p',
+      'diablo',
+      'dark souls',
+    ],
+  },
+]
+
+const DYNAMIC_DISCOVERY_SEEDS = [
+  'Octopath Traveler II',
+  'Xenoblade Chronicles 3',
+  'Sea of Stars',
+  'Cuphead',
+  'Katana ZERO',
+  'Furi',
+  'Transistor',
+  'Bastion',
+  'Divinity Original Sin 2',
+  'Frostpunk',
+  'Guilty Gear Strive',
+  'Tales of Arise',
+  'Yakuza 0',
+  'Like a Dragon Infinite Wealth',
+  'Deus Ex Human Revolution',
+  'BioShock Infinite',
+  'Dishonored 2',
+  'Prey',
+  'Metro Exodus',
+  'Warhammer 40000 Darktide',
+  'Warhammer 40000 Space Marine 2',
+  'Helldivers 2',
+  'Returnal',
+  'Ghostrunner',
+  'Astral Chain',
+  'Bayonetta 3',
+  'Dead Cells',
+  'Blasphemous 2',
+  'Hyper Light Drifter',
+  'VA-11 Hall-A',
+  'gris',
+  'Journey',
+  'Shadow of the Colossus',
+  'Kingdom Hearts II',
+  'Dragon Age Inquisition',
+  'Max Payne 3',
+  'LA Noire',
+  'Sleeping Dogs',
+  'Ace Combat 7',
+  'Metal Gear Rising',
+  'Chrono Trigger',
+  'Final Fantasy XVI',
+  'Monster Hunter Wilds',
+  'NieR Replicant',
+  'Persona 3 Reload',
+  'Metaphor ReFantazio',
+  'Armored Core VI',
+  'Hi-Fi RUSH',
+  'Stellar Blade',
+  'Lies of P',
+  'Outer Wilds',
+  'Deltarune',
+  'Street Fighter 6',
+  'Tekken 8',
+  'Forza Horizon 5',
+  'Subnautica',
+  'Risk of Rain 2',
+  'Hades II',
+]
+
+function normalizeGameOstKey(rawTitle: string): string {
+  return cleanGameTitleFromAlbumTitle(rawTitle)
+    .toLowerCase()
+    .replace(/\b(original|official|video\s*game|game|soundtrack|score|ost|music|album|deluxe|edition|complete|vol\.?\s*\d+|volume\s*\d+)\b/gi, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+}
+
+interface MoodStation {
+  id: string
+  title: string
+  subtitle: string
+  badge: string
+  gradient: string
+  accentText: string
+  icon: typeof Flame
+  keywords: string[]
+  onlineSeeds: string[]
+}
+
+const MOOD_STATIONS: MoodStation[] = [
+  {
+    id: 'boss_orchestral',
+    title: 'Boss Fight & Epic Orchestral',
+    subtitle:
+      'Live-streamed choirs, brass & symphonic boss themes — dynamically refreshed from online OST catalogs',
+    badge: 'LIVE SYMPHONY',
+    gradient: 'from-amber-500/20 via-rose-500/10 to-surface',
+    accentText: 'text-amber-400 border-amber-500/35 bg-amber-500/10',
+    icon: Flame,
+    keywords: [
+      'elden ring',
+      'god of war',
+      'baldur',
+      'dark souls',
+      'sekiro',
+      'wukong',
+      'final fantasy',
+      'skyrim',
+      'bloodborne',
+      'monster hunter',
+    ],
+    onlineSeeds: [
+      'Elden Ring Shadow of the Erdtree',
+      'Dark Souls III',
+      'Bloodborne',
+      'God of War Ragnarok',
+      'Final Fantasy XVI',
+      'Final Fantasy VII Rebirth',
+      'Black Myth Wukong',
+      'Monster Hunter Wilds',
+      'Baldur’s Gate 3',
+      'Sekiro Shadows Die Twice',
+      'Lies of P',
+      'Dragon’s Dogma 2',
+      'Metaphor ReFantazio',
+      'Skyrim',
+      'Shadow of the Colossus',
+      'Stellar Blade',
+    ],
+  },
+  {
+    id: 'cyber_pulse',
+    title: 'Cyberpunk & High-Voltage Pulse',
+    subtitle:
+      'Live synthwave, industrial combat metal & high-BPM action scores streamed fresh on every session',
+    badge: 'LIVE ADRENALINE',
+    gradient: 'from-cyan-500/20 via-fuchsia-500/10 to-surface',
+    accentText: 'text-cyan-400 border-cyan-500/35 bg-cyan-500/10',
+    icon: Activity,
+    keywords: [
+      'cyberpunk',
+      'doom',
+      'hades',
+      'armored core',
+      'control',
+      'persona',
+      'spider-man',
+      'devil may cry',
+      'metal gear',
+    ],
+    onlineSeeds: [
+      'Cyberpunk 2077 Phantom Liberty',
+      'DOOM Eternal',
+      'Devil May Cry 5',
+      'Metal Gear Rising Revengeance',
+      'Hades II',
+      'Armored Core VI',
+      'Hi-Fi RUSH',
+      'Ghostrunner 2',
+      'Hotline Miami',
+      'Katana ZERO',
+      'Ultrakill',
+      'Persona 5 Strikers',
+      'Sonic Frontiers',
+      'Tekken 8',
+      'Street Fighter 6',
+      'Helldivers 2',
+    ],
+  },
+  {
+    id: 'open_world',
+    title: 'Open World & Horizon Exploration',
+    subtitle:
+      'Sweeping frontier, wilderness & cosmic journey scores dynamically pulled from online archives',
+    badge: 'LIVE HORIZON',
+    gradient: 'from-emerald-500/20 via-teal-500/10 to-surface',
+    accentText: 'text-emerald-400 border-emerald-500/35 bg-emerald-500/10',
+    icon: Compass,
+    keywords: [
+      'witcher',
+      'red dead',
+      'tsushima',
+      'horizon',
+      'skyrim',
+      'kingdom come',
+      'monster hunter',
+      'zelda',
+    ],
+    onlineSeeds: [
+      'The Witcher 3 Blood and Wine',
+      'Red Dead Redemption 2',
+      'Ghost of Tsushima',
+      'Horizon Forbidden West',
+      'The Legend of Zelda Tears of the Kingdom',
+      'Kingdom Come Deliverance II',
+      'Assassin’s Creed Shadows',
+      'Assassin’s Creed Valhalla',
+      'Starfield',
+      'No Man’s Sky',
+      'Subnautica',
+      'Death Stranding',
+      'Xenoblade Chronicles 3',
+      'genshin impact',
+      'Sea of Thieves',
+      'Forza Horizon 5',
+    ],
+  },
+  {
+    id: 'emotional_story',
+    title: 'Emotional & Cinematic Story',
+    subtitle:
+      'Poignant vocal, piano & acoustic masterpieces updated live with rotating narrative scores',
+    badge: 'LIVE CINEMATIC',
+    gradient: 'from-violet-500/20 via-indigo-500/10 to-surface',
+    accentText: 'text-violet-400 border-violet-500/35 bg-violet-500/10',
+    icon: Heart,
+    keywords: [
+      'clair obscur',
+      'last of us',
+      'nier',
+      'death stranding',
+      'silent hill',
+      'detroit',
+      'lies of p',
+      'ori',
+    ],
+    onlineSeeds: [
+      'Clair Obscur Expedition 33',
+      'NieR Automata',
+      'NieR Replicant',
+      'The Last of Us Part II',
+      'Ori and the Will of the Wisps',
+      'Life is Strange',
+      'Detroit Become Human',
+      'Silent Hill 2',
+      'Final Fantasy X',
+      'Chrono Cross',
+      'Persona 3 Reload',
+      'Gris',
+      'Journey',
+      'A Plague Tale Requiem',
+      'Alan Wake 2',
+      'Bioshock Infinite',
+    ],
+  },
+  {
+    id: 'late_night',
+    title: 'Late Night Focus & Lo-Fi Ambient',
+    subtitle:
+      'Nocturnal piano, synth pads & atmospheric chill mixes fetched live for coding & late-night gaming',
+    badge: 'LIVE AMBIENT',
+    gradient: 'from-blue-500/20 via-sky-500/10 to-surface',
+    accentText: 'text-sky-400 border-sky-500/35 bg-sky-500/10',
+    icon: Moon,
+    keywords: [
+      'hollow knight',
+      'celeste',
+      'outer wilds',
+      'stray',
+      'disco elysium',
+      'undertale',
+      'alan wake',
+    ],
+    onlineSeeds: [
+      'Hollow Knight',
+      'Celeste',
+      'Outer Wilds',
+      'Stray',
+      'Disco Elysium',
+      'Undertale',
+      'Deltarune',
+      'Stardew Valley',
+      'Minecraft Volume Alpha',
+      'Animal Crossing New Horizons',
+      'VA-11 Hall-A',
+      'Coffee Talk',
+      'Hyper Light Drifter',
+      'Risk of Rain 2',
+      'Fez',
+      'Dave the Diver',
+    ],
+  },
+  {
+    id: 'masterpiece_mix',
+    title: 'Nexus Live Global Shuffle',
+    subtitle:
+      'Continuous online discovery radio streaming fresh tracks across 100+ legendary & new video game scores',
+    badge: '24/7 ONLINE STREAM',
+    gradient: 'from-accent/25 via-purple-500/10 to-surface',
+    accentText: 'text-accent border-accent/35 bg-accent/10',
+    icon: Radio,
+    keywords: [],
+    onlineSeeds: [
+      'Elden Ring',
+      'Cyberpunk 2077',
+      'Baldur’s Gate 3',
+      'Clair Obscur Expedition 33',
+      'Persona 5 Royal',
+      'NieR Automata',
+      'The Witcher 3',
+      'God of War Ragnarok',
+      'Red Dead Redemption 2',
+      'Final Fantasy VII Rebirth',
+      'Halo 3',
+      'Mass Effect 2',
+      'Silent Hill 2',
+      'DOOM Eternal',
+      'Devil May Cry 5',
+      'Hollow Knight',
+      'Hades',
+      'Kingdom Hearts II',
+      'Chrono Trigger',
+      'Metal Gear Solid 3',
+    ],
+  },
+]
+
+function formatSeconds(sec: number) {
+  if (!sec || sec <= 0 || !Number.isFinite(sec)) return '0:00'
+  const total = Math.floor(sec)
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function useDebouncedValue<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebounced(value), ms)
+    return () => window.clearTimeout(id)
+  }, [value, ms])
+  return debounced
+}
 
 export function SoundtrackCenterPage() {
+  const speed = useAnimationSpeed()
   const [activeTab, setActiveTab] = useState<CenterTab>('overview')
+  const [activeVibe, setActiveVibe] = useState<VibeFilterId>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedAlbum, setSelectedAlbum] = useState<SoundtrackAlbumWithTracks | null>(null)
   const [isScanning, setIsScanning] = useState(false)
+  const [isSearchingOnline, setIsSearchingOnline] = useState(false)
+  const [isSyncingLiveFeed, setIsSyncingLiveFeed] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [visibleAlbumLimit, setVisibleAlbumLimit] = useState(18)
+  const [visibleTrackLimit, setVisibleTrackLimit] = useState(18)
+  const [onlineDiscovered, setOnlineDiscovered] = useState<SoundtrackAlbumWithTracks[]>([])
+  const [rotationNonce, setRotationNonce] = useState(0)
+  const [activeStationId, setActiveStationId] = useState<string | null>(null)
+  const [loadingStationId, setLoadingStationId] = useState<string | null>(null)
+  const [stationLiveSeeds, setStationLiveSeeds] = useState<Record<string, string[]>>({})
+  const [radioWaveGeneration, setRadioWaveGeneration] = useState(1)
+  const dynamicSeedIdxRef = useRef(0)
+  const radioSeedCursorRef = useRef<Record<string, number>>({})
 
-  const { favorites, playTrack } = useSoundtrackPlayer()
+  const debouncedSearch = useDebouncedValue(searchQuery.trim(), 280)
+
+  const { data: libraryGames = [] } = useGames()
+
+  const {
+    currentTrack,
+    currentAlbum,
+    currentGame,
+    playbackState,
+    currentTime,
+    duration,
+    shuffle,
+    visualizerMode,
+    favorites,
+    savedFavoriteTracks,
+    savedFavoriteAlbums,
+    queue,
+    playTrack,
+    playAlbum,
+    togglePlay,
+    next,
+    previous,
+    seek,
+    toggleShuffle,
+    toggleFavorite,
+    setExpanded,
+    setVisualizerMode,
+    clearQueue,
+  } = useSoundtrackPlayer()
 
   // Load all albums saved in SQLite
   const { data: allAlbums = [], refetch: refetchAlbums } = useQuery({
-    queryKey: ['soundtrack', 'all-albums'],
+    queryKey: ['soundtrack', 'all-albums', favorites.size],
     queryFn: () => getAllSoundtrackAlbums(),
   })
 
@@ -49,28 +588,379 @@ export function SoundtrackCenterPage() {
 
   // Load all favorite records from SQLite
   const { data: favoriteRows = [] } = useQuery({
-    queryKey: ['soundtrack', 'favorites-list'],
+    queryKey: ['soundtrack', 'favorites-list', favorites.size],
     queryFn: () => getSoundtrackFavorites(),
   })
 
-  // Full album objects with tracks for grid
-  const { data: albumsWithTracks = [] } = useQuery({
-    queryKey: ['soundtrack', 'albums-with-tracks', allAlbums.length],
+  // Full album objects with tracks from SQLite
+  const { data: dbAlbumsWithTracks = [] } = useQuery({
+    queryKey: [
+      'soundtrack',
+      'albums-with-tracks',
+      allAlbums.map((a) => a.id).join(','),
+      favorites.size,
+    ],
     queryFn: async () => {
       const results: SoundtrackAlbumWithTracks[] = []
-      for (const alb of allAlbums.slice(0, 40)) {
+      for (const alb of allAlbums.slice(0, 80)) {
         const full = await getSoundtrackAlbum(alb.id)
-        if (full) results.push(full)
+        if (full && full.tracks.length > 0) results.push(full)
       }
       return results
     },
     enabled: allAlbums.length > 0,
   })
 
+  // Built-in Curated Masterpiece Catalog + User Library Game OST Matches
+  const curatedCatalog = useMemo(() => getAllCuratedSoundtracks(), [])
+
+  const libraryMatchedAlbums = useMemo(() => {
+    const matched: SoundtrackAlbumWithTracks[] = []
+    const seenIds = new Set<string>()
+
+    for (const g of libraryGames) {
+      if (g.is_hidden) continue
+      const fromDb = dbAlbumsWithTracks.find(
+        (a) =>
+          a.album.game_id === g.id ||
+          a.album.game_id === `igdb_${g.igdb_id}` ||
+          cleanGameTitleFromAlbumTitle(a.album.title).toLowerCase() === g.name.toLowerCase(),
+      )
+      if (fromDb && !seenIds.has(fromDb.album.id)) {
+        seenIds.add(fromDb.album.id)
+        matched.push({
+          album: {
+            ...fromDb.album,
+            game_id: g.id,
+            cover_url: fromDb.album.cover_url || assetUrl(g.cover_path),
+          },
+          tracks: fromDb.tracks,
+        })
+        continue
+      }
+
+      const curated = lookupCuratedSoundtrack({
+        gameId: g.id,
+        title: g.name,
+        releaseYear: g.release_date?.split('-')[0] || null,
+        coverUrl: assetUrl(g.cover_path),
+      })
+      if (curated && !seenIds.has(curated.album.id)) {
+        seenIds.add(curated.album.id)
+        matched.push(curated)
+      }
+    }
+    return matched
+  }, [libraryGames, dbAlbumsWithTracks])
+
+  // Auto-trigger fast parallel online soundtrack search whenever user types 2+ characters!
+  useEffect(() => {
+    if (debouncedSearch.length < 2) {
+      setIsSearchingOnline(false)
+      return
+    }
+
+    let cancelled = false
+    setIsSearchingOnline(true)
+
+    soundtrackResolver
+      .searchOnlineSoundtracksFast(debouncedSearch)
+      .then((found) => {
+        if (cancelled) return
+        if (found && found.length > 0) {
+          setOnlineDiscovered((prev) => {
+            const seenIds = new Set(prev.map((p) => p.album.id))
+            const seenKeys = new Set(prev.map((p) => normalizeGameOstKey(p.album.title)))
+            const fresh = found.filter((f) => {
+              const k = normalizeGameOstKey(f.album.title)
+              if (seenIds.has(f.album.id) || (k && seenKeys.has(k))) return false
+              seenIds.add(f.album.id)
+              if (k) seenKeys.add(k)
+              return true
+            })
+            return [...prev, ...fresh]
+          })
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setIsSearchingOnline(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [debouncedSearch])
+
+  // All known albums & tracks across every source (including right-sidebar savedFavoriteAlbums & savedFavoriteTracks!)
+  const { allKnownAlbumsById, allKnownFullAlbumsById, allKnownTracksById } = useMemo(() => {
+    const albMap = new Map<string, SoundtrackAlbumWithTracks['album']>()
+    const fullAlbMap = new Map<string, SoundtrackAlbumWithTracks>()
+    const trkMap = new Map<
+      string,
+      { track: SoundtrackTrack; album: SoundtrackAlbumWithTracks['album'] }
+    >()
+
+    const registerSource = (list: SoundtrackAlbumWithTracks[]) => {
+      for (const item of list) {
+        if (!item || !item.album || !item.tracks || item.tracks.length === 0) continue
+        const fallbackCover = item.album.cover_url || resolveAlbumCoverFallback(item.album.title)
+        const enrichedAlbum = {
+          ...item.album,
+          cover_url: fallbackCover,
+        }
+        const enrichedFull = {
+          album: enrichedAlbum,
+          tracks: item.tracks,
+        }
+        if (!albMap.has(enrichedAlbum.id)) {
+          albMap.set(enrichedAlbum.id, enrichedAlbum)
+          fullAlbMap.set(enrichedAlbum.id, enrichedFull)
+        }
+        for (const t of item.tracks) {
+          if (!trkMap.has(t.id)) {
+            trkMap.set(t.id, {
+              track: { ...t, album_id: t.album_id || enrichedAlbum.id },
+              album: enrichedAlbum,
+            })
+          }
+        }
+      }
+    }
+
+    // 1. Register direct in-memory/persisted favorites from right-hand sidebar & player first!
+    registerSource(Object.values(savedFavoriteAlbums || {}))
+    for (const [trkId, entry] of Object.entries(savedFavoriteTracks || {})) {
+      if (!entry?.track) continue
+      const alb = entry.album
+        ? {
+            ...entry.album,
+            cover_url:
+              entry.album.cover_url || resolveAlbumCoverFallback(entry.album.title),
+          }
+        : null
+      if (alb && !albMap.has(alb.id)) {
+        albMap.set(alb.id, alb)
+      }
+      if (!trkMap.has(trkId)) {
+        trkMap.set(trkId, {
+          track: { ...entry.track, album_id: entry.track.album_id || alb?.id || '' },
+          album:
+            alb || {
+              id: entry.track.album_id || `fav_alb_${trkId}`,
+              game_id: null,
+              title: entry.track.artist || entry.track.title,
+              album_type: 'original_soundtrack',
+              artist: entry.track.artist || 'Original Game Soundtrack',
+              release_date: null,
+              cover_url: resolveAlbumCoverFallback(entry.track.title),
+              track_count: 1,
+              total_duration_ms: entry.track.duration_ms || 0,
+              provider_id: entry.track.provider_id || 'curated',
+              external_id: null,
+            },
+        })
+      }
+    }
+
+    // 2. Register Curated, Library-Matched, SQLite DB, and Online Discovered
+    registerSource(curatedCatalog)
+    registerSource(libraryMatchedAlbums)
+    registerSource(dbAlbumsWithTracks)
+    registerSource(onlineDiscovered)
+
+    return {
+      allKnownAlbumsById: albMap,
+      allKnownFullAlbumsById: fullAlbMap,
+      allKnownTracksById: trkMap,
+    }
+  }, [
+    savedFavoriteAlbums,
+    savedFavoriteTracks,
+    curatedCatalog,
+    libraryMatchedAlbums,
+    dbAlbumsWithTracks,
+    onlineDiscovered,
+  ])
+
+  // Unified Master Album Catalog for Browse Grids (Preserves existing list order and appends newly discovered albums at the end without duplicates!)
+  const albumsWithTracks = useMemo(() => {
+    const merged: SoundtrackAlbumWithTracks[] = []
+    const seenTitles = new Set<string>()
+    const seenIds = new Set<string>()
+
+    const addUnique = (item: SoundtrackAlbumWithTracks) => {
+      if (!item || !item.album || !item.tracks || item.tracks.length === 0) return
+      const normTitle = normalizeGameOstKey(item.album.title)
+      const exactTitle = cleanGameTitleFromAlbumTitle(item.album.title).toLowerCase().trim()
+      if (seenIds.has(item.album.id)) return
+      if ((normTitle && seenTitles.has(normTitle)) || (exactTitle && seenTitles.has(exactTitle))) {
+        return
+      }
+      seenIds.add(item.album.id)
+      if (normTitle) seenTitles.add(normTitle)
+      if (exactTitle) seenTitles.add(exactTitle)
+      const fallbackCover = item.album.cover_url || resolveAlbumCoverFallback(item.album.title)
+      merged.push({
+        album: {
+          ...item.album,
+          cover_url: fallbackCover,
+        },
+        tracks: item.tracks,
+      })
+    }
+
+    // Keep base catalog stable at the top and append onlineDiscovered at the end!
+    for (const item of libraryMatchedAlbums) addUnique(item)
+    for (const item of curatedCatalog) addUnique(item)
+    for (const item of dbAlbumsWithTracks) addUnique(item)
+    for (const item of Object.values(savedFavoriteAlbums || {})) addUnique(item)
+    for (const item of onlineDiscovered) addUnique(item)
+
+    return merged
+  }, [
+    savedFavoriteAlbums,
+    onlineDiscovered,
+    libraryMatchedAlbums,
+    curatedCatalog,
+    dbAlbumsWithTracks,
+  ])
+
+  const albumsById = allKnownAlbumsById
+  const fullAlbumsById = allKnownFullAlbumsById
+
+  // Combined Favorite IDs set (merges Zustand `favorites` + SQLite `favoriteRows` so nothing is ever missed)
+  const effectiveFavoriteIds = useMemo(() => {
+    const set = new Set<string>(favorites)
+    for (const row of favoriteRows) {
+      if (row.target_id) set.add(row.target_id)
+    }
+    return set
+  }, [favorites, favoriteRows])
+
+  // Dynamic Spotlight Shelf
+  const spotlightShelfAlbums = useMemo(() => {
+    if (albumsWithTracks.length <= 8) return albumsWithTracks
+    const copy = [...albumsWithTracks]
+    if (rotationNonce > 0) {
+      let state = (rotationNonce * 2654435761) >>> 0
+      for (let i = copy.length - 1; i > 0; i--) {
+        state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+        const j = state % (i + 1)
+        ;[copy[i], copy[j]] = [copy[j], copy[i]]
+      }
+    }
+    return copy.slice(0, 12)
+  }, [albumsWithTracks, rotationNonce])
+
+  async function handleSyncLiveFeed() {
+    if (isSyncingLiveFeed) return
+    playButtonClick()
+    setIsSyncingLiveFeed(true)
+    setRotationNonce((n) => n + 1)
+
+    const seed1 =
+      DYNAMIC_DISCOVERY_SEEDS[dynamicSeedIdxRef.current % DYNAMIC_DISCOVERY_SEEDS.length]
+    const seed2 =
+      DYNAMIC_DISCOVERY_SEEDS[(dynamicSeedIdxRef.current + 1) % DYNAMIC_DISCOVERY_SEEDS.length]
+    dynamicSeedIdxRef.current += 2
+
+    try {
+      const [res1, res2] = await Promise.all([
+        soundtrackResolver.searchOnlineSoundtracksFast(seed1, true),
+        soundtrackResolver.searchOnlineSoundtracksFast(seed2, true),
+      ])
+      const combined = [...res1, ...res2]
+      if (combined.length > 0) {
+        setOnlineDiscovered((prev) => {
+          const seen = new Set(combined.map((f) => f.album.id))
+          return [...combined, ...prev.filter((p) => !seen.has(p.album.id))]
+        })
+      }
+      toast.success('Synced live online soundtracks & rotated featured shelves!')
+    } catch {
+      toast.success('Rotated soundtrack discovery shelves!')
+    } finally {
+      setIsSyncingLiveFeed(false)
+    }
+  }
+
+  async function handleLoadMoreSoundtracks() {
+    playButtonClick()
+    if (isLoadingMore) return
+    setIsLoadingMore(true)
+
+    // Snapshot existing album IDs and normalized game keys so we never add duplicates
+    const existingIds = new Set(albumsWithTracks.map((a) => a.album.id))
+    const existingKeys = new Set(
+      albumsWithTracks.map((a) => normalizeGameOstKey(a.album.title)).filter(Boolean),
+    )
+
+    try {
+      const q = searchQuery.trim()
+      const seedsToFetch: string[] = []
+      if (q.length >= 2) {
+        seedsToFetch.push(`${q} Soundtrack`, `${q} OST`, `${q} Original Score`)
+      } else {
+        let attempts = 0
+        while (seedsToFetch.length < 4 && attempts < DYNAMIC_DISCOVERY_SEEDS.length) {
+          const candidate =
+            DYNAMIC_DISCOVERY_SEEDS[dynamicSeedIdxRef.current % DYNAMIC_DISCOVERY_SEEDS.length]
+          dynamicSeedIdxRef.current += 1
+          attempts += 1
+          const candidateKey = normalizeGameOstKey(candidate)
+          if (!existingKeys.has(candidateKey)) {
+            seedsToFetch.push(candidate)
+          }
+        }
+      }
+
+      const results = await Promise.all(
+        seedsToFetch.map((seed) =>
+          soundtrackResolver.searchOnlineSoundtracksFast(seed, true).catch(() => []),
+        ),
+      )
+      const flat = results.flat()
+      let addedCount = 0
+
+      if (flat.length > 0) {
+        setOnlineDiscovered((prev) => {
+          const seenIds = new Set([...existingIds, ...prev.map((p) => p.album.id)])
+          const seenKeys = new Set([
+            ...existingKeys,
+            ...prev.map((p) => normalizeGameOstKey(p.album.title)).filter(Boolean),
+          ])
+          const uniqueNew: SoundtrackAlbumWithTracks[] = []
+
+          for (const item of flat) {
+            if (!item?.album?.id || !item.tracks || item.tracks.length === 0) continue
+            const key = normalizeGameOstKey(item.album.title)
+            if (seenIds.has(item.album.id) || (key && seenKeys.has(key))) continue
+            seenIds.add(item.album.id)
+            if (key) seenKeys.add(key)
+            uniqueNew.push(item)
+          }
+
+          addedCount = uniqueNew.length
+          return uniqueNew.length > 0 ? [...prev, ...uniqueNew] : prev
+        })
+      }
+
+      setVisibleAlbumLimit((prev) => Math.max(prev + 12, filteredAlbums.length + addedCount))
+      if (addedCount > 0) {
+        toast.success(`Added ${addedCount} new game soundtrack(s) to the end of the list!`)
+      }
+    } catch {
+      setVisibleAlbumLimit((prev) => prev + 12)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }
+
   async function handleScan() {
     playButtonClick()
     setIsScanning(true)
-    toast.info('Scanning for local soundtracks...')
+    toast.info('Scanning music folders for local soundtracks...')
     try {
       const found = await scanSoundtrackLibrary()
       toast.success(`Scan completed: found ${found.length} audio tracks`)
@@ -84,9 +974,165 @@ export function SoundtrackCenterPage() {
     }
   }
 
-  // Filtered albums by search
+  async function handleDiscoverOnline() {
+    const q = searchQuery.trim()
+    if (!q || isSearchingOnline) return
+    playButtonClick()
+    setIsSearchingOnline(true)
+    try {
+      const resolved = await soundtrackResolver.searchOnlineSoundtracksFast(q, true)
+      if (resolved && resolved.length > 0) {
+        setOnlineDiscovered((prev) => {
+          const seen = new Set(resolved.map((f) => f.album.id))
+          return [...resolved, ...prev.filter((p) => !seen.has(p.album.id))]
+        })
+        void refetchAlbums()
+        toast.success(`Found ${resolved.length} soundtrack album(s) for "${q}"`)
+        setSelectedAlbum(resolved[0])
+      } else {
+        toast.info(`No verified soundtrack found online for "${q}".`)
+      }
+    } catch {
+      toast.error('Online soundtrack lookup failed.')
+    } finally {
+      setIsSearchingOnline(false)
+    }
+  }
+
+  /**
+   * Live Online Mood Radio Launcher:
+   * Rotates through each station's `onlineSeeds` + user library games on every click,
+   * starts playing a fresh randomized wave immediately, and streams in newly fetched
+   * online tracks from Apple Music / Deezer / KHInsider so Radio never repeats the same playlist!
+   */
+  async function handlePlayMoodStation(station: MoodStation) {
+    playButtonClick()
+    setActiveStationId(station.id)
+    setLoadingStationId(station.id)
+    setRadioWaveGeneration((g) => g + 1)
+
+    // Pick 3 rotating online seeds for this station (advances cursor every click!)
+    const prevCursor = radioSeedCursorRef.current[station.id] ?? Math.floor(Math.random() * station.onlineSeeds.length)
+    const totalSeeds = station.onlineSeeds.length
+    const pickedSeeds: string[] = [
+      station.onlineSeeds[prevCursor % totalSeeds],
+      station.onlineSeeds[(prevCursor + 1) % totalSeeds],
+      station.onlineSeeds[(prevCursor + 2) % totalSeeds],
+    ]
+    radioSeedCursorRef.current[station.id] = (prevCursor + 3) % totalSeeds
+
+    // Also include a random game from the user's Library if available for personalized radio
+    if (libraryGames.length > 0) {
+      const randomLib = libraryGames[Math.floor(Math.random() * libraryGames.length)]
+      if (randomLib?.name && !pickedSeeds.includes(randomLib.name)) {
+        pickedSeeds.push(randomLib.name)
+      }
+    }
+
+    setStationLiveSeeds((prev) => ({ ...prev, [station.id]: pickedSeeds.slice(0, 3) }))
+
+    // 1. Build an instant randomized starter pool across all matching albums (all tracks, not just first 6!)
+    const matchingAlbums =
+      station.keywords.length === 0
+        ? albumsWithTracks
+        : albumsWithTracks.filter((a) => {
+            const hay = `${a.album.title} ${a.album.artist || ''}`.toLowerCase()
+            return station.keywords.some((kw) => hay.includes(kw))
+          })
+
+    const sourceAlbums = matchingAlbums.length > 0 ? matchingAlbums : albumsWithTracks
+    const starterPool: { track: SoundtrackTrack; album: SoundtrackAlbumWithTracks['album'] }[] = []
+
+    for (const alb of sourceAlbums) {
+      const tracksCopy = [...alb.tracks]
+      for (let i = tracksCopy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[tracksCopy[i], tracksCopy[j]] = [tracksCopy[j], tracksCopy[i]]
+      }
+      for (const trk of tracksCopy.slice(0, 4)) {
+        starterPool.push({ track: trk, album: alb.album })
+      }
+    }
+
+    for (let i = starterPool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[starterPool[i], starterPool[j]] = [starterPool[j], starterPool[i]]
+    }
+
+    // 2. Fetch fresh online soundtrack wave in parallel (~400ms)
+    try {
+      const liveWave = await soundtrackResolver.fetchLiveRadioWave(pickedSeeds, 28)
+      if (liveWave.albums.length > 0) {
+        setOnlineDiscovered((prev) => {
+          const seen = new Set(liveWave.albums.map((f) => f.album.id))
+          return [...liveWave.albums, ...prev.filter((p) => !seen.has(p.album.id))]
+        })
+      }
+
+      // Combine live online tracks at the front with shuffled starter tracks (deduplicated)
+      const combinedPool = [...liveWave.tracks, ...starterPool]
+      const seenTrackIds = new Set<string>()
+      const finalWave: { track: SoundtrackTrack; album: SoundtrackAlbumWithTracks['album'] }[] = []
+      for (const item of combinedPool) {
+        if (!seenTrackIds.has(item.track.id)) {
+          seenTrackIds.add(item.track.id)
+          finalWave.push(item)
+        }
+      }
+
+      if (finalWave.length > 0) {
+        // Lightly interleave the top 12 tracks so multiple games play in rotation
+        const topSlice = finalWave.slice(0, 14)
+        for (let i = topSlice.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1))
+          ;[topSlice[i], topSlice[j]] = [topSlice[j], topSlice[i]]
+        }
+        const fullQueue = [...topSlice, ...finalWave.slice(14)].slice(0, 40)
+        const chosen = fullQueue[0]
+        void playTrack(
+          chosen.track,
+          chosen.album,
+          deriveGameIdentityFromAlbum(chosen.album),
+          fullQueue.map((p) => p.track),
+        )
+        toast.success(
+          `Live Radio: "${station.title}" synced (${fullQueue.length} online tracks • ${pickedSeeds.slice(0, 2).join(' & ')})`,
+        )
+      }
+    } catch {
+      if (starterPool.length > 0) {
+        const chosen = starterPool[0]
+        const stationQueue = starterPool.slice(0, 35).map((p) => p.track)
+        void playTrack(
+          chosen.track,
+          chosen.album,
+          deriveGameIdentityFromAlbum(chosen.album),
+          stationQueue,
+        )
+        toast.success(`Started "${station.title}" Radio (${stationQueue.length} tracks)`)
+      }
+    } finally {
+      setLoadingStationId(null)
+    }
+  }
+
+  async function handleInjectFreshRadioWave() {
+    const targetStation =
+      MOOD_STATIONS.find((s) => s.id === activeStationId) ||
+      MOOD_STATIONS[Math.floor(Math.random() * MOOD_STATIONS.length)]
+    await handlePlayMoodStation(targetStation)
+  }
+
+  // Filtered albums by search AND active Vibe filter chip
   const filteredAlbums = useMemo(() => {
     let list = albumsWithTracks
+    const vibeObj = VIBE_FILTERS.find((v) => v.id === activeVibe)
+    if (vibeObj && vibeObj.keywords.length > 0) {
+      list = list.filter((a) => {
+        const hay = `${a.album.title} ${a.album.artist || ''}`.toLowerCase()
+        return vibeObj.keywords.some((kw) => hay.includes(kw))
+      })
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       list = list.filter(
@@ -97,15 +1143,14 @@ export function SoundtrackCenterPage() {
       )
     }
     return list
-  }, [albumsWithTracks, searchQuery])
+  }, [albumsWithTracks, activeVibe, searchQuery])
 
-  // Downloaded / Offline tracks unified from albums, download table, and local file scans
+  // Downloaded / Offline tracks
   const downloadedTracks = useMemo(() => {
     const list: SoundtrackTrack[] = []
     const seenPaths = new Set<string>()
     const seenIds = new Set<string>()
 
-    // 1. Tracks already loaded in albums with local_path
     for (const alb of albumsWithTracks) {
       for (const t of alb.tracks) {
         if (t.local_path && !seenPaths.has(t.local_path)) {
@@ -116,7 +1161,6 @@ export function SoundtrackCenterPage() {
       }
     }
 
-    // 2. Completed download rows from SQLite
     for (const dl of downloadHistory) {
       if (dl.status === 'completed' && dl.save_path && !seenPaths.has(dl.save_path)) {
         seenPaths.add(dl.save_path)
@@ -152,7 +1196,6 @@ export function SoundtrackCenterPage() {
       }
     }
 
-    // 3. Local scanned files
     for (const file of localFiles) {
       if (file.file_path && !seenPaths.has(file.file_path)) {
         seenPaths.add(file.file_path)
@@ -187,163 +1230,528 @@ export function SoundtrackCenterPage() {
     return list
   }, [albumsWithTracks, downloadHistory, localFiles])
 
-  // Favorited tracks reactively linked to favorites Set & SQLite records
+  // Favorited albums (resolved across ALL known albums + savedFavoriteAlbums)
+  const favoritedAlbums = useMemo(() => {
+    const out: SoundtrackAlbumWithTracks[] = []
+    const seen = new Set<string>()
+    for (const [id, fullAlb] of allKnownFullAlbumsById.entries()) {
+      if (effectiveFavoriteIds.has(id) && !seen.has(id)) {
+        seen.add(id)
+        out.push(fullAlb)
+      }
+    }
+    return out
+  }, [allKnownFullAlbumsById, effectiveFavoriteIds])
+
+  // Favorited tracks (resolved across savedFavoriteTracks, allKnownTracksById, downloadedTracks, cur_trk_ slugs, AND tracks from favoritedAlbums!)
   const favoritedTracks = useMemo(() => {
     const list: SoundtrackTrack[] = []
     const seenIds = new Set<string>()
 
-    // Favorited from albumsWithTracks
-    for (const alb of albumsWithTracks) {
-      for (const t of alb.tracks) {
-        if (favorites.has(t.id) && !seenIds.has(t.id)) {
-          seenIds.add(t.id)
-          list.push(t)
-        }
+    // 1. Direct tracks saved when clicking Heart in right-hand sidebar or player
+    for (const [trkId, entry] of Object.entries(savedFavoriteTracks || {})) {
+      if (effectiveFavoriteIds.has(trkId) && entry?.track && !seenIds.has(trkId)) {
+        seenIds.add(trkId)
+        list.push(entry.track)
       }
     }
 
-    // Favorited from downloaded tracks
+    // 2. All known tracks across curated, library, SQLite, and online catalogs
+    for (const [trkId, entry] of allKnownTracksById.entries()) {
+      if (effectiveFavoriteIds.has(trkId) && !seenIds.has(trkId)) {
+        seenIds.add(trkId)
+        list.push(entry.track)
+      }
+    }
+
+    // 3. Downloaded tracks
     for (const t of downloadedTracks) {
-      if (favorites.has(t.id) && !seenIds.has(t.id)) {
+      if (effectiveFavoriteIds.has(t.id) && !seenIds.has(t.id)) {
         seenIds.add(t.id)
         list.push(t)
       }
     }
 
-    // Also include favorite rows from SQLite if not found in loaded albums
-    for (const f of favoriteRows) {
-      if (f.target_type === 'track' && !seenIds.has(f.target_id) && favorites.has(f.target_id)) {
-        seenIds.add(f.target_id)
-        list.push({
-          id: f.target_id,
-          album_id: '',
-          disc_number: 1,
-          track_number: 1,
-          title: 'Favorited Track',
-          artist: 'Soundtrack',
-          duration_ms: 0,
-          preview_url: null,
-          stream_url: null,
-          download_url: null,
-          local_path: null,
-          provider_id: 'soundtrack',
-          external_id: null,
-        })
+    // 4. Reconstruct curated track IDs (`cur_trk_<slug>_<num>`) if needed
+    for (const favId of effectiveFavoriteIds) {
+      if (seenIds.has(favId)) continue
+      if (favId.startsWith('cur_trk_')) {
+        const m = favId.match(/^cur_trk_(.+)_(\d+)$/)
+        if (m) {
+          const slugTitle = m[1].replace(/_/g, ' ')
+          const trkNum = parseInt(m[2], 10)
+          const cur = lookupCuratedSoundtrack({ gameId: `curated_${m[1]}`, title: slugTitle })
+          const foundTrk =
+            cur?.tracks.find((t) => t.track_number === trkNum) || cur?.tracks[trkNum - 1]
+          if (foundTrk) {
+            seenIds.add(favId)
+            list.push(foundTrk)
+          }
+        }
+      }
+    }
+
+    // 5. If user liked an Album from the right-hand sidebar header, also include its top tracks so Favorite Soundtrack Cards are populated and immediately playable!
+    if (list.length === 0 && favoritedAlbums.length > 0) {
+      for (const favAlb of favoritedAlbums) {
+        for (const trk of favAlb.tracks) {
+          if (!seenIds.has(trk.id)) {
+            seenIds.add(trk.id)
+            list.push({ ...trk, album_id: trk.album_id || favAlb.album.id })
+          }
+        }
       }
     }
 
     return list
-  }, [albumsWithTracks, downloadedTracks, favoriteRows, favorites])
+  }, [
+    savedFavoriteTracks,
+    allKnownTracksById,
+    downloadedTracks,
+    effectiveFavoriteIds,
+    favoritedAlbums,
+  ])
 
-  // Favorited albums reactively linked to favorites Set
-  const favoritedAlbums = useMemo(() => {
-    return albumsWithTracks.filter((alb) => favorites.has(alb.album.id))
-  }, [albumsWithTracks, favorites])
+  // Active or Featured Album for the Top Hero Stage
+  const heroAlbum = useMemo(() => {
+    if (currentAlbum) {
+      const found = albumsWithTracks.find((a) => a.album.id === currentAlbum.id)
+      if (found) return found
+    }
+    return spotlightShelfAlbums[0] || albumsWithTracks[0] || null
+  }, [currentAlbum, spotlightShelfAlbums, albumsWithTracks])
 
-  // Featured Hero Album (first album with tracks or current album)
-  const featuredAlbum = useMemo(() => {
-    if (albumsWithTracks.length === 0) return null
-    return albumsWithTracks[0]
-  }, [albumsWithTracks])
+  const isPlaying =
+    Boolean(currentTrack) &&
+    (playbackState === 'playing' ||
+      (playbackState !== 'paused' && playbackState !== 'error' && currentTime > 0))
+
+  const effectiveDuration = useMemo(() => {
+    if (duration > 0) return duration
+    if (currentTrack?.duration_ms && currentTrack.duration_ms > 0) {
+      return currentTrack.duration_ms / 1000
+    }
+    return 0
+  }, [duration, currentTrack?.duration_ms])
+
+  const progressPercent =
+    effectiveDuration > 0 ? Math.min(100, Math.max(0, (currentTime / effectiveDuration) * 100)) : 0
+
+  const heroCoverSrc =
+    assetUrl(currentAlbum?.cover_url) ||
+    assetUrl(currentGame?.coverUrl) ||
+    assetUrl(heroAlbum?.album.cover_url) ||
+    null
+
+  const shelfScrollRef = useRef<HTMLDivElement>(null)
+  function scrollShelf(dir: 'left' | 'right') {
+    if (!shelfScrollRef.current) return
+    shelfScrollRef.current.scrollBy({
+      left: dir === 'left' ? -440 : 440,
+      behavior: 'smooth',
+    })
+  }
+
+  function handleOpenAlbumById(albumId: string) {
+    const found = fullAlbumsById.get(albumId)
+    if (found) setSelectedAlbum(found)
+  }
 
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-bg p-6 lg:p-8 select-none">
-      <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-8">
-        {/* Header Title & Search / Scan Bar */}
-        <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-border/80 pb-6">
-          <div>
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-accent">
-              <Sparkles className="size-3.5" />
-              <span>Cinematic Soundtrack Platform</span>
+      <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-6">
+        {/* ── 1. Game Hub-Style Dynamic Command Header & Instant Live Search ── */}
+        <header className="relative overflow-hidden rounded-3xl border border-border/85 bg-gradient-to-br from-surface-raised/95 via-surface to-surface-raised/80 p-5 sm:p-6 shadow-card">
+          <div className="pointer-events-none absolute -right-20 -top-24 size-80 rounded-full bg-accent/10 blur-3xl" />
+
+          <div className="relative z-10 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative flex size-13 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-gradient-to-br from-accent/25 via-accent/10 to-surface-raised shadow-[0_0_24px_-6px_var(--nx-accent)]">
+                <Disc3 className={cn('size-7 text-accent', isPlaying && 'animate-spin')} />
+                <span className="absolute -right-1 -top-1 flex size-4.5 items-center justify-center rounded-full bg-emerald-500 text-white ring-2 ring-surface">
+                  <Sparkles className="size-2.5 fill-current" />
+                </span>
+              </div>
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/35 bg-accent/15 px-2.5 py-0.5 font-mono text-[10px] font-black uppercase tracking-[0.16em] text-accent">
+                    <Sparkles className="size-3" />
+                    <span>NEXUS AUDIO HUB</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/35 bg-emerald-500/12 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-400">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>{albumsWithTracks.length} Live Scores • Instant CDN</span>
+                  </span>
+                </div>
+                <h1 className="mt-1 text-2xl font-black tracking-tight text-text sm:text-3xl">
+                  Soundtrack &amp; Score Hub
+                </h1>
+              </div>
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-text mt-1">Soundtrack</h1>
-            <p className="text-xs text-muted mt-1">
-              Stream and discover video game original scores and soundtracks.
-            </p>
+
+            {/* Search Input + Live Sync + Visualizer + Scan */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="relative flex-1 sm:w-88">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-accent" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && searchQuery.trim()) {
+                      void handleDiscoverOnline()
+                    }
+                  }}
+                  placeholder="Instant search any game OST, track, or composer..."
+                  className="w-full rounded-2xl border border-border/80 bg-surface pl-10 pr-20 py-2.5 text-xs font-medium text-text placeholder:text-subtle focus:border-accent focus:outline-none transition-all"
+                />
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {isSearchingOnline && (
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-accent/15 px-1.5 py-0.5 font-mono text-[9px] font-bold text-accent">
+                      <Loader2 className="size-3 animate-spin" />
+                      <span>LIVE</span>
+                    </span>
+                  )}
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="rounded-lg p-1 text-subtle hover:bg-surface-raised hover:text-text"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Sync Live OSTs Button */}
+              <button
+                type="button"
+                onClick={() => void handleSyncLiveFeed()}
+                disabled={isSyncingLiveFeed}
+                title="Fetch fresh online soundtracks & rotate discovery shelves"
+                className="flex items-center gap-1.5 rounded-2xl border border-accent/40 bg-accent/15 px-3.5 py-2.5 text-xs font-bold text-accent hover:bg-accent hover:text-white active:scale-95 disabled:opacity-60 transition-all cursor-pointer"
+              >
+                <RefreshCw className={cn('size-3.5', isSyncingLiveFeed && 'animate-spin')} />
+                <span>{isSyncingLiveFeed ? 'Syncing...' : 'Sync Live'}</span>
+              </button>
+
+              {/* Visualizer Mode Switcher */}
+              <div className="hidden 2xl:flex items-center gap-0.5 rounded-2xl border border-border/80 bg-surface p-1">
+                {(
+                  [
+                    { id: 'minimal' as const, label: 'Bars', icon: BarChart3 },
+                    { id: 'reactive' as const, label: 'Wave', icon: Activity },
+                    { id: 'off' as const, label: 'Off', icon: EyeOff },
+                  ]
+                ).map((v) => {
+                  const VIcon = v.icon
+                  const active = visualizerMode === v.id
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => {
+                        playButtonClick()
+                        setVisualizerMode(v.id)
+                      }}
+                      className={cn(
+                        'flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold transition-all cursor-pointer',
+                        active ? 'bg-accent text-white shadow-2xs' : 'text-muted hover:text-text',
+                      )}
+                    >
+                      <VIcon className="size-3" />
+                      <span>{v.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Scan Local Music Folder */}
+              <button
+                type="button"
+                onClick={() => void handleScan()}
+                disabled={isScanning}
+                className="flex items-center gap-2 rounded-2xl border border-border/80 bg-surface px-3.5 py-2.5 text-xs font-semibold text-text hover:border-accent/40 hover:bg-surface-raised active:scale-95 disabled:opacity-50 transition-all shrink-0 cursor-pointer"
+              >
+                <FolderSync className={cn('size-3.5 text-accent', isScanning && 'animate-spin')} />
+                <span>{isScanning ? 'Scanning...' : 'Scan Local'}</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* Search Input */}
-            <div className="relative flex-1 md:w-72">
-              <Search className="size-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search soundtracks, artists, songs..."
-                className="w-full rounded-2xl border border-border/80 bg-surface/80 pl-10 pr-4 py-2 text-xs font-medium text-text placeholder:text-muted/60 focus:border-accent focus:outline-none transition-all"
-              />
-            </div>
-
-            {/* Scan Music Folder */}
-            <button
-              type="button"
-              onClick={handleScan}
-              disabled={isScanning}
-              className="flex items-center gap-2 rounded-2xl border border-border/80 bg-surface px-4 py-2 text-xs font-semibold text-text hover:bg-surface-raised active:scale-95 disabled:opacity-50 transition-all shrink-0"
-            >
-              <FolderSync className={`size-3.5 text-accent ${isScanning ? 'animate-spin' : ''}`} />
-              <span>{isScanning ? 'Scanning...' : 'Scan Music'}</span>
-            </button>
+          {/* ── Quick Vibe & Genre Filter Strip ── */}
+          <div className="relative z-10 mt-4 flex items-center gap-1.5 overflow-x-auto border-t border-border/60 pt-3.5 no-scrollbar">
+            {VIBE_FILTERS.map((vibe) => {
+              const VIcon = vibe.icon
+              const isActive = activeVibe === vibe.id
+              return (
+                <button
+                  key={vibe.id}
+                  type="button"
+                  onClick={() => {
+                    playButtonClick()
+                    setActiveVibe(vibe.id)
+                    if (activeTab !== 'overview') setActiveTab('overview')
+                  }}
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 cursor-pointer',
+                    isActive
+                      ? 'border-accent bg-accent text-white shadow-xs'
+                      : 'border-border/80 bg-surface text-muted hover:border-accent/40 hover:bg-surface-raised hover:text-text',
+                  )}
+                >
+                  <VIcon className="size-3.5" />
+                  <span>{vibe.label}</span>
+                </button>
+              )
+            })}
           </div>
         </header>
 
-        {/* Cinematic Featured Hero */}
-        {featuredAlbum && activeTab === 'overview' && !searchQuery && (
-          <section className="relative overflow-hidden rounded-3xl border border-border/80 bg-surface p-6 sm:p-8 shadow-xl">
-            <div
-              className="pointer-events-none absolute -right-16 -top-16 size-60 rounded-full opacity-25 blur-2xl"
-              style={{
-                background:
-                  'radial-gradient(circle, var(--nx-accent) 0%, rgba(99, 102, 241, 0.4) 50%, transparent 70%)',
-              }}
-            />
+        {/* ── 2. Cinematic Vinyl Hero Console ── */}
+        {heroAlbum && !searchQuery && activeTab === 'overview' && (
+          <section className="relative overflow-hidden rounded-3xl border border-border/85 bg-gradient-to-br from-surface-raised/90 via-surface/95 to-bg p-6 sm:p-7 shadow-card">
+            {heroCoverSrc && (
+              <div
+                className="pointer-events-none absolute -right-12 -top-16 size-80 rounded-full opacity-20 blur-3xl transition-all duration-700"
+                style={{
+                  backgroundImage: `url(${heroCoverSrc})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              />
+            )}
 
-            <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-end gap-6">
-              <div className="size-40 sm:size-48 shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-surface-raised shadow-card">
-                {assetUrl(featuredAlbum.album.cover_url) ? (
-                  <img
-                    src={assetUrl(featuredAlbum.album.cover_url) ?? ''}
-                    alt={featuredAlbum.album.title}
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <div className="flex size-full items-center justify-center bg-accent/10 font-bold text-accent text-3xl">
-                    OST
+            <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div
+                  onClick={() => setSelectedAlbum(heroAlbum)}
+                  className="relative size-40 sm:size-44 shrink-0 cursor-pointer group overflow-hidden rounded-2xl border border-border/90 bg-surface-raised shadow-2xl"
+                >
+                  {heroCoverSrc ? (
+                    <img
+                      src={heroCoverSrc}
+                      alt={heroAlbum.album.title}
+                      className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex size-full items-center justify-center bg-accent/15 text-accent">
+                      <Disc3 className="size-14" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Center: Track / Album Details & Controls */}
+                <div className="flex flex-col min-w-0 text-center sm:text-left">
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/35 bg-accent/15 px-3 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-accent">
+                      <Headphones className="size-3" />
+                      <span>
+                        {currentTrack ? 'Now Playing on Vinyl Stage' : 'Featured Game Score'}
+                      </span>
+                    </span>
+                    <span className="rounded-full border border-border bg-surface-raised px-2.5 py-0.5 font-mono text-[10px] text-muted">
+                      {heroAlbum.tracks.length} Tracks
+                    </span>
                   </div>
-                )}
+
+                  <h2 className="mt-2 text-2xl sm:text-3xl font-black tracking-tight text-text truncate max-w-xl">
+                    {currentTrack ? currentTrack.title : heroAlbum.album.title}
+                  </h2>
+
+                  <p className="mt-1 text-sm font-semibold text-accent">
+                    {currentTrack
+                      ? currentGame?.title ||
+                        (currentAlbum
+                          ? cleanGameTitleFromAlbumTitle(currentAlbum.title)
+                          : heroAlbum.album.title)
+                      : heroAlbum.album.artist || 'Original Game Soundtrack'}
+                  </p>
+
+                  {currentTrack?.artist && (
+                    <p className="mt-0.5 text-xs text-muted">{currentTrack.artist}</p>
+                  )}
+
+                  <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playButtonClick()
+                        if (currentTrack) {
+                          togglePlay()
+                        } else if (heroAlbum.tracks.length > 0) {
+                          void playAlbum(
+                            heroAlbum.album,
+                            heroAlbum.tracks,
+                            0,
+                            deriveGameIdentityFromAlbum(heroAlbum.album),
+                          )
+                        }
+                      }}
+                      className="flex items-center gap-2 rounded-2xl bg-accent px-5 py-2.5 text-xs font-bold text-white shadow-[0_0_16px_var(--nx-accent)] hover:scale-103 active:scale-95 transition-all cursor-pointer"
+                    >
+                      {isPlaying ? (
+                        <>
+                          <Pause className="size-4 fill-current" />
+                          <span>Pause Playback</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="size-4 fill-current translate-x-0.5" />
+                          <span>{currentTrack ? 'Resume Score' : 'Play Full Album'}</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAlbum(heroAlbum)}
+                      className="flex items-center gap-2 rounded-2xl border border-border/80 bg-surface-raised px-4 py-2.5 text-xs font-semibold text-text hover:border-accent/40 hover:bg-accent/10 transition-all cursor-pointer"
+                    >
+                      <ListMusic className="size-4 text-accent" />
+                      <span>Album Tracklist ({heroAlbum.tracks.length})</span>
+                    </button>
+
+                    {currentTrack && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playButtonClick()
+                          setExpanded(true)
+                        }}
+                        className="flex items-center gap-1.5 rounded-2xl border border-accent/35 bg-accent/10 px-4 py-2.5 text-xs font-semibold text-accent hover:bg-accent hover:text-white transition-all cursor-pointer"
+                      >
+                        <Maximize2 className="size-3.5" />
+                        <span>Fullscreen Vinyl Stage</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <div className="flex flex-col min-w-0 flex-1 text-center sm:text-left">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-accent">
-                  Featured Album
-                </span>
-                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-text mt-1 truncate">
-                  {featuredAlbum.album.title}
-                </h2>
-                <p className="text-sm font-medium text-muted mt-1">{featuredAlbum.album.artist}</p>
+              {/* Right: Live Transport Deck & Audio Visualizer */}
+              <div className="flex flex-col justify-between gap-3 rounded-2xl border border-border/80 bg-surface/85 p-4 lg:w-80 shrink-0">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-subtle">
+                    Live Audio Deck
+                  </span>
+                  <AudioVisualizer mode={visualizerMode} className="h-5 w-28" />
+                </div>
 
-                <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-3">
+                <div className="space-y-1.5">
+                  <div
+                    onClick={(e) => {
+                      if (!currentTrack || effectiveDuration <= 0) return
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                      seek(ratio * effectiveDuration)
+                    }}
+                    className="h-2 w-full cursor-pointer overflow-hidden rounded-full bg-surface-raised"
+                  >
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-accent to-cyan-400 transition-all duration-150"
+                      style={{ width: `${Math.max(3, progressPercent)}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between font-mono text-[10px] text-subtle">
+                    <span>{formatSeconds(currentTime)}</span>
+                    <span>{formatSeconds(effectiveDuration)}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border/60 pt-2.5">
                   <button
                     type="button"
                     onClick={() => {
                       playButtonClick()
-                      if (featuredAlbum.tracks.length > 0) {
-                        void playTrack(featuredAlbum.tracks[0], featuredAlbum.album)
-                      }
+                      toggleShuffle()
                     }}
-                    className="flex items-center gap-2 rounded-2xl bg-accent px-5 py-2.5 text-xs font-bold text-white shadow-[0_0_16px_var(--nx-accent)] hover:scale-104 active:scale-95 transition-all"
+                    className={cn(
+                      'rounded-xl p-2 transition-colors cursor-pointer',
+                      shuffle ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text',
+                    )}
+                    title="Shuffle Queue"
                   >
-                    <Play className="size-4 fill-current translate-x-0.5" />
-                    <span>Listen Now</span>
+                    <Shuffle className="size-4" />
                   </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playButtonClick()
+                        void previous()
+                      }}
+                      className="rounded-xl p-2 text-text hover:bg-surface-raised transition-colors cursor-pointer"
+                      title="Previous Track"
+                    >
+                      <SkipBack className="size-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playButtonClick()
+                        if (currentTrack) {
+                          togglePlay()
+                        } else if (heroAlbum.tracks.length > 0) {
+                          void playAlbum(
+                            heroAlbum.album,
+                            heroAlbum.tracks,
+                            0,
+                            deriveGameIdentityFromAlbum(heroAlbum.album),
+                          )
+                        }
+                      }}
+                      className="flex size-9 items-center justify-center rounded-full bg-accent text-white shadow-md hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                    >
+                      {isPlaying ? (
+                        <Pause className="size-4 fill-current" />
+                      ) : (
+                        <Play className="size-4 fill-current translate-x-0.5" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playButtonClick()
+                        void next()
+                      }}
+                      className="rounded-xl p-2 text-text hover:bg-surface-raised transition-colors cursor-pointer"
+                      title="Next Track"
+                    >
+                      <SkipForward className="size-4" />
+                    </button>
+                  </div>
 
                   <button
                     type="button"
-                    onClick={() => setSelectedAlbum(featuredAlbum)}
-                    className="flex items-center gap-2 rounded-2xl border border-border/80 bg-surface-raised px-4 py-2.5 text-xs font-bold text-text hover:border-accent/40 hover:bg-accent/10 transition-all"
+                    onClick={() => {
+                      if (!currentTrack) return
+                      playButtonClick()
+                      void toggleFavorite('track', currentTrack.id, {
+                        track: currentTrack,
+                        album: currentAlbum,
+                        tracks: queue,
+                      })
+                    }}
+                    className={cn(
+                      'rounded-xl p-2 transition-colors cursor-pointer',
+                      currentTrack && effectiveFavoriteIds.has(currentTrack.id)
+                        ? 'text-rose-500'
+                        : 'text-muted hover:text-rose-500',
+                    )}
+                    title="Favorite Track"
                   >
-                    <span>View Tracklist ({featuredAlbum.tracks.length})</span>
+                    <Heart
+                      className={cn(
+                        'size-4',
+                        currentTrack &&
+                          effectiveFavoriteIds.has(currentTrack.id) &&
+                          'fill-current',
+                      )}
+                    />
                   </button>
                 </div>
               </div>
@@ -351,19 +1759,38 @@ export function SoundtrackCenterPage() {
           </section>
         )}
 
-        {/* Navigation Tabs */}
-        <nav className="flex items-center gap-2 border-b border-border/60 pb-3 overflow-x-auto">
-          {[
-            { id: 'overview', label: 'Overview', icon: Music },
-            { id: 'games', label: 'Library Games', icon: Sparkles },
-            { id: 'favorites', label: `Favorites (${favoritedTracks.length})`, icon: Heart },
-            {
-              id: 'downloaded',
-              label: `Local / Offline (${downloadedTracks.length})`,
-              icon: HardDrive,
-            },
-            { id: 'all', label: `All Albums (${allAlbums.length})`, icon: Music },
-          ].map((tab) => {
+        {/* ── 3. Spring-Morphing Navigation Tabs ───────────────────────────── */}
+        <nav className="flex items-center gap-1.5 overflow-x-auto border-b border-border/60 pb-3 no-scrollbar">
+          {(
+            [
+              { id: 'overview' as const, label: 'Discover & Featured', icon: Sparkles },
+              {
+                id: 'radios' as const,
+                label: 'Live Online Radios (6)',
+                icon: Radio,
+              },
+              {
+                id: 'games' as const,
+                label: `My Library OSTs (${libraryMatchedAlbums.length})`,
+                icon: Gamepad2,
+              },
+              {
+                id: 'favorites' as const,
+                label: `Favorites (${favoritedAlbums.length + favoritedTracks.length})`,
+                icon: Heart,
+              },
+              {
+                id: 'queue' as const,
+                label: `Live Queue (${queue.length})`,
+                icon: ListMusic,
+              },
+              {
+                id: 'downloaded' as const,
+                label: `Local / Offline (${downloadedTracks.length})`,
+                icon: HardDrive,
+              },
+            ]
+          ).map((tab) => {
             const Icon = tab.icon
             const active = activeTab === tab.id
             return (
@@ -371,106 +1798,240 @@ export function SoundtrackCenterPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => {
+                  if (activeTab === tab.id) return
                   playButtonClick()
-                  setActiveTab(tab.id as CenterTab)
+                  setActiveTab(tab.id)
                 }}
-                className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition-all shrink-0 ${
-                  active
-                    ? 'border border-accent/40 bg-accent/15 text-accent shadow-sm'
-                    : 'text-muted hover:bg-surface-raised hover:text-text'
-                }`}
+                className={cn(
+                  'relative flex shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-4 py-2 text-xs font-semibold transition-colors duration-200 select-none',
+                  active ? 'text-white' : 'text-muted hover:bg-surface-raised hover:text-text',
+                )}
               >
-                <Icon className="size-3.5" />
-                <span>{tab.label}</span>
+                {active && (
+                  <motion.span
+                    layoutId="soundtrack-center-tab-pill"
+                    transition={{ type: 'spring', stiffness: 420, damping: 32, mass: 0.75 }}
+                    className="absolute inset-0 rounded-2xl bg-accent shadow-sm shadow-accent/30"
+                  />
+                )}
+                <Icon className="relative z-10 size-3.5" />
+                <span className="relative z-10">{tab.label}</span>
               </button>
             )
           })}
         </nav>
 
-        {/* Tab 1: Overview / Albums Grid */}
-        {activeTab === 'overview' && (
-          <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-text">Discovered Albums</h3>
-              <span className="text-xs text-muted">{filteredAlbums.length} albums</span>
-            </div>
+        {/* ── 4. Animated Tab Stage ────────────────────────────────────────── */}
+        <AnimatePresence mode="wait" initial={false}>
+          {/* TAB 1: OVERVIEW */}
+          {activeTab === 'overview' && (
+            <motion.div
+              key="ost-tab-overview"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 * speed, ease: 'easeOut' }}
+              className="flex flex-col gap-7"
+            >
+              {/* Game Hub-Style Horizontal Spotlight Shelf */}
+              {!searchQuery && activeVibe === 'all' && spotlightShelfAlbums.length > 0 && (
+                <section className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Flame className="size-4 text-amber-400" />
+                        <h3 className="text-base font-bold text-text">
+                          Spotlight Masterpiece Scores
+                        </h3>
+                        <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-[10px] font-bold text-accent">
+                          Live Shelf
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted">
+                        Rotated selection of acclaimed video game soundtracks — click any sleeve to
+                        inspect or play
+                      </p>
+                    </div>
 
-            {filteredAlbums.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/80 bg-surface/40 p-12 text-center">
-                <Music className="size-12 text-muted/40 mb-3" />
-                <h4 className="text-sm font-bold text-text">No soundtracks in catalog yet</h4>
-                <p className="mt-1 text-xs text-muted max-w-sm">
-                  Open any game in Game Hub or your Library to discover its original soundtrack, or
-                  scan your music folder.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleScan}
-                  className="mt-4 rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-md"
-                >
-                  Scan Music Folder
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {filteredAlbums.map((item) => (
-                  <AlbumCard
-                    key={item.album.id}
-                    albumWithTracks={item}
-                    onOpenDetails={setSelectedAlbum}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playButtonClick()
+                          setRotationNonce((n) => n + 1)
+                          shelfScrollRef.current?.scrollTo({ left: 0, behavior: 'smooth' })
+                        }}
+                        title="Shuffle spotlight shelf"
+                        className="flex size-8 items-center justify-center rounded-xl border border-border bg-surface text-muted hover:border-accent/40 hover:text-accent cursor-pointer"
+                      >
+                        <Shuffle className="size-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => scrollShelf('left')}
+                        className="flex size-8 items-center justify-center rounded-xl border border-border bg-surface text-muted hover:border-accent/40 hover:text-text cursor-pointer"
+                      >
+                        <ChevronLeft className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => scrollShelf('right')}
+                        className="flex size-8 items-center justify-center rounded-xl border border-border bg-surface text-muted hover:border-accent/40 hover:text-text cursor-pointer"
+                      >
+                        <ChevronRight className="size-4" />
+                      </button>
+                    </div>
+                  </div>
 
-        {/* Tab 2: Library Games */}
-        {activeTab === 'games' && (
-          <div className="flex flex-col gap-4">
-            <h3 className="text-base font-bold text-text">Soundtracks from your Installed Games</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {filteredAlbums
-                .filter((a) => a.album.game_id)
-                .map((item) => (
-                  <AlbumCard
-                    key={item.album.id}
-                    albumWithTracks={item}
-                    onOpenDetails={setSelectedAlbum}
-                  />
-                ))}
-            </div>
-          </div>
-        )}
+                  <div
+                    ref={shelfScrollRef}
+                    className="flex items-stretch gap-4 overflow-x-auto pb-2 pt-1 no-scrollbar"
+                  >
+                    {spotlightShelfAlbums.map((item) => (
+                      <div key={`spot-${item.album.id}`} className="w-52 shrink-0">
+                        <AlbumCard
+                          albumWithTracks={item}
+                          onOpenDetails={setSelectedAlbum}
+                          className="h-full"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
-        {/* Tab 3: Favorites */}
-        {activeTab === 'favorites' && (
-          <div className="flex flex-col gap-6">
-            {favoritedAlbums.length === 0 && favoritedTracks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/80 bg-surface/40 p-12 text-center">
-                <Heart className="size-10 text-muted/40 mb-2" />
-                <h4 className="text-sm font-bold text-text">No favorites yet</h4>
-                <p className="mt-1 text-xs text-muted max-w-sm">
-                  Click the heart icon on any album or track to save them to your favorites for
-                  instant access.
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Favorited Albums */}
-                {favoritedAlbums.length > 0 && (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-bold text-text flex items-center gap-2">
-                        <Heart className="size-4 fill-rose-500 text-rose-500" />
-                        <span>Favorite Albums</span>
+              {/* Quick Mood & Atmosphere Radio Strip */}
+              {!searchQuery && activeVibe === 'all' && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Radio className="size-4 text-accent" />
+                      <h3 className="text-base font-bold text-text">
+                        1-Click Live Online Mood Radios
                       </h3>
-                      <span className="text-xs text-muted font-mono">
-                        {favoritedAlbums.length} albums
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2 py-0.5 font-mono text-[9.5px] font-bold text-emerald-400">
+                        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>DYNAMIC ONLINE STREAM</span>
                       </span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('radios')}
+                      className="text-xs font-semibold text-accent hover:underline cursor-pointer"
+                    >
+                      View All 6 Live Stations →
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {MOOD_STATIONS.slice(0, 3).map((station) => {
+                      const StIcon = station.icon
+                      const isStationLoading = loadingStationId === station.id
+                      const isStationActive = activeStationId === station.id
+                      return (
+                        <button
+                          key={station.id}
+                          type="button"
+                          onClick={() => void handlePlayMoodStation(station)}
+                          className={cn(
+                            'group relative flex items-start justify-between gap-3 overflow-hidden rounded-2xl border bg-gradient-to-br p-4 text-left shadow-xs transition-all hover:border-accent/50 hover:shadow-md cursor-pointer',
+                            isStationActive ? 'border-accent ring-1 ring-accent/35' : 'border-border/80',
+                            station.gradient,
+                          )}
+                        >
+                          <div className="space-y-1.5">
+                            <span
+                              className={cn(
+                                'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-mono text-[9.5px] font-bold uppercase tracking-wider',
+                                station.accentText,
+                              )}
+                            >
+                              <StIcon className="size-3" />
+                              <span>{station.badge}</span>
+                            </span>
+                            <div className="text-sm font-bold text-text group-hover:text-accent transition-colors">
+                              {station.title}
+                            </div>
+                            <p className="line-clamp-2 text-xs text-muted leading-relaxed">
+                              {station.subtitle}
+                            </p>
+                          </div>
+
+                          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent text-white shadow-md transition-transform group-hover:scale-110">
+                            {isStationLoading ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Play className="size-4 fill-current translate-x-0.5" />
+                            )}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Albums Catalog Grid */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Music className="size-4 text-accent" />
+                    <h3 className="text-base font-bold text-text">
+                      {searchQuery
+                        ? `Soundtrack Results for “${searchQuery}” (${filteredAlbums.length})`
+                        : activeVibe !== 'all'
+                          ? `${VIBE_FILTERS.find((v) => v.id === activeVibe)?.label} (${filteredAlbums.length})`
+                          : 'Complete Video Game Soundtrack Catalog'}
+                    </h3>
+                    {isSearchingOnline && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-2.5 py-0.5 font-mono text-[10px] font-bold text-accent">
+                        <Loader2 className="size-3 animate-spin" />
+                        <span>Streaming Online Results...</span>
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-mono text-xs text-muted">
+                    {filteredAlbums.length} Albums
+                  </span>
+                </div>
+
+                {filteredAlbums.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-3xl border border-border/80 bg-surface/40 p-12 text-center">
+                    {isSearchingOnline ? (
+                      <>
+                        <Loader2 className="size-10 text-accent animate-spin mb-3" />
+                        <h4 className="text-sm font-bold text-text">
+                          Fetching &ldquo;{searchQuery}&rdquo; Soundtrack Online...
+                        </h4>
+                        <p className="mt-1 text-xs text-muted max-w-sm">
+                          Querying Apple Music CDN, KHInsider, and YouTube in parallel...
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <Music className="size-12 text-muted/40 mb-3" />
+                        <h4 className="text-sm font-bold text-text">
+                          No match yet for &ldquo;{searchQuery}&rdquo;
+                        </h4>
+                        <p className="mt-1 text-xs text-muted max-w-sm">
+                          Click below to run a deep search across Apple Music CDN, KHInsider, and
+                          YouTube OST archives.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => void handleDiscoverOnline()}
+                          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-bold text-white shadow-md cursor-pointer"
+                        >
+                          <Globe className="size-3.5" />
+                          <span>Search &ldquo;{searchQuery}&rdquo; OST Online</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                      {favoritedAlbums.map((item) => (
+                      {filteredAlbums.slice(0, visibleAlbumLimit).map((item) => (
                         <AlbumCard
                           key={item.album.id}
                           albumWithTracks={item}
@@ -478,64 +2039,585 @@ export function SoundtrackCenterPage() {
                         />
                       ))}
                     </div>
-                  </div>
-                )}
 
-                {/* Favorited Tracks */}
-                {favoritedTracks.length > 0 && (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-bold text-text flex items-center gap-2">
-                        <Music className="size-4 text-accent" />
-                        <span>Favorite Tracks</span>
-                      </h3>
-                      <span className="text-xs text-muted font-mono">
-                        {favoritedTracks.length} tracks
+                    {/* Bottom "More" Pagination & Online Discovery Button */}
+                    <div className="mt-6 flex flex-col items-center justify-center gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleLoadMoreSoundtracks()}
+                        disabled={isLoadingMore}
+                        className="group inline-flex items-center gap-2.5 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/15 via-surface-raised to-accent/15 px-7 py-3 text-xs font-extrabold text-text shadow-md transition-all hover:border-accent hover:bg-accent hover:text-white active:scale-95 disabled:opacity-60 cursor-pointer"
+                      >
+                        {isLoadingMore ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin text-accent group-hover:text-white" />
+                            <span>Loading More Soundtracks...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="size-4 text-accent group-hover:text-white transition-colors" />
+                            <span>
+                              {visibleAlbumLimit < filteredAlbums.length
+                                ? `More Soundtracks (${filteredAlbums.length - visibleAlbumLimit} Remaining + Online)`
+                                : 'More Soundtracks (Discover Online)'}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                      <span className="font-mono text-[10px] text-subtle">
+                        Showing {Math.min(visibleAlbumLimit, filteredAlbums.length)} of {filteredAlbums.length} loaded albums
                       </span>
                     </div>
-                    <div className="flex flex-col gap-1 rounded-2xl border border-border/80 bg-surface/60 p-2">
-                      {favoritedTracks.map((t, idx) => (
-                        <TrackRow key={t.id} track={t} index={idx} allTracks={favoritedTracks} />
-                      ))}
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB 2: LIVE ONLINE MOOD RADIOS */}
+          {activeTab === 'radios' && (
+            <motion.div
+              key="ost-tab-radios"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 * speed, ease: 'easeOut' }}
+              className="flex flex-col gap-5"
+            >
+              {/* Live Online Radio Tuner Header */}
+              <div className="relative overflow-hidden rounded-3xl border border-accent/35 bg-gradient-to-br from-accent/15 via-surface-raised/90 to-surface p-6 shadow-card">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent/20 text-accent shadow-[0_0_24px_var(--nx-accent)]">
+                      <Radio className="size-7 animate-pulse" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 font-mono text-[9.5px] font-black uppercase tracking-wider text-emerald-400">
+                          <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
+                          <span>ONLINE STREAMING TUNER • WAVE #{radioWaveGeneration}</span>
+                        </span>
+                      </div>
+                      <h3 className="mt-1 text-xl font-black text-text">
+                        24/7 Live Dynamic Game Soundtrack Radios
+                      </h3>
+                      <p className="mt-0.5 text-xs text-muted">
+                        Every station dynamically fetches fresh online tracks from Apple Music,
+                        Deezer &amp; KHInsider on each wave — never repeating the same playlist.
+                      </p>
                     </div>
                   </div>
+
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => void handleInjectFreshRadioWave()}
+                      disabled={Boolean(loadingStationId)}
+                      className="flex items-center gap-2 rounded-2xl bg-accent px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-accent-hover active:scale-95 disabled:opacity-60 transition-all cursor-pointer"
+                    >
+                      <RefreshCw
+                        className={cn('size-3.5', Boolean(loadingStationId) && 'animate-spin')}
+                      />
+                      <span>
+                        {loadingStationId ? 'Fetching Online Wave...' : 'Stream Fresh Online Wave'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {MOOD_STATIONS.map((station) => {
+                  const StIcon = station.icon
+                  const isStationActive = activeStationId === station.id
+                  const isStationLoading = loadingStationId === station.id
+                  const currentSeeds =
+                    stationLiveSeeds[station.id] || station.onlineSeeds.slice(0, 3)
+
+                  return (
+                    <div
+                      key={station.id}
+                      className={cn(
+                        'flex flex-col justify-between gap-4 rounded-3xl border bg-gradient-to-br p-6 shadow-sm transition-all',
+                        isStationActive
+                          ? 'border-accent ring-2 ring-accent/30 shadow-lg'
+                          : 'border-border/80 hover:border-accent/40',
+                        station.gradient,
+                      )}
+                    >
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-wider',
+                              station.accentText,
+                            )}
+                          >
+                            <StIcon className="size-3.5" />
+                            <span>{station.badge}</span>
+                          </span>
+                          {isStationActive ? (
+                            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 font-mono text-[9.5px] font-bold text-emerald-400">
+                              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                              <span>ON AIR</span>
+                            </span>
+                          ) : (
+                            <Radio className="size-4 text-subtle" />
+                          )}
+                        </div>
+                        <h3 className="text-lg font-bold text-text">{station.title}</h3>
+                        <p className="text-xs text-muted leading-relaxed">{station.subtitle}</p>
+
+                        {/* Live Rotating Online Seeds Preview */}
+                        <div className="pt-1 flex flex-wrap items-center gap-1.5">
+                          <span className="font-mono text-[9.5px] font-bold uppercase text-subtle">
+                            Live Seeds:
+                          </span>
+                          {currentSeeds.map((seed) => (
+                            <span
+                              key={seed}
+                              className="rounded-md border border-border/70 bg-surface/75 px-2 py-0.5 text-[10px] font-semibold text-text/85"
+                            >
+                              {seed}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void handlePlayMoodStation(station)}
+                          disabled={isStationLoading}
+                          className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-accent py-2.5 text-xs font-bold text-white shadow-md hover:bg-accent-hover active:scale-98 disabled:opacity-60 transition-all cursor-pointer"
+                        >
+                          {isStationLoading ? (
+                            <>
+                              <Loader2 className="size-3.5 animate-spin" />
+                              <span>Syncing Live Stream...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Play className="size-3.5 fill-current translate-x-0.5" />
+                              <span>
+                                {isStationActive ? 'Fetch Next Online Wave' : 'Start Live Radio'}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </motion.div>
+          )}
+
+          {/* TAB 3: LIBRARY GAMES */}
+          {activeTab === 'games' && (
+            <motion.div
+              key="ost-tab-games"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 * speed, ease: 'easeOut' }}
+              className="flex flex-col gap-4"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-text">
+                  Soundtracks Matched to Your Library &amp; Wishlist
+                </h3>
+                <span className="font-mono text-xs text-muted">
+                  {libraryMatchedAlbums.length} Games
+                </span>
+              </div>
+
+              {libraryMatchedAlbums.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-3xl border border-border/80 bg-surface/40 p-12 text-center">
+                  <Gamepad2 className="size-10 text-muted/40 mb-2" />
+                  <h4 className="text-sm font-bold text-text">No library games matched yet</h4>
+                  <p className="mt-1 text-xs text-muted max-w-sm">
+                    Add games from Game Hub or open any game in your Library sidebar to sync its
+                    official soundtrack.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {libraryMatchedAlbums.slice(0, visibleAlbumLimit).map((item) => (
+                      <AlbumCard
+                        key={item.album.id}
+                        albumWithTracks={item}
+                        onOpenDetails={setSelectedAlbum}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-6 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => void handleLoadMoreSoundtracks()}
+                      disabled={isLoadingMore}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-accent/40 bg-surface-raised px-6 py-2.5 text-xs font-extrabold text-text shadow-sm transition-all hover:border-accent hover:bg-accent hover:text-white active:scale-95 cursor-pointer"
+                    >
+                      {isLoadingMore ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-3.5 text-accent" />
+                      )}
+                      <span>More Soundtracks</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          )}
+
+          {/* ── TAB 4: FAVORITES ── */}
+          {activeTab === 'favorites' && (
+            <motion.div
+              key="ost-tab-favorites"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 * speed, ease: 'easeOut' }}
+              className="flex flex-col gap-6"
+            >
+              {/* Favorites Hero Header Card */}
+              <div className="relative overflow-hidden rounded-3xl border border-rose-500/30 bg-gradient-to-br from-rose-500/12 via-surface-raised/90 to-surface p-6 shadow-card">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-rose-500/40 bg-rose-500/20 text-rose-400 shadow-[0_0_24px_rgba(244,63,94,0.3)]">
+                      <Heart className="size-7 fill-current" />
+                    </div>
+                    <div>
+                      <div className="font-mono text-[10px] font-black uppercase tracking-[0.2em] text-rose-400">
+                        Personal Masterpiece Vault
+                      </div>
+                      <h3 className="text-xl font-black text-text">
+                        Favorite Albums &amp; Tracks
+                      </h3>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {favoritedAlbums.length} Favorite Albums • {favoritedTracks.length} Favorite
+                        Tracks
+                      </p>
+                    </div>
+                  </div>
+
+                  {favoritedTracks.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playButtonClick()
+                          const first = favoritedTracks[0]
+                          const alb = albumsById.get(first.album_id) ?? null
+                          void playTrack(
+                            first,
+                            alb,
+                            deriveGameIdentityFromAlbum(alb),
+                            favoritedTracks,
+                          )
+                        }}
+                        className="flex items-center gap-2 rounded-2xl bg-rose-500 px-4 py-2.5 text-xs font-bold text-white shadow-md hover:bg-rose-400 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <Play className="size-3.5 fill-current translate-x-0.5" />
+                        <span>Play All Favorites</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playButtonClick()
+                          const copy = [...favoritedTracks]
+                          for (let i = copy.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1))
+                            ;[copy[i], copy[j]] = [copy[j], copy[i]]
+                          }
+                          const first = copy[0]
+                          const alb = albumsById.get(first.album_id) ?? null
+                          void playTrack(first, alb, deriveGameIdentityFromAlbum(alb), copy)
+                        }}
+                        className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-2.5 text-xs font-bold text-text hover:border-rose-500/40 hover:text-rose-400 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <Shuffle className="size-3.5" />
+                        <span>Shuffle Favorites</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {favoritedAlbums.length === 0 && favoritedTracks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-3xl border border-border/80 bg-surface/40 p-12 text-center">
+                  <Heart className="size-10 text-muted/40 mb-2" />
+                  <h4 className="text-sm font-bold text-text">No favorites saved yet</h4>
+                  <p className="mt-1 text-xs text-muted max-w-sm">
+                    Click the heart icon on any soundtrack album or track (including in the right
+                    game details sidebar) to build your personal collection.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {favoritedAlbums.length > 0 && (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-base font-bold text-text flex items-center gap-2">
+                          <Disc3 className="size-4 text-rose-400" />
+                          <span>Saved Soundtrack Albums ({favoritedAlbums.length})</span>
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                        {favoritedAlbums.map((item) => (
+                          <AlbumCard
+                            key={item.album.id}
+                            albumWithTracks={item}
+                            onOpenDetails={setSelectedAlbum}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {favoritedTracks.length > 0 && (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-base font-bold text-text flex items-center gap-2">
+                          <Music className="size-4 text-accent" />
+                          <span>Favorite Soundtrack Cards ({favoritedTracks.length})</span>
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 2xl:grid-cols-3">
+                        {favoritedTracks.map((t, idx) => {
+                          const resolvedAlb =
+                            albumsById.get(t.album_id) ??
+                            savedFavoriteTracks?.[t.id]?.album ??
+                            null
+                          return (
+                            <TrackRow
+                              key={t.id}
+                              track={t}
+                              album={resolvedAlb}
+                              game={deriveGameIdentityFromAlbum(resolvedAlb)}
+                              index={idx}
+                              allTracks={favoritedTracks}
+                              variant="card"
+                              badgeType="favorite"
+                              onOpenAlbum={handleOpenAlbumById}
+                            />
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </motion.div>
+          )}
+
+          {/* ── TAB 5: LIVE QUEUE ── */}
+          {activeTab === 'queue' && (
+            <motion.div
+              key="ost-tab-queue"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 * speed, ease: 'easeOut' }}
+              className="flex flex-col gap-5"
+            >
+              <div className="relative overflow-hidden rounded-3xl border border-accent/30 bg-gradient-to-br from-accent/12 via-surface-raised/90 to-surface p-6 shadow-card">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-accent/40 bg-accent/20 text-accent shadow-[0_0_24px_var(--nx-accent)]">
+                      <ListMusic className="size-7" />
+                    </div>
+                    <div>
+                      <div className="font-mono text-[10px] font-black uppercase tracking-[0.2em] text-accent">
+                        Live Playback Stream
+                      </div>
+                      <h3 className="text-xl font-black text-text">
+                        Active Soundtrack Queue ({queue.length} Tracks)
+                      </h3>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {currentTrack
+                          ? `Currently playing: ${currentTrack.title}`
+                          : 'Select any track below to jump immediately'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {queue.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playButtonClick()
+                          toggleShuffle()
+                        }}
+                        className={cn(
+                          'flex items-center gap-2 rounded-2xl border px-4 py-2.5 text-xs font-bold transition-all cursor-pointer',
+                          shuffle
+                            ? 'border-accent bg-accent text-white shadow-md'
+                            : 'border-border bg-surface text-text hover:border-accent/40',
+                        )}
+                      >
+                        <Shuffle className="size-3.5" />
+                        <span>{shuffle ? 'Shuffle On' : 'Shuffle Queue'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playButtonClick()
+                          clearQueue()
+                        }}
+                        className="flex items-center gap-1.5 rounded-2xl border border-rose-500/35 bg-rose-500/10 px-4 py-2.5 text-xs font-bold text-rose-400 hover:bg-rose-500/20 cursor-pointer"
+                      >
+                        <Trash2 className="size-3.5" />
+                        <span>Clear Queue</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {queue.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-3xl border border-border/80 bg-surface/40 p-12 text-center">
+                  <History className="size-10 text-muted/40 mb-2" />
+                  <h4 className="text-sm font-bold text-text">Playback queue is empty</h4>
+                  <p className="mt-1 text-xs text-muted max-w-sm">
+                    Start any album or Live Mood Radio station to populate your live queue.
+                  </p>
+                </div>
+              ) : (
+                <>
+                <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 2xl:grid-cols-3">
+                  {queue.slice(0, visibleTrackLimit).map((t, idx) => {
+                    const resolvedAlb = albumsById.get(t.album_id) ?? currentAlbum
+                    return (
+                      <TrackRow
+                        key={`${t.id}_${idx}`}
+                        track={t}
+                        album={resolvedAlb}
+                        game={deriveGameIdentityFromAlbum(resolvedAlb)}
+                        index={idx}
+                        allTracks={queue}
+                        variant="card"
+                        badgeType="queue"
+                        onOpenAlbum={handleOpenAlbumById}
+                      />
+                    )
+                  })}
+                </div>
+                {queue.length > visibleTrackLimit && (
+                  <div className="mt-4 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleTrackLimit((prev) => prev + 18)}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-accent/40 bg-surface-raised px-6 py-2.5 text-xs font-extrabold text-text shadow-sm transition-all hover:border-accent hover:bg-accent hover:text-white active:scale-95 cursor-pointer"
+                    >
+                      <Sparkles className="size-3.5 text-accent" />
+                      <span>More Tracks ({queue.length - visibleTrackLimit} more)</span>
+                    </button>
+                  </div>
                 )}
-              </>
-            )}
-          </div>
-        )}
+                </>
+              )}
+            </motion.div>
+          )}
 
-        {/* Tab 4: Local / Offline */}
-        {activeTab === 'downloaded' && (
-          <div className="flex flex-col gap-4">
-            <h3 className="text-base font-bold text-text">Local & Offline Soundtracks</h3>
-            {downloadedTracks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-3xl border border-border/80 bg-surface/40 p-12 text-center">
-                <HardDrive className="size-10 text-muted/40 mb-2" />
-                <p className="text-xs text-muted">No local offline tracks found.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1 rounded-2xl border border-border/80 bg-surface/60 p-2">
-                {downloadedTracks.map((t, idx) => (
-                  <TrackRow key={t.id} track={t} index={idx} allTracks={downloadedTracks} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          {/* ── TAB 6: LOCAL / OFFLINE ── */}
+          {activeTab === 'downloaded' && (
+            <motion.div
+              key="ost-tab-downloaded"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.2 * speed, ease: 'easeOut' }}
+              className="flex flex-col gap-5"
+            >
+              <div className="relative overflow-hidden rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/12 via-surface-raised/90 to-surface p-6 shadow-card">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-emerald-500/40 bg-emerald-500/20 text-emerald-400 shadow-[0_0_24px_rgba(16,185,129,0.3)]">
+                      <HardDrive className="size-7" />
+                    </div>
+                    <div>
+                      <div className="font-mono text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">
+                        Zero-Latency Offline Storage
+                      </div>
+                      <h3 className="text-xl font-black text-text">
+                        Local &amp; Downloaded Soundtracks ({downloadedTracks.length})
+                      </h3>
+                      <p className="mt-0.5 text-xs text-muted">
+                        Direct disk playback for FLAC, MP3, WAV &amp; M4A game soundtracks
+                      </p>
+                    </div>
+                  </div>
 
-        {/* Tab 5: All Albums */}
-        {activeTab === 'all' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {filteredAlbums.map((item) => (
-              <AlbumCard
-                key={item.album.id}
-                albumWithTracks={item}
-                onOpenDetails={setSelectedAlbum}
-              />
-            ))}
-          </div>
-        )}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {downloadedTracks.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playButtonClick()
+                          const first = downloadedTracks[0]
+                          const alb = albumsById.get(first.album_id) ?? null
+                          void playTrack(
+                            first,
+                            alb,
+                            deriveGameIdentityFromAlbum(alb),
+                            downloadedTracks,
+                          )
+                        }}
+                        className="flex items-center gap-2 rounded-2xl bg-emerald-500 px-4 py-2.5 text-xs font-bold text-black shadow-md hover:bg-emerald-400 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <Play className="size-3.5 fill-current translate-x-0.5" />
+                        <span>Play All Local</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => void handleScan()}
+                      disabled={isScanning}
+                      className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-4 py-2.5 text-xs font-bold text-text hover:border-emerald-500/40 hover:text-emerald-400 cursor-pointer"
+                    >
+                      <FolderSync className={cn('size-3.5', isScanning && 'animate-spin')} />
+                      <span>{isScanning ? 'Scanning Disk...' : 'Scan Music Folder'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {downloadedTracks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-3xl border border-border/80 bg-surface/40 p-12 text-center">
+                  <HardDrive className="size-10 text-muted/40 mb-2" />
+                  <h4 className="text-sm font-bold text-text">No local audio tracks indexed yet</h4>
+                  <p className="mt-1 text-xs text-muted max-w-sm">
+                    Click &ldquo;Scan Music Folder&rdquo; above or download tracks from any album to
+                    listen offline with zero latency.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 2xl:grid-cols-3">
+                  {downloadedTracks.map((t, idx) => (
+                    <TrackRow
+                      key={t.id}
+                      track={t}
+                      album={albumsById.get(t.album_id) ?? null}
+                      game={deriveGameIdentityFromAlbum(albumsById.get(t.album_id))}
+                      index={idx}
+                      allTracks={downloadedTracks}
+                      variant="card"
+                      badgeType="local"
+                      onOpenAlbum={handleOpenAlbumById}
+                    />
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Album Detail Modal */}

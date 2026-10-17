@@ -50,7 +50,7 @@ export async function handleRequest(
     return createSuccessResponse(
       {
         status: 'healthy',
-        version: 'v1.0.0',
+        version: 'v1.1.0',
         environment: env.ENVIRONMENT || 'production',
         timestamp: new Date().toISOString(),
       },
@@ -140,6 +140,8 @@ export async function handleRequest(
           ? parseInt(url.searchParams.get('min_rating')!, 10)
           : undefined
         const sort = url.searchParams.get('sort') || undefined
+        const gameCategory = url.searchParams.get('game_category') || undefined
+        const gameMode = url.searchParams.get('game_mode') || undefined
 
         const games = await igdb.searchGames({
           queryText: q,
@@ -149,6 +151,8 @@ export async function handleRequest(
           release,
           minRating,
           sort,
+          gameCategory,
+          gameMode,
           env,
         })
         return createSuccessResponse(games, {
@@ -179,13 +183,11 @@ export async function handleRequest(
       }
 
       // Artwork Options Aggregator (Cover, Hero, Logo)
-      // Supports both Steam AppID and game name search with fallback
       if (pathname.startsWith('/api/v1/artwork/options/')) {
         const type = pathname.replace('/api/v1/artwork/options/', '') as 'cover' | 'hero' | 'logo'
         let steamAppId = url.searchParams.get('app_id')
         const name = url.searchParams.get('name') || ''
 
-        // 1. Resolve SGDB Game ID from name first (primary for rich community artwork)
         let sgdbGameId: number | null = null
         if (name && env.STEAMGRIDDB_API_KEY) {
           try {
@@ -195,7 +197,6 @@ export async function handleRequest(
           }
         }
 
-        // 2. If no steamAppId passed, resolve via Steam Store search with verified title matching
         if (!steamAppId && name) {
           steamAppId = await steam.searchSteamAppId(name)
         }
@@ -203,7 +204,6 @@ export async function handleRequest(
         const results: ArtworkOption[] = []
         const seenUrls = new Set<string>()
 
-        // 3. Fetch Official Steam Assets only if verified AppID exists
         if (steamAppId) {
           const steamAssets = steam.getSteamOfficialArtwork(steamAppId)
           for (const a of steamAssets.filter((a) => a.type === type)) {
@@ -214,7 +214,6 @@ export async function handleRequest(
           }
         }
 
-        // 4. Fetch Rich SteamGridDB Assets (static + animated)
         if (env.STEAMGRIDDB_API_KEY && (sgdbGameId || steamAppId)) {
           try {
             const sgdbKind = type === 'cover' ? 'grids' : type === 'hero' ? 'heroes' : 'logos'
@@ -226,7 +225,7 @@ export async function handleRequest(
               }
             }
           } catch {
-            // Graceful degradation: if SGDB fails, Steam art is still returned!
+            // Graceful degradation
           }
         }
 
@@ -240,7 +239,6 @@ export async function handleRequest(
       return createErrorResponse('NOT_FOUND', 'Route not found', 404)
     })
 
-    // Store successful response in Edge Cache asynchronously when ExecutionContext is available
     if (request.method === 'GET' && response.status === 200) {
       if (ctx && typeof ctx.waitUntil === 'function') {
         ctx.waitUntil(putEdgeCache(request, response.clone()))

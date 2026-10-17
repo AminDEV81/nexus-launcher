@@ -2,7 +2,14 @@ import React from 'react'
 import type { MetricToggles, OverlayMetrics } from '../../types/overlay'
 import type { ThemeVisualTokens } from '../theme-tokens'
 import { buildHudModel } from '../../lib/derive'
-import { HudPanel, Label, StatusDot, Value } from '../../components/hud/primitives'
+import {
+  HudPanel,
+  Label,
+  Sparkline,
+  StatusDot,
+  Value,
+  useHistory,
+} from '../../components/hud/primitives'
 import { BatteryMetric } from '../../components/metric/battery-metric'
 import { ClockMetric } from '../../components/metric/clock-metric'
 
@@ -12,7 +19,7 @@ interface LayoutProps {
   tokens: ThemeVisualTokens
 }
 
-const Divider = () => <div className="h-7 w-px shrink-0 bg-white/10" />
+const Divider = () => <div className="h-7 w-px shrink-0 bg-white/15" />
 
 /** Label above, value below — reads at a glance in a one-line strip. */
 const Cell: React.FC<{
@@ -29,13 +36,15 @@ const Cell: React.FC<{
       value={value}
       unit={unit}
       color={color}
-      className="text-[13px] font-semibold"
+      strong
+      className="text-[13px] font-bold"
     />
   </div>
 )
 
 export const HorizontalBarLayout: React.FC<LayoutProps> = ({ metrics, toggles, tokens }) => {
   const model = buildHudModel(metrics, toggles, tokens)
+  const history = useHistory()
   const accent = model.fps.color ?? tokens.accentColor
 
   const segments: React.ReactNode[] = []
@@ -44,13 +53,13 @@ export const HorizontalBarLayout: React.FC<LayoutProps> = ({ metrics, toggles, t
     segments.push(
       <div key="session" className="flex items-center gap-2">
         <StatusDot color={tokens.accentColor} />
-        <div className="flex max-w-[150px] flex-col gap-1">
+        <div className="flex max-w-[160px] flex-col gap-1">
           <span
-            className={`truncate text-[12px] font-bold leading-none ${tokens.primaryTextColor}`}
+            className={`truncate text-[12px] font-extrabold leading-none ${tokens.primaryTextColor}`}
           >
             {model.session.title}
           </span>
-          <Value tokens={tokens} value={model.session.time} className="text-[10px] opacity-70" />
+          <Value tokens={tokens} value={model.session.time} className="text-[10px] opacity-75" />
         </div>
       </div>,
     )
@@ -59,15 +68,25 @@ export const HorizontalBarLayout: React.FC<LayoutProps> = ({ metrics, toggles, t
   if (model.fps.show) {
     segments.push(
       <div key="fps" className="flex items-center gap-3">
-        <div className="flex items-baseline gap-1">
+        <div className="flex items-baseline gap-1.5">
           <span
-            className={`font-mono text-[26px] font-black tabular-nums leading-none ${tokens.primaryTextColor}`}
-            style={{ color: model.fps.color, textShadow: `0 0 14px ${accent}66` }}
+            className={`font-mono text-[28px] font-black tabular-nums leading-none ${tokens.primaryTextColor}`}
+            style={{ color: model.fps.color, textShadow: `0 0 16px ${accent}77` }}
           >
             {model.fps.text}
           </span>
           <Label>FPS</Label>
         </div>
+        {history.fps.length > 2 && (
+          <Sparkline
+            values={history.fps}
+            color={accent}
+            width={48}
+            height={18}
+            min={Math.max(0, Math.min(...history.fps) - 5)}
+            max={Math.max(1, ...history.fps) + 5}
+          />
+        )}
         {model.fps.frametime && (
           <Cell tokens={tokens} label="FT" value={model.fps.frametime.value} unit="ms" />
         )}
@@ -91,7 +110,7 @@ export const HorizontalBarLayout: React.FC<LayoutProps> = ({ metrics, toggles, t
           <Cell
             key={s.key}
             tokens={tokens}
-            label={g.main || g.extra ? s.label : `${g.title} ${s.label}`}
+            label={g.main || g.extra ? `${g.title} ${s.label}` : `${g.title} ${s.label}`}
             value={s.value}
             unit={s.unit}
             color={s.color}
@@ -117,7 +136,7 @@ export const HorizontalBarLayout: React.FC<LayoutProps> = ({ metrics, toggles, t
   }
 
   return (
-    <HudPanel tokens={tokens} className="w-fit px-4 py-2">
+    <HudPanel tokens={tokens} className="w-fit px-4.5 py-2.5">
       <div className="flex items-center gap-4">
         {segments.map((seg, i) => (
           <React.Fragment key={i}>

@@ -122,6 +122,8 @@ export interface HubGame {
   backdrop_url: string | null
   rating: number | null
   rating_count: number | null
+  metacritic_score?: number | null
+  opencritic_score?: number | null
   hypes: number | null
   genres: string[]
   platforms: string[]
@@ -138,9 +140,10 @@ export interface HubGameDetails extends HubGame {
   trailer_url: string | null
   videos?: HubVideo[]
   screenshot_urls: string[]
-  /** The real Metacritic score (live from Steam's store API); null when
-   *  unavailable — the UI falls back to the IGDB aggregate in `rating`. */
+  /** Verified Metacritic critic score (0-100). */
   metacritic_score: number | null
+  /** Verified OpenCritic Top Critic Average (0-100). */
+  opencritic_score?: number | null
   steam_app_id?: string | null
   system_requirements?: SystemRequirements | null
 }
@@ -181,7 +184,7 @@ export interface HubPlatform {
 /** Mirrors `HubSearchFilters` — the hub catalog filters as one IPC
  *  payload. All fields optional/null; `release` is a preset key
  *  ('upcoming' | 'new' | 'last-year' | 'last-3-years') or a year string,
- *  `sort` one of 'popularity' | 'rating' | 'newest' | 'oldest' | 'name'. */
+ *  `sort` one of 'popularity' | 'rating' | 'hypes' | 'newest' | 'oldest' | 'name'. */
 export interface HubSearchFilters {
   genreId?: number | null
   genreIds?: number[]
@@ -192,6 +195,9 @@ export interface HubSearchFilters {
   yearTo?: number | null
   minRating?: number | null
   sort?: string | null
+  gameCategory?: string | null
+  gameMode?: string | null
+  onlyReleased?: boolean | null
 }
 
 /** Mirrors `DailyActivity`/`RecentSession` in `src-tauri/src/commands/stats.rs`. */

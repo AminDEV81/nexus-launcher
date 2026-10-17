@@ -16,6 +16,45 @@ export type FontFamilyId =
   | 'audiowide'
   | 'teko'
 
+export type FontWeightPreset = 'light' | 'regular' | 'bold' | 'extrabold'
+
+export const AVAILABLE_FONT_WEIGHTS: {
+  id: FontWeightPreset
+  label: string
+  shortLabel: string
+  numericLabel: string
+  description: string
+}[] = [
+  {
+    id: 'light',
+    label: 'Light',
+    shortLabel: 'Light (300)',
+    numericLabel: '300',
+    description: 'Sleek, airy strokes for a minimalist precision look.',
+  },
+  {
+    id: 'regular',
+    label: 'Regular',
+    shortLabel: 'Regular (400)',
+    numericLabel: '400',
+    description: 'Balanced default weight for everyday readability.',
+  },
+  {
+    id: 'bold',
+    label: 'Bold',
+    shortLabel: 'Bold (600)',
+    numericLabel: '600',
+    description: 'Crisp, high-contrast gaming UI emphasis.',
+  },
+  {
+    id: 'extrabold',
+    label: 'Extra Bold',
+    shortLabel: 'Extra Bold (800)',
+    numericLabel: '800',
+    description: 'Maximum visual impact across titles, badges & menus.',
+  },
+]
+
 export const AVAILABLE_FONTS: {
   id: FontFamilyId
   name: string
@@ -89,6 +128,10 @@ interface AppearanceSettingsState {
   fontFamily: FontFamilyId
   setFontFamily: (font: FontFamilyId) => void
 
+  /** 4-level UI font boldness preset (`light`, `regular`, `bold`, `extrabold`). */
+  fontWeight: FontWeightPreset
+  setFontWeight: (weight: FontWeightPreset) => void
+
   /** `backdrop-filter: blur()` radius (px) on `.glass-panel` — the
    *  title bar, sidebar, and every modal's acrylic surface. Range
    *  0-40; 0 effectively turns the glass effect into a flat panel. */
@@ -99,43 +142,27 @@ interface AppearanceSettingsState {
   ambientBackground: boolean
   setAmbientBackground: (value: boolean) => void
 
-  /** Multiplies every interaction animation's Framer Motion `duration`
-   *  (modals, sidebar collapse, page transitions, card hovers, the
-   *  details panel). 0.5 = twice as snappy, 2 = noticeably more
-   *  relaxed. Deliberately does NOT touch the startup splash's
-   *  internal choreography — see `useAnimationSpeed`'s doc comment for
-   *  why. */
+  /** Multiplies every interaction animation's Framer Motion `duration`. */
   animationSpeed: number
   setAnimationSpeed: (value: number) => void
 
-  /** Minimum card width (px) the library grid targets before wrapping
-   *  to another column — same role as `CARD_MIN_WIDTH` in
-   *  `game-grid.tsx`, just made adjustable. Lower = denser grid, more
-   *  columns; higher = fewer, bigger cards. */
+  /** Minimum card width (px) the library grid targets before wrapping. */
   cardMinWidth: number
   setCardMinWidth: (value: number) => void
 
-  /** Shrinks the root font size, which (since nearly every spacing and
-   *  type-size utility in this app is rem-based) proportionally
-   *  tightens padding and text everywhere at once, rather than needing
-   *  a parallel "compact" variant of every component. */
+  /** Shrinks the root font size proportionally. */
   compactMode: boolean
   setCompactMode: (value: boolean) => void
 
-  /** Hard override, independent of the speed slider above and of the
-   *  OS's `prefers-reduced-motion` — forces every animation in the app
-   *  (including ones the speed slider doesn't touch, like the splash)
-   *  to complete instantly. For low-power hardware or anyone who'd
-   *  simply rather nothing move. */
+  /** Hard override that forces every animation to complete instantly. */
   reduceMotion: boolean
   setReduceMotion: (value: boolean) => void
 
-  /** High-efficiency GPU power saving mode: disables blurs, heavy shaders,
-   *  and ambient background fills to keep GPU utilization at absolute zero (< 1%). */
+  /** High-efficiency GPU power saving mode. */
   gpuEcoMode: boolean
   setGpuEcoMode: (value: boolean) => void
 
-  /** Lock animation and UI rendering to 60 FPS to prevent high GPU usage on high-refresh monitors. */
+  /** Lock animation and UI rendering to 60 FPS. */
   fpsLimit60: boolean
   setFpsLimit60: (value: boolean) => void
 }
@@ -145,6 +172,9 @@ export const useAppearanceSettingsStore = create<AppearanceSettingsState>()(
     (set) => ({
       fontFamily: 'sora',
       setFontFamily: (fontFamily) => set({ fontFamily }),
+
+      fontWeight: 'regular',
+      setFontWeight: (fontWeight) => set({ fontWeight }),
 
       blurIntensity: BLUR_DEFAULT,
       setBlurIntensity: (blurIntensity) => set({ blurIntensity }),

@@ -82,6 +82,7 @@ export function PerformancePanel() {
   const isGamingMode = settings?.download_gaming_mode !== 'false'
   const autoExtract = settings?.download_auto_extract !== 'false'
   const autoCleanup = settings?.download_auto_cleanup === 'true'
+  const multiPartSequential = settings?.download_multi_part_mode !== 'concurrent'
   const windowAction = settings?.game_launch_window_action || 'hide'
 
   return (
@@ -232,6 +233,34 @@ export function PerformancePanel() {
               setSetting.mutate({ key: 'download_auto_cleanup', value: String(checked) })
             }
             ariaLabel="Auto-Delete Archives"
+          />
+        </div>
+
+        <div className="border-t border-border/40" />
+
+        {/* Multi-Part Archive Queue Mode */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-surface-raised text-accent shadow-xs">
+              <Sparkles className="size-4.5" />
+            </span>
+            <div>
+              <div className="text-sm font-bold text-text">Sequential Multi-Part Queue (One by One)</div>
+              <div className="text-xs text-subtle">
+                Downloads multi-part archives (Part 1, Part 2, Part 3…) sequentially to maximize per-file speed.
+              </div>
+            </div>
+          </div>
+
+          <Switch
+            checked={multiPartSequential}
+            onChange={(checked) =>
+              setSetting.mutate({
+                key: 'download_multi_part_mode',
+                value: checked ? 'sequential' : 'concurrent',
+              })
+            }
+            ariaLabel="Sequential Multi-Part Queue"
           />
         </div>
       </div>

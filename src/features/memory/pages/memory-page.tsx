@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Sparkles, Search, ArrowUpDown, Clock } from 'lucide-react'
+import { Sparkles, Search, ArrowUpDown, Clock, Award, Archive } from 'lucide-react'
 import {
   useGames,
   useRestoreGameFromMemory,
@@ -84,86 +84,129 @@ export function MemoryPage() {
     })
   }, [memoryGames, search, sort])
 
-  // Total recorded playtime across all memory games
   const totalMemoryPlaytimeHours = useMemo(() => {
     const totalSecs = memoryGames.reduce((acc, g) => acc + g.total_playtime_seconds, 0)
-    return Math.round(totalSecs / 3600)
+    return Math.round((totalSecs / 3600) * 10) / 10
+  }, [memoryGames])
+
+  const veteranOrHigherCount = useMemo(() => {
+    return memoryGames.filter((g) => g.total_playtime_seconds >= 25 * 3600).length
   }, [memoryGames])
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-background">
+    <div className="flex h-full flex-col overflow-hidden bg-bg text-text">
       {/* Header Toolbar */}
-      <div className="flex shrink-0 flex-col gap-4 border-b border-border/70 bg-surface/50 px-6 py-5 backdrop-blur-md">
+      <div className="flex shrink-0 flex-col gap-4 border-b border-border/70 bg-surface/65 px-8 py-5 backdrop-blur-md">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="flex size-9 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-sm shadow-amber-500/10">
-                <Sparkles className="size-5" />
+          <div className="flex items-center gap-3.5">
+            <div className="flex size-12 items-center justify-center rounded-2xl border border-amber-500/35 bg-gradient-to-br from-amber-500/20 via-amber-500/10 to-transparent text-amber-500 shadow-sm">
+              <Sparkles className="size-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-2xl font-black tracking-tight text-text">Memory Vault</h1>
+                <span className="rounded-full border border-amber-500/35 bg-amber-500/15 px-2.5 py-0.5 font-mono text-[11px] font-bold text-amber-600 dark:text-amber-300">
+                  {memoryGames.length} {memoryGames.length === 1 ? 'Archived Title' : 'Archived Titles'}
+                </span>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-black tracking-tight text-text">Memory Vault</h1>
-                  <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-300">
-                    {memoryGames.length} {memoryGames.length === 1 ? 'game' : 'games'}
-                  </span>
-                </div>
-                <p className="text-xs font-medium text-subtle">
-                  Games and playtime history permanently preserved from your library
-                </p>
-              </div>
+              <p className="mt-0.5 text-xs text-muted">
+                Uninstalled games whose playtime history, ratings, and mastery ranks are permanently
+                preserved
+              </p>
             </div>
           </div>
 
-          {/* Quick stats & Search */}
-          <div className="flex items-center gap-3">
-            {memoryGames.length > 0 && (
-              <div className="hidden items-center gap-2 rounded-xl border border-border/80 bg-surface-raised/60 px-3 py-1.5 text-xs text-subtle sm:flex">
-                <Clock className="size-3.5 text-cyan-400" />
-                <span>
-                  Archived Playtime:{' '}
-                  <strong className="font-mono text-text">{totalMemoryPlaytimeHours}h</strong>
-                </span>
-              </div>
-            )}
-
-            {/* Search Input */}
-            <div className="relative w-48 sm:w-60">
+          {/* Search & Sort Controls */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="relative w-52 sm:w-64">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-subtle" />
               <input
                 type="text"
-                placeholder="Search memories..."
+                placeholder="Search archived memories…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-xl border border-border bg-surface py-1.5 pl-8 pr-3 text-xs text-text transition-colors placeholder:text-subtle focus:border-amber-400 focus:outline-hidden"
+                className="w-full rounded-xl border border-border bg-surface py-2 pl-8.5 pr-3 text-xs text-text transition-colors placeholder:text-muted focus:border-amber-500 focus:outline-hidden"
               />
             </div>
 
-            {/* Sort Selector */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-2.5 py-1.5 text-xs text-muted">
-              <ArrowUpDown className="size-3.5 text-subtle" />
+            <div className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs text-muted shadow-xs">
+              <ArrowUpDown className="size-3.5 text-amber-500" />
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as SortOption)}
                 className="bg-transparent text-xs font-bold text-text focus:outline-hidden cursor-pointer"
               >
-                <option value="playtime">Playtime</option>
-                <option value="recent">Recently Played</option>
-                <option value="name">Name</option>
+                <option value="playtime" className="bg-surface text-text">
+                  Sort by Playtime
+                </option>
+                <option value="recent" className="bg-surface text-text">
+                  Sort by Last Played
+                </option>
+                <option value="name" className="bg-surface text-text">
+                  Sort by Name
+                </option>
               </select>
             </div>
           </div>
         </div>
+
+        {/* Summary KPI Strip */}
+        {memoryGames.length > 0 && (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="flex items-center gap-3 rounded-2xl border border-border/75 bg-surface px-4 py-2.5 shadow-xs">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500">
+                <Archive className="size-4.5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                  Preserved Memories
+                </div>
+                <div className="font-mono text-sm font-black text-text">
+                  {memoryGames.length} Games Saved
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 rounded-2xl border border-border/75 bg-surface px-4 py-2.5 shadow-xs">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent">
+                <Clock className="size-4.5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                  Archived Playtime
+                </div>
+                <div className="font-mono text-sm font-black text-text">
+                  {totalMemoryPlaytimeHours} Hours Logged
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 rounded-2xl border border-border/75 bg-surface px-4 py-2.5 shadow-xs">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-purple-500/15 text-purple-500 dark:text-purple-400">
+                <Award className="size-4.5" />
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-muted">
+                  Veteran &amp; Legend Titles
+                </div>
+                <div className="font-mono text-sm font-black text-text">
+                  {veteranOrHigherCount} High-Mastery Games
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Content Area */}
-      <div className="min-h-0 flex-1 overflow-y-auto p-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 py-6">
         {isPending ? (
           <div className="flex h-64 items-center justify-center">
-            <div className="size-8 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+            <div className="size-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
           </div>
         ) : displayedGames.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-            <div className="mb-4 flex size-16 items-center justify-center rounded-3xl border border-amber-500/20 bg-amber-500/10 text-amber-400">
+            <div className="mb-4 flex size-16 items-center justify-center rounded-3xl border border-amber-500/25 bg-amber-500/10 text-amber-500">
               <Sparkles className="size-8" />
             </div>
             <h2 className="text-base font-black tracking-tight text-text">
@@ -171,7 +214,7 @@ export function MemoryPage() {
             </h2>
             <p className="mt-1 max-w-sm text-xs leading-relaxed text-subtle">
               {memoryGames.length === 0
-                ? 'When you remove a game from your library, it is safely preserved here along with its playtime, artwork, and telemetry.'
+                ? 'When you remove a game from your Library, it is safely preserved here along with its playtime, artwork, and mastery progress.'
                 : 'No archived games match your search query.'}
             </p>
           </div>

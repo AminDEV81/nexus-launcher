@@ -137,7 +137,14 @@ export function HubFeaturedHero({
               </span>
             )}
 
-            {game.rating !== null && <HubScoreBadge variant="card" igdbRating={game.rating} />}
+            <HubScoreBadge
+              variant="card"
+              metacriticScore={game.metacritic_score}
+              opencriticScore={game.opencritic_score}
+              igdbRating={game.rating}
+              gameName={game.name}
+              releaseDate={game.release_date}
+            />
           </div>
 
           {/* Quick Navigation Controls */}
@@ -399,9 +406,14 @@ export function HubFeaturedHero({
                   {item.name}
                 </p>
                 <div className="mt-0.5 flex items-center gap-2 text-[10px] text-subtle">
-                  {item.rating != null && (
-                    <span className="flex items-center gap-0.5 font-semibold text-amber-400">
-                      ★ {Math.round(item.rating)}%
+                  {(item.metacritic_score ?? item.rating) != null && (
+                    <span className="inline-flex items-center gap-1 font-mono font-bold text-emerald-400">
+                      <span>MC {Math.round(item.metacritic_score ?? item.rating ?? 0)}</span>
+                      {(item.opencritic_score ?? item.metacritic_score ?? item.rating) != null && (
+                        <span className="text-orange-400">
+                          · OC {Math.round(item.opencritic_score ?? item.metacritic_score ?? item.rating ?? 0)}
+                        </span>
+                      )}
                     </span>
                   )}
                   <span className="truncate">

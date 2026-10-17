@@ -291,7 +291,7 @@ export function ProfileSelectScreen() {
     selectedIndex < profiles.length ? (profiles[selectedIndex] ?? null) : null
 
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence>
       {isOpen && (
         <motion.div
           key="profile-selection-gate"
@@ -299,11 +299,13 @@ export function ProfileSelectScreen() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{
             opacity: 0,
-            scale: 1.04,
-            transition: { duration: 0.35 * speed, ease: [0.22, 1, 0.36, 1] },
+            scale: 1.02,
+            pointerEvents: 'none',
+            transition: { duration: 0.18 * speed, ease: 'easeOut' },
           }}
           className={cn(
             'fixed inset-0 z-[100] flex flex-col items-center justify-between select-none overflow-hidden transition-colors duration-300',
+            !isOpen && 'pointer-events-none',
             mode === 'light'
               ? 'bg-gradient-to-br from-[#f8fafc] via-[#f1f5f9] to-[#e2e8f0] text-slate-900'
               : 'bg-gradient-to-br from-[#09090e] via-[#0d0d14] to-[#13121f] text-text',

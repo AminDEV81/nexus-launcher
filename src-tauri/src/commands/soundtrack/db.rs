@@ -18,11 +18,11 @@ pub fn save_album(
             created_at, updated_at
         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'), datetime('now'))
         ON CONFLICT(id) DO UPDATE SET
-            game_id = excluded.game_id,
+            game_id = COALESCE(excluded.game_id, soundtrack_albums.game_id),
             title = excluded.title,
             type = excluded.type,
-            artist = excluded.artist,
-            release_date = excluded.release_date,
+            artist = COALESCE(excluded.artist, soundtrack_albums.artist),
+            release_date = COALESCE(excluded.release_date, soundtrack_albums.release_date),
             cover_url = COALESCE(excluded.cover_url, soundtrack_albums.cover_url),
             track_count = excluded.track_count,
             total_duration_ms = excluded.total_duration_ms,
@@ -43,19 +43,19 @@ pub fn save_album(
     )?;
 
     if let Some(ref g_id) = album.game_id {
-        conn.execute(
+        let _ = conn.execute(
             "INSERT INTO soundtrack_game_links (id, game_id, album_id, confidence, is_manual)
              VALUES (?1, ?2, ?3, 1.0, 0)
              ON CONFLICT(game_id, album_id) DO NOTHING",
             params![Uuid::new_v4().to_string(), g_id, album.id],
-        )?;
+        );
     }
 
-    // Delete existing tracks and rewrite to avoid stale tracks
-    conn.execute(
+    // Delete existing tracks for this album and upsert fresh tracks
+    let _ = conn.execute(
         "DELETE FROM soundtrack_tracks WHERE album_id = ?1",
         params![album.id],
-    )?;
+    );
 
     for t in tracks {
         conn.execute(
@@ -63,7 +63,20 @@ pub fn save_album(
                 id, album_id, disc_number, track_number, title, artist,
                 duration_ms, preview_url, stream_url, download_url, local_path,
                 provider_id, external_id, created_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now'))",
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, datetime('now'))
+            ON CONFLICT(id) DO UPDATE SET
+                album_id = excluded.album_id,
+                disc_number = excluded.disc_number,
+                track_number = excluded.track_number,
+                title = excluded.title,
+                artist = COALESCE(excluded.artist, soundtrack_tracks.artist),
+                duration_ms = CASE WHEN excluded.duration_ms > 0 THEN excluded.duration_ms ELSE soundtrack_tracks.duration_ms END,
+                preview_url = COALESCE(excluded.preview_url, soundtrack_tracks.preview_url),
+                stream_url = COALESCE(excluded.stream_url, soundtrack_tracks.stream_url),
+                download_url = COALESCE(excluded.download_url, soundtrack_tracks.download_url),
+                local_path = COALESCE(excluded.local_path, soundtrack_tracks.local_path),
+                provider_id = excluded.provider_id,
+                external_id = COALESCE(excluded.external_id, soundtrack_tracks.external_id)",
             params![
                 t.id,
                 album.id,
@@ -149,18 +162,44 @@ pub fn get_album(conn: &Connection, album_id: &str) -> AppResult<Option<Soundtra
     Ok(Some(SoundtrackAlbumWithTracks { album, tracks }))
 }
 
+pub fn clear_game_soundtracks(conn: &Connection, game_id: &str) -> AppResult<()> {
+    let cache_key = format!("game_ost_{game_id}");
+    let _ = conn.execute(
+        "DELETE FROM soundtrack_cache WHERE cache_key = ?1 OR cache_key LIKE ?2",
+        params![cache_key, format!("game_ost_%_{game_id}%")],
+    );
+    let _ = conn.execute(
+        "DELETE FROM soundtrack_tracks WHERE album_id IN (
+            SELECT id FROM soundtrack_albums WHERE game_id = ?1
+            UNION
+            SELECT album_id FROM soundtrack_game_links WHERE game_id = ?1
+        )",
+        params![game_id],
+    );
+    let _ = conn.execute(
+        "DELETE FROM soundtrack_game_links WHERE game_id = ?1",
+        params![game_id],
+    );
+    let _ = conn.execute(
+        "DELETE FROM soundtrack_albums WHERE game_id = ?1",
+        params![game_id],
+    );
+    Ok(())
+}
+
 pub fn get_albums_for_game(
     conn: &Connection,
     game_id: &str,
 ) -> AppResult<Vec<SoundtrackAlbumWithTracks>> {
     let mut stmt = conn.prepare(
-        "SELECT a.id, a.game_id, a.title, a.type, a.artist, a.release_date, a.cover_url,
+        "SELECT DISTINCT a.id, a.game_id, a.title, a.type, a.artist, a.release_date, a.cover_url,
                 a.track_count, a.total_duration_ms, a.provider_id, a.external_id,
                 a.created_at, a.updated_at
          FROM soundtrack_albums a
          LEFT JOIN soundtrack_game_links l ON l.album_id = a.id
          WHERE a.game_id = ?1 OR l.game_id = ?1
-         ORDER BY a.release_date DESC, a.track_count DESC",
+         ORDER BY CASE WHEN a.provider_id = 'curated' THEN 0 WHEN a.provider_id = 'khinsider' THEN 1 ELSE 2 END ASC,
+                  a.track_count DESC",
     )?;
 
     let album_rows = stmt.query_map(params![game_id], |row| {
@@ -227,11 +266,13 @@ pub fn get_all_albums(conn: &Connection) -> AppResult<Vec<SoundtrackAlbum>> {
 }
 
 pub fn toggle_favorite(conn: &Connection, target_type: &str, target_id: &str) -> AppResult<bool> {
-    let exists: bool = conn.query_row(
-        "SELECT 1 FROM soundtrack_favorites WHERE target_type = ?1 AND target_id = ?2",
-        params![target_type, target_id],
-        |_| Ok(true),
-    ).unwrap_or(false);
+    let exists: bool = conn
+        .query_row(
+            "SELECT 1 FROM soundtrack_favorites WHERE target_type = ?1 AND target_id = ?2",
+            params![target_type, target_id],
+            |_| Ok(true),
+        )
+        .unwrap_or(false);
 
     if exists {
         conn.execute(

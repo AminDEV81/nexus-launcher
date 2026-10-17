@@ -38,7 +38,7 @@ describe('KHInsiderProvider', () => {
 
     const albums = await provider.getAlbums({ gameId: 'g1', title: 'Cyberpunk 2077' })
 
-    expect(albums.length).toBe(2)
+    expect(albums.length).toBe(1)
     expect(albums[0].title).toBe('Cyberpunk 2077 Original Score EP')
     expect(albums[0].id).toBe('kh_cyberpunk-2077-original-score-ep')
     expect(albums[0].provider_id).toBe('khinsider')

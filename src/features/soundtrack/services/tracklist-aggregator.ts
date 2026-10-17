@@ -117,9 +117,21 @@ function stringSimilarity(s1: string, s2: string): number {
   return 1.0 - distance / maxLen
 }
 
+function isFullStreamProvider(providerId?: string | null, externalId?: string | null): boolean {
+  if (externalId && externalId.startsWith('/game-soundtracks/')) return true
+  return (
+    providerId === 'khinsider' ||
+    providerId === 'archive' ||
+    providerId === 'audius' ||
+    providerId === 'youtube_direct' ||
+    providerId === 'youtube'
+  )
+}
+
 /**
  * Reconciles multiple tracklists from different providers into one canonical tracklist.
- * Multi-disc structures are preserved.
+ * Multi-disc structures are preserved, and full-length stream providers (e.g. KHInsider)
+ * always take priority over 30-second preview providers (e.g. iTunes/Deezer) for external_id & provider_id.
  */
 export function aggregateTracklists(
   primaryTracks: SoundtrackTrack[],
@@ -131,20 +143,16 @@ export function aggregateTracklists(
     for (const secTrack of secondaryTracks) {
       // Find matching track in canonical list
       const matchIndex = canonical.findIndex((canTrack) => {
-        // Must match disc if multi-disc
         if (canTrack.disc_number !== secTrack.disc_number) {
-          // If both specify a disc number > 1 and they differ, they're not the same
           if (canTrack.disc_number > 1 || secTrack.disc_number > 1) {
             return false
           }
         }
 
-        // Check title match
         if (!titlesMatch(canTrack.title, secTrack.title)) {
           return false
         }
 
-        // Duration check: if both have duration, should be within 15 seconds
         if (canTrack.duration_ms > 0 && secTrack.duration_ms > 0) {
           const delta = Math.abs(canTrack.duration_ms - secTrack.duration_ms)
           if (delta > 15000) {
@@ -156,8 +164,16 @@ export function aggregateTracklists(
       })
 
       if (matchIndex >= 0) {
-        // Merge metadata: enrich missing fields (artist, duration, stream/download URLs)
         const canTrack = canonical[matchIndex]
+        const canIsFull = isFullStreamProvider(canTrack.provider_id, canTrack.external_id)
+        const secIsFull = isFullStreamProvider(secTrack.provider_id, secTrack.external_id)
+
+        const preferSec =
+          (!canIsFull && secIsFull) ||
+          (canTrack.provider_id === 'curated' &&
+            !canTrack.stream_url &&
+            Boolean(secTrack.stream_url || secTrack.external_id))
+
         canonical[matchIndex] = {
           ...canTrack,
           artist: canTrack.artist || secTrack.artist,
@@ -166,9 +182,12 @@ export function aggregateTracklists(
           download_url: canTrack.download_url || secTrack.download_url,
           preview_url: canTrack.preview_url || secTrack.preview_url,
           local_path: canTrack.local_path || secTrack.local_path,
+          external_id: preferSec
+            ? secTrack.external_id || canTrack.external_id
+            : canTrack.external_id || secTrack.external_id,
+          provider_id: preferSec ? secTrack.provider_id : canTrack.provider_id,
         }
       } else {
-        // Track was missing in primary list! Add it to the canonical list
         canonical.push(secTrack)
       }
     }

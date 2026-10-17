@@ -20,6 +20,7 @@ import {
   CalendarRange,
   Clock3,
   Crown,
+  Dices,
   Flame,
   Gamepad2,
   HardDrive,
@@ -50,6 +51,7 @@ import { HabitsChart } from '../components/habits-chart'
 import { TrophiesGrid } from '../components/trophies-grid'
 import { LibraryHealthCard } from '../components/library-health-card'
 import { GamerPassportModal } from '../components/gamer-passport-modal'
+import { SmartRouletteModal } from '@/features/library/components/smart-roulette-modal'
 import { calculateGamerLevel, calculateCircadianHabits } from '../utils/gamer-level'
 import { evaluateMilestones } from '../utils/milestones'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
@@ -85,6 +87,7 @@ export function StatsPage() {
   const [rangeMode, setRangeMode] = useState<RangeMode>('daily')
   const [activeTab, setActiveTab] = useState<StatsTab>('overview')
   const [passportOpen, setPassportOpen] = useState(false)
+  const [rouletteOpen, setRouletteOpen] = useState(false)
 
   const timeline = toHours(timelineData ?? [])
   const daily = toHours(dailyData ?? [])
@@ -106,6 +109,17 @@ export function StatsPage() {
   })
   const unlockedTrophiesCount = milestones.filter((m) => m.unlocked).length
   const playedCount = (games ?? []).filter((g) => g.total_playtime_seconds > 0).length
+  const totalGamesCount = summary?.total_games ?? (games?.length ?? 0)
+  const completionRate = totalGamesCount > 0 ? Math.round((playedCount / totalGamesCount) * 100) : 0
+  const avgSessionMins =
+    sessions && sessions.length > 0
+      ? Math.max(
+          1,
+          Math.round(
+            sessions.reduce((acc, s) => acc + s.duration_seconds, 0) / sessions.length / 60,
+          ),
+        )
+      : 0
 
   return (
     <div className="h-full overflow-y-auto p-5 sm:p-8">
@@ -136,6 +150,15 @@ export function StatsPage() {
                 <span className="font-bold text-accent">{activeProfile.name}</span>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={() => setPassportOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs font-extrabold text-white shadow-lg shadow-accent/25 transition-all hover:bg-accent-hover hover:scale-102 active:scale-95 cursor-pointer"
+            >
+              <Share2 className="size-3.5" />
+              <span>Share State</span>
+            </button>
 
             <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-border/80 bg-surface/80 px-3.5 py-2 font-mono text-xs font-semibold text-text shadow-xs">
               <CalendarDays className="size-3.5 text-accent" />
@@ -173,56 +196,107 @@ export function StatsPage() {
                 }}
               />
 
-              <div className="relative grid gap-6 lg:grid-cols-[1.35fr_1fr] lg:items-end">
-                <div>
-                  {/* Gamer Level & Rank Pill */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/15 px-3 py-1 font-mono text-xs font-black text-accent shadow-sm">
-                      <Crown className="size-3.5" />
-                      <span>LVL {levelInfo.level}</span>
-                      <span className="text-subtle">•</span>
-                      <span>{levelInfo.rankTitle}</span>
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => setPassportOpen(true)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-surface-raised/80 px-3 py-1 font-mono text-xs font-bold text-text transition-all hover:border-accent hover:text-accent shadow-xs active:scale-95"
-                    >
-                      <Share2 className="size-3.5 text-accent" />
-                      <span>Gamer Passport</span>
-                    </button>
-                  </div>
-
-                  {/* Lifetime Hours Big Readout */}
-                  <div className="mt-3">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-subtle">
-                      LIFETIME LOGGED PLAYTIME
-                    </span>
-                    <div className="mt-1 font-mono text-4xl font-black tracking-tight text-text sm:text-5xl lg:text-6xl drop-shadow-sm">
-                      {formatPlaytime(summary?.total_playtime_seconds ?? 0)}
-                    </div>
-                  </div>
-
-                  {/* XP Bar to Next Rank */}
-                  <div className="mt-4 max-w-md">
-                    <div className="flex items-center justify-between font-mono text-[11px] font-bold">
-                      <span className="text-muted">Rank XP Progression</span>
-                      <span className="text-accent">{levelInfo.progressPercent}%</span>
-                    </div>
-                    <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-surface-raised ring-1 ring-inset ring-black/20">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${levelInfo.progressPercent}%` }}
-                        transition={{ duration: 0.8, ease: 'easeOut' }}
-                        className="h-full rounded-full bg-gradient-to-r from-accent to-accent-hover shadow-[0_0_10px_var(--nx-accent)]"
+              <div className="relative grid gap-6 lg:grid-cols-[1.35fr_1fr] lg:items-center">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+                  {/* Circular SVG RPG Level Ring */}
+                  <div className="relative flex size-28 shrink-0 items-center justify-center rounded-3xl border border-accent/30 bg-surface-raised/60 p-2 shadow-inner">
+                    <svg viewBox="0 0 100 100" className="size-full -rotate-90">
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="41"
+                        fill="none"
+                        stroke="var(--color-border)"
+                        strokeWidth="7"
+                        opacity="0.45"
                       />
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="41"
+                        fill="none"
+                        stroke="var(--color-accent)"
+                        strokeWidth="7"
+                        strokeLinecap="round"
+                        strokeDasharray={257.6}
+                        strokeDashoffset={257.6 - (257.6 * levelInfo.progressPercent) / 100}
+                        className="transition-all duration-700 ease-out"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                      <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-subtle">
+                        LEVEL
+                      </span>
+                      <span className="font-mono text-2xl font-black leading-none text-accent">
+                        {levelInfo.level}
+                      </span>
+                      <span className="mt-0.5 font-mono text-[9px] font-bold text-muted">
+                        {levelInfo.progressPercent}% XP
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex-1">
+                    {/* Gamer Level & Rank Pill */}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/15 px-3 py-1 font-mono text-xs font-black text-accent shadow-sm">
+                        <Crown className="size-3.5" />
+                        <span>{levelInfo.rankTitle}</span>
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => setPassportOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-surface-raised/80 px-3 py-1 font-mono text-xs font-bold text-text transition-all hover:border-accent hover:text-accent shadow-xs active:scale-95"
+                      >
+                        <Share2 className="size-3.5 text-accent" />
+                        <span>Share State</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setRouletteOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-accent/35 bg-accent/10 px-3 py-1 font-mono text-xs font-bold text-accent transition-all hover:bg-accent hover:text-white shadow-xs active:scale-95"
+                      >
+                        <Dices className="size-3.5" />
+                        <span>Smart Roulette</span>
+                      </button>
+                    </div>
+
+                    {/* Lifetime Hours Big Readout */}
+                    <div className="mt-3">
+                      <span className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-subtle">
+                        LIFETIME LOGGED PLAYTIME • {(habits.dominantPersona?.title ?? habits.personaTitle ?? 'BALANCED ADVENTURER').toUpperCase()}
+                      </span>
+                      <div className="mt-1 font-mono text-4xl font-black tracking-tight text-text sm:text-5xl drop-shadow-sm">
+                        {formatPlaytime(summary?.total_playtime_seconds ?? 0)}
+                      </div>
+                    </div>
+
+                    {/* XP Bar to Next Rank */}
+                    <div className="mt-3 max-w-md">
+                      <div className="flex items-center justify-between font-mono text-[11px] font-bold">
+                        <span className="text-muted">
+                          Next Rank ({levelInfo.nextLevelHours ?? Math.round((levelInfo.xpForNextLevel ?? 300) / 60)}h target)
+                        </span>
+                        <span className="text-accent">
+                          {levelInfo.hoursToNextLevel ?? Math.max(0.1, Math.round(((levelInfo.xpForNextLevel - levelInfo.currentXp) / 60) * 10) / 10)}h remaining
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-surface-raised ring-1 ring-inset ring-black/20">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${levelInfo.progressPercent}%` }}
+                          transition={{ duration: 0.6, ease: 'easeOut' }}
+                          className="h-full rounded-full bg-gradient-to-r from-accent to-accent-hover shadow-[0_0_10px_var(--nx-accent)]"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Right Side Quick Metrics */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-2">
                   <HeroMetricCard
                     label="Last 4 Weeks"
                     value={formatChartHours(recentHours)}
@@ -242,6 +316,12 @@ export function StatsPage() {
                     icon={Flame}
                     accent
                     hint="Consecutive days"
+                  />
+
+                  <HeroMetricCard
+                    label="Avg Session"
+                    value={avgSessionMins > 0 ? `${avgSessionMins}m` : '—'}
+                    hint={`${completionRate}% library touched`}
                   />
                 </div>
               </div>
@@ -274,7 +354,7 @@ export function StatsPage() {
             </div>
 
             {/* Animated Tab Content Container */}
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence initial={false}>
               <motion.div
                 key={activeTab}
                 initial={{ opacity: 0, y: 8 }}
@@ -349,7 +429,7 @@ export function StatsPage() {
                     </section>
 
                     {/* Random Game Picker */}
-                    <RandomGamePicker />
+                    <RandomGamePicker onOpenSmartRoulette={() => setRouletteOpen(true)} />
                   </>
                 )}
 
@@ -390,7 +470,7 @@ export function StatsPage() {
               </motion.div>
             </AnimatePresence>
 
-            {/* Gamer Passport Modal */}
+            {/* Share State / Gamer Passport Infographic Modal */}
             <GamerPassportModal
               isOpen={passportOpen}
               onClose={() => setPassportOpen(false)}
@@ -398,8 +478,22 @@ export function StatsPage() {
               levelInfo={levelInfo}
               summary={summary}
               topGenre={topGenre}
+              genres={genres}
               streak={streak}
               milestones={milestones}
+              habits={habits}
+              completionRate={completionRate}
+              avgSessionMins={avgSessionMins}
+              recentHours={recentHours}
+              playedCount={playedCount}
+              totalGamesCount={totalGamesCount}
+            />
+
+            {/* Smart Roulette & Mood Matcher Modal */}
+            <SmartRouletteModal
+              open={rouletteOpen}
+              onClose={() => setRouletteOpen(false)}
+              games={games ?? []}
             />
           </>
         )}
@@ -870,50 +964,33 @@ function MostPlayedCard({
   )
 }
 
-function RandomGamePicker() {
+function RandomGamePicker({ onOpenSmartRoulette }: { onOpenSmartRoulette: () => void }) {
   const { data: games } = useGames()
-  const navigate = useNavigate()
-  const selectGame = useUiStore((s) => s.selectGame)
-  const [picking, setPicking] = useState(false)
-
-  function handlePick() {
-    if (!games || games.length === 0) return
-    const installed = games.filter((game) => game.is_installed && !game.is_hidden)
-    const candidates = installed.length > 0 ? installed : games.filter((game) => !game.is_hidden)
-    if (candidates.length === 0) return
-
-    setPicking(true)
-    const chosen = candidates[Math.floor(Math.random() * candidates.length)]
-    window.setTimeout(() => {
-      setPicking(false)
-      selectGame(chosen.id)
-      navigate('/')
-    }, 250)
-  }
 
   return (
     <button
       type="button"
-      onClick={handlePick}
+      onClick={onOpenSmartRoulette}
       disabled={!games || games.length === 0}
       className="group relative flex items-center justify-between gap-4 overflow-hidden rounded-3xl border border-dashed border-accent/40 bg-surface/60 p-5 text-left shadow-sm transition-all duration-200 hover:border-accent hover:bg-surface-raised active:scale-[0.99] disabled:opacity-50"
     >
       <div className="flex items-center gap-3.5">
         <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-accent/15 text-accent shadow-xs transition-transform duration-300 group-hover:scale-110 group-hover:bg-accent group-hover:text-white">
-          <Shuffle className={picking ? 'size-5 animate-spin' : 'size-5'} />
+          <Shuffle className="size-5" />
         </span>
         <div>
           <div className="text-sm font-bold text-text group-hover:text-accent">
-            Undecided what to play?
+            Undecided what to play? Open Smart Game Roulette &amp; Mood Matcher
           </div>
           <div className="text-xs text-muted">
-            Spin the Nexus cyber-roulette to pick a random installed title from your backlog.
+            Filter by your mood (Quick 15m Burst, Unplayed Backlog Gem, High-Octane Action, or Deep Story) and spin the reel.
           </div>
         </div>
       </div>
 
       <span className="flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent/10 px-4 py-2 font-mono text-xs font-bold text-accent shadow-xs transition-colors group-hover:bg-accent group-hover:text-white">
-        <span>Pick for me</span>
+        <Dices className="size-3.5" />
+        <span>Launch Roulette</span>
       </span>
     </button>
   )

@@ -1,4 +1,5 @@
 mod amazon;
+mod cracked;
 mod epic;
 mod registry_stores;
 mod steam;
@@ -7,14 +8,10 @@ mod xbox;
 use crate::db::Database;
 use crate::error::AppResult;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
-/// A single game found by a store scanner, before the user has reviewed
-/// or imported it. Deliberately similar to `commands::games::CreateGameInput`
-/// but kept as its own type: this carries `source` and `steam_app_id`
-/// (which manual add never sets) and everything is scanner-guessed, so
-/// none of it should be mistaken for confirmed, user-provided data.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScannedGame {
     pub name: String,
@@ -37,17 +34,19 @@ pub struct ScanResult {
     pub summaries: Vec<StoreScanSummary>,
 }
 
-/// Runs every store scanner and returns the combined, de-duplicated
-/// list for the user to review before anything is added — automatic
-/// scan only ever *finds* games here; `import_scanned_games` is the
-/// separate, explicit step that actually writes them to the library.
-///
-/// Each scanner degrades to an empty result if its store isn't
-/// installed or its expected files/registry keys aren't present, so one
-/// missing launcher never fails the whole scan.
+fn normalize_path_key(raw: &str) -> String {
+    raw.trim()
+        .to_lowercase()
+        .replace('/', "\\")
+        .trim_end_matches('\\')
+        .to_string()
+}
+
+/// Runs every official store scanner PLUS the Cracked / Repack / Standalone scanner
+/// and returns the combined, de-duplicated list for the user to review.
 #[tauri::command]
 pub fn scan_all_stores(db: State<'_, Database>) -> AppResult<ScanResult> {
-    let scans: [(&str, Vec<ScannedGame>); 8] = [
+    let scans: [(&str, Vec<ScannedGame>); 9] = [
         ("steam", steam::scan_steam()),
         ("epic", epic::scan_epic()),
         ("gog", registry_stores::scan_gog()),
@@ -56,6 +55,7 @@ pub fn scan_all_stores(db: State<'_, Database>) -> AppResult<ScanResult> {
         ("battlenet", registry_stores::scan_battlenet()),
         ("amazon", amazon::scan_amazon()),
         ("xbox", xbox::scan_xbox()),
+        ("cracked", cracked::scan_cracked_and_standalone()),
     ];
 
     let summaries = scans
@@ -66,11 +66,30 @@ pub fn scan_all_stores(db: State<'_, Database>) -> AppResult<ScanResult> {
         })
         .collect();
 
-    let mut games: Vec<ScannedGame> = scans.into_iter().flat_map(|(_, games)| games).collect();
+    let mut games: Vec<ScannedGame> = Vec::new();
+    let mut seen_install_paths: HashSet<String> = HashSet::new();
+    let mut seen_exe_paths: HashSet<String> = HashSet::new();
+
+    for (_, store_games) in scans {
+        for game in store_games {
+            if let Some(ref ip) = game.install_path {
+                let key = normalize_path_key(ip);
+                if !key.is_empty() && !seen_install_paths.insert(key) {
+                    continue;
+                }
+            }
+            if let Some(ref ep) = game.executable_path {
+                let key = normalize_path_key(ep);
+                if !key.is_empty() && !seen_exe_paths.insert(key) {
+                    continue;
+                }
+            }
+            games.push(game);
+        }
+    }
 
     // Drop anything that's already in the library so re-running the scan
-    // doesn't keep re-surfacing games the user already added (or already
-    // dismissed on a previous scan).
+    // doesn't keep re-surfacing games the user already added.
     let conn = db.connection.lock().expect("db mutex poisoned");
     games.retain(|game| {
         let already_exists: bool = conn
@@ -78,8 +97,8 @@ pub fn scan_all_stores(db: State<'_, Database>) -> AppResult<ScanResult> {
                 "SELECT EXISTS(
                     SELECT 1 FROM games
                     WHERE (steam_app_id IS NOT NULL AND steam_app_id = ?1)
-                       OR (executable_path IS NOT NULL AND executable_path = ?2)
-                       OR (install_path IS NOT NULL AND install_path = ?3)
+                       OR (executable_path IS NOT NULL AND LOWER(REPLACE(executable_path, '/', '\\')) = LOWER(REPLACE(?2, '/', '\\')))
+                       OR (install_path IS NOT NULL AND LOWER(REPLACE(install_path, '/', '\\')) = LOWER(REPLACE(?3, '/', '\\')))
                 )",
                 rusqlite::params![
                     &game.steam_app_id,
@@ -95,11 +114,6 @@ pub fn scan_all_stores(db: State<'_, Database>) -> AppResult<ScanResult> {
     Ok(ScanResult { games, summaries })
 }
 
-/// Writes the subset of scanned games the user chose to keep. Runs the
-/// same de-duplication check as `scan_all_stores` (rather than trusting
-/// the frontend's snapshot) since time may have passed between the scan
-/// and the user clicking "Import" — e.g. they could have manually added
-/// one of the same games in between via Epic 4's Add Game modal.
 #[tauri::command]
 pub fn import_scanned_games(
     app: AppHandle,
@@ -120,8 +134,8 @@ pub fn import_scanned_games(
                 "SELECT EXISTS(
                     SELECT 1 FROM games
                     WHERE (steam_app_id IS NOT NULL AND steam_app_id = ?1)
-                       OR (executable_path IS NOT NULL AND executable_path = ?2)
-                       OR (install_path IS NOT NULL AND install_path = ?3)
+                       OR (executable_path IS NOT NULL AND LOWER(REPLACE(executable_path, '/', '\\')) = LOWER(REPLACE(?2, '/', '\\')))
+                       OR (install_path IS NOT NULL AND LOWER(REPLACE(install_path, '/', '\\')) = LOWER(REPLACE(?3, '/', '\\')))
                 )",
                 rusqlite::params![
                     &game.steam_app_id,

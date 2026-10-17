@@ -61,6 +61,10 @@ pub struct DownloadState {
 pub struct DownloadInfo {
     pub id: String,
     pub game_id: String,
+    #[serde(default)]
+    pub game_name: Option<String>,
+    #[serde(default)]
+    pub cover_url: Option<String>,
     pub url: String,
     pub save_path: String,
     pub file_path: Option<String>,
@@ -1801,7 +1805,13 @@ fn insert_download_row(
     let db = app.state::<Database>();
     let conn = db.connection.lock().expect("db mutex poisoned");
     conn.execute(
-        "INSERT INTO downloads (id, game_id, url, save_path, file_path, status, auto_extract) VALUES (?1,?2,?3,?4,?5,'downloading',?6)",
+        "INSERT INTO downloads (
+            id, game_id, url, save_path, file_path, status, auto_extract, game_name, cover_url
+         ) VALUES (
+            ?1, ?2, ?3, ?4, ?5, 'downloading', ?6,
+            (SELECT name FROM games WHERE id = ?2),
+            (SELECT cover_path FROM games WHERE id = ?2)
+         )",
         rusqlite::params![id, game_id, url, save_path, file_path, if auto_extract { 1 } else { 0 }],
     )?;
     Ok(())
@@ -1954,8 +1964,44 @@ pub async fn start_game_download(
 ) -> AppResult<StartedDownload> {
     validate_download_url(&url)?;
 
-    let game = crate::commands::hub::ensure_library_game(&app, &db, &http, &token_cache, igdb_id)
-        .await?;
+    let game = match crate::commands::hub::ensure_library_game(&app, &db, &http, &token_cache, igdb_id).await {
+        Ok(g) => g,
+        Err(_) => {
+            let fallback_name = {
+                let stem = file_name_from_url(&url);
+                let clean = stem
+                    .split('.')
+                    .next()
+                    .unwrap_or("Downloaded Game")
+                    .replace(['_', '-', '.'], " ")
+                    .trim()
+                    .to_string();
+                if clean.is_empty() {
+                    format!("Game #{igdb_id}")
+                } else {
+                    clean
+                }
+            };
+            let new_id = uuid::Uuid::new_v4().to_string();
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            if let Ok(existing_id) = conn.query_row(
+                "SELECT id FROM games WHERE igdb_id = ?1 LIMIT 1",
+                [igdb_id],
+                |row| row.get::<_, String>(0),
+            ) {
+                let sql = format!("SELECT {} FROM games WHERE id = ?1", Game::SELECT_COLUMNS);
+                conn.query_row(&sql, [&existing_id], Game::from_row)?
+            } else {
+                conn.execute(
+                    "INSERT INTO games (id, name, is_installed, source, igdb_id, is_wishlist, genres, platforms)
+                     VALUES (?1, ?2, 0, 'igdb_hub', ?3, 0, '[]', '[]')",
+                    rusqlite::params![&new_id, &fallback_name, igdb_id],
+                )?;
+                let sql = format!("SELECT {} FROM games WHERE id = ?1", Game::SELECT_COLUMNS);
+                conn.query_row(&sql, [&new_id], Game::from_row)?
+            }
+        }
+    };
 
     // Create a dedicated folder named exactly after the game inside the chosen save_path
     let safe_folder_name = sanitize_file_name(&game.name);
@@ -2079,7 +2125,13 @@ pub async fn start_batch_downloads(
         {
             let conn = db.connection.lock().expect("db mutex poisoned");
             conn.execute(
-                "INSERT INTO downloads (id, game_id, url, save_path, file_path, status, auto_extract) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                "INSERT INTO downloads (
+                    id, game_id, url, save_path, file_path, status, auto_extract, game_name, cover_url
+                 ) VALUES (
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7,
+                    (SELECT name FROM games WHERE id = ?2),
+                    (SELECT cover_path FROM games WHERE id = ?2)
+                 )",
                 rusqlite::params![
                     id,
                     resolved_game_id.as_deref().unwrap_or(""),
@@ -2454,7 +2506,25 @@ pub async fn delete_download(
 pub fn get_downloads(db: State<'_, Database>) -> AppResult<Vec<DownloadInfo>> {
     let conn = db.connection.lock().expect("db mutex poisoned");
     let mut stmt = conn.prepare(
-        "SELECT id, game_id, url, save_path, COALESCE(file_path,''), total_bytes, downloaded_bytes, status, error_message, speed_bps, created_at, updated_at, COALESCE(auto_extract, 1) FROM downloads ORDER BY created_at DESC",
+        "SELECT
+            d.id,
+            d.game_id,
+            d.url,
+            d.save_path,
+            COALESCE(d.file_path, ''),
+            d.total_bytes,
+            d.downloaded_bytes,
+            d.status,
+            d.error_message,
+            d.speed_bps,
+            d.created_at,
+            d.updated_at,
+            COALESCE(d.auto_extract, 1),
+            COALESCE(d.game_name, g.name),
+            COALESCE(d.cover_url, g.cover_path)
+         FROM downloads d
+         LEFT JOIN games g ON g.id = d.game_id
+         ORDER BY d.created_at DESC",
     )?;
     let rows = stmt.query_map([], |row| {
         Ok(DownloadInfo {
@@ -2471,6 +2541,8 @@ pub fn get_downloads(db: State<'_, Database>) -> AppResult<Vec<DownloadInfo>> {
             created_at: row.get(10)?,
             updated_at: row.get(11)?,
             auto_extract: row.get::<_, i64>(12)? != 0,
+            game_name: row.get(13).ok().flatten(),
+            cover_url: row.get(14).ok().flatten(),
         })
     })?;
     rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)

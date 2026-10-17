@@ -1,23 +1,35 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  Disc3,
+  Maximize2,
+  Moon,
+  Music,
   PanelLeftClose,
   PanelLeftOpen,
+  Pause,
+  Play,
   Plus,
   Search,
-  Sun,
-  Moon,
-  Sparkles,
   Settings,
+  SkipForward,
+  Sparkles,
+  Sun,
 } from 'lucide-react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { LogoMark } from '@/components/brand/logo-mark'
 import { cn } from '@/lib/utils'
+import { assetUrl } from '@/lib/asset-url'
+import { playButtonClick } from '@/lib/sound-engine'
 import { useUiStore } from '@/store/ui-store'
 import { useThemeStore } from '@/store/theme-store'
 import { useUpdaterStore } from '@/store/updater-store'
 import { useAddGameModalStore } from '@/features/library/store/add-game-modal-store'
+import {
+  cleanGameTitleFromAlbumTitle,
+  useSoundtrackStore,
+} from '@/features/soundtrack/store/soundtrack-store'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
-import { LIBRARY_NAV_ITEMS, MANAGE_NAV_ITEMS, DISCOVER_NAV_ITEMS } from './nav-items'
+import { DISCOVER_NAV_ITEMS, LIBRARY_NAV_ITEMS, MANAGE_NAV_ITEMS } from './nav-items'
 import { SidebarNavItem } from './sidebar-nav-item'
 
 const WIDTH_EXPANDED = 252
@@ -34,11 +46,26 @@ export function Sidebar() {
   const isUpdateAvailable = useUpdaterStore((s) => s.status === 'available')
   const speed = useAnimationSpeed()
 
+  const currentTrack = useSoundtrackStore((s) => s.currentTrack)
+  const currentAlbum = useSoundtrackStore((s) => s.currentAlbum)
+  const currentGame = useSoundtrackStore((s) => s.currentGame)
+  const playbackState = useSoundtrackStore((s) => s.playbackState)
+  const currentTime = useSoundtrackStore((s) => s.currentTime)
+  const togglePlay = useSoundtrackStore((s) => s.togglePlay)
+  const nextTrack = useSoundtrackStore((s) => s.next)
+  const setExpanded = useSoundtrackStore((s) => s.setExpanded)
+
+  const isPlaying =
+    Boolean(currentTrack) &&
+    (playbackState === 'playing' ||
+      (playbackState !== 'paused' && playbackState !== 'error' && currentTime > 0))
+  const coverSrc = assetUrl(currentAlbum?.cover_url) || assetUrl(currentGame?.coverUrl) || null
+
   const isSettingsActive = location.pathname.startsWith('/settings')
 
   return (
     <motion.aside
-      animate={{ width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
+      animate={{ width: collapsed ? WIDTH_EXPANDED * 0 + WIDTH_COLLAPSED : WIDTH_EXPANDED }}
       transition={{ duration: 0.28 * speed, ease: [0.16, 1, 0.3, 1] }}
       className="chrome-surface relative z-10 flex shrink-0 flex-col overflow-hidden border-r border-border"
     >
@@ -104,7 +131,77 @@ export function Sidebar() {
       </nav>
 
       <div className={cn('border-t border-border p-3', collapsed && 'px-2')}>
-        {!collapsed && (
+        {/* Live Soundtrack Quick Deck in Left Sidebar */}
+        {!collapsed && currentTrack && (
+          <div className="mb-2.5 overflow-hidden rounded-xl border border-accent/30 bg-gradient-to-r from-accent/12 via-surface/90 to-surface p-2.5 shadow-xs">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  playButtonClick()
+                  setExpanded(true)
+                }}
+                title="Open Fullscreen Vinyl Stage"
+                className="group relative size-9 shrink-0 overflow-hidden rounded-lg border border-border/80 bg-surface-raised cursor-pointer"
+              >
+                {coverSrc ? (
+                  <img src={coverSrc} alt="" className="size-full object-cover" />
+                ) : (
+                  <span className="flex size-full items-center justify-center bg-accent/15 text-accent">
+                    <Disc3 className={cn('size-4', isPlaying && 'animate-spin')} />
+                  </span>
+                )}
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition-opacity group-hover:opacity-100">
+                  <Maximize2 className="size-3 text-white" />
+                </span>
+              </button>
+
+              <div
+                onClick={() => navigate('/soundtrack')}
+                className="min-w-0 flex-1 cursor-pointer"
+              >
+                <div className="truncate text-[11px] font-semibold text-text hover:text-accent transition-colors">
+                  {currentTrack.title}
+                </div>
+                <div className="truncate text-[10px] text-accent/90">
+                  {currentGame?.title ||
+                    (currentAlbum ? cleanGameTitleFromAlbumTitle(currentAlbum.title) : 'OST')}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-0.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    playButtonClick()
+                    togglePlay()
+                  }}
+                  className="flex size-7 items-center justify-center rounded-lg bg-accent text-white shadow-2xs hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                  title={isPlaying ? 'Pause' : 'Play'}
+                >
+                  {isPlaying ? (
+                    <Pause className="size-3 fill-current" />
+                  ) : (
+                    <Play className="size-3 fill-current translate-x-0.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playButtonClick()
+                    void nextTrack()
+                  }}
+                  className="flex size-6.5 items-center justify-center rounded-lg text-muted hover:bg-surface-raised hover:text-text transition-colors cursor-pointer"
+                  title="Next Track"
+                >
+                  <SkipForward className="size-3" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!collapsed && !currentTrack && (
           <div className="mb-3 flex items-center gap-2 rounded-xl bg-surface/70 px-3 py-2.5 ring-1 ring-border/60">
             <span className="flex size-7 items-center justify-center rounded-lg bg-accent/10 text-accent">
               <Search className="size-3.5" />
@@ -118,6 +215,7 @@ export function Sidebar() {
             </kbd>
           </div>
         )}
+
         <div className={cn('flex items-center gap-1', collapsed && 'flex-col gap-2')}>
           <SidebarFooterButton
             label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}

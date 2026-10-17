@@ -21,6 +21,7 @@ import { useDragReorder } from '../hooks/use-drag-reorder'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { formatElapsed, formatPlaytime, isGameUnreleased } from '../utils/format'
 import { CoverPlaceholder } from './cover-placeholder'
+import { resolveClientCriticScores } from '@/features/hub/utils/score'
 import type { Game } from '@/types/models'
 
 interface GameListProps {
@@ -191,20 +192,53 @@ const GameListRow = memo(function GameListRow({
                 LIVE
               </span>
             )}
-            {!isGameUnreleased(game.release_date) && game.metacritic_score && (
-              <span
-                className={cn(
-                  'rounded px-1.5 py-0.2 font-mono text-[10px] font-black text-white shadow-xs',
-                  game.metacritic_score >= 75
-                    ? 'bg-emerald-600'
-                    : game.metacritic_score >= 50
-                      ? 'bg-amber-600'
-                      : 'bg-red-600',
-                )}
-              >
-                {game.metacritic_score}
-              </span>
-            )}
+            {!isGameUnreleased(game.release_date) &&
+              (() => {
+                const sc = resolveClientCriticScores(
+                  game.name,
+                  game.release_date,
+                  game.metacritic_score,
+                  game.opencritic_score,
+                  null,
+                )
+                if (!sc.metacritic && !sc.opencritic) return null
+                return (
+                  <span className="inline-flex items-center gap-1">
+                    {sc.metacritic && (
+                      <span
+                        title={`Metacritic: ${sc.metacritic}/100`}
+                        className={cn(
+                          'rounded px-1.5 py-0.2 font-mono text-[10px] font-black text-white shadow-xs',
+                          sc.metacritic >= 75
+                            ? 'bg-emerald-600'
+                            : sc.metacritic >= 50
+                              ? 'bg-amber-600'
+                              : 'bg-red-600',
+                        )}
+                      >
+                        MC {sc.metacritic}
+                      </span>
+                    )}
+                    {sc.opencritic && (
+                      <span
+                        title={`OpenCritic: ${sc.opencritic}/100`}
+                        className={cn(
+                          'rounded px-1.5 py-0.2 font-mono text-[10px] font-black text-white shadow-xs',
+                          sc.opencritic >= 84
+                            ? 'bg-[#fc430a]'
+                            : sc.opencritic >= 75
+                              ? 'bg-purple-600'
+                              : sc.opencritic >= 66
+                                ? 'bg-sky-600'
+                                : 'bg-slate-600',
+                        )}
+                      >
+                        OC {sc.opencritic}
+                      </span>
+                    )}
+                  </span>
+                )
+              })()}
           </div>
 
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-subtle">

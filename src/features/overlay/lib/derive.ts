@@ -21,6 +21,8 @@ export interface HudBar {
 export interface HudGroup {
   id: 'gpu' | 'cpu' | 'ram' | 'net' | 'disk'
   title: string
+  /** Compact hardware identifier (e.g. "RTX 4080 Super", "16 Threads"). */
+  subtitle?: string
   /** Headline reading (usage %). */
   main: HudBar | null
   /** Second bar (VRAM). */
@@ -57,6 +59,17 @@ function pingColor(ms: number | null, tokens: ThemeVisualTokens): string | undef
   if (ms > 120) return tokens.dangerColor
   if (ms > 60) return WARN
   return undefined
+}
+
+function compactGpuName(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined
+  return raw
+    .replace(/NVIDIA\s+GeForce\s+/i, '')
+    .replace(/AMD\s+Radeon\s+/i, 'Radeon ')
+    .replace(/Intel\(R\)\s+/i, 'Intel ')
+    .replace(/\(TM\)|\(R\)|Graphics/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 const pct = (used: number | null, total: number | null): number | null =>
@@ -155,6 +168,7 @@ export function buildHudModel(
   const gpu: HudGroup = {
     id: 'gpu',
     title: 'GPU',
+    subtitle: compactGpuName(m.gpu_name),
     main: t.gpu_usage
       ? {
           percent: m.gpu_usage,
@@ -211,6 +225,7 @@ export function buildHudModel(
   const cpu: HudGroup = {
     id: 'cpu',
     title: 'CPU',
+    subtitle: m.cpu_cores != null ? `${m.cpu_cores} Threads` : undefined,
     main: t.cpu_usage
       ? {
           percent: m.cpu_usage,
@@ -247,6 +262,7 @@ export function buildHudModel(
   const ram: HudGroup = {
     id: 'ram',
     title: 'RAM',
+    subtitle: m.ram_total_bytes ? `${formatBytesGb(m.ram_total_bytes, 0)} GB` : undefined,
     main: t.ram_percentage
       ? {
           percent: ramPct,

@@ -7,12 +7,13 @@ export const STORE_LABELS: Record<string, string> = {
   battlenet: 'Battle.net',
   amazon: 'Amazon Games',
   xbox: 'Xbox',
+  cracked: 'Cracked / Repack',
   manual: 'Manually added',
   other: 'Other',
 }
 
 export function storeLabel(source: string): string {
-  return STORE_LABELS[source] ?? source
+  return STORE_LABELS[source.toLowerCase()] ?? STORE_LABELS[source] ?? source
 }
 
 export const STORE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -24,6 +25,7 @@ export const STORE_COLORS: Record<string, { bg: string; text: string; border: st
   battlenet: { bg: 'bg-cyan-500/15', text: 'text-cyan-400', border: 'border-cyan-500/30' },
   xbox: { bg: 'bg-emerald-500/15', text: 'text-emerald-400', border: 'border-emerald-500/30' },
   amazon: { bg: 'bg-amber-500/15', text: 'text-amber-400', border: 'border-amber-500/30' },
+  cracked: { bg: 'bg-rose-500/15', text: 'text-rose-400', border: 'border-rose-500/35' },
   manual: { bg: 'bg-slate-500/15', text: 'text-slate-400', border: 'border-slate-500/30' },
   other: { bg: 'bg-slate-500/15', text: 'text-slate-400', border: 'border-slate-500/30' },
 }

@@ -1,6 +1,10 @@
 use super::models::{HubGameDetails, HubVideo, NameIdItem};
 use super::traits::MetadataProvider;
-use crate::commands::hub::{self, HubGame, STANDALONE_GAME_TYPES};
+use crate::commands::hub::{
+    self, apply_hub_filters_and_sort, build_igdb_filter_query, expand_search_query,
+    name_wildcard_clause, search_steam_store_fallback, HubGame, SEARCH_GAME_TYPES,
+    STANDALONE_GAME_TYPES,
+};
 use crate::commands::metadata::igdb;
 use crate::commands::metadata::IgdbTokenCache;
 use crate::error::{AppError, AppResult};
@@ -41,7 +45,8 @@ impl DirectIgdbProvider {
 }
 
 const LIST_FIELDS: &str = "fields name, summary, first_release_date, game_type, cover.image_id, \
-     screenshots.image_id, total_rating_count, aggregated_rating, hypes, genres.name, platforms.name";
+     screenshots.image_id, total_rating_count, aggregated_rating, total_rating, rating, hypes, \
+     genres.name, themes.name, platforms.name, game_modes.id, game_modes.name";
 
 impl MetadataProvider for DirectIgdbProvider {
     fn provider_name(&self) -> &'static str {
@@ -91,95 +96,78 @@ impl MetadataProvider for DirectIgdbProvider {
         filters: &crate::commands::hub::HubSearchFilters,
     ) -> AppResult<Vec<HubGame>> {
         let token = self.get_token().await?;
-        let clean_q = query.replace(['"', '\\'], "");
+        let trimmed = query.trim();
 
-        let mut genre_ids = Vec::new();
-        if let Some(ids) = &filters.genre_ids {
-            genre_ids.extend(ids.iter().copied().filter(|&id| id > 0));
-        } else if let Some(id) = filters.genre_id {
-            if id > 0 {
-                genre_ids.push(id);
+        if let Some(body) = build_igdb_filter_query(trimmed, offset, filters) {
+            if body.is_empty() {
+                return Ok(Vec::new());
             }
+            let value = igdb::query(&self.http, &self.client_id, &token, "games", &body).await?;
+            let Value::Array(entries) = value else {
+                return Ok(Vec::new());
+            };
+            let parsed: Vec<HubGame> = entries.iter().filter_map(hub::parse_hub_game).collect();
+            return Ok(apply_hub_filters_and_sort(parsed, trimmed, filters));
         }
 
-        let mut platform_ids = Vec::new();
-        if let Some(ids) = &filters.platform_ids {
-            platform_ids.extend(ids.iter().copied().filter(|&id| id > 0));
-        } else if let Some(id) = filters.platform_id {
-            if id > 0 {
-                platform_ids.push(id);
-            }
-        }
-
-        let mut conditions = vec![
-            format!("game_type = {STANDALONE_GAME_TYPES}"),
-            "cover != null".to_string(),
-        ];
-        if !clean_q.is_empty() {
-            conditions.push(format!("name ~ *\"{clean_q}\"*"));
-        }
-        if !genre_ids.is_empty() {
-            let list = genre_ids
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-                .join(",");
-            conditions.push(format!("genres = [{list}]"));
-        }
-        if !platform_ids.is_empty() {
-            let list = platform_ids
-                .iter()
-                .map(|id| id.to_string())
-                .collect::<Vec<_>>()
-                .join(",");
-            conditions.push(format!("platforms = ({list})"));
-        }
-        if let Some(min_r) = filters.min_rating {
-            conditions.push(format!("aggregated_rating >= {min_r}"));
-        }
-        if let Some(rel) = &filters.release {
-            let now = chrono::Utc::now().timestamp();
-            if rel == "upcoming" {
-                conditions.push(format!("first_release_date > {now}"));
-            } else if rel == "new" {
-                conditions.push(format!(
-                    "first_release_date < {now} & first_release_date > {}",
-                    now - 90 * 86_400
-                ));
-            }
-        }
-
-        let sort_order = match filters.sort.as_deref() {
-            Some("rating") => "aggregated_rating desc",
-            Some("newest") => "first_release_date desc",
-            Some("oldest") => "first_release_date asc",
-            Some("name") => "name asc",
-            _ => "total_rating_count desc",
-        };
-
-        let query_body = if conditions.len() > 2 || !clean_q.is_empty() {
-            format!(
-                "{LIST_FIELDS};\nwhere {};\nsort {sort_order};\nlimit 24;\noffset {offset};",
-                conditions.join(" & ")
-            )
-        } else {
-            format!(
-                "{LIST_FIELDS};\nwhere game_type = {STANDALONE_GAME_TYPES} & cover != null;\nsort {sort_order};\nlimit 24;\noffset {offset};"
-            )
-        };
-
-        let value = igdb::query(&self.http, &self.client_id, &token, "games", &query_body).await?;
-        let Value::Array(entries) = value else {
+        if trimmed.chars().count() < 2 {
             return Ok(Vec::new());
-        };
-        Ok(entries.iter().filter_map(hub::parse_hub_game).collect())
+        }
+
+        let expanded = expand_search_query(trimmed);
+        let sanitized: String = expanded
+            .chars()
+            .filter(|c| *c != '"' && *c != '\\' && !c.is_control())
+            .collect();
+
+        let search_body = format!(
+            "search \"{sanitized}\";\n\
+             {LIST_FIELDS};\n\
+             where game_type = {SEARCH_GAME_TYPES} & cover != null;\n\
+             limit 30;\n\
+             offset {offset};"
+        );
+
+        let wildcard_opt = name_wildcard_clause(&sanitized).map(|wc| {
+            format!(
+                "{LIST_FIELDS};\n\
+                 where game_type = {SEARCH_GAME_TYPES} & cover != null & {wc};\n\
+                 sort total_rating_count desc;\n\
+                 limit 24;\n\
+                 offset {offset};"
+            )
+        });
+
+        let mut combined: Vec<HubGame> = Vec::new();
+        if let Some(wildcard_body) = wildcard_opt {
+            let (res_search, res_wild) = tokio::join!(
+                igdb::query(&self.http, &self.client_id, &token, "games", &search_body),
+                igdb::query(&self.http, &self.client_id, &token, "games", &wildcard_body)
+            );
+            if let Ok(Value::Array(arr)) = res_wild {
+                combined.extend(arr.iter().filter_map(hub::parse_hub_game));
+            }
+            if let Ok(Value::Array(arr)) = res_search {
+                combined.extend(arr.iter().filter_map(hub::parse_hub_game));
+            }
+        } else if let Ok(Value::Array(arr)) =
+            igdb::query(&self.http, &self.client_id, &token, "games", &search_body).await
+        {
+            combined.extend(arr.iter().filter_map(hub::parse_hub_game));
+        }
+
+        if combined.is_empty() && offset == 0 {
+            combined = search_steam_store_fallback(&self.http, &expanded).await;
+        }
+
+        Ok(apply_hub_filters_and_sort(combined, trimmed, filters))
     }
 
     async fn get_game_details(&self, igdb_id: i64) -> AppResult<Option<HubGameDetails>> {
         let token = self.get_token().await?;
         let query = format!(
             "fields name, summary, first_release_date, game_type, cover.image_id, screenshots.image_id, \
-             total_rating_count, aggregated_rating, hypes, genres.name, platforms.name, \
+             total_rating_count, aggregated_rating, total_rating, rating, hypes, genres.name, themes.name, platforms.name, \
              involved_companies.developer, involved_companies.publisher, involved_companies.company.name, \
              videos.video_id, videos.name;\nwhere id = {igdb_id};"
         );
@@ -246,6 +234,9 @@ impl MetadataProvider for DirectIgdbProvider {
             }
         }
 
+        let metacritic_score = hub_game.metacritic_score;
+        let opencritic_score = hub_game.opencritic_score;
+
         Ok(Some(HubGameDetails {
             game: hub_game,
             developer,
@@ -253,7 +244,8 @@ impl MetadataProvider for DirectIgdbProvider {
             trailer_url,
             videos,
             screenshot_urls,
-            metacritic_score: None,
+            metacritic_score,
+            opencritic_score,
             steam_app_id: None,
             system_requirements: None,
         }))
@@ -265,7 +257,7 @@ impl MetadataProvider for DirectIgdbProvider {
             "fields similar_games.id, similar_games.name, similar_games.summary, \
              similar_games.first_release_date, similar_games.game_type, \
              similar_games.cover.image_id, similar_games.screenshots.image_id, \
-             similar_games.total_rating_count, similar_games.aggregated_rating, \
+             similar_games.total_rating_count, similar_games.aggregated_rating, similar_games.total_rating, \
              similar_games.hypes, similar_games.genres.name, similar_games.platforms.name, \
              genres.id;\n\
              where id = {igdb_id};"
@@ -354,10 +346,10 @@ impl MetadataProvider for DirectIgdbProvider {
         .await?;
 
         let Value::Array(entries) = value else {
-            return Ok(Vec::new());
+            return Ok(hub::default_hub_genres());
         };
 
-        let items = entries
+        let items: Vec<NameIdItem> = entries
             .into_iter()
             .filter_map(|v| {
                 let id = v.get("id")?.as_i64()?;
@@ -369,7 +361,11 @@ impl MetadataProvider for DirectIgdbProvider {
                 })
             })
             .collect();
-        Ok(items)
+        if items.is_empty() {
+            Ok(hub::default_hub_genres())
+        } else {
+            Ok(items)
+        }
     }
 
     async fn list_platforms(&self) -> AppResult<Vec<NameIdItem>> {
@@ -384,10 +380,10 @@ impl MetadataProvider for DirectIgdbProvider {
         .await?;
 
         let Value::Array(entries) = value else {
-            return Ok(Vec::new());
+            return Ok(hub::default_hub_platforms());
         };
 
-        let items = entries
+        let items: Vec<NameIdItem> = entries
             .into_iter()
             .filter_map(|v| {
                 let id = v.get("id")?.as_i64()?;
@@ -403,6 +399,10 @@ impl MetadataProvider for DirectIgdbProvider {
                 })
             })
             .collect();
-        Ok(items)
+        if items.is_empty() {
+            Ok(hub::default_hub_platforms())
+        } else {
+            Ok(items)
+        }
     }
 }

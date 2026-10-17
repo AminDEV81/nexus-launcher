@@ -58,10 +58,10 @@ export class InvidiousAudioProvider extends BaseSoundtrackProvider {
           ? `${instance}/search?q=${query}&filter=music_songs`
           : `${instance}/api/v1/search?q=${query}&type=video`
 
-        const searchResp = await this.fetchWithTimeout(searchUrl, {}, 4000)
-        if (!searchResp.ok) continue
+        const searchText = await this.fetchHtml(searchUrl, undefined, 4000)
+        if (!searchText) continue
 
-        const json = await searchResp.json()
+        const json = JSON.parse(searchText)
         const items = isPiped ? json.items : json
         if (!items || items.length === 0) continue
 
@@ -76,9 +76,9 @@ export class InvidiousAudioProvider extends BaseSoundtrackProvider {
         if (isPiped) {
           try {
             const streamUrl = `${instance}/streams/${videoId}`
-            const streamResp = await this.fetchWithTimeout(streamUrl, {}, 3500)
-            if (streamResp.ok) {
-              const streamData = await streamResp.json()
+            const streamText = await this.fetchHtml(streamUrl, undefined, 3500)
+            if (streamText) {
+              const streamData = JSON.parse(streamText)
               const audioStream = streamData.audioStreams?.[0]
               if (audioStream?.url) {
                 return {

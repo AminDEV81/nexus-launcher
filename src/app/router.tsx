@@ -18,6 +18,7 @@ import { LazySoundtrackPage } from './lazy-soundtrack-page'
 import { OverlaySettingsPage } from '@/features/overlay/pages/overlay-settings-page'
 import { OverlayWindowPage } from '@/features/overlay/pages/overlay-window-page'
 import { BoosterPanel } from '@/features/booster/components/booster-panel'
+import { DualSensePage } from '@/features/dualsense/pages/dualsense-page'
 
 export const router = createHashRouter([
   {
@@ -119,6 +120,10 @@ export const router = createHashRouter([
       {
         path: '/memory',
         element: <MemoryPage />,
+      },
+      {
+        path: '/dualsense',
+        element: <DualSensePage />,
       },
       {
         path: '/booster',

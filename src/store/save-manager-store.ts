@@ -15,6 +15,7 @@ interface SaveManagerState {
   closeHistoryModal: () => void
   restoreSnapshot: (gameId: string, snapshotId: string, profileId?: string) => Promise<void>
   deleteSnapshot: (gameId: string, snapshotId: string, profileId?: string) => Promise<void>
+  resetCache: () => void
 }
 
 export const useSaveManagerStore = create<SaveManagerState>((set, get) => ({
@@ -63,5 +64,9 @@ export const useSaveManagerStore = create<SaveManagerState>((set, get) => ({
   deleteSnapshot: async (gameId: string, snapshotId: string, profileId?: string) => {
     await saveService.deleteSaveSnapshot(gameId, snapshotId, profileId)
     await get().loadSnapshots(gameId, profileId)
+  },
+
+  resetCache: () => {
+    set({ saveDetailsByGame: {}, snapshotsByGame: {} })
   },
 }))

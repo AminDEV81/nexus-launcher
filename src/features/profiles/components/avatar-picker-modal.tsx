@@ -353,20 +353,25 @@ export function AvatarPickerModal({
                               isSelected && 'border-accent bg-accent/10 ring-1 ring-accent/30',
                             )}
                           >
-                            {/* Avatar Circle */}
-                            <div className="relative size-16 sm:size-18 my-1 flex items-center justify-center">
+                            {/* High-Res Avatar Circle */}
+                            <div className="relative size-18 sm:size-20 my-1 flex items-center justify-center">
                               <img
-                                src={item.preview_url || item.image_url}
+                                src={item.image_url || item.preview_url}
                                 alt={item.name}
                                 loading="lazy"
                                 onError={(e) => {
-                                  // Fallback gracefully on broken images
                                   const target = e.currentTarget
-                                  target.style.display = 'none'
-                                  const fallback = target.nextElementSibling as HTMLElement
-                                  if (fallback) fallback.style.display = 'flex'
+                                  if (target.src.endsWith('/library_600x900_2x.jpg')) {
+                                    target.src = target.src.replace('/library_600x900_2x.jpg', '/library_600x900.jpg')
+                                  } else if (target.src.endsWith('/library_600x900.jpg')) {
+                                    target.src = target.src.replace('/library_600x900.jpg', '/header.jpg')
+                                  } else {
+                                    target.style.display = 'none'
+                                    const fallback = target.nextElementSibling as HTMLElement
+                                    if (fallback) fallback.style.display = 'flex'
+                                  }
                                 }}
-                                className="size-full rounded-full object-cover border-2 border-border/80 group-hover:border-accent transition-colors shadow-sm"
+                                className="size-full rounded-full object-cover object-top border-2 border-border/80 group-hover:border-accent transition-all duration-200 shadow-md"
                               />
                               <div
                                 style={{ display: 'none' }}
