@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { assetUrl } from '@/lib/asset-url'
-import { ArchiveRestore } from 'lucide-react'
+import { ArchiveRestore, FolderOpen, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { useLaunchGame, useRestoreGameFromMemory } from '@/features/library/hooks/use-games'
 import { useLaunchStore } from '@/store/launch-store'

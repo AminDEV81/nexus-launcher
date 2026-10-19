@@ -139,7 +139,12 @@ export function mountEmbeddedGoogleAuth(
   return call<void>('mount_embedded_google_auth', { videoId, x, y, width, height })
 }
 
-export function updateEmbeddedTrailerBounds(x: number, y: number, width: number, height: number) {
+export function updateEmbeddedTrailerBounds(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
   return call<void>('update_embedded_trailer_bounds', { x, y, width, height })
 }
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   AlertTriangle,
@@ -197,7 +197,9 @@ export function HubSystemRequirements({
       return free > max ? free : max
     }, 0)
     const primaryGpu = pcSpecs.gpus.find((g) => g.is_primary) ?? pcSpecs.gpus[0]
-    const gpuVramGb = primaryGpu?.vram_bytes ? Math.round(primaryGpu.vram_bytes / 1024 ** 3) : null
+    const gpuVramGb = primaryGpu?.vram_bytes
+      ? Math.round(primaryGpu.vram_bytes / 1024 ** 3)
+      : null
 
     const minRamGb = parseGigabytes(minimum.memory) ?? 8
     const recRamGb = parseGigabytes(recommended.memory) ?? 16
@@ -313,8 +315,7 @@ export function HubSystemRequirements({
               </span>
             </div>
             <p className="text-xs text-subtle">
-              Minimum &amp; Recommended hardware specifications for {gameTitle || 'this title'}{' '}
-              compared against your PC
+              Minimum &amp; Recommended hardware specifications for {gameTitle || 'this title'} compared against your PC
             </p>
           </div>
         </div>

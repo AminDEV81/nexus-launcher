@@ -36,12 +36,8 @@ describe('match-download utilities', () => {
   it('matches downloads by direct game_id first and ignores completed entries', () => {
     const completed = makeDownload({ id: 'dl-done', status: 'completed' })
     const active = makeDownload({ id: 'dl-active', status: 'downloading' })
-    expect(
-      findActiveDownloadForGame([completed], { id: 'game-1', name: 'Elden Ring' }),
-    ).toBeUndefined()
-    expect(
-      findActiveDownloadForGame([completed, active], { id: 'game-1', name: 'Elden Ring' })?.id,
-    ).toBe('dl-active')
+    expect(findActiveDownloadForGame([completed], { id: 'game-1', name: 'Elden Ring' })).toBeUndefined()
+    expect(findActiveDownloadForGame([completed, active], { id: 'game-1', name: 'Elden Ring' })?.id).toBe('dl-active')
   })
 
   it('falls back to normalized game name matching on save_path or file_path', () => {

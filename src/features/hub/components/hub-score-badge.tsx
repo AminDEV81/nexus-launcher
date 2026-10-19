@@ -238,7 +238,9 @@ export function HubScoreBadge({
                 <span className="font-mono text-xs font-black tabular-nums text-white">
                   {Math.round(igdbRating)}%
                 </span>
-                <span className="text-[10px] font-extrabold text-white/75 uppercase">IGDB</span>
+                <span className="text-[10px] font-extrabold text-white/75 uppercase">
+                  IGDB
+                </span>
               </div>
               <span className="text-[10px] font-medium text-amber-200/85">{igdbTone.label}</span>
             </div>

@@ -307,9 +307,7 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
             <span
               className="mt-0.5 truncate text-xs font-semibold text-text"
               title={
-                details?.last_synced_at
-                  ? formatExactDateTime(details.last_synced_at)
-                  : 'Not synced yet'
+                details?.last_synced_at ? formatExactDateTime(details.last_synced_at) : 'Not synced yet'
               }
             >
               {details?.last_synced_at ? formatRelativeDate(details.last_synced_at) : 'Ready'}

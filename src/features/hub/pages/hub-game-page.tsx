@@ -102,9 +102,7 @@ export function HubGamePage() {
     try {
       await refreshCatalog.mutateAsync()
       await refetch()
-      toast.success(
-        `Synced latest screenshots, trailers & hardware specs for ${game?.name || 'game'}`,
-      )
+      toast.success(`Synced latest screenshots, trailers & hardware specs for ${game?.name || 'game'}`)
     } catch {
       void refetch()
     }

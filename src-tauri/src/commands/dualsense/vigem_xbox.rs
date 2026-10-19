@@ -4,9 +4,13 @@
 
 use super::models::{DualSenseProfileConfig, DualSenseRawInput, Xbox360EmulatedState};
 use std::sync::{
-    atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering},
     Arc,
 };
+
+/// Global bitmask tracking which ViGEmBus target serial numbers (`1..=16`) are currently claimed
+/// by our 4 controller slots so two slots never claim the same `serial_no` on separate bus handles.
+static CLAIMED_VIGEM_SERIALS: AtomicU32 = AtomicU32::new(0);
 
 // XUSB_BUTTON bitmask constants (matching XInput / ViGEmBus XUSB_REPORT.wButtons)
 pub const XUSB_GAMEPAD_DPAD_UP: u16 = 0x0001;
@@ -104,8 +108,6 @@ pub fn convert_dualsense_to_xbox360(
         w_buttons |= XUSB_GAMEPAD_DPAD_RIGHT;
     }
 
-    // When Touchpad Mouse Mode is enabled (DS4Windows default), Touchpad Click acts as Left/Right Mouse Click,
-    // while Create/Share acts as Xbox View (Back).
     let back = ds.create || (!cfg.touchpad_mouse_enabled && cfg.touchpad_as_xbox_back && ds.touchpad_click);
     let start = ds.options;
     let guide = ds.ps;
@@ -254,6 +256,7 @@ struct XusbRequestNotification {
 pub struct VigemXbox360Client {
     #[cfg(target_os = "windows")]
     bus_handle: isize,
+    slot_index: u8,
     serial_no: u32,
     plugged_in: AtomicBool,
     pub large_motor: Arc<AtomicU8>,
@@ -281,6 +284,7 @@ impl VigemXbox360Client {
         Self {
             #[cfg(target_os = "windows")]
             bus_handle: -1,
+            slot_index,
             serial_no: (slot_index as u32) + 1,
             plugged_in: AtomicBool::new(false),
             large_motor: Arc::new(AtomicU8::new(0)),
@@ -327,23 +331,32 @@ impl VigemXbox360Client {
                 size: std::mem::size_of::<VigemCheckVersion>() as u32,
                 version: 0x0001,
             };
-            win32_vigem::ioctl_sync(
+            win32_vigem::ioctl_timeout(
                 handle,
                 0x002AA00C,
                 &check as *const _ as *const u8,
                 check.size,
                 std::ptr::null_mut(),
                 0,
+                250,
             )
             .map_err(|e| {
                 win32_vigem::close_handle(handle);
                 format!("ViGEmBus version check failed: {}", e)
             })?;
 
-            let start_serial = self.serial_no.max(1);
+            let preferred_serial = (self.slot_index as u32) + 1;
             let mut chosen_serial = 0u32;
             for offset in 0..16u32 {
-                let serial = ((start_serial - 1 + offset) % 16) + 1;
+                let serial = ((preferred_serial - 1 + offset) % 16) + 1;
+                let bit = 1u32 << (serial - 1);
+
+                // Ensure no other slot in this process has already claimed `serial`
+                let prev_mask = CLAIMED_VIGEM_SERIALS.fetch_or(bit, Ordering::SeqCst);
+                if (prev_mask & bit) != 0 {
+                    continue;
+                }
+
                 let plugin = VigemPluginTarget {
                     size: std::mem::size_of::<VigemPluginTarget>() as u32,
                     serial_no: serial,
@@ -351,30 +364,35 @@ impl VigemXbox360Client {
                     vendor_id: 0x045E,
                     product_id: 0x028E,
                 };
-                if win32_vigem::ioctl_sync(
+                if win32_vigem::ioctl_timeout(
                     handle,
                     0x002AA004,
                     &plugin as *const _ as *const u8,
                     plugin.size,
                     std::ptr::null_mut(),
                     0,
+                    300,
                 )
                 .is_ok()
                 {
+                    // Bounded wait (180ms max) so plugging in multiple controllers never freezes PnP
                     let wait_ready = VigemWaitDeviceReady {
                         size: std::mem::size_of::<VigemWaitDeviceReady>() as u32,
                         serial_no: serial,
                     };
-                    let _ = win32_vigem::ioctl_sync(
+                    let _ = win32_vigem::ioctl_timeout(
                         handle,
                         0x002AA010,
                         &wait_ready as *const _ as *const u8,
                         wait_ready.size,
                         std::ptr::null_mut(),
                         0,
+                        180,
                     );
                     chosen_serial = serial;
                     break;
+                } else {
+                    CLAIMED_VIGEM_SERIALS.fetch_and(!bit, Ordering::SeqCst);
                 }
             }
 
@@ -385,11 +403,16 @@ impl VigemXbox360Client {
 
             self.bus_handle = handle;
             self.serial_no = chosen_serial;
+            self.led_number.store(self.slot_index, Ordering::Relaxed);
             self.plugged_in.store(true, Ordering::SeqCst);
             self.notify_stop.store(false, Ordering::SeqCst);
 
+            // Submit an initial neutral XUSB report immediately so Windows XInput registers the pad
+            let _ = self.submit_report(&XusbReport::default());
+
             let bus_handle = self.bus_handle;
             let serial_no = self.serial_no;
+            let slot_idx = self.slot_index;
             let large = self.large_motor.clone();
             let small = self.small_motor.clone();
             let led = self.led_number.clone();
@@ -402,22 +425,23 @@ impl VigemXbox360Client {
                         serial_no,
                         large_motor: 0,
                         small_motor: 0,
-                        led_number: 0,
+                        led_number: slot_idx,
                         _pad: 0,
                     };
-                    if win32_vigem::ioctl_sync(
+                    if win32_vigem::ioctl_timeout(
                         bus_handle,
                         0x002AE804,
                         &req as *const _ as *const u8,
                         req.size,
                         &mut req as *mut _ as *mut u8,
                         req.size,
+                        120,
                     )
                     .is_ok()
                     {
                         large.store(req.large_motor, Ordering::Relaxed);
                         small.store(req.small_motor, Ordering::Relaxed);
-                        led.store(req.led_number, Ordering::Relaxed);
+                        led.store(req.led_number.min(3), Ordering::Relaxed);
                     } else {
                         std::thread::sleep(std::time::Duration::from_millis(25));
                     }
@@ -425,7 +449,8 @@ impl VigemXbox360Client {
             });
 
             Ok(format!(
-                "Virtual Xbox 360 Controller (VID_045E&PID_028E, Slot #{}) plugged into ViGEmBus.",
+                "Virtual Xbox 360 Controller (VID_045E&PID_028E, Slot #{}, XInput #{}) plugged into ViGEmBus.",
+                self.slot_index + 1,
                 chosen_serial
             ))
         }
@@ -456,13 +481,14 @@ impl VigemXbox360Client {
                 serial_no: self.serial_no,
                 report: *report,
             };
-            let ok = win32_vigem::ioctl_sync(
+            let ok = win32_vigem::ioctl_timeout(
                 self.bus_handle,
                 0x002AA808,
                 &payload as *const _ as *const u8,
                 std::mem::size_of::<XusbSubmitReport>() as u32,
                 std::ptr::null_mut(),
                 0,
+                10,
             )
             .is_ok();
             if ok {
@@ -487,20 +513,28 @@ impl VigemXbox360Client {
         self.notify_stop.store(true, Ordering::SeqCst);
         self.plugged_in.store(false, Ordering::SeqCst);
 
+        if self.serial_no >= 1 && self.serial_no <= 16 {
+            let bit = 1u32 << (self.serial_no - 1);
+            CLAIMED_VIGEM_SERIALS.fetch_and(!bit, Ordering::SeqCst);
+        }
+
         #[cfg(target_os = "windows")]
         {
             if self.bus_handle != -1 {
+                // Cancel any pending notification IRP before unplugging or closing the handle so it never hangs!
+                win32_vigem::cancel_io(self.bus_handle);
                 let unplug = VigemUnplugTarget {
                     size: std::mem::size_of::<VigemUnplugTarget>() as u32,
                     serial_no: self.serial_no,
                 };
-                let _ = win32_vigem::ioctl_sync(
+                let _ = win32_vigem::ioctl_timeout(
                     self.bus_handle,
                     0x002AA008,
                     &unplug as *const _ as *const u8,
                     unplug.size,
                     std::ptr::null_mut(),
                     0,
+                    150,
                 );
                 win32_vigem::close_handle(self.bus_handle);
                 self.bus_handle = -1;
@@ -615,6 +649,8 @@ pub mod win32_vigem {
             lp_number_of_bytes_transferred: *mut u32,
             b_wait: i32,
         ) -> i32;
+        pub fn WaitForSingleObject(h_handle: isize, dw_milliseconds: u32) -> u32;
+        pub fn CancelIoEx(h_file: isize, lp_overlapped: *const Overlapped) -> i32;
         pub fn GetLastError() -> u32;
         pub fn CloseHandle(h_object: isize) -> i32;
     }
@@ -711,16 +747,17 @@ pub mod win32_vigem {
         }
     }
 
-    pub fn ioctl_sync(
+    pub fn ioctl_timeout(
         handle: isize,
         ioctl_code: u32,
         in_buf: *const u8,
         in_len: u32,
         out_buf: *mut u8,
         out_len: u32,
+        timeout_ms: u32,
     ) -> Result<u32, String> {
         unsafe {
-            let event = CreateEventW(std::ptr::null(), 0, 0, std::ptr::null());
+            let event = CreateEventW(std::ptr::null(), 1, 0, std::ptr::null());
             let mut ov = Overlapped {
                 internal: 0,
                 internal_high: 0,
@@ -750,6 +787,17 @@ pub mod win32_vigem {
                         ioctl_code, err
                     ));
                 }
+                if WaitForSingleObject(event, timeout_ms) != 0 {
+                    let _ = CancelIoEx(handle, &ov);
+                    let _ = GetOverlappedResult(handle, &ov, &mut transferred, 1);
+                    if event != 0 {
+                        let _ = CloseHandle(event);
+                    }
+                    return Err(format!(
+                        "DeviceIoControl(0x{:08X}) timed out after {}ms",
+                        ioctl_code, timeout_ms
+                    ));
+                }
             }
             let ok = GetOverlappedResult(handle, &ov, &mut transferred, 1);
             let err = GetLastError();
@@ -763,6 +811,26 @@ pub mod win32_vigem {
                 ));
             }
             Ok(transferred)
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn ioctl_sync(
+        handle: isize,
+        ioctl_code: u32,
+        in_buf: *const u8,
+        in_len: u32,
+        out_buf: *mut u8,
+        out_len: u32,
+    ) -> Result<u32, String> {
+        ioctl_timeout(handle, ioctl_code, in_buf, in_len, out_buf, out_len, 250)
+    }
+
+    pub fn cancel_io(handle: isize) {
+        if handle != INVALID_HANDLE_VALUE && handle != 0 {
+            unsafe {
+                let _ = CancelIoEx(handle, std::ptr::null());
+            }
         }
     }
 

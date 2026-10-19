@@ -4,6 +4,7 @@ import {
   ExternalLink,
   Play,
   Film,
+  ShieldAlert,
   ShieldCheck,
   LogIn,
   Check,
@@ -140,14 +141,7 @@ export function HubTrailerModal({
     return () => {
       cancelled = true
     }
-  }, [
-    open,
-    currentVideo?.video_id,
-    currentVideo?.name,
-    gameName,
-    steamAppId,
-    handleMountDockedYouTube,
-  ])
+  }, [open, currentVideo?.video_id, currentVideo?.name, gameName, steamAppId, handleMountDockedYouTube])
 
   // Continuously lock docked native WebView bounds to the exact fixed container frame (no manual resizing!)
   useEffect(() => {
@@ -539,8 +533,7 @@ export function HubTrailerModal({
                       </span>
                       <div className="min-w-0">
                         <p className="font-bold text-emerald-400 truncate">
-                          Uncensored Direct HD Stream Active (
-                          {resolvedStream?.stream_source || 'Direct Stream'})
+                          Uncensored Direct HD Stream Active ({resolvedStream?.stream_source || 'Direct Stream'})
                         </p>
                       </div>
                     </>
@@ -598,8 +591,7 @@ export function HubTrailerModal({
                 <div className="border-t border-border/80 bg-surface-raised/80 p-3 sm:px-5">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-subtle">
-                      Available Trailers (
-                      {videos.length + (resolvedStream?.steam_movies?.length ?? 0)})
+                      Available Trailers ({videos.length + (resolvedStream?.steam_movies?.length ?? 0)})
                     </span>
                     <span className="text-[11px] text-emerald-400 font-semibold">
                       Direct HD streams play uncensored with zero age restrictions

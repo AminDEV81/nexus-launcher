@@ -24,7 +24,10 @@ export function useRefreshGameSoundtrack(game?: GameIdentity | null) {
     },
     onSuccess: (freshAlbums) => {
       if (game?.gameId) {
-        queryClient.setQueryData(['soundtrack', 'game', game.gameId, game.title], freshAlbums)
+        queryClient.setQueryData(
+          ['soundtrack', 'game', game.gameId, game.title],
+          freshAlbums,
+        )
         void queryClient.invalidateQueries({ queryKey: ['soundtrack', 'all-albums'] })
       }
     },

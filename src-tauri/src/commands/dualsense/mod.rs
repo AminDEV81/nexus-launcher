@@ -6,7 +6,7 @@ pub mod touchpad_mouse;
 pub mod vigem_xbox;
 
 use self::hid_driver::{build_dualsense_output_report, parse_dualsense_input_report};
-use self::hidhide::{configure_hidhide_cloaking, is_hidhide_installed, re_enable_hid_device};
+use self::hidhide::{configure_hidhide_cloaking, is_hidhide_installed};
 use self::models::{
     ControllerSlotSnapshot, DriverStatusInfo, DualSenseProfileConfig, DualSenseRawInput,
     DualSenseTelemetrySnapshot, VirtualControllerOverride, Xbox360EmulatedState,
@@ -245,6 +245,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
         DualSenseRawInput::for_slot(2),
         DualSenseRawInput::for_slot(3),
     ];
+
     #[cfg(target_os = "windows")]
     let mut read_buf = [0u8; 128];
 
@@ -258,7 +259,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
             fr
         };
 
-        // 1. Handle Windows Multi-Controller HID Enumeration, Hot-Unplug Verification & Shared/Exclusive Mode transitions
+        // 1. Handle Windows Multi-Controller HID Enumeration & Fast Mode Transitions
         #[cfg(target_os = "windows")]
         {
             for slot_idx in 0..MAX_CONTROLLER_SLOTS {
@@ -282,9 +283,6 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                         let want_exclusive = emulation_active && hide_ps5;
                         let hidhide_ok =
                             configure_hidhide_cloaking(&dev.instance_id, want_exclusive);
-                        if want_exclusive {
-                            let _ = re_enable_hid_device(&dev.instance_id);
-                        }
                         match hid_driver::win32_hid::open_controller_handle(
                             &dev.device_path,
                             want_exclusive,
@@ -321,45 +319,19 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                 }
             }
 
-            // Periodic hot-plug & hot-unplug verification every 1000ms
-            if last_scan.elapsed() >= Duration::from_millis(1000) || force_rescan {
+            // Periodic hot-plug discovery every 1500ms (or on explicit rescan)
+            // NOTE: Already-open controllers (`active_handles[slot_idx] != -1`) are NEVER closed here;
+            // physical unplugging is detected immediately by `read_hid_report_overlapped` returning `Err`!
+            if last_scan.elapsed() >= Duration::from_millis(1500) || force_rescan {
                 last_scan = Instant::now();
                 let found = hid_driver::win32_hid::enumerate_sony_controllers();
 
-                // First: check if any currently open slot's physical controller was unplugged from the system!
-                for slot_idx in 0..MAX_CONTROLLER_SLOTS {
-                    if active_handles[slot_idx] != -1 {
-                        let still_present = active_devs[slot_idx].as_ref().map_or(false, |open_dev| {
-                            found.iter().any(|f| {
-                                f.device_path.eq_ignore_ascii_case(&open_dev.device_path)
-                            })
-                        });
-                        if !still_present {
-                            crate::commands::dualsense::vigem_xbox::win32_vigem::close_handle(
-                                active_handles[slot_idx],
-                            );
-                            active_handles[slot_idx] = -1;
-                            active_devs[slot_idx] = None;
-                            hw_states[slot_idx] = DualSenseRawInput::for_slot(slot_idx as u8);
-                            let mut guard = inner.lock().unwrap();
-                            guard.slots[slot_idx].virtual_override.web_gamepad_connected = false;
-                            guard.slots[slot_idx].virtual_override.active = false;
-                            guard.push_log(format!(
-                                "Slot #{}: Controller unplugged from system — status updated to Disconnected.",
-                                slot_idx + 1
-                            ));
-                        }
-                    }
-                }
-
-                // Second: connect any newly plugged-in controllers to free slots
                 for dev in found {
                     let already_open = (0..MAX_CONTROLLER_SLOTS).any(|idx| {
                         active_handles[idx] != -1
                             && active_devs[idx].as_ref().map_or(false, |d| {
                                 d.device_path.eq_ignore_ascii_case(&dev.device_path)
-                                    || (d.serial_mac != "00:00:00:00:00:00"
-                                        && d.serial_mac == dev.serial_mac)
+                                    || d.serial_mac.eq_ignore_ascii_case(&dev.serial_mac)
                             })
                     });
                     if already_open {
@@ -379,9 +351,6 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                         let want_exclusive = emulation_active && hide_ps5;
                         let hidhide_ok =
                             configure_hidhide_cloaking(&dev.instance_id, want_exclusive);
-                        if want_exclusive {
-                            let _ = re_enable_hid_device(&dev.instance_id);
-                        }
                         if let Ok((h, is_excl)) = hid_driver::win32_hid::open_controller_handle(
                             &dev.device_path,
                             want_exclusive,
@@ -404,12 +373,17 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                             hw_states[free_slot].product_id = dev.product_id;
 
                             let mut guard = inner.lock().unwrap();
+                            // Clear any stale web gamepad override when a real physical HID controller connects
+                            guard.slots[free_slot].virtual_override = VirtualControllerOverride {
+                                slot_index: free_slot as u8,
+                                ..Default::default()
+                            };
                             guard.slots[free_slot].xbox.ps5_hidden_exclusive =
                                 is_excl || hidhide_ok;
                             guard.slots[free_slot].xbox.hidhide_active = hidhide_ok;
                             guard.slots[free_slot].output_dirty = true;
                             guard.push_log(format!(
-                                "Slot #{}: Connected {} ({}, MAC {})",
+                                "Slot #{}: Connected {} ({}, ID {})",
                                 free_slot + 1,
                                 dev.product_name,
                                 hw_states[free_slot].connection_type,
@@ -421,7 +395,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                 }
             }
 
-            // 2. Read raw HID input reports across all connected controller slots
+            // 2. Read raw HID input reports across all connected controller slots (drains latest packet in <= 1ms)
             for slot_idx in 0..MAX_CONTROLLER_SLOTS {
                 if active_handles[slot_idx] != -1 {
                     if let Some(ref dev) = active_devs[slot_idx] {
@@ -429,7 +403,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                         match hid_driver::win32_hid::read_hid_report_overlapped(
                             active_handles[slot_idx],
                             &mut read_buf[..read_len],
-                            3,
+                            1,
                         ) {
                             Ok(bytes_read) if bytes_read >= 64 => {
                                 let _ = parse_dualsense_input_report(
@@ -439,16 +413,20 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                                 );
                                 hw_states[slot_idx].connected = true;
                                 hw_states[slot_idx].input_latency_us =
-                                    loop_start.elapsed().as_micros().max(400) as u64;
+                                    loop_start.elapsed().as_micros().max(250) as u64;
                             }
                             Ok(_) => {}
                             Err(_) => {
+                                let old_instance = dev.instance_id.clone();
                                 crate::commands::dualsense::vigem_xbox::win32_vigem::close_handle(
                                     active_handles[slot_idx],
                                 );
                                 active_handles[slot_idx] = -1;
                                 active_devs[slot_idx] = None;
                                 hw_states[slot_idx] = DualSenseRawInput::for_slot(slot_idx as u8);
+                                if !old_instance.is_empty() {
+                                    let _ = configure_hidhide_cloaking(&old_instance, false);
+                                }
                                 let mut guard = inner.lock().unwrap();
                                 guard.slots[slot_idx].virtual_override.web_gamepad_connected =
                                     false;
@@ -469,105 +447,121 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
             let _ = (last_scan, force_rescan);
         }
 
-        // 3. Process all 4 slots: merge virtual override, run Touchpad Mouse engine, submit Xbox 360 reports
+        // Check if any physical Win32 HID controller is open so we never let browser Gamepad API
+        // create phantom controllers from Virtual Xbox 360 pads in empty slots!
+        #[cfg(target_os = "windows")]
+        let any_physical_hid_open = active_handles.iter().any(|&h| h != -1);
+        #[cfg(not(target_os = "windows"))]
+        let any_physical_hid_open = false;
+
+        // 3. Process all 4 slots inside a minimal lock, collecting output reports to send AFTER releasing the lock!
         let mut any_connected_or_emulating = false;
-        let mut guard = inner.lock().unwrap();
-        for slot_idx in 0..MAX_CONTROLLER_SLOTS {
-            let slot = &mut guard.slots[slot_idx];
-            let mut final_ds =
-                merge_virtual_override(&hw_states[slot_idx], &slot.virtual_override);
+        #[cfg(target_os = "windows")]
+        let mut pending_hid_writes: Vec<(isize, Vec<u8>)> = Vec::new();
 
-            // Only mark connected if physically connected via Win32 HID OR actively connected via Web Gamepad API
-            if hw_states[slot_idx].connected {
-                final_ds.connected = true;
-            } else if slot.virtual_override.web_gamepad_connected {
-                final_ds.connected = true;
-                final_ds.connection_type = "Gamepad".to_string();
-                if final_ds.battery_percent == 0 {
-                    final_ds.battery_percent = 100;
+        {
+            let mut guard = inner.lock().unwrap();
+            for slot_idx in 0..MAX_CONTROLLER_SLOTS {
+                let slot = &mut guard.slots[slot_idx];
+                if any_physical_hid_open && !hw_states[slot_idx].connected {
+                    // Prevent Virtual Xbox 360 gamepads in `navigator.getGamepads()` from marking empty slots connected
+                    slot.virtual_override.web_gamepad_connected = false;
                 }
-            } else {
-                final_ds.connected = false;
-                final_ds.connection_type = "Disconnected".to_string();
-                final_ds.battery_percent = 0;
-            }
 
-            let emulation_active = slot.xbox.emulation_active;
-            if final_ds.connected || emulation_active || slot.virtual_override.active {
-                any_connected_or_emulating = true;
-            }
+                let mut final_ds =
+                    merge_virtual_override(&hw_states[slot_idx], &slot.virtual_override);
 
-            let (m_left, m_right) =
-                slot.mouse_tracker
-                    .process_frame(&final_ds, &slot.config, emulation_active);
-            final_ds.mouse_left_click = m_left;
-            final_ds.mouse_right_click = m_right;
+                if hw_states[slot_idx].connected {
+                    final_ds.connected = true;
+                } else if !any_physical_hid_open && slot.virtual_override.web_gamepad_connected {
+                    final_ds.connected = true;
+                    final_ds.connection_type = "Gamepad".to_string();
+                    if final_ds.battery_percent == 0 {
+                        final_ds.battery_percent = 100;
+                    }
+                } else {
+                    final_ds.connected = false;
+                    final_ds.connection_type = "Disconnected".to_string();
+                    final_ds.battery_percent = 0;
+                }
 
-            let vigem_connected = slot.vigem_client.is_plugged_in();
-            let large_motor = slot.vigem_client.large_motor.load(Ordering::Relaxed);
-            let small_motor = slot.vigem_client.small_motor.load(Ordering::Relaxed);
-            let led_number = slot.vigem_client.led_number.load(Ordering::Relaxed);
-            let packets_sent = slot.vigem_client.packets_sent.load(Ordering::Relaxed);
+                let emulation_active = slot.xbox.emulation_active;
+                if final_ds.connected || emulation_active || slot.virtual_override.active {
+                    any_connected_or_emulating = true;
+                }
 
-            let ps5_hidden_exclusive = if emulation_active {
-                slot.xbox.ps5_hidden_exclusive || slot.config.hide_ps5_controller
-            } else {
-                false
-            };
-            let hidhide_active = slot.xbox.hidhide_active;
+                let (m_left, m_right) =
+                    slot.mouse_tracker
+                        .process_frame(&final_ds, &slot.config, emulation_active);
+                final_ds.mouse_left_click = m_left;
+                final_ds.mouse_right_click = m_right;
 
-            let (xbox_state, xusb_report) = convert_dualsense_to_xbox360(
-                &final_ds,
-                &slot.config,
-                emulation_active,
-                vigem_connected,
-                led_number,
-                ps5_hidden_exclusive,
-                hidhide_active,
-                large_motor,
-                small_motor,
-                packets_sent,
-            );
+                let vigem_connected = slot.vigem_client.is_plugged_in();
+                let large_motor = slot.vigem_client.large_motor.load(Ordering::Relaxed);
+                let small_motor = slot.vigem_client.small_motor.load(Ordering::Relaxed);
+                let led_number = slot.vigem_client.led_number.load(Ordering::Relaxed);
+                let packets_sent = slot.vigem_client.packets_sent.load(Ordering::Relaxed);
 
-            if emulation_active && vigem_connected {
-                let _ = slot.vigem_client.submit_report(&xusb_report);
-            }
+                let ps5_hidden_exclusive = if emulation_active {
+                    slot.xbox.ps5_hidden_exclusive || slot.config.hide_ps5_controller
+                } else {
+                    false
+                };
+                let hidhide_active = slot.xbox.hidhide_active;
 
-            slot.dualsense = final_ds;
-            slot.xbox = xbox_state;
+                let (xbox_state, xusb_report) = convert_dualsense_to_xbox360(
+                    &final_ds,
+                    &slot.config,
+                    emulation_active,
+                    vigem_connected,
+                    led_number,
+                    ps5_hidden_exclusive,
+                    hidhide_active,
+                    large_motor,
+                    small_motor,
+                    packets_sent,
+                );
 
-            let rumble_changed = (large_motor, small_motor) != last_rumbles[slot_idx];
-            let should_send_output = slot.output_dirty
-                || rumble_changed
-                || last_output_sent[slot_idx].elapsed() >= Duration::from_secs(2);
+                if emulation_active && vigem_connected {
+                    let _ = slot.vigem_client.submit_report(&xusb_report);
+                }
 
-            if should_send_output {
-                slot.output_dirty = false;
-                last_rumbles[slot_idx] = (large_motor, small_motor);
-                last_output_sent[slot_idx] = Instant::now();
+                slot.dualsense = final_ds;
+                slot.xbox = xbox_state;
 
-                #[cfg(target_os = "windows")]
-                if active_handles[slot_idx] != -1 {
-                    if let Some(ref dev) = active_devs[slot_idx] {
-                        let report = build_dualsense_output_report(
-                            &slot.config,
-                            large_motor,
-                            small_motor,
-                            dev.is_bluetooth,
-                            dev.output_report_len as usize,
-                        );
-                        let _ = hid_driver::win32_hid::write_hid_report_overlapped(
-                            active_handles[slot_idx],
-                            &report,
-                            12,
-                        );
+                let rumble_changed = (large_motor, small_motor) != last_rumbles[slot_idx];
+                let should_send_output = slot.output_dirty
+                    || rumble_changed
+                    || last_output_sent[slot_idx].elapsed() >= Duration::from_secs(2);
+
+                if should_send_output {
+                    slot.output_dirty = false;
+                    last_rumbles[slot_idx] = (large_motor, small_motor);
+                    last_output_sent[slot_idx] = Instant::now();
+
+                    #[cfg(target_os = "windows")]
+                    if active_handles[slot_idx] != -1 {
+                        if let Some(ref dev) = active_devs[slot_idx] {
+                            let report = build_dualsense_output_report(
+                                &slot.config,
+                                large_motor,
+                                small_motor,
+                                dev.is_bluetooth,
+                                dev.output_report_len as usize,
+                            );
+                            pending_hid_writes.push((active_handles[slot_idx], report));
+                        }
                     }
                 }
             }
         }
-        drop(guard);
 
-        // Adaptive sleep: 4ms (250Hz) when a controller is connected/active, 35ms (~28Hz) when idle to keep CPU usage near 0%
+        // Send output reports OUTSIDE the engine mutex so UI IPC calls never wait on USB/BT writes!
+        #[cfg(target_os = "windows")]
+        for (handle, report) in pending_hid_writes {
+            let _ = hid_driver::win32_hid::write_hid_report_overlapped(handle, &report, 8);
+        }
+
         let target_sleep = if any_connected_or_emulating {
             Duration::from_millis(4)
         } else {
@@ -605,97 +599,123 @@ pub fn dualsense_select_slot(
 }
 
 #[tauri::command]
-pub fn dualsense_set_xbox_emulation(
+pub async fn dualsense_set_xbox_emulation(
     enabled: bool,
     slot_index: Option<u8>,
     all_slots: Option<bool>,
     state: tauri::State<'_, DualSenseEngineState>,
 ) -> Result<DualSenseTelemetrySnapshot, String> {
     state.ensure_worker_started();
-    let mut guard = state.inner.lock().map_err(|e| e.to_string())?;
+    let inner = state.inner.clone();
 
-    let target_indices: Vec<usize> = if all_slots.unwrap_or(false) {
-        (0..MAX_CONTROLLER_SLOTS).collect()
-    } else {
-        let idx = slot_index.unwrap_or(guard.active_slot) as usize;
-        vec![idx.min(MAX_CONTROLLER_SLOTS - 1)]
-    };
+    tokio::task::spawn_blocking(move || {
+        let mut guard = inner.lock().map_err(|e| e.to_string())?;
 
-    let mut log_messages = Vec::new();
-    let mut any_vigem_ok = false;
-
-    for idx in target_indices {
-        let slot = &mut guard.slots[idx];
-        if enabled {
-            match slot.vigem_client.connect_and_plug_in() {
-                Ok(msg) => {
-                    log_messages.push(format!("Slot #{}: {}", idx + 1, msg));
-                    any_vigem_ok = true;
+        let target_indices: Vec<usize> = if all_slots.unwrap_or(false) {
+            if enabled {
+                // When clicking "Activate All", activate all physically connected slots!
+                // Disconnected slots must NOT be activated (prevents spawning phantom Xbox pads on empty slots).
+                let connected_indices: Vec<usize> = (0..MAX_CONTROLLER_SLOTS)
+                    .filter(|&i| {
+                        guard.slots[i].dualsense.connected
+                            || !guard.slots[i].dualsense.device_path.is_empty()
+                    })
+                    .collect();
+                if connected_indices.is_empty() {
+                    // Fallback if 0 physical controllers are connected (virtual testing mode): activate active_slot
+                    vec![(guard.active_slot as usize).min(MAX_CONTROLLER_SLOTS - 1)]
+                } else {
+                    connected_indices
                 }
-                Err(err) => {
-                    log_messages.push(format!(
-                        "Slot #{}: ViGEmBus notice ({}) — Xbox 360 XInput & Touchpad Mouse active.",
-                        idx + 1,
-                        err
-                    ));
-                }
-            }
-
-            let inst_id = slot.dualsense.instance_id.clone();
-            let hide_ok = if !inst_id.is_empty() && slot.config.hide_ps5_controller {
-                configure_hidhide_cloaking(&inst_id, true)
             } else {
-                false
-            };
-
-            slot.xbox.emulation_active = true;
-            slot.xbox.vigem_connected = slot.vigem_client.is_plugged_in();
-            slot.xbox.hidhide_active = hide_ok;
-            slot.xbox.ps5_hidden_exclusive = slot.config.hide_ps5_controller;
-            slot.mode_changed = true;
-            slot.output_dirty = true;
-        } else {
-            slot.vigem_client.unplug_and_disconnect();
-            let inst_id = slot.dualsense.instance_id.clone();
-            if !inst_id.is_empty() {
-                let _ = configure_hidhide_cloaking(&inst_id, false);
+                // When stopping all, stop all 4 slots
+                (0..MAX_CONTROLLER_SLOTS).collect()
             }
+        } else {
+            let idx = slot_index.unwrap_or(guard.active_slot) as usize;
+            vec![idx.min(MAX_CONTROLLER_SLOTS - 1)]
+        };
 
-            slot.xbox.emulation_active = false;
-            slot.xbox.vigem_connected = false;
-            slot.xbox.hidhide_active = false;
-            slot.xbox.ps5_hidden_exclusive = false;
-            slot.mode_changed = true;
-            slot.output_dirty = true;
-            log_messages.push(format!(
-                "Slot #{}: Restored to Native PS5 DualSense Mode.",
-                idx + 1
-            ));
+        // If `all_slots` was requested with `enabled == true`, also make sure any disconnected slot
+        // that is NOT in `target_indices` is cleanly unplugged and cleared!
+        if all_slots.unwrap_or(false) && enabled {
+            for idx in 0..MAX_CONTROLLER_SLOTS {
+                if !target_indices.contains(&idx) && guard.slots[idx].xbox.emulation_active {
+                    guard.slots[idx].vigem_client.unplug_and_disconnect();
+                    guard.slots[idx].xbox.emulation_active = false;
+                    guard.slots[idx].xbox.vigem_connected = false;
+                    guard.slots[idx].xbox.hidhide_active = false;
+                    guard.slots[idx].xbox.ps5_hidden_exclusive = false;
+                    guard.slots[idx].mode_changed = true;
+                }
+            }
         }
-    }
 
-    if any_vigem_ok {
-        guard.driver_status.vigembus_installed = true;
-    }
-    for msg in log_messages {
-        guard.push_log(msg);
-    }
+        let mut log_messages = Vec::new();
+        let mut any_vigem_ok = false;
 
-    let any_active = guard.slots.iter().any(|s| s.xbox.emulation_active);
-    guard.driver_status.exclusive_access_granted = any_active;
-    if any_active {
-        guard.driver_status.active_mode_label =
-            "Xbox 360 Emulation + Touchpad Mouse Active (PS5 Cloaked)".to_string();
-        guard.driver_status.status_message =
-            "Xbox 360 Emulation ACTIVE: PS5 DualSense is hidden from games, Virtual Xbox 360 Controller is active, and PS5 Touchpad acts as Windows Mouse (Left/Right Click).".to_string();
-    } else {
-        guard.driver_status.active_mode_label =
-            "PS5 DualSense Native Mode (Active in Games)".to_string();
-        guard.driver_status.status_message =
-            "Native PS5 Mode ACTIVE: Games detect your PS5 DualSense controller(s) directly.".to_string();
-    }
+        for idx in target_indices {
+            let slot = &mut guard.slots[idx];
+            if enabled {
+                match slot.vigem_client.connect_and_plug_in() {
+                    Ok(msg) => {
+                        log_messages.push(format!("Slot #{}: {}", idx + 1, msg));
+                        any_vigem_ok = true;
+                    }
+                    Err(err) => {
+                        log_messages.push(format!(
+                            "Slot #{}: ViGEmBus notice ({}) — Xbox 360 XInput & Touchpad Mouse active.",
+                            idx + 1,
+                            err
+                        ));
+                    }
+                }
 
-    Ok(guard.build_snapshot())
+                slot.xbox.emulation_active = true;
+                slot.xbox.vigem_connected = slot.vigem_client.is_plugged_in();
+                slot.xbox.ps5_hidden_exclusive = slot.config.hide_ps5_controller;
+                slot.mode_changed = true;
+                slot.output_dirty = true;
+            } else {
+                slot.vigem_client.unplug_and_disconnect();
+                slot.xbox.emulation_active = false;
+                slot.xbox.vigem_connected = false;
+                slot.xbox.hidhide_active = false;
+                slot.xbox.ps5_hidden_exclusive = false;
+                slot.mode_changed = true;
+                slot.output_dirty = true;
+                log_messages.push(format!(
+                    "Slot #{}: Restored to Native PS5 DualSense Mode.",
+                    idx + 1
+                ));
+            }
+        }
+
+        if any_vigem_ok {
+            guard.driver_status.vigembus_installed = true;
+        }
+        for msg in log_messages {
+            guard.push_log(msg);
+        }
+
+        let any_active = guard.slots.iter().any(|s| s.xbox.emulation_active);
+        guard.driver_status.exclusive_access_granted = any_active;
+        if any_active {
+            guard.driver_status.active_mode_label =
+                "Xbox 360 Emulation + Touchpad Mouse Active (PS5 Cloaked)".to_string();
+            guard.driver_status.status_message =
+                "Xbox 360 Emulation ACTIVE: PS5 DualSense is hidden from games, Virtual Xbox 360 Controller is active, and PS5 Touchpad acts as Windows Mouse (Left/Right Click).".to_string();
+        } else {
+            guard.driver_status.active_mode_label =
+                "PS5 DualSense Native Mode (Active in Games)".to_string();
+            guard.driver_status.status_message =
+                "Native PS5 Mode ACTIVE: Games detect your PS5 DualSense controller(s) directly.".to_string();
+        }
+
+        Ok(guard.build_snapshot())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -719,19 +739,27 @@ pub fn dualsense_update_config(
 
 #[tauri::command]
 pub fn dualsense_set_virtual_override(
-    override_state: VirtualControllerOverride,
+    mut override_state: VirtualControllerOverride,
     state: tauri::State<'_, DualSenseEngineState>,
 ) -> Result<DualSenseTelemetrySnapshot, String> {
     state.ensure_worker_started();
     let mut guard = state.inner.lock().map_err(|e| e.to_string())?;
     let idx = (override_state.slot_index as usize).min(MAX_CONTROLLER_SLOTS - 1);
+
+    let any_native_hid = guard
+        .slots
+        .iter()
+        .any(|s| !s.dualsense.device_path.is_empty());
+    if any_native_hid && guard.slots[idx].dualsense.device_path.is_empty() {
+        override_state.web_gamepad_connected = false;
+    }
+
     let slot = &mut guard.slots[idx];
     let was_web_pad = slot.virtual_override.web_gamepad_connected;
     let now_web_pad = override_state.web_gamepad_connected;
 
-    // Reset baseline DualSense buttons/axes before applying the new override so released buttons clear immediately
     if !slot.dualsense.device_path.is_empty() {
-        // Physical Win32 HID is connected: keep its hardware state
+        // Physical Win32 HID is connected: preserve its hardware baseline
     } else {
         let mut clean = DualSenseRawInput::for_slot(idx as u8);
         if now_web_pad {

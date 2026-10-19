@@ -394,9 +394,9 @@ export function ExpandedPlayer() {
                   key={currentAlbum?.id || currentGame?.gameId || currentTrack.id}
                   className="mt-1.5 text-sm sm:text-base font-semibold text-accent"
                 >
-                  {currentAlbum &&
-                  (!currentGame ||
-                    (currentAlbum.game_id && currentGame.gameId !== currentAlbum.game_id))
+                  {(currentAlbum &&
+                    (!currentGame ||
+                      (currentAlbum.game_id && currentGame.gameId !== currentAlbum.game_id)))
                     ? cleanGameTitleFromAlbumTitle(currentAlbum.title)
                     : currentGame?.title ||
                       (currentAlbum ? cleanGameTitleFromAlbumTitle(currentAlbum.title) : '')}

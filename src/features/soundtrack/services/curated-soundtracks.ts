@@ -35,20 +35,12 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     tracks: [
       { title: 'The Trail', artist: 'Marcin Przybyłowicz', durationSec: 169 },
       { title: 'Geralt of Rivia', artist: 'Marcin Przybyłowicz', durationSec: 141 },
-      {
-        title: 'Silver for Monsters...',
-        artist: 'Marcin Przybyłowicz, Percival',
-        durationSec: 139,
-      },
+      { title: 'Silver for Monsters...', artist: 'Marcin Przybyłowicz, Percival', durationSec: 139 },
       { title: '...Steel for Humans', artist: 'Marcin Przybyłowicz, Percival', durationSec: 87 },
       { title: 'Kaer Morhen', artist: 'Marcin Przybyłowicz', durationSec: 155 },
       { title: 'The Fields of Ard Skellig', artist: 'Marcin Przybyłowicz', durationSec: 189 },
       { title: 'Ladies of the Woods', artist: 'Marcin Przybyłowicz', durationSec: 111 },
-      {
-        title: 'The Wolven Storm (Priscilla’s Song)',
-        artist: 'Marcin Przybyłowicz',
-        durationSec: 185,
-      },
+      { title: 'The Wolven Storm (Priscilla’s Song)', artist: 'Marcin Przybyłowicz', durationSec: 185 },
       { title: 'Hunt or Be Hunted', artist: 'Marcin Przybyłowicz', durationSec: 145 },
       { title: 'Lullaby of Woe', artist: 'Marcin Przybyłowicz', durationSec: 151 },
     ],
@@ -65,11 +57,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Chippin’ In', artist: 'SAMURAI', durationSec: 214 },
       { title: 'Outsider No More', artist: 'P.T. Adamczyk', durationSec: 230 },
       { title: 'No Save Point', artist: 'Run The Jewels', durationSec: 194 },
-      {
-        title: 'I Really Want to Stay at Your House',
-        artist: ' Rosa Walton & Hallie Coggins',
-        durationSec: 246,
-      },
+      { title: 'I Really Want to Stay at Your House', artist: ' Rosa Walton & Hallie Coggins', durationSec: 246 },
     ],
   },
   'baldurs gate 3': {
@@ -149,11 +137,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     artist: 'Ilan Eshkeri & Shigeru Umebayashi',
     releaseYear: '2020',
     tracks: [
-      {
-        title: 'The Way of the Ghost',
-        artist: 'Ilan Eshkeri feat. Clare Uchima',
-        durationSec: 216,
-      },
+      { title: 'The Way of the Ghost', artist: 'Ilan Eshkeri feat. Clare Uchima', durationSec: 216 },
       { title: 'Jin Sakai', artist: 'Ilan Eshkeri', durationSec: 171 },
       { title: 'Komoda Beach', artist: 'Ilan Eshkeri', durationSec: 212 },
       { title: 'The Way of the Samurai', artist: 'Shigeru Umebayashi', durationSec: 204 },
@@ -246,11 +230,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     tracks: [
       { title: 'Celestial Symphony (Main Theme)', artist: '8082 Audio', durationSec: 168 },
       { title: 'Black Cloud, Red Fire', artist: '8082 Audio', durationSec: 194 },
-      {
-        title: 'Headless Lingji Bodhisattva (Sanxian Ballad)',
-        artist: 'Xiong Zhuying',
-        durationSec: 156,
-      },
+      { title: 'Headless Lingji Bodhisattva (Sanxian Ballad)', artist: 'Xiong Zhuying', durationSec: 156 },
       { title: 'Seeing Through', artist: '8082 Audio', durationSec: 212 },
       { title: 'Nonsense! (Yellowbrow)', artist: '8082 Audio', durationSec: 225 },
       { title: 'Unfinished (Destined One)', artist: '8082 Audio', durationSec: 242 },
@@ -263,11 +243,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     tracks: [
       { title: 'Alicia', artist: 'Lorien Testard & Alice Duport-Percier', durationSec: 198 },
       { title: 'Lumière', artist: 'Lorien Testard & Alice Duport-Percier', durationSec: 224 },
-      {
-        title: 'Une vie à t’aimer',
-        artist: 'Lorien Testard & Alice Duport-Percier',
-        durationSec: 265,
-      },
+      { title: 'Une vie à t’aimer', artist: 'Lorien Testard & Alice Duport-Percier', durationSec: 265 },
       { title: 'Monoco', artist: 'Lorien Testard', durationSec: 184 },
       { title: 'Verso', artist: 'Lorien Testard', durationSec: 211 },
       { title: 'Clair-Obscur', artist: 'Lorien Testard', durationSec: 246 },
@@ -295,11 +271,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Death to Chronos', artist: 'Darren Korb', durationSec: 184 },
       { title: 'The Silver Sisters', artist: 'Darren Korb', durationSec: 228 },
       { title: 'Coral Crown', artist: 'Darren Korb & Scylla and the Sirens', durationSec: 215 },
-      {
-        title: 'I Am Gonna Claw (Out Your Eyes then Drown You to Death)',
-        artist: 'Darren Korb',
-        durationSec: 244,
-      },
+      { title: 'I Am Gonna Claw (Out Your Eyes then Drown You to Death)', artist: 'Darren Korb', durationSec: 244 },
       { title: 'Song of the Sirens', artist: 'Darren Korb', durationSec: 192 },
       { title: 'Moonlight Guide Us', artist: 'Darren Korb feat. Ashley Barrett', durationSec: 210 },
     ],
@@ -342,11 +314,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Full Moon Full Life', artist: 'Azumi Takahashi & Lotus Juice', durationSec: 290 },
       { title: "It's Going Down Now", artist: 'Azumi Takahashi & Lotus Juice', durationSec: 186 },
       { title: 'Color Your Night', artist: 'Azumi Takahashi & Lotus Juice', durationSec: 227 },
-      {
-        title: 'Mass Destruction -Reload-',
-        artist: 'Azumi Takahashi & Lotus Juice',
-        durationSec: 204,
-      },
+      { title: 'Mass Destruction -Reload-', artist: 'Azumi Takahashi & Lotus Juice', durationSec: 204 },
       { title: 'Memories of You -Reload-', artist: 'Azumi Takahashi', durationSec: 358 },
     ],
   },
@@ -467,11 +435,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Follow You into the Dark', artist: 'RAKAAEL', durationSec: 238 },
       { title: 'Wide Awake', artist: 'Jaimes', durationSec: 210 },
       { title: 'Dark Ocean Summoning', artist: 'Old Gods of Asgard', durationSec: 274 },
-      {
-        title: 'Yötön Yö (Nightless Night)',
-        artist: 'Martti Suosalo & Petri Alanko',
-        durationSec: 256,
-      },
+      { title: 'Yötön Yö (Nightless Night)', artist: 'Martti Suosalo & Petri Alanko', durationSec: 256 },
     ],
   },
   control: {
@@ -533,11 +497,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     tracks: [
       { title: 'Welcome to Los Santos', artist: 'Oh No', durationSec: 154 },
       { title: 'We Were Set Up', artist: 'Tangerine Dream & Woody Jackson', durationSec: 211 },
-      {
-        title: 'A Legitimate Business Man',
-        artist: 'Tangerine Dream & Woody Jackson',
-        durationSec: 177,
-      },
+      { title: 'A Legitimate Business Man', artist: 'Tangerine Dream & Woody Jackson', durationSec: 177 },
       { title: 'The Agency Heist', artist: 'Tangerine Dream & Woody Jackson', durationSec: 202 },
       { title: 'Minor Turbulence', artist: 'Tangerine Dream & Woody Jackson', durationSec: 273 },
       { title: 'Sleepwalking', artist: 'The Chain Gang of 1974', durationSec: 218 },
@@ -630,7 +590,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Stardew Valley Overture', artist: 'ConcernedApe', durationSec: 136 },
       { title: "Spring (It's a Big World Outside)", artist: 'ConcernedApe', durationSec: 239 },
       { title: 'Summer (Nature’s Crescendo)', artist: 'ConcernedApe', durationSec: 210 },
-      { title: 'Fall (The Smell of Mushroom)', artist: 'ConcernedApe', durationSec: 216 },
+      { title: "Fall (The Smell of Mushroom)", artist: 'ConcernedApe', durationSec: 216 },
       { title: 'Winter (The Wind Can Be Still)', artist: 'ConcernedApe', durationSec: 173 },
       { title: 'Dance of the Moonlight Jellies', artist: 'ConcernedApe', durationSec: 112 },
     ],
@@ -702,11 +662,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     releaseYear: '2022',
     tracks: [
       { title: 'In the Flood', artist: 'Lovisa Sjöberg & Oleksa Lozowchuk', durationSec: 242 },
-      {
-        title: 'The World on Her Shoulders',
-        artist: 'Joris de Man feat. Julie Elven',
-        durationSec: 210,
-      },
+      { title: 'The World on Her Shoulders', artist: 'Joris de Man feat. Julie Elven', durationSec: 210 },
       { title: 'Built to Kill', artist: 'The Flight', durationSec: 224 },
       { title: 'Guardian of the Deep', artist: 'Joris de Man', durationSec: 195 },
     ],
@@ -737,7 +693,9 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
   },
 }
 
-export function lookupCuratedSoundtrack(game: GameIdentity): SoundtrackAlbumWithTracks | null {
+export function lookupCuratedSoundtrack(
+  game: GameIdentity,
+): SoundtrackAlbumWithTracks | null {
   if (!game?.title) return null
   const core = extractCoreGameTitle(game.title).toLowerCase()
   const spec = CURATED_OST_CATALOG[core]
@@ -775,11 +733,7 @@ export function lookupCuratedSoundtrack(game: GameIdentity): SoundtrackAlbumWith
       album_type: 'original_soundtrack',
       artist: spec.artist,
       release_date: spec.releaseYear || game.releaseYear || null,
-      cover_url:
-        game.coverUrl ||
-        CURATED_OST_COVERS[core] ||
-        resolveAlbumCoverFallback(spec.albumTitle) ||
-        null,
+      cover_url: game.coverUrl || CURATED_OST_COVERS[core] || resolveAlbumCoverFallback(spec.albumTitle) || null,
       track_count: tracks.length,
       total_duration_ms: totalDurationMs,
       provider_id: 'curated',
@@ -791,128 +745,76 @@ export function lookupCuratedSoundtrack(game: GameIdentity): SoundtrackAlbumWith
 
 export const CURATED_OST_COVERS: Record<string, string> = {
   'elden ring': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1245620/library_600x900_2x.jpg',
-  'the witcher 3 wild hunt':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900_2x.jpg',
+  'the witcher 3 wild hunt': 'https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900_2x.jpg',
   'witcher 3': 'https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900_2x.jpg',
-  'cyberpunk 2077':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1091500/library_600x900_2x.jpg',
-  'baldurs gate 3':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1086940/library_600x900_2x.jpg',
-  'red dead redemption 2':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1174180/library_600x900_2x.jpg',
-  'red dead redemption':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2668510/library_600x900_2x.jpg',
+  'cyberpunk 2077': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1091500/library_600x900_2x.jpg',
+  'baldurs gate 3': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1086940/library_600x900_2x.jpg',
+  'red dead redemption 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1174180/library_600x900_2x.jpg',
+  'red dead redemption': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2668510/library_600x900_2x.jpg',
   'god of war': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1593500/library_600x900_2x.jpg',
-  'god of war ragnarok':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2322010/library_600x900_2x.jpg',
-  'ghost of tsushima':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2215430/library_600x900_2x.jpg',
-  'the last of us':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
-  'the last of us part i':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
-  'the last of us part 1':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
-  'the last of us part ii':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2531310/library_600x900_2x.jpg',
-  'the last of us part 2':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2531310/library_600x900_2x.jpg',
-  'clair obscur expedition 33':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1903340/header.jpg',
-  'hollow knight':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/367520/library_600x900_2x.jpg',
-  hades: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145360/library_600x900_2x.jpg',
+  'god of war ragnarok': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2322010/library_600x900_2x.jpg',
+  'ghost of tsushima': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2215430/library_600x900_2x.jpg',
+  'the last of us': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
+  'the last of us part i': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
+  'the last of us part 1': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
+  'the last of us part ii': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2531310/library_600x900_2x.jpg',
+  'the last of us part 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2531310/library_600x900_2x.jpg',
+  'clair obscur expedition 33': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1903340/header.jpg',
+  'hollow knight': 'https://cdn.cloudflare.steamstatic.com/steam/apps/367520/library_600x900_2x.jpg',
+  'hades': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145360/library_600x900_2x.jpg',
   'hades 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145350/library_600x900_2x.jpg',
   'hades ii': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145350/library_600x900_2x.jpg',
   'doom eternal': 'https://cdn.cloudflare.steamstatic.com/steam/apps/782330/library_600x900_2x.jpg',
-  doom: 'https://cdn.cloudflare.steamstatic.com/steam/apps/379720/library_600x900_2x.jpg',
-  'nier automata':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/524220/library_600x900_2x.jpg',
-  'persona 5 royal':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1687950/library_600x900_2x.jpg',
+  'doom': 'https://cdn.cloudflare.steamstatic.com/steam/apps/379720/library_600x900_2x.jpg',
+  'nier automata': 'https://cdn.cloudflare.steamstatic.com/steam/apps/524220/library_600x900_2x.jpg',
+  'persona 5 royal': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1687950/library_600x900_2x.jpg',
   'dark souls 3': 'https://cdn.cloudflare.steamstatic.com/steam/apps/374320/library_600x900_2x.jpg',
-  'dark souls iii':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/374320/library_600x900_2x.jpg',
-  'sekiro shadows die twice':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/814380/library_600x900_2x.jpg',
-  'black myth wukong':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2358720/library_600x900_2x.jpg',
-  'death stranding':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1850570/library_600x900_2x.jpg',
-  'silent hill 2':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2124490/library_600x900_2x.jpg',
-  'resident evil 4':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2050650/library_600x900_2x.jpg',
+  'dark souls iii': 'https://cdn.cloudflare.steamstatic.com/steam/apps/374320/library_600x900_2x.jpg',
+  'sekiro shadows die twice': 'https://cdn.cloudflare.steamstatic.com/steam/apps/814380/library_600x900_2x.jpg',
+  'black myth wukong': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2358720/library_600x900_2x.jpg',
+  'death stranding': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1850570/library_600x900_2x.jpg',
+  'silent hill 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2124490/library_600x900_2x.jpg',
+  'resident evil 4': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2050650/library_600x900_2x.jpg',
   'alan wake 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/108710/library_600x900_2x.jpg',
-  control: 'https://cdn.cloudflare.steamstatic.com/steam/apps/870780/library_600x900_2x.jpg',
-  celeste: 'https://cdn.cloudflare.steamstatic.com/steam/apps/504230/library_600x900_2x.jpg',
-  undertale: 'https://cdn.cloudflare.steamstatic.com/steam/apps/391540/library_600x900_2x.jpg',
-  'final fantasy 7 remake':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1462040/library_600x900_2x.jpg',
-  'final fantasy vii remake':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1462040/library_600x900_2x.jpg',
-  'final fantasy 7 rebirth':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2909400/library_600x900_2x.jpg',
-  'final fantasy vii rebirth':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2909400/library_600x900_2x.jpg',
-  'final fantasy 16':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2515020/library_600x900_2x.jpg',
-  'final fantasy xvi':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2515020/library_600x900_2x.jpg',
-  'the elder scrolls 5 skyrim':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
-  'the elder scrolls v skyrim':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
-  skyrim: 'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
-  'grand theft auto 5':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg',
-  'grand theft auto v':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg',
-  'marvels spider man':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1817070/library_600x900_2x.jpg',
+  'control': 'https://cdn.cloudflare.steamstatic.com/steam/apps/870780/library_600x900_2x.jpg',
+  'celeste': 'https://cdn.cloudflare.steamstatic.com/steam/apps/504230/library_600x900_2x.jpg',
+  'undertale': 'https://cdn.cloudflare.steamstatic.com/steam/apps/391540/library_600x900_2x.jpg',
+  'final fantasy 7 remake': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1462040/library_600x900_2x.jpg',
+  'final fantasy vii remake': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1462040/library_600x900_2x.jpg',
+  'final fantasy 7 rebirth': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2909400/library_600x900_2x.jpg',
+  'final fantasy vii rebirth': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2909400/library_600x900_2x.jpg',
+  'final fantasy 16': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2515020/library_600x900_2x.jpg',
+  'final fantasy xvi': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2515020/library_600x900_2x.jpg',
+  'the elder scrolls 5 skyrim': 'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
+  'the elder scrolls v skyrim': 'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
+  'skyrim': 'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
+  'grand theft auto 5': 'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg',
+  'grand theft auto v': 'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg',
+  'marvels spider man': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1817070/library_600x900_2x.jpg',
   'marvels spider man 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2651280/header.jpg',
-  'marvels spider man miles morales':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1817190/library_600x900_2x.jpg',
-  'horizon zero dawn':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1151640/library_600x900_2x.jpg',
-  'horizon forbidden west':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2420110/library_600x900_2x.jpg',
-  'detroit become human':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1222140/library_600x900_2x.jpg',
+  'marvels spider man miles morales': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1817190/library_600x900_2x.jpg',
+  'horizon zero dawn': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1151640/library_600x900_2x.jpg',
+  'horizon forbidden west': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2420110/library_600x900_2x.jpg',
+  'detroit become human': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1222140/library_600x900_2x.jpg',
   'lies of p': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1627720/library_600x900_2x.jpg',
-  'armored core 6 fires of rubicon':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1888160/library_600x900_2x.jpg',
-  'armored core vi fires of rubicon':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1888160/library_600x900_2x.jpg',
-  'monster hunter world':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/582010/library_600x900_2x.jpg',
-  'monster hunter wilds':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2246340/library_600x900_2x.jpg',
-  'kingdom come deliverance 2':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg',
-  'kingdom come deliverance ii':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg',
-  'metaphor refantazio':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2679460/library_600x900_2x.jpg',
-  'persona 3 reload':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/2161700/library_600x900_2x.jpg',
-  'halo the master chief collection':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/976730/library_600x900_2x.jpg',
-  'mass effect legendary edition':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/1328670/library_600x900_2x.jpg',
-  stray: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1332010/library_600x900_2x.jpg',
+  'armored core 6 fires of rubicon': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1888160/library_600x900_2x.jpg',
+  'armored core vi fires of rubicon': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1888160/library_600x900_2x.jpg',
+  'monster hunter world': 'https://cdn.cloudflare.steamstatic.com/steam/apps/582010/library_600x900_2x.jpg',
+  'monster hunter wilds': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2246340/library_600x900_2x.jpg',
+  'kingdom come deliverance 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg',
+  'kingdom come deliverance ii': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg',
+  'metaphor refantazio': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2679460/library_600x900_2x.jpg',
+  'persona 3 reload': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2161700/library_600x900_2x.jpg',
+  'halo the master chief collection': 'https://cdn.cloudflare.steamstatic.com/steam/apps/976730/library_600x900_2x.jpg',
+  'mass effect legendary edition': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1328670/library_600x900_2x.jpg',
+  'stray': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1332010/library_600x900_2x.jpg',
   'outer wilds': 'https://cdn.cloudflare.steamstatic.com/steam/apps/753640/library_600x900_2x.jpg',
-  'disco elysium':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/632470/library_600x900_2x.jpg',
-  'devil may cry 5':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/601150/library_600x900_2x.jpg',
-  'stardew valley':
-    'https://cdn.cloudflare.steamstatic.com/steam/apps/413150/library_600x900_2x.jpg',
+  'disco elysium': 'https://cdn.cloudflare.steamstatic.com/steam/apps/632470/library_600x900_2x.jpg',
+  'devil may cry 5': 'https://cdn.cloudflare.steamstatic.com/steam/apps/601150/library_600x900_2x.jpg',
+  'stardew valley': 'https://cdn.cloudflare.steamstatic.com/steam/apps/413150/library_600x900_2x.jpg',
   'helldivers 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/553850/library_600x900_2x.jpg',
-  'the legend of zelda breath of the wild':
-    'https://images.igdb.com/igdb/image/upload/t_cover_big/co3p2d.jpg',
-  'the legend of zelda tears of the kingdom':
-    'https://images.igdb.com/igdb/image/upload/t_cover_big/co5vmg.jpg',
+  'the legend of zelda breath of the wild': 'https://images.igdb.com/igdb/image/upload/t_cover_big/co3p2d.jpg',
+  'the legend of zelda tears of the kingdom': 'https://images.igdb.com/igdb/image/upload/t_cover_big/co5vmg.jpg',
 }
 
 export function resolveAlbumCoverFallback(rawTitle?: string | null): string | null {

@@ -75,10 +75,19 @@ function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T
   })
 }
 
-async function fetchJsonFast<T>(url: string, timeoutMs = 3500): Promise<T | null> {
+let offlineCircuitBreakerUntil = 0
+
+function isEffectivelyOffline(): boolean {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true
+  return Date.now() < offlineCircuitBreakerUntil
+}
+
+async function fetchJsonFast<T>(url: string, timeoutMs = 2200): Promise<T | null> {
+  if (isEffectivelyOffline()) return null
   try {
     const text = await withTimeout(soundtrackHttpGet(url), timeoutMs, '')
     if (text) {
+      offlineCircuitBreakerUntil = 0
       return JSON.parse(text) as T
     }
   } catch {
@@ -86,12 +95,14 @@ async function fetchJsonFast<T>(url: string, timeoutMs = 3500): Promise<T | null
   }
   try {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    const timer = setTimeout(() => controller.abort(), Math.min(timeoutMs, 1800))
     const resp = await fetch(url, { signal: controller.signal })
     clearTimeout(timer)
     if (!resp.ok) return null
+    offlineCircuitBreakerUntil = 0
     return (await resp.json()) as T
   } catch {
+    offlineCircuitBreakerUntil = Date.now() + 45_000
     return null
   }
 }
@@ -122,7 +133,8 @@ export class SoundtrackResolver {
     ])
 
     const out: SoundtrackAlbumWithTracks[] = []
-    const gameId = game?.gameId || `custom_${cleanQ.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`
+    const gameId =
+      game?.gameId || `custom_${cleanQ.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`
 
     // 1. Process iTunes songs into grouped albums
     const itunesItems = itunesData?.results || []
@@ -598,7 +610,7 @@ export class SoundtrackResolver {
       discoveredAlbumsWithTracks.push(curated)
     }
 
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    if (isEffectivelyOffline() && !forceRefresh) {
       return discoveredAlbumsWithTracks
     }
 
@@ -624,8 +636,9 @@ export class SoundtrackResolver {
             ),
           ),
         )
-        return fetched.filter((f): f is SoundtrackAlbumWithTracks =>
-          Boolean(f && f.tracks.length > 0 && isAlbumValidForGame(f.album.title, game.title)),
+        return fetched.filter(
+          (f): f is SoundtrackAlbumWithTracks =>
+            Boolean(f && f.tracks.length > 0 && isAlbumValidForGame(f.album.title, game.title)),
         )
       } catch {
         return []
@@ -642,10 +655,7 @@ export class SoundtrackResolver {
       discoveredAlbumsWithTracks.push(alb)
     }
     for (const alb of cdnAlbums) {
-      if (
-        isAlbumValidForGame(alb.album.title, game.title) ||
-        discoveredAlbumsWithTracks.length === 0
-      ) {
+      if (isAlbumValidForGame(alb.album.title, game.title) || discoveredAlbumsWithTracks.length === 0) {
         alb.album.game_id = game.gameId
         discoveredAlbumsWithTracks.push(alb)
       }
@@ -933,8 +943,7 @@ export class SoundtrackResolver {
     const ytCandidatesPromise: Promise<PlaybackSource[]> = ytProvider
       ? withTimeout(
           'getCandidateSources' in ytProvider &&
-            typeof (ytProvider as { getCandidateSources?: unknown }).getCandidateSources ===
-              'function'
+            typeof (ytProvider as { getCandidateSources?: unknown }).getCandidateSources === 'function'
             ? (
                 ytProvider as unknown as {
                   getCandidateSources: (
@@ -950,8 +959,7 @@ export class SoundtrackResolver {
       : Promise.resolve([])
 
     const ytFirstDirectStreamPromise: Promise<PlaybackSource | null> = ytCandidatesPromise.then(
-      (list) =>
-        list.find((s) => s.type === 'stream' && s.url && !this.isPreviewClipUrl(s.url)) || null,
+      (list) => list.find((s) => s.type === 'stream' && s.url && !this.isPreviewClipUrl(s.url)) || null,
     )
     const allDirectStreamPromises = [...streamPromises, ytFirstDirectStreamPromise]
 
@@ -1040,35 +1048,33 @@ export class SoundtrackResolver {
       }
     } else {
       // Even when a fast direct stream won, attach full-length YouTube and remaining streams in background
-      void Promise.all([Promise.all(streamPromises), ytCandidatesPromise]).then(
-        ([allStreams, ytSources]) => {
-          const enriched: PlaybackSource[] = [fastFullStream!]
-          for (const s of allStreams) {
-            if (
-              s &&
-              s.url &&
-              s.type === 'stream' &&
-              !this.isPreviewClipUrl(s.url) &&
-              s.url !== fastFullStream!.url
-            ) {
-              enriched.push(s)
-            }
+      void Promise.all([Promise.all(streamPromises), ytCandidatesPromise]).then(([allStreams, ytSources]) => {
+        const enriched: PlaybackSource[] = [fastFullStream!]
+        for (const s of allStreams) {
+          if (
+            s &&
+            s.url &&
+            s.type === 'stream' &&
+            !this.isPreviewClipUrl(s.url) &&
+            s.url !== fastFullStream!.url
+          ) {
+            enriched.push(s)
           }
-          for (const ys of ytSources) {
-            if (ys && ys.url) {
-              enriched.push(ys)
-            }
+        }
+        for (const ys of ytSources) {
+          if (ys && ys.url) {
+            enriched.push(ys)
           }
-          if (track.preview_url) {
-            enriched.push({
-              type: 'stream',
-              url: track.preview_url,
-              providerId: track.provider_id,
-            })
-          }
-          this.playbackCandidateCache.set(track.id, enriched)
-        },
-      )
+        }
+        if (track.preview_url) {
+          enriched.push({
+            type: 'stream',
+            url: track.preview_url,
+            providerId: track.provider_id,
+          })
+        }
+        this.playbackCandidateCache.set(track.id, enriched)
+      })
     }
 
     // 3. Last-resort fallback ONLY if all full-length HTTP streams and YouTube full tracks fail: 30s CDN preview

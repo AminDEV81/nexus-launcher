@@ -37,8 +37,7 @@ const QUICK_SETTINGS_COMMANDS = [
   },
   {
     label: 'Settings: Launcher & Downloads',
-    keywords:
-      'parallel download streams speed limit bandwidth auto extract 60 fps gpu eco launch window',
+    keywords: 'parallel download streams speed limit bandwidth auto extract 60 fps gpu eco launch window',
     path: '/settings?section=performance',
     icon: MonitorCog,
   },

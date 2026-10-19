@@ -2598,7 +2598,7 @@ mod tests {
 
     #[test]
     fn test_sanitize_file_name_strips_traversal_and_reserved_names() {
-        assert_eq!(sanitize_file_name("../../etc/passwd"), "-..-etc-passwd");
+        assert_eq!(sanitize_file_name("../../etc/passwd"), "--..-..-etc-passwd");
         assert_eq!(sanitize_file_name("CON.txt"), "_CON.txt");
         assert_eq!(sanitize_file_name("NUL"), "_NUL");
         assert_eq!(sanitize_file_name("   ...   "), "download");

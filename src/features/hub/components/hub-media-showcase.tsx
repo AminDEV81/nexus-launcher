@@ -225,10 +225,13 @@ export function HubMediaShowcase({
       resolvedStream?.direct_stream_url ||
       null)
 
-  const isAgeRestrictedOrBlocked = Boolean(resolvedStream?.is_age_restricted || embedRuntimeBlocked)
+  const isAgeRestrictedOrBlocked = Boolean(
+    resolvedStream?.is_age_restricted || embedRuntimeBlocked,
+  )
 
   const shouldUseDirectVideo =
-    Boolean(directVideoUrl) && (engineMode === 'direct_hd' || engineMode === 'auto_bypass')
+    Boolean(directVideoUrl) &&
+    (engineMode === 'direct_hd' || engineMode === 'auto_bypass')
 
   const effectiveYoutubeVideoId = (() => {
     if (!currentVideo) return ''
@@ -267,8 +270,7 @@ export function HubMediaShowcase({
               </span>
             </div>
             <p className="text-xs text-subtle">
-              Latest official trailers, gameplay captures, and 1080p screenshots from IGDB &amp;
-              Steam
+              Latest official trailers, gameplay captures, and 1080p screenshots from IGDB &amp; Steam
             </p>
           </div>
         </div>
@@ -403,9 +405,7 @@ export function HubMediaShowcase({
                           title="Switch between Uncensored Direct HD Stream and YouTube Player"
                         >
                           <ShieldCheck className="size-3.5" />
-                          <span>
-                            {shouldUseDirectVideo ? '18+ Direct HD Active' : 'Use 18+ Direct HD'}
-                          </span>
+                          <span>{shouldUseDirectVideo ? '18+ Direct HD Active' : 'Use 18+ Direct HD'}</span>
                         </button>
                       )}
 
@@ -528,7 +528,9 @@ export function HubMediaShowcase({
                       {(resolvedStream?.steam_movies ?? []).map((mv, mIdx) => {
                         const isSelected =
                           shouldUseDirectVideo &&
-                          (selectedSteamMovie ? selectedSteamMovie.id === mv.id : mIdx === 0)
+                          (selectedSteamMovie
+                            ? selectedSteamMovie.id === mv.id
+                            : mIdx === 0)
                         return (
                           <button
                             key={mv.id}
@@ -616,9 +618,7 @@ export function HubMediaShowcase({
                           isPlayingHere ? 'bg-accent' : 'bg-black/80',
                         )}
                       >
-                        <Film
-                          className={cn('size-3', isPlayingHere ? 'text-white' : 'text-red-500')}
-                        />
+                        <Film className={cn('size-3', isPlayingHere ? 'text-white' : 'text-red-500')} />
                         <span>{isPlayingHere ? 'NOW PLAYING' : 'TRAILER'}</span>
                       </span>
 

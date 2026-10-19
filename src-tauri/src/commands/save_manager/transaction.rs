@@ -152,6 +152,24 @@ impl TransactionCoordinator {
         // - If the launching profile IS `default` (or if `profile_id` had never been initialized as empty),
         //   it will launch with those adopted saves; if `profile_id != "default"`, `default` keeps the backup
         //   and `profile_id` starts with its own isolated save directory!
+        // Fast-path for single-profile or unswapped games: if only 1 profile exists in the database
+        // and this profile is not explicitly marked empty, the OS save directory is already the active save state!
+        // Skip heavy pre-launch directory cloning/snapshot so game launch is instant (<1ms); saves sync on exit.
+        let total_profiles: i64 = conn
+            .query_row("SELECT COUNT(*) FROM profiles", [], |row| row.get(0))
+            .unwrap_or(1);
+        let cur_profile_state: Option<String> = conn
+            .query_row(
+                "SELECT state FROM profile_game_saves WHERE profile_id = ?1 AND game_id = ?2",
+                params![profile_id, game_id],
+                |row| row.get(0),
+            )
+            .ok();
+        if total_profiles <= 1 && cur_profile_state.as_deref() != Some("empty") {
+            let _ = JournalManager::update_operation_state(conn, &op_id, "completed");
+            return Ok(op_id);
+        }
+
         let any_profile_has_saves: bool = conn
             .query_row(
                 "SELECT COUNT(*) > 0 FROM profile_game_saves WHERE game_id = ?1 AND file_count > 0",

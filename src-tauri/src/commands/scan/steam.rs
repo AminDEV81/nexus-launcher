@@ -26,10 +26,16 @@ pub fn scan_steam() -> Vec<ScannedGame> {
                 .join("common")
                 .join(&app.install_dir);
 
+            let executable_path = if install_path.is_dir() {
+                crate::commands::import::find_best_executable(&install_path)
+            } else {
+                None
+            };
+
             games.push(ScannedGame {
                 name,
                 source: "steam".into(),
-                executable_path: None,
+                executable_path,
                 install_path: Some(install_path.to_string_lossy().to_string()),
                 install_size_bytes: None,
                 steam_app_id: Some(app.app_id.to_string()),

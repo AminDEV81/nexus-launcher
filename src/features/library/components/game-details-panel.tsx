@@ -165,9 +165,7 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
   const [installationEditorOpen, setInstallationEditorOpen] = useState(false)
   const [tagsEditorOpen, setTagsEditorOpen] = useState(false)
   const [playtimeEditorOpen, setPlaytimeEditorOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<
-    'overview' | 'soundtrack' | 'saves' | 'media' | 'launch'
-  >('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'soundtrack' | 'saves' | 'media' | 'launch'>('overview')
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [copiedFeedback, setCopiedFeedback] = useState(false)
 

@@ -417,9 +417,9 @@ pub fn health_check(db: State<'_, Database>) -> AppResult<HealthStatus> {
 /// Safely performs a scheduled power action (shutdown / sleep / hibernate) on completion.
 #[tauri::command]
 pub fn shutdown_system(action: Option<String>) -> AppResult<()> {
+    let act = action.as_deref().unwrap_or("shutdown");
     #[cfg(target_os = "windows")]
     {
-        let act = action.as_deref().unwrap_or("shutdown");
         match act {
             "sleep" => {
                 let _ = std::process::Command::new("rundll32.exe")
@@ -437,10 +437,6 @@ pub fn shutdown_system(action: Option<String>) -> AppResult<()> {
                     .spawn();
             }
         }
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = action;
     }
     Ok(())
 }

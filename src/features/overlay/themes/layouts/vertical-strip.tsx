@@ -97,11 +97,7 @@ export const VerticalStripLayout: React.FC<LayoutProps> = ({ metrics, toggles, t
             {g.extra && (
               <div className="flex items-center gap-2">
                 <Label className="w-9 shrink-0">{g.extra.label}</Label>
-                <Bar
-                  percent={g.extra.percent}
-                  color={g.extra.color}
-                  className="flex-1 !h-[3.5px]"
-                />
+                <Bar percent={g.extra.percent} color={g.extra.color} className="flex-1 !h-[3.5px]" />
                 <Value
                   tokens={tokens}
                   value={g.extra.text}

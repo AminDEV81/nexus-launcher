@@ -81,10 +81,7 @@ export const GameCard = memo(function GameCard({
     !game.is_installed && !game.executable_path && game.source !== 'steam' && !isUnreleased
   const releaseYear = game.release_date ? game.release_date.split('-')[0] : null
   const isWishlist = Boolean(game.is_wishlist)
-  const sizeLabel = useMemo(
-    () => formatSizeCompact(game.install_size_bytes),
-    [game.install_size_bytes],
-  )
+  const sizeLabel = useMemo(() => formatSizeCompact(game.install_size_bytes), [game.install_size_bytes])
 
   const criticScores = useMemo(() => {
     if (isGameUnreleased(game.release_date)) {
@@ -225,9 +222,7 @@ export const GameCard = memo(function GameCard({
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex size-1.5 rounded-full bg-emerald-400" />
               </span>
-              <span>
-                {elapsedSeconds !== undefined ? formatElapsed(elapsedSeconds) : 'Playing'}
-              </span>
+              <span>{elapsedSeconds !== undefined ? formatElapsed(elapsedSeconds) : 'Playing'}</span>
             </span>
           ) : isWishlist ? (
             <span className="flex items-center gap-1 rounded-full border border-amber-400/40 bg-black/80 px-2 py-0.5 text-[10px] font-bold text-amber-300 shadow-xs">

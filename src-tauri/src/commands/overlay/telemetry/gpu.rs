@@ -1,7 +1,6 @@
 #![allow(clippy::manual_c_str_literals)]
 
 use super::external_sensors::ExternalSensors;
-#[cfg(target_os = "windows")]
 use super::pdh::{PdhCounter, PdhQuery};
 
 #[derive(Debug, Clone, Default)]
@@ -41,15 +40,10 @@ pub struct GpuTelemetryProvider {
     has_adl: bool,
     adl_context: usize,
     adl_adapter_index: i32,
-    #[cfg(target_os = "windows")]
     pdh_query: Option<PdhQuery>,
-    #[cfg(target_os = "windows")]
     pdh_vram_local: Option<PdhCounter>,
-    #[cfg(target_os = "windows")]
     pdh_vram_dedicated: Option<PdhCounter>,
-    #[cfg(target_os = "windows")]
     pdh_vram_shared: Option<PdhCounter>,
-    #[cfg(target_os = "windows")]
     pdh_gpu_engine: Option<PdhCounter>,
     smoothed_temp: f32,
 }
@@ -64,15 +58,10 @@ impl Default for GpuTelemetryProvider {
             has_adl: false,
             adl_context: 0,
             adl_adapter_index: 0,
-            #[cfg(target_os = "windows")]
             pdh_query: None,
-            #[cfg(target_os = "windows")]
             pdh_vram_local: None,
-            #[cfg(target_os = "windows")]
             pdh_vram_dedicated: None,
-            #[cfg(target_os = "windows")]
             pdh_vram_shared: None,
-            #[cfg(target_os = "windows")]
             pdh_gpu_engine: None,
             smoothed_temp: 44.0,
         }
@@ -275,9 +264,6 @@ impl GpuTelemetryProvider {
         self.pdh_vram_shared = pdh_vram_shared;
         self.pdh_gpu_engine = pdh_gpu_engine;
     }
-
-    #[cfg(not(target_os = "windows"))]
-    fn init_pdh(&mut self) {}
 
     /// Universal Windows WDDM GPU utilization & VRAM reader (works for Intel, AMD, and NVIDIA).
     #[cfg(target_os = "windows")]

@@ -104,54 +104,30 @@ export function HubGameCard({
     const matchId = (gg: string, gid: number): boolean => {
       const low = gg.trim().toLowerCase()
       switch (gid) {
-        case 2:
-          return low === 'point-and-click' || low === 'point and click'
-        case 4:
-          return low === 'fighting'
-        case 5:
-          return low === 'shooter'
-        case 7:
-          return low === 'music'
-        case 8:
-          return low === 'platform' || low === 'platformer'
-        case 9:
-          return low === 'puzzle'
-        case 10:
-          return low === 'racing'
-        case 11:
-          return low.includes('real time strategy') || low === 'rts'
-        case 12:
-          return low.includes('role-playing') || low === 'rpg'
-        case 13:
-          return low === 'simulator' || low === 'simulation'
-        case 14:
-          return low === 'sport' || low === 'sports'
-        case 15:
-          return low === 'strategy'
-        case 16:
-          return low.includes('turn-based strategy') || low === 'tbs'
-        case 24:
-          return low === 'tactical'
-        case 25:
-          return low.includes('hack and slash') || low.includes("beat 'em up")
-        case 26:
-          return low.includes('quiz') || low.includes('trivia')
-        case 30:
-          return low === 'pinball'
-        case 31:
-          return low === 'adventure'
-        case 32:
-          return low === 'indie'
-        case 33:
-          return low === 'arcade'
-        case 34:
-          return low === 'visual novel'
-        case 35:
-          return low.includes('card') || low.includes('board')
-        case 36:
-          return low === 'moba'
-        default:
-          return false
+        case 2: return low === 'point-and-click' || low === 'point and click'
+        case 4: return low === 'fighting'
+        case 5: return low === 'shooter'
+        case 7: return low === 'music'
+        case 8: return low === 'platform' || low === 'platformer'
+        case 9: return low === 'puzzle'
+        case 10: return low === 'racing'
+        case 11: return low.includes('real time strategy') || low === 'rts'
+        case 12: return low.includes('role-playing') || low === 'rpg'
+        case 13: return low === 'simulator' || low === 'simulation'
+        case 14: return low === 'sport' || low === 'sports'
+        case 15: return low === 'strategy'
+        case 16: return low.includes('turn-based strategy') || low === 'tbs'
+        case 24: return low === 'tactical'
+        case 25: return low.includes('hack and slash') || low.includes("beat 'em up")
+        case 26: return low.includes('quiz') || low.includes('trivia')
+        case 30: return low === 'pinball'
+        case 31: return low === 'adventure'
+        case 32: return low === 'indie'
+        case 33: return low === 'arcade'
+        case 34: return low === 'visual novel'
+        case 35: return low.includes('card') || low.includes('board')
+        case 36: return low === 'moba'
+        default: return false
       }
     }
     const sorted = [...game.genres].sort((a, b) => {

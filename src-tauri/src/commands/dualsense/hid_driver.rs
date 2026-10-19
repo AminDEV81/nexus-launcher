@@ -139,19 +139,16 @@ fn write_adaptive_trigger_effect(dst: &mut [u8], effect_name: &str, start_pos: u
     dst.fill(0);
     match effect_name {
         "Rigid" => {
-            // TriggerEffects.Rigid (Continuous Resistance)
             dst[0] = 0x01;
             dst[1] = start_pos;
             dst[2] = max_force;
         }
         "Pulse" => {
-            // TriggerEffects.Pulse (Section / Vibrating Pulse Resistance)
             dst[0] = 0x02;
             dst[1] = start_pos;
             dst[2] = max_force;
         }
         "FullClick" => {
-            // Exact FullClick bytes from DualSenseDevice.cs lines 1551..1561:
             dst[0] = 0x25;
             dst[1] = 0x08;
             dst[2] = 0x01;
@@ -163,7 +160,6 @@ fn write_adaptive_trigger_effect(dst: &mut [u8], effect_name: &str, start_pos: u
             dst[8] = 0x03;
         }
         _ => {
-            // TriggerEffects.None (Linear / Off)
             dst[0] = 0x00;
         }
     }
@@ -195,10 +191,9 @@ pub fn build_dualsense_output_report(
     };
 
     // Feature flags (Rumble + Trigger effects + Mic LED + Player LED + Lightbar RGB)
-    out[offset + 1] = 0x0F; // 0x01 (Rumble) | 0x02 (Triggers) | 0x04 (R2) | 0x08 (L2)
-    out[offset + 2] = 0x57; // 0x01 (Mic LED) | 0x02 (Audio) | 0x04 (Lightbar) | 0x10 (Player LEDs) | 0x40 (Motor power)
+    out[offset + 1] = 0x0F;
+    out[offset + 2] = 0x57;
 
-    // Combine game XInput rumble feedback and manual UI test rumble, scaled by rumble_strength
     let scale = (cfg.rumble_strength.min(100) as u16) as f32 / 100.0;
     let right_fast = ((game_small_rumble.max(cfg.test_light_rumble) as f32) * scale)
         .round()
@@ -207,10 +202,9 @@ pub fn build_dualsense_output_report(
         .round()
         .clamp(0.0, 255.0) as u8;
 
-    out[offset + 3] = right_fast; // Fast / Right motor
-    out[offset + 4] = left_heavy; // Heavy / Left motor
+    out[offset + 3] = right_fast;
+    out[offset + 4] = left_heavy;
 
-    // Mute button orange LED (0 = Off, 1 = Solid, 2 = Pulse)
     out[offset + 9] = cfg.mute_led_mode.min(2);
 
     // Right Trigger (R2) Adaptive Effect: bytes 11..=20
@@ -229,7 +223,7 @@ pub fn build_dualsense_output_report(
         cfg.left_trigger_force,
     );
 
-    // LED Brightness & Lightbar setup (matching DualSenseDevice.cs lines 1409..1422)
+    // LED Brightness & Lightbar setup
     out[offset + 39] = 0x06;
     out[offset + 42] = 0x02;
     out[offset + 43] = 0x02;
@@ -251,7 +245,7 @@ pub mod win32_hid {
     use super::*;
     use crate::commands::dualsense::vigem_xbox::win32_vigem::{
         CloseHandle, CreateEventW, CreateFileW, GetLastError, GetOverlappedResult, Guid, Overlapped,
-         SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInterfaces, SetupDiGetClassDevsW,
+        SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInterfaces, SetupDiGetClassDevsW,
         SetupDiGetDeviceInterfaceDetailW, SpDeviceInterfaceData, DIGCF_DEVICEINTERFACE,
         DIGCF_PRESENT, INVALID_HANDLE_VALUE,
     };
@@ -314,6 +308,10 @@ pub mod win32_hid {
             report_buffer: *const u8,
             report_buffer_length: u32,
         ) -> u8;
+        pub fn HidD_SetNumInputBuffers(
+            hid_device_object: isize,
+            number_buffers: u32,
+        ) -> u8;
     }
 
     #[link(name = "kernel32")]
@@ -336,9 +334,37 @@ pub mod win32_hid {
         pub fn CancelIoEx(h_file: isize, lp_overlapped: *const Overlapped) -> i32;
     }
 
+    /// Generates a deterministic unique MAC-like identifier from a physical HID instance ID
+    /// when a USB controller does not report its Bluetooth MAC via Feature 0x09.
+    fn deterministic_mac_from_instance(instance_id: &str) -> String {
+        // Normalize away interface/collection suffixes (&COL01, &MI_03) so collections on the same
+        // physical USB port hash to the same controller, while distinct USB ports hash uniquely.
+        let upper = instance_id.to_uppercase();
+        let base = if let Some(pos) = upper.find("&COL") {
+            &upper[..pos]
+        } else {
+            upper.as_str()
+        };
+        let mut h: u64 = 0xcbf29ce484222325;
+        for b in base.bytes() {
+            h ^= b as u64;
+            h = h.wrapping_mul(0x100000001b3);
+        }
+        format!(
+            "02:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+            (h & 0xFF) as u8,
+            ((h >> 8) & 0xFF) as u8,
+            ((h >> 16) & 0xFF) as u8,
+            ((h >> 24) & 0xFF) as u8,
+            ((h >> 32) & 0xFF) as u8
+        )
+    }
+
     /// Enumerates all connected Sony DualSense / DualSense Edge / DualShock 4 controllers on Windows.
+    /// Uses `dwDesiredAccess = 0` (metadata query mode) so controllers that are already open in
+    /// Exclusive Mode (`dwShareMode = 0`) never fail enumeration with `ERROR_SHARING_VIOLATION`!
     pub fn enumerate_sony_controllers() -> Vec<DiscoveredSonyController> {
-        let mut results = Vec::new();
+        let mut results: Vec<DiscoveredSonyController> = Vec::new();
         unsafe {
             let mut hid_guid = Guid {
                 data1: 0,
@@ -421,10 +447,11 @@ pub mod win32_hid {
                 let mut wide_null = wide.clone();
                 wide_null.push(0);
 
-                // Open metadata handle (`dwDesiredAccess = 0` or `FILE_GENERIC_READ`, shared)
+                // CRITICAL: Open with `dwDesiredAccess = 0` (metadata-only access) so this succeeds
+                // even when our worker thread holds an Exclusive (`dwShareMode = 0`) handle on the controller!
                 let h = CreateFileW(
                     wide_null.as_ptr(),
-                    0x8000_0000, // GENERIC_READ
+                    0,           // Metadata-only access (never triggers ERROR_SHARING_VIOLATION)
                     0x0000_0003, // FILE_SHARE_READ | FILE_SHARE_WRITE
                     std::ptr::null(),
                     3, // OPEN_EXISTING
@@ -461,51 +488,81 @@ pub mod win32_hid {
                     let _ = HidD_FreePreparsedData(preparsed);
                 }
 
-                // Filter to Gamepad (0x05) or Joystick (0x04) HID usage
-                if caps.usage != 0x05 && caps.usage != 0x04 && caps.input_report_byte_length < 64 {
+                // Filter strictly to Generic Desktop (0x01) Gamepad (0x05) or Joystick (0x04) HID collections
+                // with full input reports (>= 64 bytes) so audio/mic/touch sub-interfaces are never duplicated!
+                if caps.usage_page != 0x01
+                    || (caps.usage != 0x05 && caps.usage != 0x04)
+                    || caps.input_report_byte_length < 64
+                {
                     let _ = CloseHandle(h);
                     continue;
                 }
 
-                // Read MAC / Serial (`SERIAL_FEATURE_ID = 9` for DualSense, `18` for DS4)
+                let instance_id = device_path_to_instance_id(&device_path);
+
+                // Read MAC / Serial (`SERIAL_FEATURE_ID = 0x09` for DualSense, `0x12` for DS4)
                 let mut mac = String::from("00:00:00:00:00:00");
-                let mut feat_buf = [0u8; 64];
-                feat_buf[0] = if attrs.product_id == DUALSENSE_PID || attrs.product_id == DUALSENSE_EDGE_PID {
-                    0x09
-                } else {
-                    0x12
-                };
-                if HidD_GetFeature(h, feat_buf.as_mut_ptr(), 64) != 0 {
+                let report_id: u8 =
+                    if attrs.product_id == DUALSENSE_PID || attrs.product_id == DUALSENSE_EDGE_PID {
+                        0x09
+                    } else {
+                        0x12
+                    };
+
+                // Try exact 20-byte buffer first (DualSense Feature 0x09 is 20 bytes), then 64-byte fallback
+                let mut feat20 = [0u8; 20];
+                feat20[0] = report_id;
+                if HidD_GetFeature(h, feat20.as_mut_ptr(), 20) != 0
+                    && (feat20[1] | feat20[2] | feat20[3] | feat20[4] | feat20[5] | feat20[6]) != 0
+                {
                     mac = format!(
                         "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
-                        feat_buf[6], feat_buf[5], feat_buf[4], feat_buf[3], feat_buf[2], feat_buf[1]
+                        feat20[6], feat20[5], feat20[4], feat20[3], feat20[2], feat20[1]
                     );
                 } else {
-                    let mut ser_buf = [0u8; 126];
-                    if HidD_GetSerialNumberString(h, ser_buf.as_mut_ptr(), 126) != 0 {
-                        let u16s: Vec<u16> = ser_buf
-                            .chunks_exact(2)
-                            .map(|c| u16::from_le_bytes([c[0], c[1]]))
-                            .take_while(|&c| c != 0)
-                            .collect();
-                        let s = String::from_utf16_lossy(&u16s).to_uppercase();
-                        if s.len() == 12 {
-                            mac = format!(
-                                "{}:{}:{}:{}:{}:{}",
-                                &s[0..2],
-                                &s[2..4],
-                                &s[4..6],
-                                &s[6..8],
-                                &s[8..10],
-                                &s[10..12]
-                            );
+                    let mut feat64 = [0u8; 64];
+                    feat64[0] = report_id;
+                    if HidD_GetFeature(h, feat64.as_mut_ptr(), 64) != 0
+                        && (feat64[1] | feat64[2] | feat64[3] | feat64[4] | feat64[5] | feat64[6])
+                            != 0
+                    {
+                        mac = format!(
+                            "{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
+                            feat64[6], feat64[5], feat64[4], feat64[3], feat64[2], feat64[1]
+                        );
+                    } else {
+                        let mut ser_buf = [0u8; 126];
+                        if HidD_GetSerialNumberString(h, ser_buf.as_mut_ptr(), 126) != 0 {
+                            let u16s: Vec<u16> = ser_buf
+                                .chunks_exact(2)
+                                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+                                .take_while(|&c| c != 0)
+                                .collect();
+                            let s = String::from_utf16_lossy(&u16s).trim().to_uppercase();
+                            if s.len() == 12 && s.chars().all(|c| c.is_ascii_hexdigit()) {
+                                mac = format!(
+                                    "{}:{}:{}:{}:{}:{}",
+                                    &s[0..2],
+                                    &s[2..4],
+                                    &s[4..6],
+                                    &s[6..8],
+                                    &s[8..10],
+                                    &s[10..12]
+                                );
+                            }
                         }
                     }
                 }
 
-                let is_bluetooth = caps.input_report_byte_length == 78;
-                // If Bluetooth DualSense, request Feature Report 0x05 (41 bytes) to switch the controller
-                // into full 78-byte extended input report mode (gyro, touchpad, battery, adaptive triggers)!
+                if mac == "00:00:00:00:00:00" {
+                    mac = deterministic_mac_from_instance(&instance_id);
+                }
+
+                let is_bluetooth = caps.input_report_byte_length == 78
+                    || device_path.to_lowercase().contains("00001124-0000-1000-8000-00805f9b34fb")
+                    || instance_id.contains("BTHENUM");
+
+                // If Bluetooth DualSense, request Feature Report 0x05 (41 bytes) to unlock full 78-byte report mode
                 if is_bluetooth {
                     let mut cal_buf = [0u8; 41];
                     cal_buf[0] = 0x05;
@@ -514,6 +571,15 @@ pub mod win32_hid {
 
                 let _ = CloseHandle(h);
 
+                // Deduplicate if another collection from the exact same physical controller is already in results
+                let already_listed = results.iter().any(|existing: &DiscoveredSonyController| {
+                    existing.device_path.eq_ignore_ascii_case(&device_path)
+                        || existing.serial_mac.eq_ignore_ascii_case(&mac)
+                });
+                if already_listed {
+                    continue;
+                }
+
                 let product_name = match attrs.product_id {
                     DUALSENSE_EDGE_PID => "Sony DualSense Edge Wireless Controller".to_string(),
                     DUALSENSE_PID => "Sony DualSense Wireless Controller (PS5)".to_string(),
@@ -521,7 +587,7 @@ pub mod win32_hid {
                 };
 
                 results.push(DiscoveredSonyController {
-                    instance_id: device_path_to_instance_id(&device_path),
+                    instance_id,
                     device_path,
                     product_name,
                     serial_mac: mac,
@@ -535,6 +601,9 @@ pub mod win32_hid {
 
             let _ = SetupDiDestroyDeviceInfoList(dev_info);
         }
+
+        // Sort deterministically by instance_id so slot assignment is always stable
+        results.sort_by(|a, b| a.instance_id.cmp(&b.instance_id));
         results
     }
 
@@ -559,6 +628,7 @@ pub mod win32_hid {
                     0,
                 );
                 if h_excl != INVALID_HANDLE_VALUE && h_excl != 0 {
+                    let _ = HidD_SetNumInputBuffers(h_excl, 3);
                     return Ok((h_excl, true));
                 }
             }
@@ -578,12 +648,14 @@ pub mod win32_hid {
                     GetLastError()
                 ))
             } else {
+                let _ = HidD_SetNumInputBuffers(h_shared, 3);
                 Ok((h_shared, false))
             }
         }
     }
 
-    pub fn read_hid_report_overlapped(handle: isize, buf: &mut [u8], timeout_ms: u32) -> Result<usize, String> {
+    /// Performs a single Overlapped HID read with safe cancellation (`CancelIoEx` + `GetOverlappedResult(..., 1)`).
+    fn read_single_hid_report(handle: isize, buf: &mut [u8], timeout_ms: u32) -> Result<usize, String> {
         unsafe {
             let event = CreateEventW(std::ptr::null(), 1, 0, std::ptr::null());
             let mut ov = Overlapped {
@@ -604,7 +676,7 @@ pub mod win32_hid {
             if ok == 0 {
                 let err = GetLastError();
                 if err != 997 {
-                    // Not ERROR_IO_PENDING
+                    // Not ERROR_IO_PENDING (e.g. ERROR_DEVICE_NOT_CONNECTED = 1167)
                     if event != 0 {
                         let _ = CloseHandle(event);
                     }
@@ -612,18 +684,24 @@ pub mod win32_hid {
                 }
                 let wait_res = WaitForSingleObject(event, timeout_ms);
                 if wait_res != 0 {
-                    // WAIT_TIMEOUT (258) or error
+                    // WAIT_TIMEOUT (258): cancel and MUST wait for overlapped completion before freeing stack `ov`!
                     let _ = CancelIoEx(handle, &ov);
+                    let _ = GetOverlappedResult(handle, &ov, &mut bytes_read, 1);
                     if event != 0 {
                         let _ = CloseHandle(event);
                     }
                     return Ok(0);
                 }
-                if GetOverlappedResult(handle, &ov, &mut bytes_read, 0) == 0 {
+                if GetOverlappedResult(handle, &ov, &mut bytes_read, 1) == 0 {
+                    let g_err = GetLastError();
                     if event != 0 {
                         let _ = CloseHandle(event);
                     }
-                    return Err("GetOverlappedResult failed on HID read".to_string());
+                    // 995 = ERROR_OPERATION_ABORTED
+                    if g_err == 995 {
+                        return Ok(0);
+                    }
+                    return Err(format!("GetOverlappedResult failed on HID read (Win32 error {})", g_err));
                 }
             }
             if event != 0 {
@@ -631,6 +709,29 @@ pub mod win32_hid {
             }
             Ok(bytes_read as usize)
         }
+    }
+
+    /// Reads the newest available HID input report for a controller slot, draining up to 4 queued
+    /// reports so multi-controller polling never falls behind the 250Hz–1000Hz hardware stream.
+    pub fn read_hid_report_overlapped(handle: isize, buf: &mut [u8], timeout_ms: u32) -> Result<usize, String> {
+        let first_len = read_single_hid_report(handle, buf, timeout_ms)?;
+        if first_len == 0 {
+            return Ok(0);
+        }
+
+        let mut latest_len = first_len;
+        let mut scratch = [0u8; 128];
+        let max_len = buf.len().min(scratch.len());
+        for _ in 0..3 {
+            match read_single_hid_report(handle, &mut scratch[..max_len], 0) {
+                Ok(n) if n >= 64 => {
+                    buf[..n].copy_from_slice(&scratch[..n]);
+                    latest_len = n;
+                }
+                _ => break,
+            }
+        }
+        Ok(latest_len)
     }
 
     pub fn write_hid_report_overlapped(handle: isize, report: &[u8], timeout_ms: u32) -> bool {
@@ -657,17 +758,17 @@ pub mod win32_hid {
                     if event != 0 {
                         let _ = CloseHandle(event);
                     }
-                    // Fallback to HidD_SetOutputReport control transfer
                     return HidD_SetOutputReport(handle, report.as_ptr(), report.len() as u32) != 0;
                 }
                 if WaitForSingleObject(event, timeout_ms) != 0 {
                     let _ = CancelIoEx(handle, &ov);
+                    let _ = GetOverlappedResult(handle, &ov, &mut written, 1);
                     if event != 0 {
                         let _ = CloseHandle(event);
                     }
                     return false;
                 }
-                let res = GetOverlappedResult(handle, &ov, &mut written, 0) != 0;
+                let res = GetOverlappedResult(handle, &ov, &mut written, 1) != 0;
                 if event != 0 {
                     let _ = CloseHandle(event);
                 }

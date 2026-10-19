@@ -2,10 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import * as boosterService from '@/services/booster'
 import { useSettings, useSetSetting } from '@/features/settings/hooks/use-settings'
-import {
-  liveMetricsQueryKey,
-  systemSpecsQueryKey,
-} from '@/features/settings/hooks/use-system-specs'
+import { liveMetricsQueryKey, systemSpecsQueryKey } from '@/features/settings/hooks/use-system-specs'
 
 export const boostableAppsKey = ['booster', 'boostable-apps'] as const
 
@@ -116,12 +113,12 @@ export function useBoosterModules() {
   const raw = settings?.booster_enabled_modules
   const enabledIds: BoosterModuleId[] =
     raw !== undefined
-      ? raw
+      ? (raw
           .split(',')
           .map((id) => id.trim())
           .filter((id): id is BoosterModuleId =>
             (BOOSTER_MODULE_IDS as readonly string[]).includes(id),
-          )
+          ))
       : [...BOOSTER_MODULE_IDS]
 
   function isEnabled(id: BoosterModuleId) {

@@ -362,15 +362,9 @@ export function AvatarPickerModal({
                                 onError={(e) => {
                                   const target = e.currentTarget
                                   if (target.src.endsWith('/library_600x900_2x.jpg')) {
-                                    target.src = target.src.replace(
-                                      '/library_600x900_2x.jpg',
-                                      '/library_600x900.jpg',
-                                    )
+                                    target.src = target.src.replace('/library_600x900_2x.jpg', '/library_600x900.jpg')
                                   } else if (target.src.endsWith('/library_600x900.jpg')) {
-                                    target.src = target.src.replace(
-                                      '/library_600x900.jpg',
-                                      '/header.jpg',
-                                    )
+                                    target.src = target.src.replace('/library_600x900.jpg', '/header.jpg')
                                   } else {
                                     target.style.display = 'none'
                                     const fallback = target.nextElementSibling as HTMLElement

@@ -493,9 +493,7 @@ export default function DownloadsPage() {
                 Live Bandwidth
               </div>
               <div className="truncate font-mono text-sm font-black text-text">
-                {aggregateSpeedBps > 0
-                  ? `${formatBytesSummary(aggregateSpeedBps)}/s`
-                  : 'Idle (0 B/s)'}
+                {aggregateSpeedBps > 0 ? `${formatBytesSummary(aggregateSpeedBps)}/s` : 'Idle (0 B/s)'}
               </div>
             </div>
           </div>
@@ -638,7 +636,9 @@ export default function DownloadsPage() {
                 onClick={() => setTab('all')}
                 className={cn(
                   'rounded-lg px-3 py-1 text-xs font-bold transition-colors cursor-pointer',
-                  tab === 'all' ? 'bg-accent text-white shadow-xs' : 'text-subtle hover:text-text',
+                  tab === 'all'
+                    ? 'bg-accent text-white shadow-xs'
+                    : 'text-subtle hover:text-text',
                 )}
               >
                 All ({allGrouped.length})
@@ -714,8 +714,8 @@ export default function DownloadsPage() {
             <p className="text-base font-bold text-text">No downloads or history yet</p>
             <p className="mt-1 max-w-sm text-xs text-subtle">
               Search a game on IGDB or paste direct download links to start a high-speed
-              multi-connection download. Completed downloads stay preserved here in your history
-              even if you remove a game from the Library.
+              multi-connection download. Completed downloads stay preserved here in your history even
+              if you remove a game from the Library.
             </p>
             <button
               type="button"

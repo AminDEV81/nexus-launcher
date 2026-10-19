@@ -203,17 +203,17 @@ export function useHubSearch(query: string, filters: HubSearchFilters = {}) {
     filters.platformIds && filters.platformIds.length > 0 ? filters.platformIds : undefined
   const hasFilter = Boolean(
     (gIds && gIds.length > 0) ||
-    filters.genreId != null ||
-    (pIds && pIds.length > 0) ||
-    filters.platformId != null ||
-    (filters.release && filters.release.length > 0) ||
-    filters.yearFrom != null ||
-    filters.yearTo != null ||
-    filters.minRating != null ||
-    (filters.sort && filters.sort.length > 0) ||
-    (filters.gameCategory && filters.gameCategory !== 'all') ||
-    (filters.gameMode && filters.gameMode !== 'all') ||
-    filters.onlyReleased,
+      filters.genreId != null ||
+      (pIds && pIds.length > 0) ||
+      filters.platformId != null ||
+      (filters.release && filters.release.length > 0) ||
+      filters.yearFrom != null ||
+      filters.yearTo != null ||
+      filters.minRating != null ||
+      (filters.sort && filters.sort.length > 0) ||
+      (filters.gameCategory && filters.gameCategory !== 'all') ||
+      (filters.gameMode && filters.gameMode !== 'all') ||
+      filters.onlyReleased,
   )
   const enabled = trimmed.length >= 2 || hasFilter
   const normalizedFilters: HubSearchFilters = {
@@ -233,10 +233,13 @@ export function useHubSearch(query: string, filters: HubSearchFilters = {}) {
 
   return useInfiniteQuery({
     queryKey: ['hub', 'search', trimmed.toLowerCase(), normalizedFilters],
-    queryFn: ({ pageParam }) => hubService.searchHubGames(trimmed, pageParam, normalizedFilters),
+    queryFn: ({ pageParam }) =>
+      hubService.searchHubGames(trimmed, pageParam, normalizedFilters),
     initialPageParam: 0,
     getNextPageParam: (lastPage: HubGame[], allPages: HubGame[][]) =>
-      lastPage.length < 16 ? undefined : allPages.length * hubService.HUB_SEARCH_PAGE_SIZE,
+      lastPage.length < 16
+        ? undefined
+        : allPages.length * hubService.HUB_SEARCH_PAGE_SIZE,
     enabled,
     staleTime: 2 * 60_000,
     placeholderData: keepPreviousData,

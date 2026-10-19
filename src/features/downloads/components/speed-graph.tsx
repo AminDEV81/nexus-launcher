@@ -1,5 +1,14 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { Activity, ArrowUpRight, Clock, Gauge, HardDriveDownload, Layers, Zap } from 'lucide-react'
+import {
+  Activity,
+  ArrowUpRight,
+  Clock,
+  Gauge,
+  HardDriveDownload,
+  Layers,
+  Sparkles,
+  Zap,
+} from 'lucide-react'
 import type { DownloadInfo } from '@/services/download'
 import { cn } from '@/lib/utils'
 
@@ -265,7 +274,9 @@ export function SpeedGraph({ downloads }: SpeedGraphProps) {
                 {formatSpeed(hoveredPoint ? hoveredPoint.rawSpeed : currentSpeed, useBitsUnit)}
               </span>
               <span className="font-mono text-xs font-bold text-muted">
-                {hoveredPoint ? 'Sampled Point' : formatSpeed(currentSpeed, !useBitsUnit)}
+                {hoveredPoint
+                  ? 'Sampled Point'
+                  : formatSpeed(currentSpeed, !useBitsUnit)}
               </span>
             </div>
           </div>
@@ -418,7 +429,9 @@ export function SpeedGraph({ downloads }: SpeedGraphProps) {
           )}
 
           {/* Secondary Harmonic Wave Fill & Line */}
-          {harmonicAreaPath && <path d={harmonicAreaPath} fill="url(#nxSpeedHarmonicGrad)" />}
+          {harmonicAreaPath && (
+            <path d={harmonicAreaPath} fill="url(#nxSpeedHarmonicGrad)" />
+          )}
           {harmonicLinePath && (
             <path
               d={harmonicLinePath}
@@ -490,8 +503,19 @@ export function SpeedGraph({ downloads }: SpeedGraphProps) {
           {/* Leading-Edge Live Plasma Beacon */}
           {lastPoint && currentSpeed > 0 && (
             <g>
-              <circle cx={lastPoint.x} cy={lastPoint.y} r="11" fill="#10b981" opacity="0.22">
-                <animate attributeName="r" values="5;14;5" dur="1.6s" repeatCount="indefinite" />
+              <circle
+                cx={lastPoint.x}
+                cy={lastPoint.y}
+                r="11"
+                fill="#10b981"
+                opacity="0.22"
+              >
+                <animate
+                  attributeName="r"
+                  values="5;14;5"
+                  dur="1.6s"
+                  repeatCount="indefinite"
+                />
                 <animate
                   attributeName="opacity"
                   values="0.45;0.05;0.45"

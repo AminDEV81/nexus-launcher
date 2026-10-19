@@ -90,7 +90,9 @@ export function SmartRouletteModal({ open, onClose, games: propGames }: SmartRou
 
   const pool = useMemo(() => {
     const visible = games.filter((g) => !g.is_hidden && !g.is_wishlist && !g.is_memory)
-    const byInstall = onlyInstalled ? visible.filter((g) => g.is_installed) : visible
+    const byInstall = onlyInstalled
+      ? visible.filter((g) => g.is_installed)
+      : visible
     const basePool = byInstall.length > 0 ? byInstall : visible
 
     if (mood === 'all') return basePool
@@ -158,7 +160,9 @@ export function SmartRouletteModal({ open, onClose, games: propGames }: SmartRou
               <div className="font-mono text-[10px] font-black uppercase tracking-[0.2em] text-accent">
                 AI MOOD MATCHER &amp; BACKLOG DECIDER
               </div>
-              <h2 className="text-lg font-black tracking-tight text-text">Smart Game Roulette</h2>
+              <h2 className="text-lg font-black tracking-tight text-text">
+                Smart Game Roulette
+              </h2>
             </div>
           </div>
           <ModalCloseButton onClick={onClose} />
@@ -226,11 +230,7 @@ export function SmartRouletteModal({ open, onClose, games: propGames }: SmartRou
               >
                 <div className="relative h-36 w-27 shrink-0 overflow-hidden rounded-xl border border-border bg-surface shadow-md mx-auto sm:mx-0">
                   {coverSrc ? (
-                    <img
-                      src={coverSrc}
-                      alt={displayedGame.name}
-                      className="size-full object-cover"
-                    />
+                    <img src={coverSrc} alt={displayedGame.name} className="size-full object-cover" />
                   ) : (
                     <div className="flex size-full items-center justify-center bg-surface-raised text-accent">
                       <Gamepad2 className="size-8" />

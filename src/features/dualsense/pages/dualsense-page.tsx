@@ -240,6 +240,65 @@ function makeDefaultOverride(slotIndex: number): VirtualControllerOverride {
   }
 }
 
+function hasAnyManualOverrideInput(ov: VirtualControllerOverride): boolean {
+  return (
+    ov.cross ||
+    ov.circle ||
+    ov.square ||
+    ov.triangle ||
+    ov.l1 ||
+    ov.r1 ||
+    ov.l2 > 0 ||
+    ov.r2 > 0 ||
+    ov.create ||
+    ov.options ||
+    ov.l3 ||
+    ov.r3 ||
+    ov.ps ||
+    ov.touchpadClick ||
+    ov.touch1Active ||
+    ov.mute ||
+    ov.dpadUp ||
+    ov.dpadDown ||
+    ov.dpadLeft ||
+    ov.dpadRight ||
+    Math.abs(ov.lx - 128) > 2 ||
+    Math.abs(ov.ly - 128) > 2 ||
+    Math.abs(ov.rx - 128) > 2 ||
+    Math.abs(ov.ry - 128) > 2
+  )
+}
+
+/**
+ * Strictly filters browser `navigator.getGamepads()` entries to genuine Sony DualSense / DualShock
+ * controllers and explicitly rejects Virtual Xbox 360 / XInput / ViGEmBus controllers (`VID_045E&PID_028E`).
+ * This prevents Virtual Xbox 360 controllers spawned by "Activate All" from being mistaken for
+ * additional physical DualSense controllers in Slots 3 & 4!
+ */
+function isSonyDualSenseGamepad(pad: Gamepad | null | undefined): pad is Gamepad {
+  if (!pad || !pad.connected) return false
+  const id = (pad.id || '').toLowerCase()
+  if (
+    id.includes('xbox') ||
+    id.includes('xinput') ||
+    id.includes('045e') ||
+    id.includes('028e') ||
+    id.includes('vigem') ||
+    id.includes('microsoft') ||
+    id.includes('virtual')
+  ) {
+    return false
+  }
+  return (
+    id.includes('054c') ||
+    id.includes('dualsense') ||
+    id.includes('dualshock') ||
+    id.includes('wireless controller') ||
+    id.includes('playstation') ||
+    id.includes('sony')
+  )
+}
+
 function rgbToHex(r: number, g: number, b: number): string {
   const toHex = (n: number) =>
     Math.max(0, Math.min(255, Math.round(n)))
@@ -265,6 +324,9 @@ export function DualSensePage() {
   const [autoCircleTest, setAutoCircleTest] = useState(false)
   const [hexDraft, setHexDraft] = useState<string>('#0070FF')
 
+  const snapshotRef = useRef<DualSenseTelemetrySnapshot | null>(null)
+  snapshotRef.current = snapshot
+
   const overridesRef = useRef<VirtualControllerOverride[]>([
     makeDefaultOverride(0),
     makeDefaultOverride(1),
@@ -286,32 +348,37 @@ export function DualSensePage() {
     }
   }, [])
 
+  const slots = snapshot?.slots ?? []
+  const currentSlot = slots[activeSlot]
+  const ds = currentSlot?.dualsense ?? snapshot?.dualsense
+  const xb = currentSlot?.xbox ?? snapshot?.xbox
+  const cfg = currentSlot?.config ?? snapshot?.config
+  const drv = snapshot?.driverStatus
+  const emulationActive = Boolean(xb?.emulationActive)
+
+  const connectedSlots = slots.filter((s) => s.dualsense.connected)
+  const allConnectedEmulating =
+    connectedSlots.length > 0
+      ? connectedSlots.every((s) => s.xbox.emulationActive)
+      : slots.some((s) => s.xbox.emulationActive)
+
   // Sync hex input when slot or config changes
   useEffect(() => {
-    if (snapshot?.config) {
-      setHexDraft(
-        rgbToHex(snapshot.config.lightbarR, snapshot.config.lightbarG, snapshot.config.lightbarB),
-      )
+    if (cfg) {
+      setHexDraft(rgbToHex(cfg.lightbarR, cfg.lightbarG, cfg.lightbarB))
     }
-  }, [
-    snapshot?.activeSlot,
-    snapshot?.config?.lightbarR,
-    snapshot?.config?.lightbarG,
-    snapshot?.config?.lightbarB,
-  ])
+  }, [activeSlot, cfg?.lightbarR, cfg?.lightbarG, cfg?.lightbarB])
 
-  // Listen to browser gamepaddisconnected / gamepadconnected events for instant disconnect detection
+  // Listen to browser gamepadconnected / gamepaddisconnected for Sony controllers only
   useEffect(() => {
     const onDisconnect = (e: GamepadEvent) => {
-      const idx = e.gamepad.index
-      if (idx >= 0 && idx < 4) {
-        prevPadConnectedRef.current[idx] = false
-        const reset = makeDefaultOverride(idx)
-        overridesRef.current[idx] = reset
-        void syncOverrideToBackend(reset)
-      }
+      if (!isSonyDualSenseGamepad(e.gamepad)) return
+      void invoke<DualSenseTelemetrySnapshot>('dualsense_scan_devices')
+        .then((res) => setSnapshot(res))
+        .catch(() => {})
     }
-    const onConnect = () => {
+    const onConnect = (e: GamepadEvent) => {
+      if (!isSonyDualSenseGamepad(e.gamepad)) return
       void invoke<DualSenseTelemetrySnapshot>('dualsense_scan_devices')
         .then((res) => setSnapshot(res))
         .catch(() => {})
@@ -322,15 +389,17 @@ export function DualSensePage() {
       window.removeEventListener('gamepaddisconnected', onDisconnect)
       window.removeEventListener('gamepadconnected', onConnect)
     }
-  }, [syncOverrideToBackend])
+  }, [])
 
-  // Adaptive telemetry & multi-controller Gamepad API loop
+  // Non-overlapping adaptive telemetry loop (never queues overlapping IPC requests)
   useEffect(() => {
-    let mounted = true
+    let cancelled = false
+    let timerId: number | null = null
+
     const fetchInitial = async () => {
       try {
         const res = await invoke<DualSenseTelemetrySnapshot>('dualsense_get_state')
-        if (mounted) {
+        if (!cancelled) {
           setSnapshot(res)
           setActiveSlot(res.activeSlot)
         }
@@ -340,116 +409,138 @@ export function DualSensePage() {
     }
     void fetchInitial()
 
-    const interval = window.setInterval(async () => {
-      if (document.hidden) return
+    const tick = async () => {
+      if (cancelled) return
 
-      const rawPads = navigator.getGamepads ? Array.from(navigator.getGamepads()) : []
-      let sentViaOverride = false
+      if (!document.hidden) {
+        let sentViaOverride = false
 
-      if (autoCircleTest) {
-        autoCircleAngleRef.current = (autoCircleAngleRef.current + 0.14) % (Math.PI * 2)
-        const angle = autoCircleAngleRef.current
-        const lx = Math.round(128 + Math.cos(angle) * 118)
-        const ly = Math.round(128 + Math.sin(angle) * 118)
-        const rx = Math.round(128 + Math.sin(angle * 1.5) * 118)
-        const ry = Math.round(128 + Math.cos(angle * 1.5) * 118)
-        const cur = overridesRef.current[activeSlot] ?? makeDefaultOverride(activeSlot)
-        const next: VirtualControllerOverride = {
-          ...cur,
-          slotIndex: activeSlot,
-          active: true,
-          webGamepadConnected: Boolean(rawPads[activeSlot]?.connected),
-          lx,
-          ly,
-          rx,
-          ry,
-        }
-        overridesRef.current[activeSlot] = next
-        sentViaOverride = true
-        try {
-          const res = await invoke<DualSenseTelemetrySnapshot>('dualsense_set_virtual_override', {
-            overrideState: next,
-          })
-          if (mounted) {
-            setSnapshot(res)
+        if (autoCircleTest) {
+          autoCircleAngleRef.current = (autoCircleAngleRef.current + 0.14) % (Math.PI * 2)
+          const angle = autoCircleAngleRef.current
+          const lx = Math.round(128 + Math.cos(angle) * 118)
+          const ly = Math.round(128 + Math.sin(angle) * 118)
+          const rx = Math.round(128 + Math.sin(angle * 1.5) * 118)
+          const ry = Math.round(128 + Math.cos(angle * 1.5) * 118)
+          const cur = overridesRef.current[activeSlot] ?? makeDefaultOverride(activeSlot)
+          const next: VirtualControllerOverride = {
+            ...cur,
+            slotIndex: activeSlot,
+            active: true,
+            lx,
+            ly,
+            rx,
+            ry,
           }
-        } catch {
-          // Ignore
-        }
-      } else {
-        for (let slotIdx = 0; slotIdx < 4; slotIdx++) {
-          const pad = rawPads[slotIdx]
-          const isNowConnected = Boolean(pad && pad.connected)
+          overridesRef.current[activeSlot] = next
+          sentViaOverride = true
+          try {
+            const res = await invoke<DualSenseTelemetrySnapshot>('dualsense_set_virtual_override', {
+              overrideState: next,
+            })
+            if (!cancelled) {
+              setSnapshot(res)
+            }
+          } catch {
+            // Ignore
+          }
+        } else {
+          // Check if native Win32 HID driver has already claimed physical Sony controller(s)
+          const hasNativeHid = Boolean(
+            snapshotRef.current?.slots?.some(
+              (s) => s.dualsense.devicePath && s.dualsense.devicePath.length > 0,
+            ),
+          )
 
-          if (!isNowConnected) {
-            // If it WAS connected on the previous tick and is now unplugged, immediately clear it!
-            if (prevPadConnectedRef.current[slotIdx]) {
-              prevPadConnectedRef.current[slotIdx] = false
-              const cleared = makeDefaultOverride(slotIdx)
-              overridesRef.current[slotIdx] = cleared
+          if (!hasNativeHid && navigator.getGamepads) {
+            const rawPads = Array.from(navigator.getGamepads())
+            const sonyPads = rawPads.filter(isSonyDualSenseGamepad).slice(0, 4)
+
+            for (let slotIdx = 0; slotIdx < 4; slotIdx++) {
+              const pad = sonyPads[slotIdx]
+              const isNowConnected = Boolean(pad && pad.connected)
+
+              if (!isNowConnected) {
+                if (prevPadConnectedRef.current[slotIdx]) {
+                  prevPadConnectedRef.current[slotIdx] = false
+                  const cleared = makeDefaultOverride(slotIdx)
+                  overridesRef.current[slotIdx] = cleared
+                  sentViaOverride = true
+                  try {
+                    const res = await invoke<DualSenseTelemetrySnapshot>(
+                      'dualsense_set_virtual_override',
+                      { overrideState: cleared },
+                    )
+                    if (!cancelled) {
+                      setSnapshot(res)
+                    }
+                  } catch {
+                    // Ignore
+                  }
+                }
+                continue
+              }
+
+              prevPadConnectedRef.current[slotIdx] = true
+              const b = pad.buttons
+              const ax = pad.axes
+              const padLx = Math.round(((ax[0] ?? 0) + 1) * 127.5)
+              const padLy = Math.round(((ax[1] ?? 0) + 1) * 127.5)
+              const padRx = Math.round(((ax[2] ?? 0) + 1) * 127.5)
+              const padRy = Math.round(((ax[3] ?? 0) + 1) * 127.5)
+
+              const m = overridesRef.current[slotIdx] ?? makeDefaultOverride(slotIdx)
+              const combined: VirtualControllerOverride = {
+                slotIndex: slotIdx,
+                active: true,
+                webGamepadConnected: true,
+                cross: m.cross || Boolean(b[0]?.pressed),
+                circle: m.circle || Boolean(b[1]?.pressed),
+                square: m.square || Boolean(b[2]?.pressed),
+                triangle: m.triangle || Boolean(b[3]?.pressed),
+                l1: m.l1 || Boolean(b[4]?.pressed),
+                r1: m.r1 || Boolean(b[5]?.pressed),
+                l2: Math.max(m.l2, Math.round((b[6]?.value ?? 0) * 255)),
+                r2: Math.max(m.r2, Math.round((b[7]?.value ?? 0) * 255)),
+                create: m.create || Boolean(b[8]?.pressed),
+                options: m.options || Boolean(b[9]?.pressed),
+                l3: m.l3 || Boolean(b[10]?.pressed),
+                r3: m.r3 || Boolean(b[11]?.pressed),
+                dpadUp: m.dpadUp || Boolean(b[12]?.pressed),
+                dpadDown: m.dpadDown || Boolean(b[13]?.pressed),
+                dpadLeft: m.dpadLeft || Boolean(b[14]?.pressed),
+                dpadRight: m.dpadRight || Boolean(b[15]?.pressed),
+                ps: m.ps || Boolean(b[16]?.pressed),
+                touchpadClick: m.touchpadClick || Boolean(b[17]?.pressed),
+                touch1Active: m.touch1Active,
+                touch1X: m.touch1X,
+                touch1Y: m.touch1Y,
+                mute: m.mute,
+                lx: Math.abs(m.lx - 128) > 4 ? m.lx : padLx,
+                ly: Math.abs(m.ly - 128) > 4 ? m.ly : padLy,
+                rx: Math.abs(m.rx - 128) > 4 ? m.rx : padRx,
+                ry: Math.abs(m.ry - 128) > 4 ? m.ry : padRy,
+              }
               sentViaOverride = true
               try {
                 const res = await invoke<DualSenseTelemetrySnapshot>(
                   'dualsense_set_virtual_override',
-                  { overrideState: cleared },
+                  { overrideState: combined },
                 )
-                if (mounted && slotIdx === activeSlot) {
+                if (!cancelled) {
                   setSnapshot(res)
                 }
               } catch {
                 // Ignore
               }
             }
-            continue
           }
+        }
 
-          prevPadConnectedRef.current[slotIdx] = true
-          if (!pad) continue
-          const b = pad.buttons
-          const ax = pad.axes
-          const padLx = Math.round(((ax[0] ?? 0) + 1) * 127.5)
-          const padLy = Math.round(((ax[1] ?? 0) + 1) * 127.5)
-          const padRx = Math.round(((ax[2] ?? 0) + 1) * 127.5)
-          const padRy = Math.round(((ax[3] ?? 0) + 1) * 127.5)
-
-          const m = overridesRef.current[slotIdx] ?? makeDefaultOverride(slotIdx)
-          const combined: VirtualControllerOverride = {
-            slotIndex: slotIdx,
-            active: true,
-            webGamepadConnected: true,
-            cross: m.cross || Boolean(b[0]?.pressed),
-            circle: m.circle || Boolean(b[1]?.pressed),
-            square: m.square || Boolean(b[2]?.pressed),
-            triangle: m.triangle || Boolean(b[3]?.pressed),
-            l1: m.l1 || Boolean(b[4]?.pressed),
-            r1: m.r1 || Boolean(b[5]?.pressed),
-            l2: Math.max(m.l2, Math.round((b[6]?.value ?? 0) * 255)),
-            r2: Math.max(m.r2, Math.round((b[7]?.value ?? 0) * 255)),
-            create: m.create || Boolean(b[8]?.pressed),
-            options: m.options || Boolean(b[9]?.pressed),
-            l3: m.l3 || Boolean(b[10]?.pressed),
-            r3: m.r3 || Boolean(b[11]?.pressed),
-            dpadUp: m.dpadUp || Boolean(b[12]?.pressed),
-            dpadDown: m.dpadDown || Boolean(b[13]?.pressed),
-            dpadLeft: m.dpadLeft || Boolean(b[14]?.pressed),
-            dpadRight: m.dpadRight || Boolean(b[15]?.pressed),
-            ps: m.ps || Boolean(b[16]?.pressed),
-            touchpadClick: m.touchpadClick || Boolean(b[17]?.pressed),
-            touch1Active: m.touch1Active,
-            touch1X: m.touch1X,
-            touch1Y: m.touch1Y,
-            mute: m.mute,
-            lx: Math.abs(m.lx - 128) > 4 ? m.lx : padLx,
-            ly: Math.abs(m.ly - 128) > 4 ? m.ly : padLy,
-            rx: Math.abs(m.rx - 128) > 4 ? m.rx : padRx,
-            ry: Math.abs(m.ry - 128) > 4 ? m.ry : padRy,
-          }
-          sentViaOverride = true
+        if (!sentViaOverride) {
           try {
-            const res = await invoke<DualSenseTelemetrySnapshot>('dualsense_set_virtual_override', {
-              overrideState: combined,
-            })
-            if (mounted && slotIdx === activeSlot) {
+            const res = await invoke<DualSenseTelemetrySnapshot>('dualsense_get_state')
+            if (!cancelled) {
               setSnapshot(res)
             }
           } catch {
@@ -458,21 +549,22 @@ export function DualSensePage() {
         }
       }
 
-      if (!sentViaOverride) {
-        try {
-          const res = await invoke<DualSenseTelemetrySnapshot>('dualsense_get_state')
-          if (mounted) {
-            setSnapshot(res)
-          }
-        } catch {
-          // Ignore
-        }
+      if (!cancelled) {
+        timerId = window.setTimeout(() => {
+          void tick()
+        }, 35)
       }
-    }, 45)
+    }
+
+    timerId = window.setTimeout(() => {
+      void tick()
+    }, 35)
 
     return () => {
-      mounted = false
-      window.clearInterval(interval)
+      cancelled = true
+      if (timerId !== null) {
+        window.clearTimeout(timerId)
+      }
     }
   }, [autoCircleTest, activeSlot])
 
@@ -489,16 +581,22 @@ export function DualSensePage() {
   }
 
   const handleToggleXboxEmulation = async (targetSlot?: number, allSlots?: boolean) => {
+    if (isToggling) return
     setIsToggling(true)
-    const currentEmulating =
-      targetSlot !== undefined
-        ? Boolean(snapshot?.slots?.[targetSlot]?.xbox?.emulationActive)
-        : Boolean(snapshot?.xbox?.emulationActive)
-    const nextState = !currentEmulating
+    const slotToUse = targetSlot ?? activeSlot
+    if (targetSlot !== undefined && !allSlots && targetSlot !== activeSlot) {
+      setActiveSlot(targetSlot)
+      void invoke('dualsense_select_slot', { slotIndex: targetSlot }).catch(() => {})
+    }
+
+    const nextState = allSlots
+      ? !allConnectedEmulating
+      : !Boolean(slots[slotToUse]?.xbox?.emulationActive ?? snapshot?.xbox?.emulationActive)
+
     try {
       const updated = await invoke<DualSenseTelemetrySnapshot>('dualsense_set_xbox_emulation', {
         enabled: nextState,
-        slotIndex: targetSlot ?? activeSlot,
+        slotIndex: slotToUse,
         allSlots: Boolean(allSlots),
       })
       setSnapshot(updated)
@@ -508,26 +606,25 @@ export function DualSensePage() {
   }
 
   const handleButtonToggle = (btnKey: string, pressed: boolean) => {
-    const cur = {
+    const cur: VirtualControllerOverride = {
       ...(overridesRef.current[activeSlot] ?? makeDefaultOverride(activeSlot)),
       slotIndex: activeSlot,
-      active: true,
     }
     if (btnKey === 'l2') {
       cur.l2 = pressed ? 255 : 0
     } else if (btnKey === 'r2') {
       cur.r2 = pressed ? 255 : 0
     } else if (btnKey in cur) {
-      ;(cur as Record<string, unknown>)[btnKey] = pressed
+      ;(cur as unknown as Record<string, unknown>)[btnKey] = pressed
     }
+    cur.active = pressed || hasAnyManualOverrideInput(cur)
     void syncOverrideToBackend(cur)
   }
 
   const handleStickMove = (stick: 'left' | 'right', x: number, y: number) => {
-    const cur = {
+    const cur: VirtualControllerOverride = {
       ...(overridesRef.current[activeSlot] ?? makeDefaultOverride(activeSlot)),
       slotIndex: activeSlot,
-      active: true,
     }
     if (stick === 'left') {
       cur.lx = x
@@ -536,33 +633,38 @@ export function DualSensePage() {
       cur.rx = x
       cur.ry = y
     }
+    cur.active = hasAnyManualOverrideInput(cur)
     void syncOverrideToBackend(cur)
   }
 
-  const handleTouchpadInput = (active: boolean, x: number, y: number, clicked: boolean) => {
-    const cur = {
+  const handleTouchpadInput = (
+    active: boolean,
+    x: number,
+    y: number,
+    clicked: boolean,
+  ) => {
+    const cur: VirtualControllerOverride = {
       ...(overridesRef.current[activeSlot] ?? makeDefaultOverride(activeSlot)),
       slotIndex: activeSlot,
-      active: true,
       touch1Active: active,
       touch1X: x,
       touch1Y: y,
       touchpadClick: clicked,
     }
+    cur.active = active || clicked || hasAnyManualOverrideInput(cur)
     void syncOverrideToBackend(cur)
   }
 
   const handleResetTestInputs = () => {
     setAutoCircleTest(false)
     const reset = makeDefaultOverride(activeSlot)
-    reset.webGamepadConnected = prevPadConnectedRef.current[activeSlot] ?? false
     void syncOverrideToBackend(reset)
   }
 
   const handleUpdateConfig = async (patch: Partial<DualSenseProfileConfig>) => {
-    if (!snapshot) return
+    if (!cfg) return
     const nextCfg: DualSenseProfileConfig = {
-      ...snapshot.config,
+      ...cfg,
       ...patch,
     }
     try {
@@ -608,13 +710,6 @@ export function DualSensePage() {
       // Ignore
     }
   }
-
-  const ds = snapshot?.dualsense
-  const xb = snapshot?.xbox
-  const cfg = snapshot?.config
-  const drv = snapshot?.driverStatus
-  const emulationActive = Boolean(xb?.emulationActive)
-  const slots = snapshot?.slots ?? []
 
   const ps5VisualState = {
     cross: !emulationActive ? Boolean(ds?.cross) : false,
@@ -678,7 +773,11 @@ export function DualSensePage() {
     thumbRy: emulationActive ? (xb?.thumbRy ?? 0) : 0,
   }
 
-  const currentHex = rgbToHex(cfg?.lightbarR ?? 0, cfg?.lightbarG ?? 112, cfg?.lightbarB ?? 255)
+  const currentHex = rgbToHex(
+    cfg?.lightbarR ?? 0,
+    cfg?.lightbarG ?? 112,
+    cfg?.lightbarB ?? 255,
+  )
 
   return (
     <div className="flex h-full flex-col overflow-y-auto px-6 py-6 text-text">
@@ -753,24 +852,24 @@ export function DualSensePage() {
             Rescan HID
           </button>
 
-          {/* Toggle All 4 Slots Button */}
+          {/* Toggle All Connected Slots Button */}
           <button
             type="button"
             disabled={isToggling}
-            onClick={() => handleToggleXboxEmulation(activeSlot, true)}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3.5 py-2.5 text-xs font-extrabold text-text transition hover:border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer"
-            title="Start or Stop Xbox Emulation across all 4 controller slots simultaneously"
+            onClick={() => void handleToggleXboxEmulation(undefined, true)}
+            className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3.5 py-2.5 text-xs font-extrabold text-text transition hover:border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer disabled:opacity-50"
+            title="Start or Stop Xbox Emulation across all connected controllers simultaneously"
           >
             <Users className="size-3.5 text-emerald-500" />
-            {emulationActive ? 'Stop All (1–4)' : 'Activate All (1–4)'}
+            {allConnectedEmulating ? 'Stop All (1–4)' : 'Activate All (1–4)'}
           </button>
 
           {/* Primary Active Slot Start / Stop Emulation Button */}
           <button
             type="button"
             disabled={isToggling}
-            onClick={() => handleToggleXboxEmulation(activeSlot, false)}
-            className={`flex items-center gap-2.5 rounded-xl px-5 py-2.5 text-sm font-black tracking-wide text-white shadow-md transition-all cursor-pointer ${
+            onClick={() => void handleToggleXboxEmulation(activeSlot, false)}
+            className={`flex items-center gap-2.5 rounded-xl px-5 py-2.5 text-sm font-black tracking-wide text-white shadow-md transition-all cursor-pointer disabled:opacity-50 ${
               emulationActive
                 ? 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 shadow-emerald-600/20 ring-2 ring-emerald-400/50 hover:brightness-110'
                 : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 shadow-blue-600/20 ring-1 ring-blue-400/40 hover:brightness-110'
@@ -799,9 +898,11 @@ export function DualSensePage() {
           const isSlotEmulating = Boolean(slotSnap?.xbox?.emulationActive)
           const isSlotConnected = Boolean(slotSnap?.dualsense?.connected)
           const sr =
-            slotSnap?.config?.lightbarR ?? (idx === 0 ? 0 : idx === 1 ? 239 : idx === 2 ? 16 : 168)
+            slotSnap?.config?.lightbarR ??
+            (idx === 0 ? 0 : idx === 1 ? 239 : idx === 2 ? 16 : 168)
           const sg =
-            slotSnap?.config?.lightbarG ?? (idx === 0 ? 112 : idx === 1 ? 68 : idx === 2 ? 185 : 85)
+            slotSnap?.config?.lightbarG ??
+            (idx === 0 ? 112 : idx === 1 ? 68 : idx === 2 ? 185 : 85)
           const sb =
             slotSnap?.config?.lightbarB ??
             (idx === 0 ? 255 : idx === 1 ? 68 : idx === 2 ? 129 : 247)
@@ -834,7 +935,9 @@ export function DualSensePage() {
                     </span>
                     <span
                       className={`size-2 rounded-full ${
-                        isSlotConnected ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]' : 'bg-subtle/50'
+                        isSlotConnected
+                          ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]'
+                          : 'bg-subtle/50'
                       }`}
                     />
                   </div>
@@ -850,6 +953,7 @@ export function DualSensePage() {
 
               <button
                 type="button"
+                disabled={isToggling}
                 onClick={(e) => {
                   e.stopPropagation()
                   void handleToggleXboxEmulation(idx, false)
@@ -873,13 +977,11 @@ export function DualSensePage() {
           <div className="flex items-center gap-2.5">
             <span className="size-2.5 rounded-full bg-subtle animate-pulse" />
             <span className="font-extrabold text-text">
-              Controller #{activeSlot + 1} is Disconnected — Both Controllers Displayed in Standby
-              Grayscale
+              Controller #{activeSlot + 1} is Disconnected — Both Controllers Displayed in Standby Grayscale
             </span>
           </div>
           <span className="font-medium text-muted">
-            Connect controller #{activeSlot + 1} via USB or Bluetooth to restore full RGB color
-            &amp; live telemetry
+            Connect controller #{activeSlot + 1} via USB or Bluetooth to restore full RGB color &amp; live telemetry
           </span>
         </div>
       )}
@@ -1159,118 +1261,22 @@ export function DualSensePage() {
           <div className="flex flex-col justify-between gap-4 xl:col-span-7">
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
               {[
-                {
-                  key: 'cross',
-                  psLabel: '✕ Cross',
-                  xbLabel: 'A Button',
-                  active: ds?.cross,
-                  badgeColor: 'text-blue-500',
-                },
-                {
-                  key: 'circle',
-                  psLabel: '○ Circle',
-                  xbLabel: 'B Button',
-                  active: ds?.circle,
-                  badgeColor: 'text-rose-500',
-                },
-                {
-                  key: 'square',
-                  psLabel: '□ Square',
-                  xbLabel: 'X Button',
-                  active: ds?.square,
-                  badgeColor: 'text-pink-500',
-                },
-                {
-                  key: 'triangle',
-                  psLabel: '△ Triangle',
-                  xbLabel: 'Y Button',
-                  active: ds?.triangle,
-                  badgeColor: 'text-emerald-500',
-                },
-                {
-                  key: 'l1',
-                  psLabel: 'L1 Bumper',
-                  xbLabel: 'LB Bumper',
-                  active: ds?.l1,
-                  badgeColor: 'text-accent',
-                },
-                {
-                  key: 'r1',
-                  psLabel: 'R1 Bumper',
-                  xbLabel: 'RB Bumper',
-                  active: ds?.r1,
-                  badgeColor: 'text-accent',
-                },
-                {
-                  key: 'l3',
-                  psLabel: 'L3 Click',
-                  xbLabel: 'LS Click',
-                  active: ds?.l3,
-                  badgeColor: 'text-accent',
-                },
-                {
-                  key: 'r3',
-                  psLabel: 'R3 Click',
-                  xbLabel: 'RS Click',
-                  active: ds?.r3,
-                  badgeColor: 'text-accent',
-                },
-                {
-                  key: 'dpadUp',
-                  psLabel: 'D-Pad Up',
-                  xbLabel: 'D-Pad Up',
-                  active: ds?.dpadUp,
-                  badgeColor: 'text-subtle',
-                },
-                {
-                  key: 'dpadDown',
-                  psLabel: 'D-Pad Down',
-                  xbLabel: 'D-Pad Down',
-                  active: ds?.dpadDown,
-                  badgeColor: 'text-subtle',
-                },
-                {
-                  key: 'dpadLeft',
-                  psLabel: 'D-Pad Left',
-                  xbLabel: 'D-Pad Left',
-                  active: ds?.dpadLeft,
-                  badgeColor: 'text-subtle',
-                },
-                {
-                  key: 'dpadRight',
-                  psLabel: 'D-Pad Right',
-                  xbLabel: 'D-Pad Right',
-                  active: ds?.dpadRight,
-                  badgeColor: 'text-subtle',
-                },
-                {
-                  key: 'create',
-                  psLabel: 'Create',
-                  xbLabel: 'View / Back',
-                  active: ds?.create,
-                  badgeColor: 'text-subtle',
-                },
-                {
-                  key: 'options',
-                  psLabel: 'Options',
-                  xbLabel: 'Menu / Start',
-                  active: ds?.options,
-                  badgeColor: 'text-subtle',
-                },
-                {
-                  key: 'ps',
-                  psLabel: 'PS Home',
-                  xbLabel: 'Xbox Guide',
-                  active: ds?.ps,
-                  badgeColor: 'text-emerald-500',
-                },
-                {
-                  key: 'mute',
-                  psLabel: 'Mic Mute',
-                  xbLabel: 'Share',
-                  active: ds?.mute,
-                  badgeColor: 'text-amber-500',
-                },
+                { key: 'cross', psLabel: '✕ Cross', xbLabel: 'A Button', active: ds?.cross, badgeColor: 'text-blue-500' },
+                { key: 'circle', psLabel: '○ Circle', xbLabel: 'B Button', active: ds?.circle, badgeColor: 'text-rose-500' },
+                { key: 'square', psLabel: '□ Square', xbLabel: 'X Button', active: ds?.square, badgeColor: 'text-pink-500' },
+                { key: 'triangle', psLabel: '△ Triangle', xbLabel: 'Y Button', active: ds?.triangle, badgeColor: 'text-emerald-500' },
+                { key: 'l1', psLabel: 'L1 Bumper', xbLabel: 'LB Bumper', active: ds?.l1, badgeColor: 'text-accent' },
+                { key: 'r1', psLabel: 'R1 Bumper', xbLabel: 'RB Bumper', active: ds?.r1, badgeColor: 'text-accent' },
+                { key: 'l3', psLabel: 'L3 Click', xbLabel: 'LS Click', active: ds?.l3, badgeColor: 'text-accent' },
+                { key: 'r3', psLabel: 'R3 Click', xbLabel: 'RS Click', active: ds?.r3, badgeColor: 'text-accent' },
+                { key: 'dpadUp', psLabel: 'D-Pad Up', xbLabel: 'D-Pad Up', active: ds?.dpadUp, badgeColor: 'text-subtle' },
+                { key: 'dpadDown', psLabel: 'D-Pad Down', xbLabel: 'D-Pad Down', active: ds?.dpadDown, badgeColor: 'text-subtle' },
+                { key: 'dpadLeft', psLabel: 'D-Pad Left', xbLabel: 'D-Pad Left', active: ds?.dpadLeft, badgeColor: 'text-subtle' },
+                { key: 'dpadRight', psLabel: 'D-Pad Right', xbLabel: 'D-Pad Right', active: ds?.dpadRight, badgeColor: 'text-subtle' },
+                { key: 'create', psLabel: 'Create', xbLabel: 'View / Back', active: ds?.create, badgeColor: 'text-subtle' },
+                { key: 'options', psLabel: 'Options', xbLabel: 'Menu / Start', active: ds?.options, badgeColor: 'text-subtle' },
+                { key: 'ps', psLabel: 'PS Home', xbLabel: 'Xbox Guide', active: ds?.ps, badgeColor: 'text-emerald-500' },
+                { key: 'mute', psLabel: 'Mic Mute', xbLabel: 'Share', active: ds?.mute, badgeColor: 'text-amber-500' },
               ].map((btn) => (
                 <button
                   key={btn.key}
@@ -1305,7 +1311,9 @@ export function DualSensePage() {
                   </div>
                   <span
                     className={`size-2 rounded-full transition-transform ${
-                      btn.active ? 'bg-white scale-125' : 'bg-border group-hover:bg-accent/60'
+                      btn.active
+                        ? 'bg-white scale-125'
+                        : 'bg-border group-hover:bg-accent/60'
                     }`}
                   />
                 </button>
@@ -1320,7 +1328,7 @@ export function DualSensePage() {
                     {emulationActive ? 'Left Trigger (LT ← L2)' : 'Left Trigger (L2)'}
                   </span>
                   <span className="rounded-md bg-accent/15 px-2 py-0.5 font-mono text-[11px] text-accent">
-                    {emulationActive ? (xb?.lt ?? 0) : (ds?.l2 ?? 0)} / 255
+                    {emulationActive ? xb?.lt ?? 0 : ds?.l2 ?? 0} / 255
                   </span>
                 </div>
                 <input
@@ -1330,12 +1338,13 @@ export function DualSensePage() {
                   value={ds?.l2 ?? 0}
                   onChange={(e) => {
                     const v = Number(e.target.value)
-                    void syncOverrideToBackend({
+                    const cur: VirtualControllerOverride = {
                       ...(overridesRef.current[activeSlot] ?? makeDefaultOverride(activeSlot)),
                       slotIndex: activeSlot,
-                      active: true,
                       l2: v,
-                    })
+                    }
+                    cur.active = v > 0 || hasAnyManualOverrideInput(cur)
+                    void syncOverrideToBackend(cur)
                   }}
                   className="w-full accent-blue-600 cursor-pointer"
                 />
@@ -1347,7 +1356,7 @@ export function DualSensePage() {
                     {emulationActive ? 'Right Trigger (RT ← R2)' : 'Right Trigger (R2)'}
                   </span>
                   <span className="rounded-md bg-accent/15 px-2 py-0.5 font-mono text-[11px] text-accent">
-                    {emulationActive ? (xb?.rt ?? 0) : (ds?.r2 ?? 0)} / 255
+                    {emulationActive ? xb?.rt ?? 0 : ds?.r2 ?? 0} / 255
                   </span>
                 </div>
                 <input
@@ -1357,12 +1366,13 @@ export function DualSensePage() {
                   value={ds?.r2 ?? 0}
                   onChange={(e) => {
                     const v = Number(e.target.value)
-                    void syncOverrideToBackend({
+                    const cur: VirtualControllerOverride = {
                       ...(overridesRef.current[activeSlot] ?? makeDefaultOverride(activeSlot)),
                       slotIndex: activeSlot,
-                      active: true,
                       r2: v,
-                    })
+                    }
+                    cur.active = v > 0 || hasAnyManualOverrideInput(cur)
+                    void syncOverrideToBackend(cur)
                   }}
                   className="w-full accent-blue-600 cursor-pointer"
                 />

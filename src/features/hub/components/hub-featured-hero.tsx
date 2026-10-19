@@ -411,10 +411,7 @@ export function HubFeaturedHero({
                       <span>MC {Math.round(item.metacritic_score ?? item.rating ?? 0)}</span>
                       {(item.opencritic_score ?? item.metacritic_score ?? item.rating) != null && (
                         <span className="text-orange-400">
-                          · OC{' '}
-                          {Math.round(
-                            item.opencritic_score ?? item.metacritic_score ?? item.rating ?? 0,
-                          )}
+                          · OC {Math.round(item.opencritic_score ?? item.metacritic_score ?? item.rating ?? 0)}
                         </span>
                       )}
                     </span>

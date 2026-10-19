@@ -1,8 +1,4 @@
-import {
-  BaseSoundtrackProvider,
-  extractCoreGameTitle,
-  scoreAlbumMatchForGame,
-} from './base-provider'
+import { BaseSoundtrackProvider, extractCoreGameTitle, scoreAlbumMatchForGame } from './base-provider'
 import type {
   DownloadSource,
   GameIdentity,
@@ -36,7 +32,10 @@ const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
     'red-dead-redemption-2-original-soundtrack',
     'red-dead-redemption-2',
   ],
-  'red dead redemption': ['red-dead-redemption-original-soundtrack', 'red-dead-redemption'],
+  'red dead redemption': [
+    'red-dead-redemption-original-soundtrack',
+    'red-dead-redemption',
+  ],
   'god of war': [
     'god-of-war-playstation-soundtrack-ps4-2018',
     'god-of-war-2018-original-soundtrack',
@@ -50,32 +49,65 @@ const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
     'ghost-of-tsushima-original-soundtrack-2020',
     'ghost-of-tsushima-original-soundtrack',
   ],
-  'the last of us': ['the-last-of-us-original-score-soundtrack', 'the-last-of-us'],
-  'the last of us part i': ['the-last-of-us-original-score-soundtrack', 'the-last-of-us'],
+  'the last of us': [
+    'the-last-of-us-original-score-soundtrack',
+    'the-last-of-us',
+  ],
+  'the last of us part i': [
+    'the-last-of-us-original-score-soundtrack',
+    'the-last-of-us',
+  ],
   'the last of us part ii': [
     'the-last-of-us-part-ii-original-soundtrack-2020',
     'the-last-of-us-part-ii',
   ],
-  'hollow knight': ['hollow-knight-original-soundtrack', 'hollow-knight-official-soundtrack'],
-  hades: ['hades-original-soundtrack', 'hades'],
+  'hollow knight': [
+    'hollow-knight-original-soundtrack',
+    'hollow-knight-official-soundtrack',
+  ],
+  'hades': ['hades-original-soundtrack', 'hades'],
   'hades ii': ['hades-ii-original-soundtrack', 'hades-original-soundtrack'],
   'hades 2': ['hades-ii-original-soundtrack', 'hades-original-soundtrack'],
-  'doom eternal': ['doom-eternal-original-game-soundtrack', 'doom-eternal-original-soundtrack'],
-  doom: ['doom-2016-original-game-soundtrack', 'doom-original-game-soundtrack'],
-  'nier automata': ['nier-automata-original-soundtrack', 'nier-automata'],
-  'persona 5 royal': ['persona-5-royal-original-soundtrack', 'persona-5-original-soundtrack'],
+  'doom eternal': [
+    'doom-eternal-original-game-soundtrack',
+    'doom-eternal-original-soundtrack',
+  ],
+  'doom': [
+    'doom-2016-original-game-soundtrack',
+    'doom-original-game-soundtrack',
+  ],
+  'nier automata': [
+    'nier-automata-original-soundtrack',
+    'nier-automata',
+  ],
+  'persona 5 royal': [
+    'persona-5-royal-original-soundtrack',
+    'persona-5-original-soundtrack',
+  ],
   'persona 3 reload': [
     'persona-3-reload-original-soundtrack-2024',
     'persona-3-original-soundtrack',
   ],
-  'dark souls iii': ['dark-souls-iii-original-soundtrack', 'dark-souls-3-original-soundtrack'],
-  'dark souls 3': ['dark-souls-iii-original-soundtrack', 'dark-souls-3-original-soundtrack'],
+  'dark souls iii': [
+    'dark-souls-iii-original-soundtrack',
+    'dark-souls-3-original-soundtrack',
+  ],
+  'dark souls 3': [
+    'dark-souls-iii-original-soundtrack',
+    'dark-souls-3-original-soundtrack',
+  ],
   'sekiro shadows die twice': [
     'sekiro-shadows-die-twice-original-soundtrack',
     'sekiro-shadows-die-twice',
   ],
-  'black myth wukong': ['black-myth-wukong-original-soundtrack-2024', 'black-myth-wukong'],
-  'death stranding': ['death-stranding-original-score-2019', 'death-stranding-original-score'],
+  'black myth wukong': [
+    'black-myth-wukong-original-soundtrack-2024',
+    'black-myth-wukong',
+  ],
+  'death stranding': [
+    'death-stranding-original-score-2019',
+    'death-stranding-original-score',
+  ],
   'silent hill 2': [
     'silent-hill-2-original-soundtrack-2024',
     'silent-hill-2-original-soundtracks',
@@ -86,9 +118,9 @@ const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
     'resident-evil-4-original-soundtrack',
   ],
   'alan wake 2': ['alan-wake-2-original-soundtrack', 'alan-wake-original-soundtrack'],
-  control: ['control-original-soundtrack-2019', 'control-original-soundtrack'],
-  celeste: ['celeste-original-soundtrack', 'celeste'],
-  undertale: ['undertale-original-soundtrack', 'undertale'],
+  'control': ['control-original-soundtrack-2019', 'control-original-soundtrack'],
+  'celeste': ['celeste-original-soundtrack', 'celeste'],
+  'undertale': ['undertale-original-soundtrack', 'undertale'],
   'final fantasy vii remake': [
     'final-fantasy-vii-remake-original-soundtrack',
     'final-fantasy-vii-original-soundtrack',
@@ -105,7 +137,10 @@ const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
     'the-elder-scrolls-v-skyrim-original-game-soundtrack',
     'skyrim-original-soundtrack',
   ],
-  'grand theft auto v': ['the-music-of-grand-theft-auto-v-vol.-2-the-score', 'grand-theft-auto-v'],
+  'grand theft auto v': [
+    'the-music-of-grand-theft-auto-v-vol.-2-the-score',
+    'grand-theft-auto-v',
+  ],
   'marvels spider man': [
     'marvels-spider-man-original-video-game-soundtrack-2018',
     'marvel-s-spider-man-original-video-game-soundtrack',
@@ -117,27 +152,19 @@ const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
   'horizon forbidden west': ['horizon-forbidden-west-original-soundtrack-2022'],
   'detroit become human': ['detroit-become-human-original-soundtrack-2018'],
   'lies of p': ['lies-of-p-original-soundtrack-2023', 'lies-of-p-original-soundtrack'],
-  'armored core vi fires of rubicon': ['armored-core-vi-fires-of-rubicon-original-soundtrack-2023'],
+  'armored core vi fires of rubicon': [
+    'armored-core-vi-fires-of-rubicon-original-soundtrack-2023',
+  ],
   'monster hunter world': ['monster-hunter-world-original-soundtrack'],
-  'halo the master chief collection': [
-    'halo-combat-evolved-original-soundtrack',
-    'halo-2-original-soundtrack',
-  ],
-  'mass effect legendary edition': [
-    'mass-effect-original-soundtrack',
-    'mass-effect-2-original-videogame-score',
-  ],
-  stray: ['stray-original-soundtrack-2022', 'stray-original-soundtrack'],
+  'halo the master chief collection': ['halo-combat-evolved-original-soundtrack', 'halo-2-original-soundtrack'],
+  'mass effect legendary edition': ['mass-effect-original-soundtrack', 'mass-effect-2-original-videogame-score'],
+  'stray': ['stray-original-soundtrack-2022', 'stray-original-soundtrack'],
   'outer wilds': ['outer-wilds-original-soundtrack-2019', 'outer-wilds-original-soundtrack'],
   'disco elysium': ['disco-elysium-original-soundtrack-2019', 'disco-elysium-original-soundtrack'],
   'devil may cry 5': ['devil-may-cry-5-original-soundtrack'],
   'stardew valley': ['stardew-valley-original-soundtrack', 'stardew-valley-ost'],
-  'the legend of zelda breath of the wild': [
-    'the-legend-of-zelda-breath-of-the-wild-original-soundtrack',
-  ],
-  'the legend of zelda tears of the kingdom': [
-    'the-legend-of-zelda-tears-of-the-kingdom-original-soundtrack-2024',
-  ],
+  'the legend of zelda breath of the wild': ['the-legend-of-zelda-breath-of-the-wild-original-soundtrack'],
+  'the legend of zelda tears of the kingdom': ['the-legend-of-zelda-tears-of-the-kingdom-original-soundtrack-2024'],
 }
 
 export class KHInsiderProvider extends BaseSoundtrackProvider {

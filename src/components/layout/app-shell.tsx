@@ -105,12 +105,16 @@ export function AppShell() {
       await markLaunchSuccessful(ver)
 
       startupTimer = window.setTimeout(() => {
-        void useUpdaterStore.getState().checkUpdates(false, true)
+        if (typeof navigator === "undefined" || navigator.onLine !== false) {
+          void useUpdaterStore.getState().checkUpdates(false, true)
+        }
       }, 1800)
 
       intervalId = window.setInterval(
         () => {
-          void useUpdaterStore.getState().checkUpdates(false, false)
+          if (typeof navigator === "undefined" || navigator.onLine !== false) {
+            void useUpdaterStore.getState().checkUpdates(false, false)
+          }
         },
         2 * 60 * 60 * 1000,
       )

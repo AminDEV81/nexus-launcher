@@ -1,17 +1,11 @@
 //! Bridge to LibreHardwareMonitor / OpenHardwareMonitor (HTTP JSON + WMI)
 //! and Windows WMI thermal zones.
-//!
-//! Checks:
-//! 1. `http://127.0.0.1:8085/data.json` (LibreHardwareMonitor / OpenHardwareMonitor web server)
-//! 2. Windows WMI namespaces (`root\LibreHardwareMonitor`, `root\OpenHardwareMonitor`,
-//!    `root\cimv2` ThermalZoneInformation, and `root\wmi` MSAcpi_ThermalZoneTemperature)
-//!    on a low-priority background thread with `CREATE_NO_WINDOW`.
 
 use serde_json::Value;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const ADDRESS: &str = "127.0.0.1:8085";
 
@@ -45,50 +39,54 @@ pub struct ExternalSensorBridge {
 
 impl ExternalSensorBridge {
     /// Spawns the background polling thread.
+    /// Uses zero-overhead TCP socket reads for LibreHardwareMonitor HTTP (`127.0.0.1:8085`),
+    /// and strictly rate-limits PowerShell WMI thermal fallback so `powershell.exe` is NEVER
+    /// spawned repeatedly every 2-5 seconds during gameplay!
     pub fn start() -> Self {
         let latest = Arc::new(Mutex::new(ExternalSensors::default()));
         let shared = latest.clone();
 
-        std::thread::spawn(move || loop {
-            let mut next = fetch_http().unwrap_or_default();
-            if next.cpu_temp_c.is_none() {
-                if let Some(wmi_sensors) = fetch_wmi_sensors() {
-                    if next.cpu_temp_c.is_none() {
-                        next.cpu_temp_c = wmi_sensors.cpu_temp_c;
-                        next.source = wmi_sensors.source.or(next.source);
-                    }
-                    if next.cpu_power_w.is_none() {
-                        next.cpu_power_w = wmi_sensors.cpu_power_w;
-                    }
-                    if next.gpu_temp_c.is_none() {
-                        next.gpu_temp_c = wmi_sensors.gpu_temp_c;
-                    }
-                    if next.gpu_hotspot_c.is_none() {
-                        next.gpu_hotspot_c = wmi_sensors.gpu_hotspot_c;
-                    }
-                    if next.gpu_memory_temp_c.is_none() {
-                        next.gpu_memory_temp_c = wmi_sensors.gpu_memory_temp_c;
-                    }
-                    if next.gpu_usage.is_none() {
-                        next.gpu_usage = wmi_sensors.gpu_usage;
-                    }
-                    if next.gpu_clock_mhz.is_none() {
-                        next.gpu_clock_mhz = wmi_sensors.gpu_clock_mhz;
-                    }
-                    if next.gpu_fan_percent.is_none() {
-                        next.gpu_fan_percent = wmi_sensors.gpu_fan_percent;
-                    }
-                    if next.gpu_power_w.is_none() {
-                        next.gpu_power_w = wmi_sensors.gpu_power_w;
+        std::thread::spawn(move || {
+            let mut last_wmi_probe: Option<Instant> = None;
+            let mut wmi_consecutive_misses: u32 = 0;
+
+            loop {
+                let mut next = fetch_http().unwrap_or_default();
+                let http_ok = !next.is_empty();
+
+                if !http_ok {
+                    // Only probe WMI via PowerShell if enough time has elapsed (60s if supported, 300s if unsupported)
+                    let wmi_interval = if wmi_consecutive_misses >= 2 {
+                        Duration::from_secs(300)
+                    } else {
+                        Duration::from_secs(45)
+                    };
+                    let should_probe_wmi = last_wmi_probe
+                        .map(|t| t.elapsed() >= wmi_interval)
+                        .unwrap_or(true);
+
+                    if should_probe_wmi {
+                        last_wmi_probe = Some(Instant::now());
+                        if let Some(wmi_sensors) = fetch_wmi_sensors() {
+                            if !wmi_sensors.is_empty() {
+                                wmi_consecutive_misses = 0;
+                                next = wmi_sensors;
+                            } else {
+                                wmi_consecutive_misses = wmi_consecutive_misses.saturating_add(1);
+                            }
+                        } else {
+                            wmi_consecutive_misses = wmi_consecutive_misses.saturating_add(1);
+                        }
+                    } else if let Ok(prev) = shared.lock() {
+                        next = prev.clone();
                     }
                 }
-            }
 
-            let reachable = !next.is_empty();
-            if let Ok(mut slot) = shared.lock() {
-                *slot = next;
+                if let Ok(mut slot) = shared.lock() {
+                    *slot = next;
+                }
+                std::thread::sleep(Duration::from_secs(if http_ok { 2 } else { 8 }));
             }
-            std::thread::sleep(Duration::from_secs(if reachable { 2 } else { 5 }));
         });
 
         Self { latest }
@@ -101,9 +99,9 @@ impl ExternalSensorBridge {
 
 fn fetch_http() -> Option<ExternalSensors> {
     let addr: SocketAddr = ADDRESS.parse().ok()?;
-    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_millis(180)).ok()?;
-    stream.set_read_timeout(Some(Duration::from_millis(750))).ok()?;
-    stream.set_write_timeout(Some(Duration::from_millis(250))).ok()?;
+    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_millis(120)).ok()?;
+    stream.set_read_timeout(Some(Duration::from_millis(600))).ok()?;
+    stream.set_write_timeout(Some(Duration::from_millis(200))).ok()?;
     stream
         .write_all(b"GET /data.json HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
         .ok()?;
@@ -124,7 +122,6 @@ fn fetch_wmi_sensors() -> Option<ExternalSensors> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-    // Single fast PowerShell snippet checking LHM WMI, OHM WMI, PerfFormattedData ThermalZone, and MSAcpi
     let script = r#"
 $ErrorActionPreference = 'SilentlyContinue'
 $out = @{ cpuTemp = $null; cpuPower = $null; gpuTemp = $null; gpuHot = $null; gpuMem = $null; src = $null }
@@ -161,15 +158,6 @@ if (-not $out.cpuTemp) {
     $c = if ($hp -gt 2732) { ($hp / 10.0) - 273.15 } elseif ([double]$z.Temperature -gt 273) { [double]$z.Temperature - 273.15 } else { 0 }
     if ($c -gt 22 -and $c -lt 115 -and [Math]::Abs($c - 27.85) -gt 0.2) {
       if (-not $out.cpuTemp -or $c -gt $out.cpuTemp) { $out.cpuTemp = [Math]::Round($c, 1); $out.src = 'Windows Thermal Zone (WMI)' }
-    }
-  }
-}
-if (-not $out.cpuTemp) {
-  $acpi = Get-CimInstance -Namespace 'root\wmi' -ClassName MSAcpi_ThermalZoneTemperature
-  foreach ($a in $acpi) {
-    $c = ([double]$a.CurrentTemperature / 10.0) - 273.15
-    if ($c -gt 22 -and $c -lt 115 -and [Math]::Abs($c - 27.85) -gt 0.2) {
-      if (-not $out.cpuTemp -or $c -gt $out.cpuTemp) { $out.cpuTemp = [Math]::Round($c, 1); $out.src = 'ACPI Thermal Zone' }
     }
   }
 }
@@ -225,7 +213,6 @@ fn fetch_wmi_sensors() -> Option<ExternalSensors> {
     None
 }
 
-/// Leading number of strings like `65.4 °C`, `72.0 W`, `2450 MHz`, `45.2 %` (also accepts a decimal comma).
 fn parse_value(text: &str, max_bound: f32) -> Option<f32> {
     let trimmed = text.trim();
     let end = trimmed
@@ -238,7 +225,6 @@ fn parse_value(text: &str, max_bound: f32) -> Option<f32> {
     (1.0..=max_bound).contains(&value).then_some(value)
 }
 
-/// Walks the LibreHardwareMonitor sensor tree and picks CPU & GPU temperatures, power, clocks, and load.
 pub fn parse_sensor_tree(root: &Value) -> ExternalSensors {
     #[derive(Default)]
     struct Acc {
