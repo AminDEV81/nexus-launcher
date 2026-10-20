@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.7.0"
+version = "0.7.5"
 description = "Nexus — Native PC Game Launcher & Gaming Suite"
 authors = ["Amin (@AminDEV81)"]
 license = "MIT"
