@@ -14,10 +14,82 @@ import type {
   HubSearchFilters,
 } from '@/types/models'
 
-const HUB_REFRESH = {
-  staleTime: 3 * 60_000,
-  refetchInterval: 5 * 60_000,
-  refetchOnWindowFocus: true,
+/**
+ * 12-Hour Persistent Cache Window for Game Hub:
+ * Prevents Game Hub from auto-refreshing every time the user enters the Hub tab or restarts the app.
+ * Auto-refreshes only once every 12 hours (or immediately when the user clicks the manual Refresh button).
+ */
+export const HUB_CACHE_TTL_MS = 12 * 60 * 60 * 1000 // 12 hours in ms
+const HUB_STORAGE_PREFIX = 'nexus_hub_shelf_v2_'
+
+interface PersistedShelfPayload {
+  updatedAt: number
+  data: HubGame[]
+}
+
+function readPersistedShelf(shelfKey: string): PersistedShelfPayload | null {
+  try {
+    const raw = localStorage.getItem(`${HUB_STORAGE_PREFIX}${shelfKey}`)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as PersistedShelfPayload
+    if (
+      !parsed ||
+      typeof parsed.updatedAt !== 'number' ||
+      !Array.isArray(parsed.data) ||
+      parsed.data.length === 0
+    ) {
+      return null
+    }
+    if (Date.now() - parsed.updatedAt > HUB_CACHE_TTL_MS) {
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writePersistedShelf(shelfKey: string, data: HubGame[]): void {
+  try {
+    if (!Array.isArray(data) || data.length === 0) return
+    const payload: PersistedShelfPayload = {
+      updatedAt: Date.now(),
+      data,
+    }
+    localStorage.setItem(`${HUB_STORAGE_PREFIX}${shelfKey}`, JSON.stringify(payload))
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+export function clearPersistedHubShelves(): void {
+  try {
+    for (const key of ['new-releases', 'coming-soon', 'top-rated', 'recommended', 'discounted']) {
+      localStorage.removeItem(`${HUB_STORAGE_PREFIX}${key}`)
+    }
+  } catch {
+    // Ignore
+  }
+}
+
+function createShelfQueryOptions(shelfKey: string, fetcher: () => Promise<HubGame[]>) {
+  const persisted = readPersistedShelf(shelfKey)
+  return {
+    queryKey: ['hub', shelfKey] as const,
+    queryFn: async () => {
+      const fresh = await fetcher()
+      writePersistedShelf(shelfKey, fresh)
+      return fresh
+    },
+    initialData: persisted?.data,
+    initialDataUpdatedAt: persisted?.updatedAt,
+    staleTime: HUB_CACHE_TTL_MS,
+    gcTime: HUB_CACHE_TTL_MS,
+    refetchInterval: HUB_CACHE_TTL_MS,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+  }
 }
 
 /** Built-in canonical IGDB genres so filter chips render immediately without waiting for network. */
@@ -59,34 +131,26 @@ export const FALLBACK_HUB_PLATFORMS: HubPlatform[] = [
 ]
 
 export function useHubNewReleases() {
-  return useQuery({
-    queryKey: ['hub', 'new-releases'],
-    queryFn: hubService.getHubNewReleases,
-    ...HUB_REFRESH,
-  })
+  return useQuery(createShelfQueryOptions('new-releases', hubService.getHubNewReleases))
 }
 
 export function useHubComingSoon() {
-  return useQuery({
-    queryKey: ['hub', 'coming-soon'],
-    queryFn: hubService.getHubComingSoon,
-    ...HUB_REFRESH,
-  })
+  return useQuery(createShelfQueryOptions('coming-soon', hubService.getHubComingSoon))
 }
 
 export function useHubTopRated() {
-  return useQuery({
-    queryKey: ['hub', 'top-rated'],
-    queryFn: hubService.getHubTopRated,
-    ...HUB_REFRESH,
-  })
+  return useQuery(createShelfQueryOptions('top-rated', hubService.getHubTopRated))
 }
 
 export function useHubRecommended() {
+  return useQuery(createShelfQueryOptions('recommended', hubService.getHubRecommended))
+}
+
+export function useHubDiscountedGames(enabled = true) {
+  const opts = createShelfQueryOptions('discounted', hubService.getHubDiscountedGames)
   return useQuery({
-    queryKey: ['hub', 'recommended'],
-    queryFn: hubService.getHubRecommended,
-    ...HUB_REFRESH,
+    ...opts,
+    enabled,
   })
 }
 
@@ -110,9 +174,13 @@ export function useHubHomeFeed() {
 export function useRefreshHubCatalog() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: () => hubService.refreshHubCatalog(),
+    mutationFn: async () => {
+      clearPersistedHubShelves()
+      return hubService.refreshHubCatalog()
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['hub'] })
+      await queryClient.refetchQueries({ queryKey: ['hub'], type: 'active' })
     },
   })
 }
@@ -140,6 +208,7 @@ function findCachedHubGame(
           opencritic_score: match.opencritic_score ?? null,
           steam_app_id: null,
           system_requirements: null,
+          download_size: null,
         }
       }
     } else if (
@@ -163,6 +232,7 @@ function findCachedHubGame(
             opencritic_score: match.opencritic_score ?? null,
             steam_app_id: null,
             system_requirements: null,
+            download_size: null,
           }
         }
       }
@@ -171,15 +241,20 @@ function findCachedHubGame(
   return undefined
 }
 
-export function useHubGameDetails(igdbId: number) {
+export function useHubGameDetails(igdbId: number, expectedName?: string | null) {
   const queryClient = useQueryClient()
+  const cached = findCachedHubGame(queryClient, igdbId)
+  const effectiveExpectedName = expectedName?.trim() || cached?.name || null
+
   return useQuery({
-    queryKey: ['hub', 'game', igdbId],
-    queryFn: () => hubService.getHubGameDetails(igdbId),
+    queryKey: ['hub', 'game', igdbId, (effectiveExpectedName ?? '').toLowerCase()],
+    queryFn: () => hubService.getHubGameDetails(igdbId, effectiveExpectedName),
     enabled: igdbId > 0,
-    staleTime: 10 * 60_000,
+    staleTime: HUB_CACHE_TTL_MS,
+    gcTime: HUB_CACHE_TTL_MS,
     refetchOnWindowFocus: false,
-    placeholderData: () => findCachedHubGame(queryClient, igdbId),
+    refetchOnMount: false,
+    placeholderData: () => cached,
   })
 }
 
@@ -188,7 +263,10 @@ export function useSimilarHubGames(igdbId: number) {
     queryKey: ['hub', 'similar', igdbId],
     queryFn: () => hubService.getHubSimilarGames(igdbId),
     enabled: igdbId > 0,
-    staleTime: 10 * 60_000,
+    staleTime: HUB_CACHE_TTL_MS,
+    gcTime: HUB_CACHE_TTL_MS,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   })
 }
 
@@ -241,7 +319,8 @@ export function useHubSearch(query: string, filters: HubSearchFilters = {}) {
         ? undefined
         : allPages.length * hubService.HUB_SEARCH_PAGE_SIZE,
     enabled,
-    staleTime: 2 * 60_000,
+    staleTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   })
 }
@@ -253,6 +332,7 @@ export function useHubGenres() {
     queryFn: hubService.listHubGenres,
     placeholderData: FALLBACK_HUB_GENRES,
     staleTime: 24 * 60 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -263,6 +343,7 @@ export function useHubPlatforms() {
     queryFn: hubService.listHubPlatforms,
     placeholderData: FALLBACK_HUB_PLATFORMS,
     staleTime: 24 * 60 * 60_000,
+    refetchOnWindowFocus: false,
   })
 }
 
@@ -277,7 +358,10 @@ export function useHubFeed(feed: string, enabled = true) {
         ? undefined
         : allPages.length * hubService.HUB_FEED_PAGE_SIZE,
     enabled,
-    staleTime: 5 * 60_000,
+    staleTime: HUB_CACHE_TTL_MS,
+    gcTime: HUB_CACHE_TTL_MS,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   })
 }
 
@@ -287,7 +371,6 @@ export function useAddGameFromHub() {
     mutationFn: (igdbId: number) => hubService.addGameFromHub(igdbId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['games'] })
-      queryClient.invalidateQueries({ queryKey: ['hub', 'recommended'] })
     },
   })
 }
@@ -298,7 +381,6 @@ export function useAddGameToWishlist() {
     mutationFn: (igdbId: number) => hubService.addGameToWishlist(igdbId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['games'] })
-      queryClient.invalidateQueries({ queryKey: ['hub', 'recommended'] })
     },
   })
 }

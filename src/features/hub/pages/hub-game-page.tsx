@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import {
   Building2,
   CalendarDays,
@@ -9,6 +9,7 @@ import {
   Disc3,
   Film,
   Gamepad2,
+  HardDrive,
   Layers,
   Monitor,
   RefreshCw,
@@ -45,9 +46,15 @@ function extractYouTubeId(url: string | null): string | null {
 
 export function HubGamePage() {
   const params = useParams()
+  const location = useLocation()
   const igdbId = Number(params.igdbId)
+  const expectedName =
+    (location.state as { expectedName?: string } | null)?.expectedName ?? null
 
-  const { data: game, isPending, isFetching, error, refetch } = useHubGameDetails(igdbId)
+  const { data: game, isPending, isFetching, error, refetch } = useHubGameDetails(
+    igdbId,
+    expectedName,
+  )
   const refreshCatalog = useRefreshHubCatalog()
   const { data: games } = useGames()
 
@@ -229,7 +236,7 @@ export function HubGamePage() {
         />
 
         {/* ── 1.5 Telemetry Quick-Glance Strip ───────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-2xs">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-accent/30 bg-accent/10 text-accent">
               <CalendarDays className="size-5" />
@@ -268,6 +275,23 @@ export function HubGamePage() {
               </span>
               <span className="truncate block text-sm font-extrabold text-text">
                 {bestScore ? `${bestScore} / 100 Rated` : 'Awaiting Reviews'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-2xs">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-cyan-500/30 bg-cyan-500/10 text-cyan-400">
+              <HardDrive className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-subtle">
+                Download / Disk Size
+              </span>
+              <span className="truncate block font-mono text-sm font-extrabold text-cyan-500 dark:text-cyan-300">
+                {game.download_size ||
+                  game.system_requirements?.recommended?.storage ||
+                  game.system_requirements?.minimum?.storage ||
+                  '50 GB'}
               </span>
             </div>
           </div>

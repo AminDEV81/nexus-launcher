@@ -517,35 +517,250 @@ async fn fetch_steamgriddb_screenshot_fallback(
 /// SteamGridDB are each entirely optional and independent: having only
 /// one (or none) configured/available is a completely normal, silent
 /// no-op for the others.
+fn upgrade_cover_url_to_highres(raw: &str) -> String {
+    raw.replace("/t_cover_big/", "/t_1080p/")
+        .replace("/t_720p/", "/t_1080p/")
+        .replace("/library_600x900.jpg", "/library_600x900_2x.jpg")
+}
+
+/// Automatically resolves Steam AppID (if missing) and fetches high-resolution
+/// Cover (`library_600x900_2x.jpg` / `t_1080p`), Sidebar Hero Banner (`library_hero.jpg`),
+/// and Official Transparent Game Logo (`logo.png`) across Steam CDN + SteamGridDB / Nexus Cloud.
+async fn auto_fetch_highres_artwork_and_logo(
+    app: &AppHandle,
+    db: &Database,
+    http: &reqwest::Client,
+    resolver: &MetadataProviderResolver,
+    game_id: &str,
+    game_name: &str,
+    fallback_cover_url: Option<&str>,
+) -> bool {
+    let (mut steam_app_id, existing_cover, existing_banner, existing_logo) = {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        let row_opt = conn
+            .query_row(
+                "SELECT steam_app_id, cover_path, banner_path, logo_path FROM games WHERE id = ?1",
+                [game_id],
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                    ))
+                },
+            )
+            .ok();
+        match row_opt {
+            Some(r) => r,
+            None => return false,
+        }
+    };
+
+    if steam_app_id.as_deref().map(str::trim).filter(|s| !s.is_empty()).is_none() {
+        let steam_provider = crate::services::providers::SteamArtworkProvider::new(http.clone());
+        if let Some(resolved_aid) = steam_provider.resolve_app_id(game_name).await {
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            conn.execute(
+                "UPDATE games SET steam_app_id = COALESCE(steam_app_id, ?1) WHERE id = ?2",
+                rusqlite::params![&resolved_aid, game_id],
+            )
+            .ok();
+            steam_app_id = Some(resolved_aid);
+        }
+    }
+
+    let need_cover = existing_cover.is_none();
+    let need_banner = existing_banner.is_none();
+    let need_logo = existing_logo.is_none();
+
+    if !need_cover && !need_banner && !need_logo {
+        return false;
+    }
+
+    let aid_ref = steam_app_id.as_deref();
+    let (cover_opts, hero_opts, logo_opts) = tokio::join!(
+        async {
+            if need_cover {
+                resolver
+                    .get_artwork_options(db, "cover", aid_ref, game_name)
+                    .await
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            }
+        },
+        async {
+            if need_banner {
+                resolver
+                    .get_artwork_options(db, "hero", aid_ref, game_name)
+                    .await
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            }
+        },
+        async {
+            if need_logo {
+                resolver
+                    .get_artwork_options(db, "logo", aid_ref, game_name)
+                    .await
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            }
+        }
+    );
+
+    let mut updated = false;
+
+    if need_cover {
+        let mut downloaded_cover: Option<(String, String, bool)> = None;
+        for opt in cover_opts.iter().filter(|o| !o.is_animated).chain(cover_opts.iter()) {
+            let hi_url = upgrade_cover_url_to_highres(&opt.url);
+            if let Ok(path) = artwork::download_artwork(http, app, game_id, "cover", &hi_url, false).await {
+                downloaded_cover = Some((path, hi_url, opt.is_animated));
+                break;
+            }
+        }
+        if downloaded_cover.is_none() {
+            if let Some(fb_url) = fallback_cover_url {
+                let hi_fb = upgrade_cover_url_to_highres(fb_url);
+                if let Ok(path) = artwork::download_artwork(http, app, game_id, "cover", &hi_fb, false).await {
+                    downloaded_cover = Some((path, hi_fb, false));
+                } else if hi_fb != fb_url {
+                    if let Ok(path) = artwork::download_artwork(http, app, game_id, "cover", fb_url, false).await {
+                        downloaded_cover = Some((path, fb_url.to_string(), false));
+                    }
+                }
+            }
+        }
+        if let Some((path, url, is_anim)) = downloaded_cover {
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            conn.execute(
+                "UPDATE games SET cover_path = ?1, cover_is_animated = ?2 WHERE id = ?3",
+                rusqlite::params![&path, is_anim, game_id],
+            )
+            .ok();
+            artwork::record_artwork_cache(&conn, game_id, "cover", &path, Some(&url), false).ok();
+            updated = true;
+        }
+    }
+
+    if need_banner {
+        for opt in &hero_opts {
+            if let Ok(path) = artwork::download_artwork(http, app, game_id, "banner", &opt.url, false).await {
+                let conn = db.connection.lock().expect("db mutex poisoned");
+                conn.execute(
+                    "UPDATE games SET banner_path = ?1 WHERE id = ?2",
+                    rusqlite::params![&path, game_id],
+                )
+                .ok();
+                artwork::record_artwork_cache(&conn, game_id, "banner", &path, Some(&opt.url), false).ok();
+                updated = true;
+                break;
+            }
+        }
+    }
+
+    if need_logo {
+        for opt in &logo_opts {
+            if let Ok(path) = artwork::download_artwork(http, app, game_id, "logo", &opt.url, false).await {
+                let conn = db.connection.lock().expect("db mutex poisoned");
+                conn.execute(
+                    "UPDATE games SET logo_path = ?1 WHERE id = ?2",
+                    rusqlite::params![&path, game_id],
+                )
+                .ok();
+                artwork::record_artwork_cache(&conn, game_id, "logo", &path, Some(&opt.url), false).ok();
+                updated = true;
+                break;
+            }
+        }
+    }
+
+    updated
+}
+
 async fn auto_fetch_one(app: &AppHandle, game_id: &str, game_name: &str) {
     let db = app.state::<Database>();
     let http = app.state::<HttpClient>();
     let token_cache = app.state::<IgdbTokenCache>();
+    let resolver = app.state::<Arc<MetadataProviderResolver>>();
     let credentials = get_credentials(&db);
 
     let mut updated = false;
+    let mut igdb_cover_fallback: Option<String> = None;
 
-    if let (Some(client_id), Some(client_secret)) =
-        (&credentials.igdb_client_id, &credentials.igdb_client_secret)
-    {
-        updated |= auto_fetch_igdb_text(
-            app,
-            &db,
-            &http.0,
-            &token_cache,
-            client_id,
-            client_secret,
-            game_id,
-            game_name,
+    // 1. Automatic full IGDB / Nexus Cloud metadata sync (same pipeline as manual Sync button)
+    let existing_igdb_id: Option<i64> = {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        conn.query_row(
+            "SELECT igdb_id FROM games WHERE id = ?1",
+            [game_id],
+            |row| row.get(0),
         )
-        .await;
+        .ok()
+        .flatten()
+    };
+
+    let target_igdb_id = match existing_igdb_id {
+        Some(id) if id > 0 => Some(id),
+        _ => {
+            if let Ok(candidates) = resolver
+                .search_games(&db, game_name, 0, &HubSearchFilters::default())
+                .await
+            {
+                candidates.into_iter().next().map(|g| g.igdb_id)
+            } else {
+                None
+            }
+        }
+    };
+
+    if let Some(igdb_id) = target_igdb_id {
+        if let Ok(Some(details)) = resolver.get_game_details(&db, igdb_id).await {
+            igdb_cover_fallback = details.game.cover_url.clone();
+            if apply_hub_details_to_game(app, &db, &http.0, game_id, &details)
+                .await
+                .is_ok()
+            {
+                updated = true;
+            }
+        }
     }
 
-    // No API key needed, so this always runs for any game with a Steam
-    // AppID — it only ever fills gaps IGDB left (`COALESCE(existing,
-    // new)`, never the other way around) so an already-set IGDB match
-    // never gets clobbered by this; for anyone without IGDB configured
-    // at all, this is the sole text-metadata source for their Steam games.
+    if !updated {
+        if let (Some(client_id), Some(client_secret)) =
+            (&credentials.igdb_client_id, &credentials.igdb_client_secret)
+        {
+            updated |= auto_fetch_igdb_text(
+                app,
+                &db,
+                &http.0,
+                &token_cache,
+                client_id,
+                client_secret,
+                game_id,
+                game_name,
+            )
+            .await;
+        }
+    }
+
+    // 2. High-res Cover, Hero Banner, and Official Transparent Game Logo
+    updated |= auto_fetch_highres_artwork_and_logo(
+        app,
+        &db,
+        &http.0,
+        &resolver,
+        game_id,
+        game_name,
+        igdb_cover_fallback.as_deref(),
+    )
+    .await;
+
+    // 3. Steam Store gap-fill (screenshots, developer/publisher, description)
     let (steam_app_id, _) = get_game_lookup_fields(&db, game_id);
     if let Some(steam_app_id) = &steam_app_id {
         updated |= auto_fetch_steam_store_text(app, &db, &http.0, game_id, steam_app_id).await;
@@ -556,12 +771,22 @@ async fn auto_fetch_one(app: &AppHandle, game_id: &str, game_name: &str) {
             auto_fetch_steamgriddb_artwork(app, &db, &http.0, sgdb_key, game_id, game_name).await;
     }
 
-    // Ensure Metacritic & OpenCritic scores are always resolved and persisted
+    // 4. Ensure Metacritic & OpenCritic scores are always resolved and persisted
+    let release_date_opt: Option<String> = {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        conn.query_row(
+            "SELECT release_date FROM games WHERE id = ?1",
+            [game_id],
+            |row| row.get(0),
+        )
+        .ok()
+        .flatten()
+    };
     let live_scores = crate::services::scores::resolve_critic_scores_live(
         &db,
         &http.0,
         game_name,
-        None,
+        release_date_opt.as_deref(),
         None,
         None,
         None,
@@ -623,9 +848,21 @@ pub fn spawn_hub_artwork_fetch(
     tauri::async_runtime::spawn(async move {
         let db = app.state::<Database>();
         let http = app.state::<HttpClient>();
+        let resolver = app.state::<Arc<MetadataProviderResolver>>();
         let credentials = get_credentials(&db);
 
         let mut updated = false;
+
+        updated |= auto_fetch_highres_artwork_and_logo(
+            &app,
+            &db,
+            &http.0,
+            &resolver,
+            &game_id,
+            &game_name,
+            igdb_cover_url.as_deref(),
+        )
+        .await;
 
         if let Some(sgdb_key) = &credentials.steamgriddb_api_key {
             updated |=
@@ -758,28 +995,35 @@ pub(crate) async fn apply_hub_details_to_game(
         }
     }
 
-    // Cover fallback if missing
-    let has_cover: Option<String> = {
+    if let Some(ref aid) = details.steam_app_id {
         let conn = db.connection.lock().expect("db mutex poisoned");
-        conn.query_row(
-            "SELECT cover_path FROM games WHERE id = ?1",
-            [game_id],
-            |row| row.get(0),
+        conn.execute(
+            "UPDATE games SET steam_app_id = COALESCE(steam_app_id, ?1) WHERE id = ?2",
+            rusqlite::params![aid, game_id],
         )
-        .ok()
-        .flatten()
-    };
-    if has_cover.is_none() {
-        if let Some(cover_url) = &details.game.cover_url {
-            if let Ok(path) = artwork::download_artwork(http, app, game_id, "cover", cover_url, false).await {
-                let conn = db.connection.lock().expect("db mutex poisoned");
-                conn.execute(
-                    "UPDATE games SET cover_path = ?1, cover_is_animated = 0 WHERE id = ?2",
-                    rusqlite::params![path, game_id],
-                ).ok();
-                artwork::record_artwork_cache(&conn, game_id, "cover", &path, Some(cover_url), false).ok();
-            }
-        }
+        .ok();
+    }
+
+    let resolver = app.state::<Arc<MetadataProviderResolver>>();
+    let _ = auto_fetch_highres_artwork_and_logo(
+        app,
+        db,
+        http,
+        &resolver,
+        game_id,
+        &details.game.name,
+        details.game.cover_url.as_deref(),
+    )
+    .await;
+
+    // Fallback banner from first 1080p screenshot if banner_path is still None
+    if let Some(ref bg) = background_path {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        conn.execute(
+            "UPDATE games SET banner_path = COALESCE(banner_path, ?1) WHERE id = ?2",
+            rusqlite::params![bg, game_id],
+        )
+        .ok();
     }
 
     Ok(())
@@ -898,7 +1142,7 @@ pub async fn sync_game_metadata(
     let conn = db.connection.lock().expect("db mutex poisoned");
     let sql = format!("SELECT {} FROM games WHERE id = ?1", Game::SELECT_COLUMNS);
     let game = conn.query_row(&sql, [&game_id], Game::from_row)?;
-    let _ = app.emit("metadata-updated", &game);
+    let _ = app.emit("metadata-updated", &game_id);
     Ok(game)
 }
 

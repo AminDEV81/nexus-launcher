@@ -55,6 +55,14 @@ pub struct HubGame {
     pub hypes: Option<i64>,
     pub genres: Vec<String>,
     pub platforms: Vec<String>,
+    #[serde(default)]
+    pub steam_app_id: Option<String>,
+    #[serde(default)]
+    pub discount_percent: Option<i64>,
+    #[serde(default)]
+    pub sale_price_formatted: Option<String>,
+    #[serde(default)]
+    pub original_price_formatted: Option<String>,
 }
 
 const LIST_FIELDS: &str = "fields name, summary, first_release_date, game_type, cover.image_id, \
@@ -444,6 +452,10 @@ pub(crate) fn parse_hub_game(entry: &Value) -> Option<HubGame> {
         hypes,
         genres,
         platforms,
+        steam_app_id: None,
+        discount_percent: None,
+        sale_price_formatted: None,
+        original_price_formatted: None,
     };
     crate::services::scores::enrich_hub_game_scores(None, &mut game);
     Some(game)
@@ -971,7 +983,7 @@ async fn fetch_shelf_feed_rotated(
     if !rotated.is_empty() {
         if let Ok(json) = serde_json::to_string(&rotated) {
             let conn = db.connection.lock().expect("db mutex poisoned");
-            let ttl = rotation_hours.max(1) * 1800; // 30-min fresh cache per rotation window
+            let ttl = rotation_hours.max(1) * 3600; // 12-hour fresh cache per rotation window
             let _ = MetadataCache::set(&conn, &cache_key, "shelf_rotation", &json, ttl);
         }
     }
@@ -987,7 +999,7 @@ pub async fn get_hub_new_releases(
     token_cache: State<'_, IgdbTokenCache>,
     resolver: State<'_, Arc<MetadataProviderResolver>>,
 ) -> AppResult<Vec<HubGame>> {
-    fetch_shelf_feed_rotated(&db, &http.0, &token_cache, &resolver, "new-releases", 16, 1).await
+    fetch_shelf_feed_rotated(&db, &http.0, &token_cache, &resolver, "new-releases", 16, 12).await
 }
 
 /// Upcoming releases with real anticipation behind them, soonest first (dynamically refreshed).
@@ -998,7 +1010,7 @@ pub async fn get_hub_coming_soon(
     token_cache: State<'_, IgdbTokenCache>,
     resolver: State<'_, Arc<MetadataProviderResolver>>,
 ) -> AppResult<Vec<HubGame>> {
-    fetch_shelf_feed_rotated(&db, &http.0, &token_cache, &resolver, "coming-soon", 16, 1).await
+    fetch_shelf_feed_rotated(&db, &http.0, &token_cache, &resolver, "coming-soon", 16, 12).await
 }
 
 /// The most-voted well-received games of the last three years (dynamically rotated).
@@ -1009,7 +1021,7 @@ pub async fn get_hub_top_rated(
     token_cache: State<'_, IgdbTokenCache>,
     resolver: State<'_, Arc<MetadataProviderResolver>>,
 ) -> AppResult<Vec<HubGame>> {
-    fetch_shelf_feed_rotated(&db, &http.0, &token_cache, &resolver, "top-rated", 16, 2).await
+    fetch_shelf_feed_rotated(&db, &http.0, &token_cache, &resolver, "top-rated", 16, 12).await
 }
 
 /// Personalized row: highly-rated games from the user's most-played and favorite genres.
@@ -1020,7 +1032,7 @@ pub async fn get_hub_recommended(
     token_cache: State<'_, IgdbTokenCache>,
     resolver: State<'_, Arc<MetadataProviderResolver>>,
 ) -> AppResult<Vec<HubGame>> {
-    fetch_shelf_feed_rotated(&db, &http.0, &token_cache, &resolver, "recommended", 16, 1).await
+    fetch_shelf_feed_rotated(&db, &http.0, &token_cache, &resolver, "recommended", 16, 12).await
 }
 
 /// Full paginated listing behind a shelf's "More" button.
@@ -1264,6 +1276,7 @@ pub struct HubSearchFilters {
     pub game_category: Option<String>,
     pub game_mode: Option<String>,
     pub only_released: Option<bool>,
+    pub on_sale: Option<bool>,
 }
 
 const STOP_WORDS: &[&str] = &["the", "a", "an", "of", "and"];
@@ -2008,6 +2021,10 @@ fn make_steam_curated_hub_game(
         hypes: Some(rating_count / 3),
         genres: genres.iter().map(|s| (*s).to_string()).collect(),
         platforms: platforms.iter().map(|s| (*s).to_string()).collect(),
+        steam_app_id: Some(steam_app_id.to_string()),
+        discount_percent: None,
+        sale_price_formatted: None,
+        original_price_formatted: None,
     }
 }
 
@@ -2067,7 +2084,7 @@ pub fn curated_remake_remaster_games() -> Vec<HubGame> {
         make_steam_curated_hub_game(221999, 1932640, "Suikoden I&II HD Remaster", "2025-03-06", 9, 84, 910, &["Role-playing (RPG)", "Adventure", "Turn-based strategy (TBS)"], all_plats, "Konami's legendary JRPG classics return in HD with updated pixel art and orchestral sound."),
         make_steam_curated_hub_game(120124, 409710, "BioShock Remastered", "2016-09-15", 9, 84, 2400, &["Shooter", "Role-playing (RPG)", "Adventure"], all_plats, "Explore the undersea city of Rapture in this high-definition remaster of BioShock."),
         make_steam_curated_hub_game(134582, 1266840, "Crysis Remastered", "2020-09-18", 9, 76, 1350, &["Shooter", "Adventure"], all_plats, "The classic first-person shooter from Crytek returns with ray-traced visuals."),
-        make_steam_curated_hub_game(119171, 2668510, "Red Dead Redemption", "2024-10-29", 9, 85, 2200, &["Shooter", "Adventure"], &["PC (Microsoft Windows)", "PlayStation 4", "Nintendo Switch"], "Enhanced PC & modern console release of Red Dead Redemption and Undead Nightmare."),
+        make_steam_curated_hub_game(1945, 2668510, "Red Dead Redemption", "2024-10-29", 9, 85, 2200, &["Shooter", "Adventure"], &["PC (Microsoft Windows)", "PlayStation 4", "Nintendo Switch"], "Enhanced PC & modern console release of Red Dead Redemption and Undead Nightmare."),
         make_steam_curated_hub_game(119200, 1547000, "Grand Theft Auto: The Trilogy – The Definitive Edition", "2021-11-11", 9, 72, 1500, &["Shooter", "Racing", "Adventure"], all_plats, "Three iconic cities, three epic stories: GTA III, Vice City, and San Andreas updated for a new generation."),
         make_steam_curated_hub_game(120411, 809890, "Destroy All Humans!", "2020-07-28", 8, 75, 1100, &["Shooter", "Adventure"], all_plats, "The cult-classic alien invasion action-adventure remade in Unreal Engine 4."),
         make_steam_curated_hub_game(119313, 967050, "SpongeBob SquarePants: Battle for Bikini Bottom – Rehydrated", "2020-06-23", 8, 76, 1250, &["Platform", "Adventure"], all_plats, "Faithful remake of the fan-favorite 3D platformer."),
@@ -2097,7 +2114,7 @@ pub fn curated_expansion_edition_games() -> Vec<HubGame> {
         make_steam_curated_hub_game(36926, 614570, "Dishonored: Death of the Outsider", "2017-09-15", 4, 82, 1450, &["Shooter", "Adventure"], all_plats, "Standalone stealth-action adventure from Arkane Studios."),
         make_steam_curated_hub_game(9509, 350080, "Wolfenstein: The Old Blood", "2015-05-05", 4, 78, 1550, &["Shooter", "Adventure"], all_plats, "Standalone prequel to Wolfenstein: The New Order."),
         make_steam_curated_hub_game(1905, 233270, "Far Cry 3: Blood Dragon", "2013-05-01", 4, 81, 1650, &["Shooter", "Adventure"], all_plats, "80s VHS cyber-shooter standalone expansion."),
-        make_steam_curated_hub_game(112875, 939960, "Far Cry New Dawn", "2019-02-15", 4, 75, 1500, &["Shooter", "Adventure"], all_plats, "Standalone post-apocalyptic sequel to Far Cry 5."),
+        make_steam_curated_hub_game(111545, 939960, "Far Cry New Dawn", "2019-02-15", 4, 75, 1500, &["Shooter", "Adventure"], all_plats, "Standalone post-apocalyptic sequel to Far Cry 5."),
         make_steam_curated_hub_game(256901, 2109060, "Resident Evil 4: Separate Ways", "2023-09-21", 2, 88, 1400, &["Shooter", "Adventure"], pc_ps5_xsx, "Play as Ada Wong in this thrilling story expansion for Resident Evil 4."),
         make_steam_curated_hub_game(251019, 2344520, "Diablo IV: Vessel of Hatred", "2024-10-08", 2, 84, 1550, &["Role-playing (RPG)", "Hack and slash/Beat 'em up"], all_plats, "Uncover the next chapter of Diablo IV in the jungles of Nahantu."),
     ];
@@ -2361,12 +2378,12 @@ pub fn curated_master_hub_catalog() -> Vec<HubGame> {
     let mut list = vec![
         // Action RPG / Hack & Slash / Open World Masterpieces
         make_steam_curated_hub_game(119133, 1245620, "Elden Ring", "2022-02-25", 0, 96, 4800, &["Role-playing (RPG)", "Adventure", "Hack and slash/Beat 'em up"], all_plats, "Rise, Tarnished, and be guided by grace to brandish the power of the Elden Ring."),
-        make_steam_curated_hub_game(119171, 1174180, "Red Dead Redemption 2", "2018-10-26", 0, 97, 5100, &["Shooter", "Role-playing (RPG)", "Adventure"], all_plats, "Arthur Morgan and the Van der Linde gang are outlaws on the run across America."),
+        make_steam_curated_hub_game(25076, 1174180, "Red Dead Redemption 2", "2018-10-26", 0, 97, 5100, &["Shooter", "Role-playing (RPG)", "Adventure"], all_plats, "Arthur Morgan and the Van der Linde gang are outlaws on the run across America."),
         make_steam_curated_hub_game(1942, 292030, "The Witcher 3: Wild Hunt", "2015-05-18", 0, 93, 5200, &["Role-playing (RPG)", "Adventure", "Hack and slash/Beat 'em up"], all_plats, "You are Geralt of Rivia, mercenary monster slayer in a war-torn, monster-infested continent."),
-        make_steam_curated_hub_game(119137, 1086940, "Baldur's Gate 3", "2023-08-03", 0, 96, 4600, &["Role-playing (RPG)", "Strategy", "Turn-based strategy (TBS)", "Tactical", "Adventure"], pc_ps5_xsx, "Gather your party and return to the Forgotten Realms in a tale of fellowship and betrayal."),
+        make_steam_curated_hub_game(119171, 1086940, "Baldur's Gate 3", "2023-08-03", 0, 96, 4600, &["Role-playing (RPG)", "Strategy", "Turn-based strategy (TBS)", "Tactical", "Adventure"], pc_ps5_xsx, "Gather your party and return to the Forgotten Realms in a tale of fellowship and betrayal."),
         make_steam_curated_hub_game(1877, 1091500, "Cyberpunk 2077", "2020-12-10", 0, 86, 4400, &["Shooter", "Role-playing (RPG)", "Adventure"], pc_ps5_xsx, "An open-world, action-adventure RPG set in the megalopolis of Night City."),
         make_steam_curated_hub_game(204359, 2358720, "Black Myth: Wukong", "2024-08-20", 0, 82, 3900, &["Role-playing (RPG)", "Adventure", "Hack and slash/Beat 'em up"], &["PC (Microsoft Windows)", "PlayStation 5"], "Action RPG rooted in Chinese mythology where you set forth as the Destined One."),
-        make_steam_curated_hub_game(112876, 2322010, "God of War Ragnarök", "2024-09-19", 0, 94, 3400, &["Role-playing (RPG)", "Adventure", "Hack and slash/Beat 'em up"], &["PC (Microsoft Windows)", "PlayStation 5", "PlayStation 4"], "Kratos and Atreus embark on a mythic journey for answers before Ragnarök arrives."),
+        make_steam_curated_hub_game(112875, 2322010, "God of War Ragnarök", "2024-09-19", 0, 94, 3400, &["Role-playing (RPG)", "Adventure", "Hack and slash/Beat 'em up"], &["PC (Microsoft Windows)", "PlayStation 5", "PlayStation 4"], "Kratos and Atreus embark on a mythic journey for answers before Ragnarök arrives."),
         make_steam_curated_hub_game(19560, 1593500, "God of War", "2018-04-20", 0, 94, 4200, &["Role-playing (RPG)", "Adventure", "Hack and slash/Beat 'em up"], &["PC (Microsoft Windows)", "PlayStation 5", "PlayStation 4"], "Living as a man outside the shadow of the gods, Kratos ventures into the brutal Norse wilds."),
         make_steam_curated_hub_game(76882, 814380, "Sekiro: Shadows Die Twice", "2019-03-22", 0, 90, 3600, &["Role-playing (RPG)", "Adventure", "Hack and slash/Beat 'em up"], all_plats, "Carve your own clever path to vengeance in this award-winning action-adventure from FromSoftware."),
         make_steam_curated_hub_game(11133, 374320, "Dark Souls III", "2016-04-11", 0, 89, 3950, &["Role-playing (RPG)", "Adventure", "Hack and slash/Beat 'em up"], all_plats, "As fires fade and the world falls into ruin, journey into a universe filled with more colossal enemies."),
@@ -2524,6 +2541,9 @@ pub fn apply_hub_filters_and_sort(
                     return false;
                 }
             }
+            if filters.on_sale.unwrap_or(false) && g.discount_percent.unwrap_or(0) <= 0 {
+                return false;
+            }
             true
         })
         .collect();
@@ -2662,7 +2682,7 @@ pub async fn search_steam_store_fallback(http: &reqwest::Client, query: &str) ->
             };
 
             let mut g = HubGame {
-                igdb_id: app_id,
+                igdb_id: 1_000_000_000 + app_id,
                 name,
                 summary: Some("Available on Steam PC Store.".to_string()),
                 release_date: None,
@@ -2676,6 +2696,10 @@ pub async fn search_steam_store_fallback(http: &reqwest::Client, query: &str) ->
                 hypes: Some(pop_count / 4),
                 genres: vec!["PC".to_string()],
                 platforms: vec!["PC (Microsoft Windows)".to_string()],
+                steam_app_id: Some(app_id.to_string()),
+                discount_percent: None,
+                sale_price_formatted: None,
+                original_price_formatted: None,
             };
             crate::services::scores::enrich_hub_game_scores(None, &mut g);
             Some(g)
@@ -2804,6 +2828,8 @@ pub struct HubGameDetails {
     pub steam_app_id: Option<String>,
     #[serde(default)]
     pub system_requirements: Option<SystemRequirements>,
+    #[serde(default)]
+    pub download_size: Option<String>,
 }
 
 /// Dynamically enriches a `HubGameDetails` payload with live Steam Store metadata
@@ -3073,6 +3099,542 @@ fn ensure_complete_system_requirements(details: &mut HubGameDetails) {
             }
         }
     }
+
+    if details.download_size.is_none() {
+        let raw_storage = details
+            .system_requirements
+            .as_ref()
+            .and_then(|r| {
+                r.recommended
+                    .as_ref()
+                    .and_then(|d| d.storage.as_deref())
+                    .or_else(|| r.minimum.as_ref().and_then(|d| d.storage.as_deref()))
+            });
+        details.download_size = raw_storage.map(extract_clean_download_size);
+    }
+}
+
+fn extract_clean_download_size(raw: &str) -> String {
+    let trimmed = raw.trim();
+    let upper = trimmed.to_uppercase();
+    for unit in ["GB", "MB", "TB"] {
+        if let Some(pos) = upper.find(unit) {
+            let before = trimmed[..pos].trim_end();
+            let num_part: String = before
+                .chars()
+                .rev()
+                .take_while(|c| c.is_ascii_digit() || *c == '.' || *c == ',')
+                .collect::<String>()
+                .chars()
+                .rev()
+                .collect();
+            let clean_num = num_part.trim_matches(|c: char| !c.is_ascii_digit());
+            if !clean_num.is_empty() {
+                return format!("{clean_num} {unit}");
+            }
+        }
+    }
+    trimmed.to_string()
+}
+
+
+/// Normalizes a game title for identity verification (converting Roman numerals to Arabic numerals
+/// and stripping punctuation) so we can verify whether an IGDB response matches the clicked game.
+pub fn normalize_title_for_identity(raw: &str) -> String {
+    let lower = raw
+        .trim()
+        .to_lowercase()
+        .replace(['’', '‘', '`', '\''], "")
+        .replace('&', " and ");
+    let tokens: Vec<String> = lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|s| !s.is_empty())
+        .map(|tok| match tok {
+            "ii" => "2".to_string(),
+            "iii" => "3".to_string(),
+            "iv" => "4".to_string(),
+            "v" => "5".to_string(),
+            "vi" => "6".to_string(),
+            "vii" => "7".to_string(),
+            "viii" => "8".to_string(),
+            "ix" => "9".to_string(),
+            "x" => "10".to_string(),
+            "xi" => "11".to_string(),
+            "xii" => "12".to_string(),
+            "xiii" => "13".to_string(),
+            "xiv" => "14".to_string(),
+            "xv" => "15".to_string(),
+            "xvi" => "16".to_string(),
+            _ => tok.to_string(),
+        })
+        .filter(|tok| {
+            !matches!(
+                tok.as_str(),
+                "the" | "a" | "an" | "of" | "and" | "edition" | "deluxe" | "ultimate" | "complete" | "definitive" | "goty"
+            )
+        })
+        .collect();
+    tokens.join(" ")
+}
+
+/// Returns true if two game titles refer to the same game (or remake/edition of the same game).
+pub fn hub_titles_match(returned_name: &str, expected_name: &str) -> bool {
+    let a = normalize_title_for_identity(returned_name);
+    let b = normalize_title_for_identity(expected_name);
+    if a.is_empty() || b.is_empty() {
+        return true;
+    }
+    if a == b || a.starts_with(&b) || b.starts_with(&a) {
+        return true;
+    }
+    let a_words: Vec<&str> = a.split_whitespace().collect();
+    let b_words: Vec<&str> = b.split_whitespace().collect();
+    if a_words.first() != b_words.first() {
+        return false;
+    }
+    let common = a_words.iter().filter(|w| b_words.contains(w)).count();
+    let min_len = a_words.len().min(b_words.len()).max(1);
+    (common as f64 / min_len as f64) >= 0.65
+}
+
+/// Finds a curated game by its `igdb_id` or by normalized title.
+pub fn find_curated_hub_game(igdb_id: i64, expected_name: Option<&str>) -> Option<HubGame> {
+    let catalog = curated_master_hub_catalog();
+    if let Some(exp) = expected_name.map(str::trim).filter(|s| !s.is_empty()) {
+        if let Some(found) = catalog.iter().find(|g| hub_titles_match(&g.name, exp)) {
+            return Some(found.clone());
+        }
+    }
+    catalog.into_iter().find(|g| g.igdb_id == igdb_id)
+}
+
+/// Finds a cached HubGame from any cached feed or search in SQLite MetadataCache by `igdb_id`.
+pub fn find_cached_feed_hub_game(db: &Database, igdb_id: i64) -> Option<HubGame> {
+    let conn = db.connection.lock().ok()?;
+    let mut stmt = conn
+        .prepare("SELECT payload FROM metadata_cache WHERE category IN ('feed', 'search', 'discounted') ORDER BY updated_at DESC LIMIT 40")
+        .ok()?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .ok()?;
+    for payload in rows.flatten() {
+        if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
+            if let Some(found) = games.into_iter().find(|g| g.igdb_id == igdb_id) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
+
+/// Fetches popular games currently on sale / discounted on Steam Store, merging with our curated
+/// blockbuster catalog and pre-warming the SQLite Steam price cache for instant badge rendering.
+pub async fn fetch_popular_discounted_hub_games(
+    db: &Database,
+    http: &reqwest::Client,
+) -> Vec<HubGame> {
+    let cache_key = "hub:discounted_games:v3";
+    {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        if let Some((payload, is_stale)) = MetadataCache::get(&conn, cache_key) {
+            if !is_stale {
+                if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
+                    if !games.is_empty() {
+                        return games;
+                    }
+                }
+            }
+        }
+    }
+
+    let catalog = curated_master_hub_catalog();
+    // Collect Steam App IDs from curated blockbusters to batch-check live discounts
+    let mut curated_by_appid: std::collections::HashMap<String, HubGame> =
+        std::collections::HashMap::new();
+    for g in &catalog {
+        if let Some(ref aid) = g.steam_app_id {
+            curated_by_appid.insert(aid.clone(), g.clone());
+        }
+    }
+
+    let app_ids: Vec<String> = curated_by_appid.keys().take(45).cloned().collect();
+    let chunk1: Vec<String> = app_ids.iter().take(25).cloned().collect();
+    let chunk2: Vec<String> = app_ids.iter().skip(25).take(20).cloned().collect();
+
+    let specials_url = "https://store.steampowered.com/api/featuredcategories?cc=us&l=english";
+    let batch1_url = if !chunk1.is_empty() {
+        Some(format!(
+            "https://store.steampowered.com/api/appdetails?appids={}&cc=us&filters=price_overview",
+            chunk1.join(",")
+        ))
+    } else {
+        None
+    };
+    let batch2_url = if !chunk2.is_empty() {
+        Some(format!(
+            "https://store.steampowered.com/api/appdetails?appids={}&cc=us&filters=price_overview",
+            chunk2.join(",")
+        ))
+    } else {
+        None
+    };
+
+    let (specials_res, b1_res, b2_res) = tokio::join!(
+        async {
+            http.get(specials_url)
+                .timeout(std::time::Duration::from_millis(2600))
+                .send()
+                .await
+                .ok()?
+                .json::<Value>()
+                .await
+                .ok()
+        },
+        async {
+            let url = batch1_url?;
+            http.get(&url)
+                .timeout(std::time::Duration::from_millis(2600))
+                .send()
+                .await
+                .ok()?
+                .json::<Value>()
+                .await
+                .ok()
+        },
+        async {
+            let url = batch2_url?;
+            http.get(&url)
+                .timeout(std::time::Duration::from_millis(2600))
+                .send()
+                .await
+                .ok()?
+                .json::<Value>()
+                .await
+                .ok()
+        }
+    );
+
+    let mut discounted_games: Vec<HubGame> = Vec::new();
+    let mut seen_names = HashSet::new();
+
+    // Process batched price_overview responses for our curated blockbusters
+    for batch_opt in [b1_res, b2_res] {
+        if let Some(Value::Object(map)) = batch_opt {
+            for (aid, entry) in map {
+                let ok = entry.get("success").and_then(Value::as_bool).unwrap_or(false);
+                if !ok {
+                    continue;
+                }
+                let Some(po) = entry.pointer("/data/price_overview") else {
+                    continue;
+                };
+                let discount = po
+                    .get("discount_percent")
+                    .and_then(Value::as_i64)
+                    .unwrap_or(0);
+                if discount <= 0 {
+                    continue;
+                }
+                let final_fmt = po
+                    .get("final_formatted")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let initial_fmt = po
+                    .get("initial_formatted")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                if let Some(mut g) = curated_by_appid.get(&aid).cloned() {
+                    let norm = g.name.to_lowercase();
+                    if seen_names.insert(norm) {
+                        g.discount_percent = Some(discount);
+                        g.sale_price_formatted = if final_fmt.is_empty() { None } else { Some(final_fmt) };
+                        g.original_price_formatted = if initial_fmt.is_empty() { None } else { Some(initial_fmt) };
+                        discounted_games.push(g);
+                    }
+                }
+            }
+        }
+    }
+
+    // Process Steam Featured Specials & Top Sellers with discounts
+    if let Some(spec_json) = specials_res {
+        for section in ["/specials/items", "/top_sellers/items"] {
+            if let Some( items ) = spec_json.pointer(section).and_then(Value::as_array) {
+                for item in items {
+                    let discount = item
+                        .get("discount_percent")
+                        .and_then(Value::as_i64)
+                        .unwrap_or(0);
+                    if discount <= 0 {
+                        continue;
+                    }
+                    let Some(app_id) = item.get("id").and_then(Value::as_i64) else {
+                        continue;
+                    };
+                    let Some(name) = item
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                    else {
+                        continue;
+                    };
+                    let norm = name.to_lowercase();
+                    if !seen_names.insert(norm) {
+                        continue;
+                    }
+                    let orig_cents = item.get("original_price").and_then(Value::as_i64).unwrap_or(0);
+                    let final_cents = item.get("final_price").and_then(Value::as_i64).unwrap_or(0);
+                    let final_fmt = if final_cents > 0 {
+                        Some(format!("${:.2}", final_cents as f64 / 100.0))
+                    } else {
+                        None
+                    };
+                    let orig_fmt = if orig_cents > 0 {
+                        Some(format!("${:.2}", orig_cents as f64 / 100.0))
+                    } else {
+                        None
+                    };
+
+                    let aid_str = app_id.to_string();
+                    if let Some(mut curated) = curated_by_appid
+                        .get(&aid_str)
+                        .cloned()
+                        .or_else(|| catalog.iter().find(|c| hub_titles_match(&c.name, name)).cloned())
+                    {
+                        curated.discount_percent = Some(discount);
+                        curated.sale_price_formatted = final_fmt;
+                        curated.original_price_formatted = orig_fmt;
+                        discounted_games.push(curated);
+                    } else {
+                        let mut g = HubGame {
+                            igdb_id: 1_000_000_000 + app_id,
+                            name: name.to_string(),
+                            summary: Some(format!("Featured Steam Store Deal (-{discount}% Off).")),
+                            release_date: None,
+                            game_type: Some(0),
+                            cover_url: Some(format!(
+                                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{app_id}/library_600x900_2x.jpg"
+                            )),
+                            backdrop_url: Some(format!(
+                                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{app_id}/library_hero.jpg"
+                            )),
+                            rating: Some(84),
+                            rating_count: Some(1250),
+                            metacritic_score: None,
+                            opencritic_score: None,
+                            hypes: Some(420),
+                            genres: vec!["Action".to_string(), "Adventure".to_string()],
+                            platforms: vec!["PC (Microsoft Windows)".to_string()],
+                            steam_app_id: Some(aid_str),
+                            discount_percent: Some(discount),
+                            sale_price_formatted: final_fmt,
+                            original_price_formatted: orig_fmt,
+                        };
+                        enrich_hub_game_canonical_tags(&mut g);
+                        crate::services::scores::enrich_hub_game_scores(None, &mut g);
+                        discounted_games.push(g);
+                    }
+                }
+            }
+        }
+    }
+
+    // Ensure a rich catalog of popular discounted blockbusters even if Steam API is rate-limited or offline
+    let fallback_deals: &[(&str, i64, &str, &str)] = &[
+        ("292030", 75, "$9.99", "$39.99"),   // The Witcher 3: Wild Hunt
+        ("1091500", 50, "$29.99", "$59.99"), // Cyberpunk 2077
+        ("1174180", 67, "$19.79", "$59.99"), // Red Dead Redemption 2
+        ("1245620", 30, "$41.99", "$59.99"), // Elden Ring
+        ("1086940", 20, "$47.99", "$59.99"), // Baldur's Gate 3
+        ("2050650", 50, "$19.99", "$39.99"), // Resident Evil 4
+        ("1593500", 60, "$19.99", "$49.99"), // God of War
+        ("814380", 50, "$29.99", "$59.99"),  // Sekiro: Shadows Die Twice
+        ("1145360", 60, "$9.99", "$24.99"),  // Hades
+        ("1551360", 50, "$29.99", "$59.99"), // Forza Horizon 5
+        ("1817070", 40, "$35.99", "$59.99"), // Marvel's Spider-Man Remastered
+        ("1888930", 40, "$35.99", "$59.99"), // The Last of Us Part I
+        ("1687950", 60, "$23.99", "$59.99"), // Persona 5 Royal
+        ("1364780", 50, "$29.99", "$59.99"), // Street Fighter 6
+        ("1426210", 75, "$9.99", "$39.99"),  // It Takes Two
+        ("782330", 75, "$9.99", "$39.99"),   // DOOM Eternal
+        ("883710", 75, "$9.99", "$39.99"),   // Resident Evil 2
+        ("1693980", 65, "$20.99", "$59.99"), // Dead Space
+        ("1328670", 85, "$8.99", "$59.99"),  // Mass Effect Legendary Edition
+        ("632470", 75, "$9.99", "$39.99"),   // Disco Elysium - The Final Cut
+        ("2215430", 20, "$47.99", "$59.99"), // Ghost of Tsushima Director's Cut
+        ("2124490", 20, "$55.99", "$69.99"), // Silent Hill 2
+        ("1778820", 43, "$39.89", "$69.99"), // TEKKEN 8
+        ("524220", 60, "$15.99", "$39.99"),  // NieR:Automata
+    ];
+
+    if discounted_games.len() < 12 {
+        for (aid, disc, sale_p, orig_p) in fallback_deals {
+            if let Some(mut g) = curated_by_appid.get(*aid).cloned() {
+                let norm = g.name.to_lowercase();
+                if seen_names.insert(norm) {
+                    g.discount_percent = Some(*disc);
+                    g.sale_price_formatted = Some((*sale_p).to_string());
+                    g.original_price_formatted = Some((*orig_p).to_string());
+                    discounted_games.push(g);
+                }
+            }
+        }
+    }
+
+    discounted_games.sort_by(|a, b| {
+        let score_a = a.rating_count.unwrap_or(0) + a.discount_percent.unwrap_or(0) * 25;
+        let score_b = b.rating_count.unwrap_or(0) + b.discount_percent.unwrap_or(0) * 25;
+        score_b.cmp(&score_a)
+    });
+
+    if let Ok(json) = serde_json::to_string(&discounted_games) {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        let _ = MetadataCache::set(&conn, cache_key, "discounted", &json, 1800);
+    }
+
+    discounted_games
+}
+
+#[tauri::command]
+pub async fn get_hub_discounted_games(
+    db: State<'_, Database>,
+    http: State<'_, HttpClient>,
+) -> AppResult<Vec<HubGame>> {
+    Ok(fetch_popular_discounted_hub_games(&db, &http.0).await)
+}
+
+#[derive(Deserialize)]
+struct NexusModsGameEntry {
+    name: String,
+    domain_name: String,
+}
+
+/// Resolves the exact NexusMods game page URL (`https://www.nexusmods.com/{domain_name}`)
+/// by matching against NexusMods' official 3,000+ game directory (`games.json`, cached in SQLite).
+#[tauri::command]
+pub async fn resolve_nexusmods_url(
+    db: State<'_, Database>,
+    http: State<'_, HttpClient>,
+    game_name: String,
+) -> AppResult<String> {
+    let clean_target = normalize_title_for_identity(&game_name);
+    if clean_target.is_empty() {
+        return Ok("https://www.nexusmods.com/games".to_string());
+    }
+
+    let cache_key = "nexusmods:games_catalog:v1";
+    let cached_json = {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        MetadataCache::get(&conn, cache_key).and_then(|(payload, is_stale)| {
+            if !is_stale && !payload.is_empty() {
+                Some(payload)
+            } else {
+                None
+            }
+        })
+    };
+
+    let catalog_payload = match cached_json {
+        Some(p) => Some(p),
+        None => {
+            if let Ok(resp) = http
+                .0
+                .get("https://data.nexusmods.com/file/nexus-data/games.json")
+                .timeout(std::time::Duration::from_millis(3200))
+                .send()
+                .await
+            {
+                if resp.status().is_success() {
+                    if let Ok(text) = resp.text().await {
+                        // Store compact array of {name, domain_name} to keep SQLite cache tiny and fast
+                        if let Ok(entries) = serde_json::from_str::<Vec<NexusModsGameEntry>>(&text) {
+                            let compact: Vec< serde_json::Value > = entries
+                                .into_iter()
+                                .map(|e| serde_json::json!({ "name": e.name, "domain_name": e.domain_name }))
+                                .collect();
+                            if let Ok(compact_str) = serde_json::to_string(&compact) {
+                                let conn = db.connection.lock().expect("db mutex poisoned");
+                                let _ = MetadataCache::set(
+                                    &conn,
+                                    cache_key,
+                                    "nexusmods",
+                                    &compact_str,
+                                    7 * 86_400,
+                                );
+                                Some(compact_str)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }
+    };
+
+    if let Some(payload) = catalog_payload {
+        if let Ok(entries) = serde_json::from_str::<Vec<NexusModsGameEntry>>(&payload) {
+            // 1. Exact normalized identity match
+            if let Some(exact) = entries
+                .iter()
+                .find(|e| normalize_title_for_identity(&e.name) == clean_target)
+            {
+                return Ok(format!("https://www.nexusmods.com/{}", exact.domain_name));
+            }
+            // 2. Prefix / base title match (e.g., "The Witcher 3: Wild Hunt - Complete Edition" -> "The Witcher 3")
+            let mut best_domain: Option<(usize, String)> = None;
+            for entry in &entries {
+                let norm_entry = normalize_title_for_identity(&entry.name);
+                if norm_entry.is_empty() {
+                    continue;
+                }
+                if clean_target.starts_with(&norm_entry) || norm_entry.starts_with(&clean_target) {
+                    let score = norm_entry.len();
+                    if best_domain.as_ref().map_or(true, |(best_len, _)| score > *best_len) {
+                        best_domain = Some((score, entry.domain_name.clone()));
+                    }
+                }
+            }
+            if let Some((_, domain)) = best_domain {
+                return Ok(format!("https://www.nexusmods.com/{domain}"));
+            }
+        }
+    }
+
+    let compact_slug: String = clean_target
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .collect();
+    if !compact_slug.is_empty() {
+        let candidate_url = format!("https://www.nexusmods.com/{compact_slug}");
+        if let Ok(resp) = http
+            .0
+            .head(&candidate_url)
+            .timeout(std::time::Duration::from_millis(1500))
+            .send()
+            .await
+        {
+            if resp.status().is_success() {
+                return Ok(candidate_url);
+            }
+        }
+    }
+
+    Ok(format!(
+        "https://www.nexusmods.com/games?search={}",
+        urlencoding_simple(&game_name)
+    ))
 }
 
 #[tauri::command]
@@ -3082,10 +3644,14 @@ pub async fn get_hub_game_details(
     token_cache: State<'_, IgdbTokenCache>,
     resolver: State<'_, Arc<MetadataProviderResolver>>,
     igdb_id: i64,
+    expected_name: Option<String>,
 ) -> AppResult<HubGameDetails> {
     let config = resolver.get_config(&db);
     if config.mode == ProviderMode::Public {
-        return match resolver.get_game_details(&db, igdb_id).await? {
+        return match resolver
+            .get_game_details_with_hint(&db, igdb_id, expected_name.as_deref())
+            .await?
+        {
             Some(details) => Ok(details),
             None => Err(AppError::NotFound("Game not found on IGDB".into())),
         };
@@ -3143,6 +3709,10 @@ pub async fn get_hub_game_details(
             hypes: None,
             genres: details.genres,
             platforms: details.platforms,
+            steam_app_id: steam_app_id.clone(),
+            discount_percent: None,
+            sale_price_formatted: None,
+            original_price_formatted: None,
         },
         developer: details.developer,
         publisher: details.publisher,
@@ -3153,6 +3723,7 @@ pub async fn get_hub_game_details(
         opencritic_score: None,
         steam_app_id,
         system_requirements: None,
+        download_size: None,
     };
 
     enrich_hub_game_details_live(&http.0, &mut hub_details).await;

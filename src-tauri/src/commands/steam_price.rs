@@ -1,11 +1,15 @@
 //! Steam Store pricing and regional price tracking (SteamDB-style)
 //!
 //! Fetches real-time price overviews and discounts directly from Steam Store API,
-//! queries multiple regional storefronts in parallel, and converts local currencies
-//! to USD using live/cached open exchange rates to provide savings comparisons.
+//! automatically resolves Steam AppIDs from game titles when `steam_app_id` is missing,
+//! queries regional storefronts in parallel, and converts local currencies to USD.
 
 use crate::commands::metadata::HttpClient;
+use crate::db::Database;
 use crate::error::AppResult;
+use crate::services::cache::MetadataCache;
+use crate::services::providers::SteamArtworkProvider;
+use crate::services::scores::normalize_game_title;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -137,8 +141,7 @@ pub struct SteamPriceOverview {
     pub regions: Vec<SteamRegionalPrice>,
 }
 
-/// Fetches open exchange rates against USD with fallback default rates
-async fn get_exchange_rates(client: &reqwest::Client) -> HashMap<String, f64> {
+fn default_exchange_rates() -> HashMap<String, f64> {
     let mut fallback_rates: HashMap<String, f64> = HashMap::new();
     fallback_rates.insert("USD".into(), 1.0);
     fallback_rates.insert("EUR".into(), 0.86);
@@ -154,22 +157,87 @@ async fn get_exchange_rates(client: &reqwest::Client) -> HashMap<String, f64> {
     fallback_rates.insert("CAD".into(), 1.39);
     fallback_rates.insert("AUD".into(), 1.40);
     fallback_rates.insert("PLN".into(), 3.70);
+    fallback_rates
+}
 
-    if let Ok(resp) = client.get(EXCHANGE_RATES_URL).send().await {
-        if resp.status().is_success() {
-            if let Ok(body) = resp.json::<Value>().await {
-                if let Some(rates_obj) = body.get("rates").and_then(Value::as_object) {
-                    for (k, v) in rates_obj {
-                        if let Some(num) = v.as_f64() {
-                            fallback_rates.insert(k.clone(), num);
-                        }
+/// Fetches open exchange rates against USD with SQLite cache + fallback default rates
+async fn get_exchange_rates(db: &Database, client: &reqwest::Client) -> HashMap<String, f64> {
+    let cache_key = "fx_rates:usd:v1";
+    {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        if let Some((payload, is_stale)) = MetadataCache::get(&conn, cache_key) {
+            if !is_stale {
+                if let Ok(rates) = serde_json::from_str::<HashMap<String, f64>>(&payload) {
+                    if !rates.is_empty() {
+                        return rates;
                     }
                 }
             }
         }
     }
 
-    fallback_rates
+    let mut rates = default_exchange_rates();
+
+    if let Ok(resp) = client
+        .get(EXCHANGE_RATES_URL)
+        .timeout(std::time::Duration::from_millis(1800))
+        .send()
+        .await
+    {
+        if resp.status().is_success() {
+            if let Ok(body) = resp.json::<Value>().await {
+                if let Some(rates_obj) = body.get("rates").and_then(Value::as_object) {
+                    for (k, v) in rates_obj {
+                        if let Some(num) = v.as_f64() {
+                            rates.insert(k.clone(), num);
+                        }
+                    }
+                    if let Ok(json) = serde_json::to_string(&rates) {
+                        let conn = db.connection.lock().expect("db mutex poisoned");
+                        let _ = MetadataCache::set(&conn, cache_key, "fx_rates", &json, 3600);
+                    }
+                }
+            }
+        }
+    }
+
+    rates
+}
+
+/// Resolves a Steam AppID either from an explicit `steam_app_id` or by searching `game_name` on Steam Store (cached).
+async fn resolve_effective_steam_app_id(
+    db: &Database,
+    client: &reqwest::Client,
+    steam_app_id: Option<&str>,
+    game_name: Option<&str>,
+) -> Option<String> {
+    if let Some(id) = steam_app_id.map(str::trim).filter(|s| !s.is_empty()) {
+        return Some(id.to_string());
+    }
+
+    let name = game_name.map(str::trim).filter(|s| !s.is_empty())?;
+    let norm = normalize_game_title(name);
+    if norm.is_empty() {
+        return None;
+    }
+
+    let cache_key = format!("steam_appid:v2:{norm}");
+    {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
+            if !is_stale && !payload.trim().is_empty() && payload != "NONE" {
+                return Some(payload);
+            }
+        }
+    }
+
+    let provider = SteamArtworkProvider::new(client.clone());
+    let resolved = provider.resolve_app_id(name).await;
+    if let Some(ref aid) = resolved {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        let _ = MetadataCache::set(&conn, &cache_key, "steam_appid", aid, 7 * 86_400);
+    }
+    resolved
 }
 
 /// Fetches price data for a single region directly from Steam
@@ -183,7 +251,16 @@ async fn fetch_single_region_price(
         STEAM_APPDETAILS_URL, steam_app_id, region.code
     );
 
-    let res = client.get(&url).send().await.ok()?;
+    let res = client
+        .get(&url)
+        .header(
+            reqwest::header::COOKIE,
+            "birthtime=0; mature_content=1; lastagecheckage=1-January-1990; wants_mature_content=1",
+        )
+        .timeout(std::time::Duration::from_millis(2800))
+        .send()
+        .await
+        .ok()?;
     if !res.status().is_success() {
         return None;
     }
@@ -256,7 +333,6 @@ fn parse_steam_price(
         .unwrap_or("")
         .to_string();
 
-    // In Steam API, all final amounts are in cents / 100x units
     let numeric_local = raw_final as f64 / 100.0;
     let converted_usd = if currency == "USD" {
         numeric_local
@@ -270,9 +346,7 @@ fn parse_steam_price(
     };
 
     let difference_percent = match base_usd {
-        Some(base) if base > 0.0 => {
-            (((converted_usd - base) / base) * 100.0).round() as i64
-        }
+        Some(base) if base > 0.0 => (((converted_usd - base) / base) * 100.0).round() as i64,
         _ => 0,
     };
 
@@ -292,18 +366,44 @@ fn parse_steam_price(
     })
 }
 
-/// Retrieves single-region price for a game on Steam
+/// Retrieves single-region price for a game on Steam (supports either `steam_app_id` or `game_name`)
 #[tauri::command]
 pub async fn get_steam_game_price(
+    db: State<'_, Database>,
     http: State<'_, HttpClient>,
-    steam_app_id: String,
+    steam_app_id: Option<String>,
+    game_name: Option<String>,
     country_code: Option<String>,
 ) -> AppResult<Option<SteamRegionalPrice>> {
+    let client = &http.0;
+    let Some(effective_app_id) = resolve_effective_steam_app_id(
+        &db,
+        client,
+        steam_app_id.as_deref(),
+        game_name.as_deref(),
+    )
+    .await
+    else {
+        return Ok(None);
+    };
+
     let clean_code = country_code
         .as_deref()
         .map(|c| c.trim().to_lowercase())
         .filter(|c| !c.is_empty())
         .unwrap_or_else(|| "us".to_string());
+
+    let price_cache_key = format!("steam_price:v2:{effective_app_id}:{clean_code}");
+    {
+        let conn = db.connection.lock().expect("db mutex poisoned");
+        if let Some((payload, is_stale)) = MetadataCache::get(&conn, &price_cache_key) {
+            if !is_stale {
+                if let Ok(cached) = serde_json::from_str::<SteamRegionalPrice>(&payload) {
+                    return Ok(Some(cached));
+                }
+            }
+        }
+    }
 
     let region = BENCHMARK_REGIONS
         .iter()
@@ -316,42 +416,63 @@ pub async fn get_steam_game_price(
             default_currency: "USD",
         });
 
-    let client = &http.0;
-    let rates = get_exchange_rates(client).await;
+    let rates = if region.code == "us" {
+        default_exchange_rates()
+    } else {
+        get_exchange_rates(&db, client).await
+    };
 
     let Some((_, price_val, is_free)) =
-        fetch_single_region_price(client, &steam_app_id, &region).await
+        fetch_single_region_price(client, &effective_app_id, &region).await
     else {
         return Ok(None);
     };
 
-    Ok(parse_steam_price(&region, &price_val, is_free, &rates, None))
+    let parsed = parse_steam_price(&region, &price_val, is_free, &rates, None);
+    if let Some(ref p) = parsed {
+        if let Ok(json) = serde_json::to_string(p) {
+            let conn = db.connection.lock().expect("db mutex poisoned");
+            // 10-minute live price cache so hovering cards is instant while staying fresh
+            let _ = MetadataCache::set(&conn, &price_cache_key, "steam_price", &json, 600);
+        }
+    }
+
+    Ok(parsed)
 }
 
 /// Retrieves comprehensive regional prices across all benchmark regions (SteamDB-style)
 #[tauri::command]
 pub async fn get_steam_regional_prices(
+    db: State<'_, Database>,
     http: State<'_, HttpClient>,
-    steam_app_id: String,
+    steam_app_id: Option<String>,
+    game_name: Option<String>,
     active_country: Option<String>,
 ) -> AppResult<Option<SteamPriceOverview>> {
     let client = &http.0;
+    let Some(effective_app_id) = resolve_effective_steam_app_id(
+        &db,
+        client,
+        steam_app_id.as_deref(),
+        game_name.as_deref(),
+    )
+    .await
+    else {
+        return Ok(None);
+    };
 
-    // 1. Fetch exchange rates
-    let rates = get_exchange_rates(client).await;
+    let rates = get_exchange_rates(&db, client).await;
 
-    // 2. Fetch all benchmark regions in parallel using Tokio JoinSet
     let mut set = tokio::task::JoinSet::new();
     for reg in BENCHMARK_REGIONS {
         let client_clone = client.clone();
-        let app_id_clone = steam_app_id.clone();
+        let app_id_clone = effective_app_id.clone();
         let reg_clone = reg.clone();
         set.spawn(async move {
             fetch_single_region_price(&client_clone, &app_id_clone, &reg_clone).await
         });
     }
 
-    // Check if the game is free to play or found
     let mut any_found = false;
     let mut is_game_free = false;
     let mut raw_region_prices = Vec::new();
@@ -401,7 +522,7 @@ pub async fn get_steam_regional_prices(
             .or_else(|| regions.first().cloned());
 
         return Ok(Some(SteamPriceOverview {
-            steam_app_id,
+            steam_app_id: effective_app_id,
             is_free: true,
             base_usd_price: 0.0,
             active_price,
@@ -409,7 +530,6 @@ pub async fn get_steam_regional_prices(
         }));
     }
 
-    // 3. First determine base US price in USD
     let us_raw = raw_region_prices.iter().find(|(r, _, _)| r.code == "us");
     let base_usd_price = us_raw
         .and_then(|(_, price_val, _)| {
@@ -420,7 +540,6 @@ pub async fn get_steam_regional_prices(
         })
         .unwrap_or(0.0);
 
-    // 4. Parse all regional prices and calculate differences
     let mut regional_prices: Vec<SteamRegionalPrice> = raw_region_prices
         .iter()
         .filter_map(|(reg, price_val, is_free)| {
@@ -428,7 +547,6 @@ pub async fn get_steam_regional_prices(
         })
         .collect();
 
-    // Sort cheapest converted USD price first
     regional_prices.sort_by(|a, b| {
         a.converted_usd
             .partial_cmp(&b.converted_usd)
@@ -448,7 +566,7 @@ pub async fn get_steam_regional_prices(
         .or_else(|| regional_prices.iter().find(|r| r.country_code == "us").cloned());
 
     Ok(Some(SteamPriceOverview {
-        steam_app_id,
+        steam_app_id: effective_app_id,
         is_free: false,
         base_usd_price,
         active_price,
@@ -488,7 +606,6 @@ mod tests {
         assert_eq!(parsed.discount_percent, 30);
         assert_eq!(parsed.final_formatted, "629₴");
         assert!(parsed.converted_usd > 13.0 && parsed.converted_usd < 15.0);
-        // $14.13 vs $41.99 base is around -66%
         assert!(parsed.difference_percent < -60);
     }
 

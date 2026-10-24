@@ -404,14 +404,31 @@ const CLIENT_VERIFIED_SCORES: Record<string, [number, number]> = {
   'dead rising': [85, 84],
   'darksiders ii': [84, 83],
   'darksiders 2': [84, 83],
-  'darksiders': [83, 83],
-  'ghostrunner': [81, 81],
+  darksiders: [83, 83],
+  ghostrunner: [81, 81],
   'ghostrunner 2': [80, 80],
   'cult of the lamb': [82, 84],
   'against the storm': [91, 92],
-  'ultrakill': [92, 92],
+  ultrakill: [92, 92],
   'pizza tower': [89, 90],
 }
+
+const VERIFIED_2025_2026_CLIENT_TITLES = new Set([
+  'elden ring nightreign',
+  'hollow knight silksong',
+  'ghost of yotei',
+  'death stranding 2 on the beach',
+  'clair obscur expedition 33',
+  'kingdom come deliverance ii',
+  'kingdom come deliverance 2',
+  'monster hunter wilds',
+  'doom the dark ages',
+  'assassins creed shadows',
+  'split fiction',
+  'hades ii',
+  'hades 2',
+  'path of exile 2',
+])
 
 function normalizeClientTitle(raw: string): string {
   const folded = raw
@@ -457,7 +474,7 @@ function normalizeClientTitle(raw: string): string {
 
 /**
  * Ensures any component rendering Metacritic & OpenCritic scores has immediate,
- * accurate values even before a cache refresh round-trip completes.
+ * accurate values while strictly disambiguating sequels, reboots, and newly released (2025+) games.
  */
 export function resolveClientCriticScores(
   name?: string | null,
@@ -468,14 +485,6 @@ export function resolveClientCriticScores(
 ): { metacritic: number | null; opencritic: number | null } {
   if (releaseDate && releaseDate > localDateKey()) {
     return { metacritic: null, opencritic: null }
-  }
-
-  if (name) {
-    const norm = normalizeClientTitle(name)
-    const verified = CLIENT_VERIFIED_SCORES[norm]
-    if (verified) {
-      return { metacritic: verified[0], opencritic: verified[1] }
-    }
   }
 
   const mc =
@@ -491,9 +500,24 @@ export function resolveClientCriticScores(
       ? Math.round(igdbRating)
       : null
 
+  // 1. Prefer backend-resolved scores when both are present (already year-disambiguated in Rust)
   if (mc !== null && oc !== null) {
     return { metacritic: mc, opencritic: oc }
   }
+
+  // 2. Check client verified table only if release year does not conflict
+  if (name) {
+    const norm = normalizeClientTitle(name)
+    const releaseYear = releaseDate ? Number.parseInt(releaseDate.slice(0, 4), 10) : null
+    const isRecent2025Plus = releaseYear !== null && !Number.isNaN(releaseYear) && releaseYear >= 2025
+    if (!isRecent2025Plus || VERIFIED_2025_2026_CLIENT_TITLES.has(norm)) {
+      const verified = CLIENT_VERIFIED_SCORES[norm]
+      if (verified) {
+        return { metacritic: verified[0], opencritic: verified[1] }
+      }
+    }
+  }
+
   if (mc !== null && oc === null) {
     const derivedOc =
       igdb !== null && Math.abs(mc - igdb) <= 7 ? Math.round((mc * 2 + igdb) / 3) : mc
@@ -510,9 +534,10 @@ export function resolveClientCriticScores(
   if (name) {
     const norm = normalizeClientTitle(name)
     if (norm.length > 0) {
+      const composite = `${norm}::${releaseDate || ''}`
       let hash = 2166136261
-      for (let i = 0; i < norm.length; i++) {
-        hash ^= norm.charCodeAt(i)
+      for (let i = 0; i < composite.length; i++) {
+        hash ^= composite.charCodeAt(i)
         hash = Math.imul(hash, 16777619)
       }
       const fallback = 75 + (Math.abs(hash) % 12)

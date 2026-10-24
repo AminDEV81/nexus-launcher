@@ -349,7 +349,13 @@ export const useOverlayStore = create<OverlayStoreState>((set, get) => ({
 
   toggleLiveWindow: async (show) => {
     try {
-      const target = await toggleOverlayWindow(show)
+      const nextShow = show ?? !get().isLiveWindowOpen
+      if (nextShow && !get().config.enabled) {
+        const enabledCfg = { ...get().config, enabled: true }
+        set({ config: enabledCfg })
+        await saveOverlayConfig(enabledCfg).catch(() => undefined)
+      }
+      const target = await toggleOverlayWindow(nextShow)
       set({ isLiveWindowOpen: target })
       return target
     } catch (err) {

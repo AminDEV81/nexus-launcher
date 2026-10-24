@@ -33,6 +33,8 @@ interface HubSearchState extends HubSearchFilters {
   setGameMode: (mode: string | null) => void
   onlyReleased: boolean
   setOnlyReleased: (onlyReleased: boolean) => void
+  onSale: boolean
+  setOnSale: (onSale: boolean) => void
   hideInLibrary: boolean
   setHideInLibrary: (hideInLibrary: boolean) => void
   clearFilters: () => void
@@ -145,6 +147,8 @@ export const useHubSearchStore = create<HubSearchState>((set) => ({
   setGameMode: (gameMode) => set({ gameMode }),
   onlyReleased: false,
   setOnlyReleased: (onlyReleased) => set({ onlyReleased }),
+  onSale: false,
+  setOnSale: (onSale) => set({ onSale }),
   hideInLibrary: false,
   setHideInLibrary: (hideInLibrary) => set({ hideInLibrary }),
   clearFilters: () =>
@@ -161,6 +165,7 @@ export const useHubSearchStore = create<HubSearchState>((set) => ({
       gameCategory: null,
       gameMode: null,
       onlyReleased: false,
+      onSale: false,
       hideInLibrary: false,
     }),
 }))

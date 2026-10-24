@@ -47,7 +47,7 @@ export function HubRegionalPriceModal({
     isLoading,
     isRefetching,
     refetch,
-  } = useSteamRegionalPrices(steamAppId, selectedRegion)
+  } = useSteamRegionalPrices(steamAppId, selectedRegion, gameName)
 
   // Keep selectedRegion synced with defaultRegion when opened
   useEffect(() => {
@@ -91,7 +91,8 @@ export function HubRegionalPriceModal({
     return overview.regions[0]
   }, [overview])
 
-  const steamStoreUrl = steamAppId ? `https://store.steampowered.com/app/${steamAppId}` : null
+  const effectiveAppId = steamAppId || overview?.steam_app_id || null
+  const steamStoreUrl = effectiveAppId ? `https://store.steampowered.com/app/${effectiveAppId}` : null
 
   if (!open) return null
 

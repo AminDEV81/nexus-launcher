@@ -16,6 +16,8 @@ pub struct OverlayState {
     /// Single source of truth for "the HUD window is shown". The window
     /// counts as exactly one telemetry consumer while this is true.
     pub hud_active: AtomicBool,
+    /// True when the user explicitly clicked Launch Live HUD or pressed the hotkey.
+    pub manually_opened: AtomicBool,
     /// PID of the last game the watcher saw in the foreground (0 = none).
     pub foreground_game_pid: AtomicU32,
     /// PID the user manually hid the HUD for; the auto-watcher must not
@@ -31,6 +33,7 @@ impl OverlayState {
         Self {
             telemetry: Arc::new(Mutex::new(TelemetryManager::new())),
             hud_active: AtomicBool::new(false),
+            manually_opened: AtomicBool::new(false),
             foreground_game_pid: AtomicU32::new(0),
             suppressed_pid: AtomicU32::new(0),
             known_games_cache: std::sync::Mutex::new(None),
@@ -80,6 +83,14 @@ pub async fn apply_visibility(
     let target = target.unwrap_or(!current);
 
     if target == current {
+        if target {
+            let cfg = current_config(app);
+            let _ = OverlayWindowManager::show(app, &cfg);
+            if source == ToggleSource::Manual {
+                state.manually_opened.store(true, Ordering::SeqCst);
+                state.suppressed_pid.store(0, Ordering::SeqCst);
+            }
+        }
         return Ok(current);
     }
 
@@ -88,6 +99,7 @@ pub async fn apply_visibility(
         OverlayWindowManager::show(app, &cfg)?;
         state.hud_active.store(true, Ordering::SeqCst);
         if source == ToggleSource::Manual {
+            state.manually_opened.store(true, Ordering::SeqCst);
             state.suppressed_pid.store(0, Ordering::SeqCst);
         }
         let mut mgr = state.telemetry.lock().await;
@@ -96,9 +108,12 @@ pub async fn apply_visibility(
     } else {
         OverlayWindowManager::hide(app)?;
         state.hud_active.store(false, Ordering::SeqCst);
+        state.manually_opened.store(false, Ordering::SeqCst);
         if source == ToggleSource::Manual {
             let fg = state.foreground_game_pid.load(Ordering::SeqCst);
-            state.suppressed_pid.store(fg, Ordering::SeqCst);
+            if fg > 0 {
+                state.suppressed_pid.store(fg, Ordering::SeqCst);
+            }
         }
         let mut mgr = state.telemetry.lock().await;
         mgr.remove_consumer();
@@ -158,18 +173,21 @@ pub async fn save_overlay_config(
     db: State<'_, Database>,
     config: OverlayConfig,
 ) -> Result<OverlayConfig, String> {
-    let cfg = {
+    let (was_enabled, cfg) = {
         let conn = db.connection.lock().map_err(|e| e.to_string())?;
+        let prev = ConfigStore::get(&conn).enabled;
         let mut cfg = config;
         cfg.sanitize();
         ConfigStore::save(&conn, &cfg)?;
-        cfg
+        (prev, cfg)
     };
 
     app.state::<GlobalHotkeyManager>().set_hotkey(&cfg.hotkey);
     OverlayWindowManager::apply_config(&app, &cfg);
 
-    if !cfg.enabled && is_hud_active(&app) {
+    // Only auto-close if the user explicitly toggled `enabled` from true -> false!
+    // Never close the live HUD when changing position, theme, opacity, or scale.
+    if was_enabled && !cfg.enabled && is_hud_active(&app) {
         let _ = apply_visibility(&app, Some(false), ToggleSource::Auto).await;
     }
 

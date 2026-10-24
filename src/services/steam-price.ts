@@ -23,16 +23,26 @@ export interface SteamPriceOverview {
   regions: SteamRegionalPrice[]
 }
 
-export function getSteamGamePrice(steamAppId: string, countryCode?: string) {
+export function getSteamGamePrice(
+  steamAppId?: string | null,
+  countryCode?: string,
+  gameName?: string | null,
+) {
   return call<SteamRegionalPrice | null>('get_steam_game_price', {
-    steamAppId,
+    steamAppId: steamAppId ?? null,
+    gameName: gameName ?? null,
     countryCode: countryCode ?? null,
   })
 }
 
-export function getSteamRegionalPrices(steamAppId: string, activeCountry?: string) {
+export function getSteamRegionalPrices(
+  steamAppId?: string | null,
+  activeCountry?: string,
+  gameName?: string | null,
+) {
   return call<SteamPriceOverview | null>('get_steam_regional_prices', {
-    steamAppId,
+    steamAppId: steamAppId ?? null,
+    gameName: gameName ?? null,
     activeCountry: activeCountry ?? null,
   })
 }

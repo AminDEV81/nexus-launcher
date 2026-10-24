@@ -753,6 +753,22 @@ async fn track_session(
 
     let started_at = Utc::now();
     let _ = app.emit("game-launched", &game_id);
+    {
+        let app_ov_start = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let ov_cfg = crate::commands::overlay::config::current_config(&app_ov_start);
+            if ov_cfg.enabled {
+                let state = app_ov_start.state::<crate::commands::overlay::OverlayState>();
+                state.suppressed_pid.store(0, std::sync::atomic::Ordering::SeqCst);
+                let _ = crate::commands::overlay::commands::apply_visibility(
+                    &app_ov_start,
+                    Some(true),
+                    crate::commands::overlay::commands::ToggleSource::Auto,
+                )
+                .await;
+            }
+        });
+    }
     if should_boost {
         tokio::time::sleep(tokio::time::Duration::from_millis(1200)).await;
     }
@@ -855,9 +871,15 @@ async fn track_session(
 
     let app_overlay = app.clone();
     tauri::async_runtime::spawn(async move {
-        let _ =
-            crate::commands::overlay::toggle_overlay_window(app_overlay.clone(), Some(false))
-                .await;
+        let state = app_overlay.state::<crate::commands::overlay::OverlayState>();
+        if !state.manually_opened.load(std::sync::atomic::Ordering::SeqCst) {
+            let _ = crate::commands::overlay::commands::apply_visibility(
+                &app_overlay,
+                Some(false),
+                crate::commands::overlay::commands::ToggleSource::Auto,
+            )
+            .await;
+        }
     });
     let _ = app.emit(
         "game-exited",
@@ -906,12 +928,8 @@ fn restore_launcher_window(app: &AppHandle) {
         .unwrap_or_else(|_| "hide".to_string())
     };
 
-    if let Some(window) = app.get_webview_window("main") {
-        if action.as_str() != "keep" {
-            let _ = window.show();
-            let _ = window.unminimize();
-            let _ = window.set_focus();
-        }
+    if action.as_str() != "keep" {
+        crate::restore_and_focus_main_window(app);
     }
 }
 

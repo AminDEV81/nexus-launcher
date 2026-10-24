@@ -27,23 +27,50 @@ export const POPULAR_REGIONS = [
   { code: 'pl', name: 'Poland', flag: '🇵🇱', currency: 'PLN' },
 ] as const
 
-/** Fetches real-time price for a single region (used on hero price badge) */
-export function useSteamPrice(steamAppId?: string | null, countryCode?: string) {
+/** Fetches real-time price for a single region by either steamAppId or gameName */
+export function useSteamPrice(
+  steamAppId?: string | number | null,
+  countryCode?: string,
+  gameName?: string | null,
+  enabled = true,
+) {
+  const cleanId =
+    steamAppId !== null && steamAppId !== undefined ? String(steamAppId).trim() : ''
+  const cleanName = typeof gameName === 'string' ? gameName.trim() : ''
+  const cleanCountry = typeof countryCode === 'string' && countryCode.trim() ? countryCode.trim() : 'us'
+  const hasId = cleanId.length > 0
+  const hasName = cleanName.length > 0
   return useQuery<SteamRegionalPrice | null>({
-    queryKey: ['steam-price', steamAppId, countryCode ?? 'default'],
-    queryFn: () => getSteamGamePrice(steamAppId!, countryCode),
-    enabled: Boolean(steamAppId && steamAppId.trim().length > 0),
-    staleTime: 5 * 60 * 1000, // 5 minutes fresh
+    queryKey: ['steam-price', cleanId, cleanName, cleanCountry],
+    queryFn: () =>
+      getSteamGamePrice(hasId ? cleanId : null, cleanCountry, hasName ? cleanName : null),
+    enabled: Boolean(enabled) && (hasId || hasName),
+    staleTime: 10 * 60 * 1000, // 10 minutes fresh
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   })
 }
 
 /** Fetches full regional comparison across all benchmark regions (SteamDB-style) */
-export function useSteamRegionalPrices(steamAppId?: string | null, activeCountry?: string) {
+export function useSteamRegionalPrices(
+  steamAppId?: string | number | null,
+  activeCountry?: string,
+  gameName?: string | null,
+) {
+  const cleanId =
+    steamAppId !== null && steamAppId !== undefined ? String(steamAppId).trim() : ''
+  const cleanName = typeof gameName === 'string' ? gameName.trim() : ''
+  const cleanCountry = typeof activeCountry === 'string' && activeCountry.trim() ? activeCountry.trim() : 'us'
+  const hasId = cleanId.length > 0
+  const hasName = cleanName.length > 0
   return useQuery<SteamPriceOverview | null>({
-    queryKey: ['steam-regional-prices', steamAppId, activeCountry ?? 'default'],
-    queryFn: () => getSteamRegionalPrices(steamAppId!, activeCountry),
-    enabled: Boolean(steamAppId && steamAppId.trim().length > 0),
-    staleTime: 5 * 60 * 1000,
+    queryKey: ['steam-regional-prices', cleanId, cleanName, cleanCountry],
+    queryFn: () =>
+      getSteamRegionalPrices(hasId ? cleanId : null, cleanCountry, hasName ? cleanName : null),
+    enabled: hasId || hasName,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   })
 }
 

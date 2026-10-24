@@ -16,8 +16,9 @@ pub struct OverlayWindowManager;
 
 impl OverlayWindowManager {
     /// Physical bounds of the monitor selected in the config. Falls back
-    /// to the primary monitor (then to 1080p) if the index is stale, e.g.
-    /// after a second display was unplugged.
+    /// to the primary monitor (then to 1080p) if the index is stale.
+    /// Uses `height - 1` (1px shorter than full monitor height) so Windows 10/11 DWM
+    /// never engages exclusive DirectFlip bypass over the overlay when a fullscreen game is active.
     fn target_bounds(
         app: &AppHandle,
         monitor_index: usize,
@@ -30,10 +31,17 @@ impl OverlayWindowManager {
             .or_else(|| monitors.first().cloned());
 
         match picked {
-            Some(m) => (*m.position(), *m.size(), m.scale_factor()),
+            Some(m) => {
+                let raw_size = *m.size();
+                let safe_size = tauri::PhysicalSize::new(
+                    raw_size.width.max(1),
+                    raw_size.height.saturating_sub(1).max(1),
+                );
+                (*m.position(), safe_size, m.scale_factor())
+            }
             None => (
                 tauri::PhysicalPosition::new(0, 0),
-                tauri::PhysicalSize::new(1920, 1080),
+                tauri::PhysicalSize::new(1920, 1079),
                 1.0,
             ),
         }
@@ -41,28 +49,36 @@ impl OverlayWindowManager {
 
     fn apply_bounds(app: &AppHandle, win: &WebviewWindow, monitor_index: usize) {
         let (pos, size, _) = Self::target_bounds(app, monitor_index);
-        let _ = win.set_position(tauri::Position::Physical(pos));
-        let _ = win.set_size(tauri::Size::Physical(size));
+        let cur_pos = win.outer_position().ok();
+        let cur_size = win.outer_size().ok();
+        if cur_pos != Some(pos) {
+            let _ = win.set_position(tauri::Position::Physical(pos));
+        }
+        if cur_size != Some(size) {
+            let _ = win.set_size(tauri::Size::Physical(size));
+        }
     }
 
-    /// Makes the window non-activating and hidden from Alt+Tab so showing
-    /// it never steals focus from the game (a focus steal makes the game
-    /// minimise or drop out of fullscreen).
+    /// Makes the window non-activating, topmost, layered, and hidden from Alt+Tab so showing
+    /// it never steals focus from the game and stays rendered above fullscreen/borderless games.
     #[cfg(target_os = "windows")]
-    fn apply_native_styles(win: &WebviewWindow) {
+    fn apply_native_styles(win: &WebviewWindow, click_through: bool) {
         if let Ok(hwnd) = win.hwnd() {
             unsafe {
                 use windows_sys::Win32::UI::WindowsAndMessaging::{
-                    GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE,
-                    WS_EX_TOOLWINDOW,
+                    GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_LAYERED,
+                    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT,
                 };
                 let h = hwnd.0 as _;
                 let ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
-                SetWindowLongPtrW(
-                    h,
-                    GWL_EXSTYLE,
-                    ex | (WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW) as isize,
-                );
+                let mut next_ex =
+                    ex | (WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED) as isize;
+                if click_through {
+                    next_ex |= WS_EX_TRANSPARENT as isize;
+                } else {
+                    next_ex &= !(WS_EX_TRANSPARENT as isize);
+                }
+                SetWindowLongPtrW(h, GWL_EXSTYLE, next_ex);
             }
         }
     }
@@ -77,7 +93,6 @@ impl OverlayWindowManager {
 
         let (pos, size, scale) = Self::target_bounds(app, cfg.monitor_index);
 
-        // Transparent, borderless, always-on-top window covering the target monitor.
         let window = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::default())
             .title("Nexus Overlay")
             .initialization_script(
@@ -97,7 +112,7 @@ impl OverlayWindowManager {
             .map_err(|e| format!("Failed to create overlay window: {e}"))?;
 
         #[cfg(target_os = "windows")]
-        Self::apply_native_styles(&window);
+        Self::apply_native_styles(&window, cfg.click_through);
 
         Self::apply_bounds(app, &window, cfg.monitor_index);
         let _ = window.set_ignore_cursor_events(cfg.click_through);
@@ -108,12 +123,11 @@ impl OverlayWindowManager {
     pub fn show(app: &AppHandle, cfg: &OverlayConfig) -> Result<(), String> {
         let win = Self::get_or_create_window(app, cfg)?;
 
-        // Re-align in case the display setup changed since last time.
         Self::apply_bounds(app, &win, cfg.monitor_index);
         let _ = win.set_ignore_cursor_events(cfg.click_through);
 
         #[cfg(target_os = "windows")]
-        Self::apply_native_styles(&win);
+        Self::apply_native_styles(&win, cfg.click_through);
 
         win.show().map_err(|e| e.to_string())?;
         let _ = win.set_always_on_top(true);
@@ -122,12 +136,21 @@ impl OverlayWindowManager {
         Ok(())
     }
 
-    /// Re-applies bounds / click-through after a settings change without
-    /// touching visibility. No-op while the window has never been created.
+    /// Re-applies bounds / click-through after a settings change while preserving
+    /// visibility and topmost z-order so changing position/theme never hides the live HUD.
     pub fn apply_config(app: &AppHandle, cfg: &OverlayConfig) {
         if let Some(win) = app.get_webview_window("overlay") {
             Self::apply_bounds(app, &win, cfg.monitor_index);
             let _ = win.set_ignore_cursor_events(cfg.click_through);
+
+            #[cfg(target_os = "windows")]
+            Self::apply_native_styles(&win, cfg.click_through);
+
+            if super::commands::is_hud_active(app) {
+                let _ = win.show();
+                let _ = win.set_always_on_top(true);
+                Self::reassert_topmost(app);
+            }
         }
     }
 
@@ -135,12 +158,12 @@ impl OverlayWindowManager {
         #[cfg(target_os = "windows")]
         {
             if let Some(win) = app.get_webview_window("overlay") {
-                if let Ok(true) = win.is_visible() {
+                if super::commands::is_hud_active(app) || win.is_visible().unwrap_or(false) {
                     if let Ok(hwnd) = win.hwnd() {
                         unsafe {
                             use windows_sys::Win32::UI::WindowsAndMessaging::{
-                                SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-                                SWP_SHOWWINDOW,
+                                SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE,
+                                SWP_NOSENDCHANGING, SWP_NOSIZE, SWP_SHOWWINDOW,
                             };
                             SetWindowPos(
                                 hwnd.0 as _,
@@ -149,7 +172,11 @@ impl OverlayWindowManager {
                                 0,
                                 0,
                                 0,
-                                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                                SWP_NOMOVE
+                                    | SWP_NOSIZE
+                                    | SWP_NOACTIVATE
+                                    | SWP_SHOWWINDOW
+                                    | SWP_NOSENDCHANGING,
                             );
                         }
                     }
@@ -169,8 +196,15 @@ impl OverlayWindowManager {
 
     pub fn set_click_through(app: &AppHandle, click_through: bool) -> Result<(), String> {
         if let Some(win) = app.get_webview_window("overlay") {
+            #[cfg(target_os = "windows")]
+            Self::apply_native_styles(&win, click_through);
+
             win.set_ignore_cursor_events(click_through)
                 .map_err(|e| e.to_string())?;
+
+            if super::commands::is_hud_active(app) {
+                Self::reassert_topmost(app);
+            }
         }
         Ok(())
     }

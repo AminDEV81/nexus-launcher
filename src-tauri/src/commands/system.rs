@@ -482,4 +482,23 @@ pub async fn get_live_metrics() -> AppResult<LiveSystemMetrics> {
     .map_err(|e| AppError::Other(e.to_string()))?
 }
 
+#[tauri::command]
+pub fn hide_to_tray(app: tauri::AppHandle) -> AppResult<()> {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+    Ok(())
+}
 
+#[tauri::command]
+pub fn restore_main_window(app: tauri::AppHandle) -> AppResult<()> {
+    crate::restore_and_focus_main_window(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn exit_application(app: tauri::AppHandle) -> AppResult<()> {
+    app.exit(0);
+    Ok(())
+}

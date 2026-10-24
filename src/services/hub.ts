@@ -46,6 +46,14 @@ export function getHubRecommended() {
   return call<HubGame[]>('get_hub_recommended')
 }
 
+export function getHubDiscountedGames() {
+  return call<HubGame[]>('get_hub_discounted_games')
+}
+
+export function resolveNexusModsUrl(gameName: string) {
+  return call<string>('resolve_nexusmods_url', { gameName })
+}
+
 /** Clears cached hub feeds/rotations in SQLite and advances the rotation seed
  *  so all shelves and searches pull fresh live data immediately. */
 export function refreshHubCatalog() {
@@ -81,8 +89,11 @@ export function getHubFeed(feed: string, offset = 0) {
   return call<HubGame[]>('get_hub_feed', { feed, offset })
 }
 
-export function getHubGameDetails(igdbId: number) {
-  return call<HubGameDetails>('get_hub_game_details', { igdbId })
+export function getHubGameDetails(igdbId: number, expectedName?: string | null) {
+  return call<HubGameDetails>('get_hub_game_details', {
+    igdbId,
+    expectedName: expectedName ?? null,
+  })
 }
 
 export function getHubSimilarGames(igdbId: number) {

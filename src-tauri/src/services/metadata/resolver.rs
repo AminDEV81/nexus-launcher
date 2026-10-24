@@ -193,11 +193,8 @@ impl MetadataProviderResolver {
                     let conn = db.connection.lock().expect("db mutex poisoned");
                     scores::enrich_hub_games_batch(Some(&conn), &mut games);
                     if let Ok(json) = serde_json::to_string(&games) {
-                        let ttl = match feed {
-                            "new_releases" => 3600,
-                            "coming_soon" => 3 * 3600,
-                            _ => 6 * 3600,
-                        };
+                        let _ = feed;
+                        let ttl = 12 * 3600; // 12-hour cache window
                         let _ = MetadataCache::set(&conn, &cache_key, "feed", &json, ttl);
                     }
                 }
@@ -266,9 +263,15 @@ impl MetadataProviderResolver {
         let cat_str = filters.game_category.as_deref().unwrap_or("");
         let mode_filter_str = filters.game_mode.as_deref().unwrap_or("");
         let rel_only_str = if filters.only_released.unwrap_or(false) { "1" } else { "0" };
+        let on_sale_str = if filters.on_sale.unwrap_or(false) { "1" } else { "0" };
+
+        if filters.on_sale.unwrap_or(false) && offset == 0 {
+            let discounted = crate::commands::hub::fetch_popular_discounted_hub_games(db, &self.http).await;
+            return Ok(crate::commands::hub::apply_hub_filters_and_sort(discounted, query, filters));
+        }
 
         let cache_key = format!(
-            "search:v18:{mode_str}:{clean_q}:{offset}:{g_str}:{p_str}:{rel_str}:{yf_str}:{yt_str}:{rating_str}:{sort_str}:{cat_str}:{mode_filter_str}:{rel_only_str}"
+            "search:v19:{mode_str}:{clean_q}:{offset}:{g_str}:{p_str}:{rel_str}:{yf_str}:{yt_str}:{rating_str}:{sort_str}:{cat_str}:{mode_filter_str}:{rel_only_str}:{on_sale_str}"
         );
 
         {
@@ -363,137 +366,173 @@ impl MetadataProviderResolver {
         db: &Database,
         igdb_id: i64,
     ) -> AppResult<Option<HubGameDetails>> {
-        let cache_key = format!("details:v7:{igdb_id}");
+        self.get_game_details_with_hint(db, igdb_id, None).await
+    }
+
+    pub async fn get_game_details_with_hint(
+        &self,
+        db: &Database,
+        igdb_id: i64,
+        expected_name: Option<&str>,
+    ) -> AppResult<Option<HubGameDetails>> {
+        // Resolve the expected game identity from hint, curated catalog, or feed cache
+        let known_game = crate::commands::hub::find_curated_hub_game(igdb_id, expected_name)
+            .or_else(|| crate::commands::hub::find_cached_feed_hub_game(db, igdb_id));
+
+        let effective_expected_name: Option<String> = expected_name
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .or_else(|| known_game.as_ref().map(|g| g.name.clone()));
+
+        let norm_hint = effective_expected_name
+            .as_deref()
+            .map(crate::commands::hub::normalize_title_for_identity)
+            .unwrap_or_default();
+
+        let cache_key = format!("details:v10:{igdb_id}:{norm_hint}");
 
         {
             let conn = db.connection.lock().expect("db mutex poisoned");
             if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
                 if !is_stale {
                     if let Ok(mut details) = serde_json::from_str::<HubGameDetails>(&payload) {
-                        scores::enrich_hub_game_scores(Some(&conn), &mut details.game);
-                        if details.metacritic_score.is_none() {
-                            details.metacritic_score = details.game.metacritic_score;
+                        let matches_hint = effective_expected_name
+                            .as_deref()
+                            .map(|exp| crate::commands::hub::hub_titles_match(&details.game.name, exp))
+                            .unwrap_or(true);
+                        if matches_hint {
+                            scores::enrich_hub_game_scores(Some(&conn), &mut details.game);
+                            if details.metacritic_score.is_none() {
+                                details.metacritic_score = details.game.metacritic_score;
+                            }
+                            if details.opencritic_score.is_none() {
+                                details.opencritic_score = details.game.opencritic_score;
+                            }
+                            return Ok(Some(details));
                         }
-                        if details.opencritic_score.is_none() {
-                            details.opencritic_score = details.game.opencritic_score;
-                        }
-                        return Ok(Some(details));
                     }
                 }
             }
-        }
-
-        if self.circuit_breaker.is_open() {
-            let conn = db.connection.lock().expect("db mutex poisoned");
-            if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
-                if let Ok(mut details) = serde_json::from_str::<HubGameDetails>(&payload) {
-                    scores::enrich_hub_game_scores(Some(&conn), &mut details.game);
-                    if details.metacritic_score.is_none() {
-                        details.metacritic_score = details.game.metacritic_score;
-                    }
-                    if details.opencritic_score.is_none() {
-                        details.opencritic_score = details.game.opencritic_score;
-                    }
-                    return Ok(Some(details));
-                }
-            }
-            return Err(AppError::Other(
-                "Network connection offline. Serving cached data.".into(),
-            ));
         }
 
         let config = self.get_config(db);
-        let result = match config.mode {
-            ProviderMode::Public => {
-                let cloud = NexusCloudProvider::new(self.http.clone(), config.public_proxy_url);
-                cloud.get_game_details(igdb_id).await
-            }
-            ProviderMode::Custom => {
-                let (Some(cid), Some(sec)) = (config.igdb_client_id, config.igdb_client_secret)
-                else {
-                    return Err(AppError::Invalid(
-                        "IGDB Client ID and Secret are missing in Settings.".into(),
-                    ));
-                };
-                let direct = DirectIgdbProvider::new(
-                    self.http.clone(),
-                    self.token_cache.clone(),
-                    cid,
-                    sec,
-                );
-                direct.get_game_details(igdb_id).await
+
+        // If igdb_id >= 1_000_000_000, it is a synthetic Steam App ID (1_000_000_000 + steam_app_id)
+        let result = if igdb_id >= 1_000_000_000 {
+            Ok(None)
+        } else {
+            match config.mode {
+                ProviderMode::Public => {
+                    let cloud = NexusCloudProvider::new(self.http.clone(), config.public_proxy_url.clone());
+                    cloud.get_game_details(igdb_id).await
+                }
+                ProviderMode::Custom => {
+                    if let (Some(cid), Some(sec)) = (config.igdb_client_id.clone(), config.igdb_client_secret.clone()) {
+                        let direct = DirectIgdbProvider::new(
+                            self.http.clone(),
+                            self.token_cache.clone(),
+                            cid,
+                            sec,
+                        );
+                        direct.get_game_details(igdb_id).await
+                    } else {
+                        Ok(None)
+                    }
+                }
             }
         };
 
-        let resolved_result = match result {
-            Ok(Some(d)) => Ok(Some(d)),
-            Ok(None) | Err(_) => {
-                // Fallback 1: check curated master catalog by igdb_id
-                if let Some(curated_game) = crate::commands::hub::curated_master_hub_catalog()
-                    .into_iter()
-                    .find(|g| g.igdb_id == igdb_id)
-                {
-                    Ok(Some(HubGameDetails {
-                        game: curated_game,
-                        developer: None,
-                        publisher: None,
-                        trailer_url: None,
-                        videos: Vec::new(),
-                        screenshot_urls: Vec::new(),
-                        metacritic_score: None,
-                        opencritic_score: None,
-                        steam_app_id: None,
-                        system_requirements: None,
-                    }))
-                } else if let Ok(Some(steam)) =
-                    crate::commands::metadata::steam_store::get_app_details(
-                        &self.http,
-                        &igdb_id.to_string(),
-                    )
-                    .await
-                {
-                    // Fallback 2: igdb_id is a Steam App ID from search_steam_store_fallback
-                    let aid = igdb_id.to_string();
-                    Ok(Some(HubGameDetails {
-                        game: HubGame {
-                            igdb_id,
-                            name: steam.name.unwrap_or_else(|| format!("Steam Game #{igdb_id}")),
-                            summary: steam.description,
-                            release_date: None,
-                            game_type: Some(0),
-                            cover_url: Some(format!(
-                                "https://cdn.akamai.steamstatic.com/steam/apps/{aid}/library_600x900.jpg"
-                            )),
-                            backdrop_url: steam.screenshot_urls.first().cloned().or_else(|| {
-                                Some(format!(
-                                    "https://cdn.akamai.steamstatic.com/steam/apps/{aid}/header.jpg"
-                                ))
-                            }),
-                            rating: steam.metacritic_score,
-                            rating_count: Some(500),
-                            metacritic_score: steam.metacritic_score,
-                            opencritic_score: None,
-                            hypes: None,
-                            genres: if steam.genres.is_empty() {
-                                vec!["PC".to_string()]
-                            } else {
-                                steam.genres
-                            },
-                            platforms: vec!["PC (Microsoft Windows)".to_string()],
-                        },
-                        developer: steam.developer,
-                        publisher: steam.publisher,
-                        trailer_url: None,
-                        videos: Vec::new(),
-                        screenshot_urls: steam.screenshot_urls,
+        // Verify that the returned IGDB game actually matches the expected game name!
+        // If IGDB returned a different game (due to curated/synthetic ID collision), reject it and resolve by title/curated entry.
+        let verified_primary = match result {
+            Ok(Some(d)) => {
+                let is_valid_match = match effective_expected_name.as_deref() {
+                    Some(exp) => crate::commands::hub::hub_titles_match(&d.game.name, exp),
+                    None => true,
+                };
+                if is_valid_match {
+                    Some(d)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        let resolved_result: AppResult<Option<HubGameDetails>> = if let Some(d) = verified_primary {
+            Ok(Some(d))
+        } else if let Some(curated_game) = known_game {
+            let aid = curated_game.steam_app_id.clone();
+            Ok(Some(HubGameDetails {
+                game: HubGame {
+                    igdb_id,
+                    ..curated_game
+                },
+                developer: None,
+                publisher: None,
+                trailer_url: None,
+                videos: Vec::new(),
+                screenshot_urls: Vec::new(),
+                metacritic_score: None,
+                opencritic_score: None,
+                steam_app_id: aid,
+                system_requirements: None,
+                download_size: None,
+            }))
+        } else {
+            let steam_aid = if igdb_id >= 1_000_000_000 {
+                (igdb_id - 1_000_000_000).to_string()
+            } else {
+                igdb_id.to_string()
+            };
+            if let Ok(Some(steam)) =
+                crate::commands::metadata::steam_store::get_app_details(&self.http, &steam_aid).await
+            {
+                Ok(Some(HubGameDetails {
+                    game: HubGame {
+                        igdb_id,
+                        name: steam.name.unwrap_or_else(|| format!("Steam Game #{steam_aid}")),
+                        summary: steam.description,
+                        release_date: None,
+                        game_type: Some(0),
+                        cover_url: Some(format!(
+                            "https://cdn.cloudflare.steamstatic.com/steam/apps/{steam_aid}/library_600x900_2x.jpg"
+                        )),
+                        backdrop_url: steam.screenshot_urls.first().cloned().or_else(|| {
+                            Some(format!(
+                                "https://cdn.akamai.steamstatic.com/steam/apps/{steam_aid}/header.jpg"
+                            ))
+                        }),
+                        rating: steam.metacritic_score,
+                        rating_count: Some(500),
                         metacritic_score: steam.metacritic_score,
                         opencritic_score: None,
-                        steam_app_id: Some(aid),
-                        system_requirements: steam.system_requirements,
-                    }))
-                } else {
-                    result
-                }
+                        hypes: None,
+                        genres: if steam.genres.is_empty() {
+                            vec!["Action".to_string(), "Adventure".to_string()]
+                        } else {
+                            steam.genres
+                        },
+                        platforms: vec!["PC (Microsoft Windows)".to_string()],
+                        steam_app_id: Some(steam_aid.clone()),
+                        discount_percent: None,
+                        sale_price_formatted: None,
+                        original_price_formatted: None,
+                    },
+                    developer: steam.developer,
+                    publisher: steam.publisher,
+                    trailer_url: None,
+                    videos: Vec::new(),
+                    screenshot_urls: steam.screenshot_urls,
+                    metacritic_score: steam.metacritic_score,
+                    opencritic_score: None,
+                    steam_app_id: Some(steam_aid),
+                    system_requirements: steam.system_requirements,
+                    download_size: None,
+                }))
+            } else {
+                Ok(None)
             }
         };
 
@@ -519,37 +558,12 @@ impl MetadataProviderResolver {
                     .or(details.game.opencritic_score);
                 if let Ok(json) = serde_json::to_string(&details) {
                     let conn = db.connection.lock().expect("db mutex poisoned");
-                    let _ = MetadataCache::set(&conn, &cache_key, "details", &json, 6 * 3600);
+                    let _ = MetadataCache::set(&conn, &cache_key, "details", &json, 12 * 3600);
                 }
                 Ok(Some(details))
             }
             Ok(None) => Ok(None),
-            Err(err) => {
-                let err_str = err.to_string();
-                if err_str.contains("disconnect")
-                    || err_str.contains("unreachable")
-                    || err_str.contains("timed out")
-                    || err_str.contains("Network")
-                {
-                    self.circuit_breaker.trip_immediately();
-                } else {
-                    self.circuit_breaker.record_failure();
-                }
-                let conn = db.connection.lock().expect("db mutex poisoned");
-                if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
-                    if let Ok(mut details) = serde_json::from_str::<HubGameDetails>(&payload) {
-                        scores::enrich_hub_game_scores(Some(&conn), &mut details.game);
-                        if details.metacritic_score.is_none() {
-                            details.metacritic_score = details.game.metacritic_score;
-                        }
-                        if details.opencritic_score.is_none() {
-                            details.opencritic_score = details.game.opencritic_score;
-                        }
-                        return Ok(Some(details));
-                    }
-                }
-                Err(err)
-            }
+            Err(err) => Err(err),
         }
     }
 

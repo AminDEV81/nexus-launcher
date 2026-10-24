@@ -93,9 +93,12 @@ import { GameSaveCard } from './game-save-card'
 import { SidebarSoundtrackWidget } from '@/features/soundtrack/components/sidebar/sidebar-soundtrack-widget'
 import { HubScoreBadge } from '@/features/hub/components/hub-score-badge'
 import { resolveClientCriticScores } from '@/features/hub/utils/score'
+import { resolveNexusModsTarget } from '../utils/nexusmods'
+import { resolveNexusModsUrl } from '@/services/hub'
 import type { Game } from '@/types/models'
 
 const PANEL_WIDTH = 450
+const autoSyncedGameIds = new Set<string>()
 
 export function GameDetailsPanel() {
   const selectedId = useUiStore((s) => s.selectedGameId)
@@ -178,6 +181,28 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
   const heroSrc = bannerSrc ?? backgroundSrc ?? coverSrc
   const heroIsCover = !game.banner_path && !game.background_path
   const logoSrc = assetUrl(game.logo_path)
+  const [logoLoadFailed, setLogoLoadFailed] = useState(false)
+  useEffect(() => {
+    setLogoLoadFailed(false)
+  }, [game.id, game.logo_path, game.steam_app_id])
+
+  const steamCdnLogoUrl = game.steam_app_id
+    ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${game.steam_app_id}/logo.png`
+    : null
+  const effectiveLogoSrc = !logoLoadFailed ? (logoSrc ?? steamCdnLogoUrl) : null
+  const nexusModsTarget = useMemo(() => resolveNexusModsTarget(game.name), [game.name])
+
+  // Automatically sync IGDB + high-res cover/banner/logo once if missing
+  useEffect(() => {
+    if (
+      (!game.logo_path || !game.banner_path || !game.cover_path || !game.description) &&
+      !autoSyncedGameIds.has(game.id) &&
+      !syncMetadataMutation.isPending
+    ) {
+      autoSyncedGameIds.add(game.id)
+      syncMetadataMutation.mutate(game.id)
+    }
+  }, [game.id, game.logo_path, game.banner_path, game.cover_path, game.description, syncMetadataMutation])
 
   const heroRawPath = game.banner_path ?? game.background_path ?? game.cover_path
   const galleryImages = [heroRawPath, ...screenshots].filter(
@@ -274,20 +299,33 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
             </span>
           </div>
 
-          {/* Game Title / Logo & Genre Badges at the bottom */}
-          <div className="absolute inset-x-5 bottom-4 z-10 flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              {logoSrc ? (
-                <img
-                  src={logoSrc}
-                  alt={game.name}
-                  className="max-h-16 max-w-[85%] object-contain object-left drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]"
-                />
-              ) : (
-                <h1 className="text-2xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
-                  {game.name}
-                </h1>
+          {/* High-Res Game Icon + Official Game Logo & Genre Badges at the bottom */}
+          <div className="absolute inset-x-5 bottom-4 z-10 flex flex-col gap-2.5">
+            <div className="flex items-end gap-3">
+              {coverSrc && (
+                <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-xl border border-white/25 bg-black/60 shadow-[0_8px_20px_rgba(0,0,0,0.75)] ring-1 ring-white/15">
+                  <img
+                    src={coverSrc}
+                    alt={game.name}
+                    className="size-full object-cover"
+                    draggable={false}
+                  />
+                </div>
               )}
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                {effectiveLogoSrc ? (
+                  <img
+                    src={effectiveLogoSrc}
+                    alt={game.name}
+                    onError={() => setLogoLoadFailed(true)}
+                    className="max-h-16 max-w-[88%] object-contain object-left drop-shadow-[0_4px_14px_rgba(0,0,0,0.92)]"
+                    draggable={false}
+                  />
+                ) : (
+                  <h1 className="text-2xl font-black leading-tight tracking-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+                    {game.name}
+                  </h1>
+                )}
               <button
                 type="button"
                 onClick={(e) => {
@@ -300,6 +338,7 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
               >
                 <Pencil className="size-3.5" />
               </button>
+              </div>
             </div>
 
             {game.genres.length > 0 && (
@@ -904,6 +943,57 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
             </>
           )}
         </div>
+
+        {/* ── Explore Mode: Direct NexusMods Integration Card ────────── */}
+        <section className="group/mods relative overflow-hidden rounded-2xl border border-amber-500/35 bg-gradient-to-br from-amber-500/12 via-surface-raised/90 to-surface p-3.5 shadow-sm transition-all hover:border-amber-500/60 hover:shadow-md">
+          <div className="pointer-events-none absolute -right-10 -top-10 size-28 rounded-full bg-amber-500/15 blur-2xl" />
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/20">
+                <Sparkles className="size-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-black tracking-tight text-text">
+                    Explore Mods
+                  </span>
+                  <span className="rounded-md border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.2 font-mono text-[9px] font-extrabold uppercase tracking-wider text-amber-500 dark:text-amber-300">
+                    NexusMods
+                  </span>
+                </div>
+                <p className="mt-0.5 truncate text-[10.5px] font-medium text-subtle">
+                  Community mods, overhauls &amp; reshade presets
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                playButtonClick()
+                toast.success(`Opening ${game.name} mods on NexusMods…`)
+                let targetUrl = nexusModsTarget.url
+                if (!nexusModsTarget.isDirectGamePage) {
+                  try {
+                    const resolved = await resolveNexusModsUrl(game.name)
+                    if (resolved && resolved.startsWith('http')) {
+                      targetUrl = resolved
+                    }
+                  } catch {
+                    // Use client-side fallback
+                  }
+                }
+                void openUrl(targetUrl).catch(() => {
+                  window.open(targetUrl, '_blank', 'noopener,noreferrer')
+                })
+              }}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 px-3.5 py-2 text-xs font-extrabold text-white shadow-sm shadow-amber-500/25 transition-all hover:from-amber-400 hover:to-orange-500 hover:scale-[1.02] active:scale-95 cursor-pointer"
+            >
+              <span>Explore Mods</span>
+              <ExternalLink className="size-3.5" />
+            </button>
+          </div>
+        </section>
 
         {/* ── Segmented Navigation Tabs (Deterministic Equal-Width Sliding Pill) ── */}
         {(() => {

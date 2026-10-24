@@ -89,9 +89,12 @@ const SEQUEL_SUBTITLE_TOKENS = new Set([
   'unity',
   'syndicate',
   'wilds',
+  'world',
+  'rise',
   'iceborne',
   'sunbreak',
   'eternal',
+  'ages',
   'alyx',
   'silksong',
   'infinite',
@@ -100,6 +103,15 @@ const SEQUEL_SUBTITLE_TOKENS = new Set([
   'nightreign',
   'erdtree',
   'reload',
+  'yotei',
+  'tsushima',
+  'beach',
+  'retold',
+  'veilguard',
+  'inquisition',
+  'deliverance',
+  'chornobyl',
+  'rubicon',
 ])
 
 const STOP_WORDS = new Set(['the', 'of', 'and', 'a', 'an', 'in', 'on', 'to', 'for'])
@@ -108,7 +120,7 @@ const STOP_WORDS = new Set(['the', 'of', 'and', 'a', 'an', 'in', 'on', 'to', 'fo
  * Normalizes a game title into its canonical core search form:
  * - Folds diacritics (Ragnarök -> ragnarok, Pokémon -> pokemon)
  * - Strips packaging/edition suffixes ("Director's Cut", "Complete Edition", "GOTY", "Remastered", etc.)
- * - Preserves sequel numbers and Roman numerals.
+ * - Preserves sequel numbers, subtitles, and Roman numerals.
  */
 export function extractCoreGameTitle(rawTitle: string): string {
   if (!rawTitle) return ''
@@ -149,7 +161,10 @@ function normalizeTokensForComparison(text: string): string[] {
       /\b(?:original|official|video|game|soundtrack|soundtracks|score|ost|music|audio|gamerip|complete|expanded|selection|selections|ep|vol|volume|disc|cd)\b/g,
       ' ',
     )
-    .replace(/\b(?:ps1|ps2|ps3|ps4|ps5|psp|psvita|xbox|360|switch|windows|pc|mac|linux|steam|nes|snes|n64|gamecube|wii|wiiu|3ds|ds|sega|genesis|dreamcast|arcade|ost)\b/g, ' ')
+    .replace(
+      /\b(?:ps1|ps2|ps3|ps4|ps5|psp|psvita|xbox|360|switch|windows|pc|mac|linux|steam|nes|snes|n64|gamecube|wii|wiiu|3ds|ds|sega|genesis|dreamcast|arcade|ost)\b/g,
+      ' ',
+    )
     .replace(/[^\w\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -161,19 +176,47 @@ function normalizeTokensForComparison(text: string): string[] {
     .map((tok) => ROMAN_TO_DIGIT[tok] || tok)
 }
 
+function extractYearNumber(raw?: string | null): number | null {
+  if (!raw) return null
+  const m = raw.trim().match(/\b(19\d{2}|20\d{2})\b/)
+  if (!m) return null
+  const num = Number.parseInt(m[1], 10)
+  return Number.isNaN(num) ? null : num
+}
+
 /**
  * Strictly scores how well an album title matches a target game title (0 = invalid/mismatch, 1..100 = verified match).
  * Prevents:
  * - Unrelated KHInsider sidebar links ("The Witcher 3" when searching "Cyberpunk 2077")
- * - Wrong sequels ("God of War" vs "God of War Ragnarök", "Spider-Man" vs "Spider-Man 2", "Red Dead Redemption" vs "RDR2")
+ * - Wrong sequels or same-studio entries ("God of War" vs "God of War Ragnarök", "Spider-Man" vs "Spider-Man 2",
+ *   "Monster Hunter World" vs "Monster Hunter Wilds", "Ghost of Tsushima" vs "Ghost of Yōtei", "Elden Ring" vs "Elden Ring Nightreign")
  * - Single-word false positives ("Out of Control" when searching "Control", "Inside Out" when searching "Inside")
+ * - Release-year mismatches for newly released games or same-name reboots.
  */
-export function scoreAlbumMatchForGame(albumTitle: string, gameTitle: string): number {
+export function scoreAlbumMatchForGame(
+  albumTitle: string,
+  gameTitle: string,
+  albumReleaseDate?: string | null,
+  gameReleaseDate?: string | null,
+): number {
   if (!albumTitle || !gameTitle) return 0
 
   const lowerAlbum = albumTitle.toLowerCase()
   if (/\b(?:podcast|interview|audiobook|ringtone|karaoke|sound effects only)\b/.test(lowerAlbum)) {
     return 0
+  }
+
+  // Release-year guard: if the game is a brand-new release (e.g. 2025/2026) and the album is from
+  // a much older game (more than 2 years prior), reject it so new releases don't inherit old OSTs!
+  const albYear = extractYearNumber(albumReleaseDate)
+  const gmYear = extractYearNumber(gameReleaseDate)
+  if (albYear !== null && gmYear !== null) {
+    if (gmYear >= 2024 && albYear < gmYear - 2) {
+      return 0
+    }
+    if (albYear > gmYear + 2) {
+      return 0
+    }
   }
 
   const gameTokens = normalizeTokensForComparison(gameTitle)
@@ -189,14 +232,14 @@ export function scoreAlbumMatchForGame(albumTitle: string, gameTitle: string): n
   const gameTokenSet = new Set(effGameTokens)
   const albumTokenSet = new Set(effAlbumTokens)
 
-  // 1. Sequel / Spin-Off Disambiguation Guard
-  // Every sequel marker present in the game title MUST be in the album title
+  // 1. Sequel / Spin-Off / Subtitle Disambiguation Guard
+  // Every sequel or subtitle marker present in the game title MUST be in the album title
   for (const tok of effGameTokens) {
     if (SEQUEL_SUBTITLE_TOKENS.has(tok) && !albumTokenSet.has(tok)) {
       return 0
     }
   }
-  // And any sequel marker in the album title that is NOT in the game title is rejected!
+  // And any sequel or subtitle marker in the album title that is NOT in the game title is rejected!
   for (const tok of effAlbumTokens) {
     if (SEQUEL_SUBTITLE_TOKENS.has(tok) && !gameTokenSet.has(tok)) {
       return 0
@@ -215,13 +258,11 @@ export function scoreAlbumMatchForGame(albumTitle: string, gameTitle: string): n
     if (effAlbumTokens[0] !== targetWord) {
       return 0
     }
-    // If album has extra words left after stripping soundtrack/platform keywords, reject!
     if (effAlbumTokens.length > 1) {
       return 0
     }
   } else {
     // 3. Multi-word Game Title Coverage
-    // First significant word of the game must appear at the start of the album's significant tokens
     if (effAlbumTokens[0] !== effGameTokens[0] && !albumTokenSet.has(effGameTokens[0])) {
       return 0
     }
@@ -229,27 +270,25 @@ export function scoreAlbumMatchForGame(albumTitle: string, gameTitle: string): n
     const matchedCount = effGameTokens.filter((t) => albumTokenSet.has(t)).length
     const coverage = matchedCount / effGameTokens.length
 
-    if (effGameTokens.length === 2 && matchedCount < 2) {
+    if (effGameTokens.length <= 3 && matchedCount < effGameTokens.length) {
       return 0
     }
-    if (coverage < 0.75) {
+    if (coverage < 0.8) {
       return 0
     }
 
-    // Reject if the album has way too many unrelated extra tokens (e.g. compilation of 5 games)
-    if (effAlbumTokens.length > effGameTokens.length + 3) {
+    // Reject if the album has extra significant tokens that alter the game identity (e.g. spin-offs)
+    if (effAlbumTokens.length > effGameTokens.length + 2) {
       return 0
     }
   }
 
   let score = 75
 
-  // Exact core token match bonus
   if (effAlbumTokens.join(' ') === effGameTokens.join(' ')) {
     score += 15
   }
 
-  // Official soundtrack / score bonus
   if (
     lowerAlbum.includes('original soundtrack') ||
     lowerAlbum.includes('official soundtrack') ||
@@ -261,7 +300,6 @@ export function scoreAlbumMatchForGame(albumTitle: string, gameTitle: string): n
     score += 10
   }
 
-  // Deprioritize gamerips, singles, promos, or remixes below official OSTs
   if (lowerAlbum.includes('gamerip')) score -= 12
   if (lowerAlbum.includes('single') || lowerAlbum.includes('promo')) score -= 15
   if (lowerAlbum.includes('remix') || lowerAlbum.includes('arrangement')) score -= 10
@@ -269,8 +307,13 @@ export function scoreAlbumMatchForGame(albumTitle: string, gameTitle: string): n
   return Math.max(1, Math.min(100, score))
 }
 
-export function isAlbumValidForGame(albumTitle: string, gameTitle: string): boolean {
-  return scoreAlbumMatchForGame(albumTitle, gameTitle) > 0
+export function isAlbumValidForGame(
+  albumTitle: string,
+  gameTitle: string,
+  albumReleaseDate?: string | null,
+  gameReleaseDate?: string | null,
+): boolean {
+  return scoreAlbumMatchForGame(albumTitle, gameTitle, albumReleaseDate, gameReleaseDate) > 0
 }
 
 export abstract class BaseSoundtrackProvider implements SoundtrackProvider {
@@ -294,11 +337,6 @@ export abstract class BaseSoundtrackProvider implements SoundtrackProvider {
     return null
   }
 
-  /**
-   * Universal text/HTML fetcher:
-   * 1. Attempts Tauri native Rust `soundtrackHttpGet` to bypass CORS and user-agent restrictions completely.
-   * 2. Falls back to standard `fetchWithTimeout` if running in test environment.
-   */
   protected async fetchHtml(
     url: string,
     headers?: Record<string, string>,
@@ -313,9 +351,6 @@ export abstract class BaseSoundtrackProvider implements SoundtrackProvider {
     }
   }
 
-  /**
-   * Robust fetch wrapper with timeout, backoff, and error handling
-   */
   protected async fetchWithTimeout(
     url: string,
     options: RequestInit = {},
@@ -337,9 +372,6 @@ export abstract class BaseSoundtrackProvider implements SoundtrackProvider {
     }
   }
 
-  /**
-   * Helper to normalize a game title for search queries (strips edition noise & punctuation).
-   */
   protected cleanTitle(title: string): string {
     return extractCoreGameTitle(title)
   }

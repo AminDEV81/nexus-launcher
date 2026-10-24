@@ -15,7 +15,10 @@ import {
   Gamepad2,
   Image as ImageIcon,
   Layers,
+  LayoutGrid,
+  List,
   Plus,
+  Tag,
   RefreshCw,
   Search,
   Sparkles,
@@ -46,10 +49,65 @@ import { playButtonClick, playCardHover } from '@/lib/sound-engine'
 import { useWindowActive } from '@/hooks/use-window-active'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { cn } from '@/lib/utils'
+import { useSteamPrice } from '@/features/hub/hooks/use-steam-price'
 import type { Game } from '@/types/models'
 
 type WishlistTab = 'all' | 'upcoming' | 'released' | 'acclaimed'
 type WishlistSort = 'custom' | 'release-soon' | 'score-desc' | 'name'
+
+function WishlistSteamPriceBadge({
+  steamAppId,
+  gameName,
+}: {
+  steamAppId?: string | number | null
+  gameName: string
+}) {
+  const { data: price, isLoading } = useSteamPrice(steamAppId, 'us', gameName, true)
+
+  if (isLoading) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black/65 px-2 py-0.5 font-mono text-[9.5px] font-semibold text-white/60 backdrop-blur-md">
+        <Tag className="size-2.5 animate-pulse text-accent" />
+        <span>…</span>
+      </span>
+    )
+  }
+
+  if (!price) return null
+
+  if (price.is_free) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 font-mono text-[9.5px] font-black uppercase tracking-wider text-emerald-300 backdrop-blur-md shadow-md">
+        Free
+      </span>
+    )
+  }
+
+  const hasDiscount = price.discount_percent > 0
+
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/80 px-2 py-0.5 backdrop-blur-md shadow-md">
+      {hasDiscount && (
+        <span className="rounded bg-emerald-500 px-1 py-0.2 font-mono text-[9px] font-black text-black">
+          -{price.discount_percent}%
+        </span>
+      )}
+      {hasDiscount && price.initial_formatted && (
+        <span className="font-mono text-[9px] text-white/45 line-through">
+          {price.initial_formatted}
+        </span>
+      )}
+      <span
+        className={cn(
+          'font-mono text-[10px] font-black',
+          hasDiscount ? 'text-emerald-300' : 'text-white',
+        )}
+      >
+        {price.final_formatted || 'N/A'}
+      </span>
+    </span>
+  )
+}
 
 function WishlistCoverCountdown({ releaseDate }: { releaseDate: string | null }) {
   const windowActive = useWindowActive()
@@ -163,6 +221,8 @@ export function WishlistPage() {
   const [activeTab, setActiveTab] = useState<WishlistTab>('all')
   const [sortBy, setSortBy] = useState<WishlistSort>('custom')
   const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [selectedGenre, setSelectedGenre] = useState<string>('all')
   const [gamePendingRemoval, setGamePendingRemoval] = useState<Game | null>(null)
   const lastRemovalGameRef = useRef<Game | null>(null)
   if (gamePendingRemoval) {
@@ -206,6 +266,19 @@ export function WishlistPage() {
     return Math.round(scored.reduce((a, b) => a + b, 0) / scored.length)
   }, [wishlistGames])
 
+  const topGenres = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const g of wishlistGames) {
+      for (const genre of Array.isArray(g.genres) ? g.genres : []) {
+        counts.set(genre, (counts.get(genre) ?? 0) + 1)
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 7)
+      .map(([genre]) => genre)
+  }, [wishlistGames])
+
   // Spotlight Hero Game (soonest upcoming release, or highest-rated wishlisted game)
   const spotlightGame = useMemo(() => {
     if (wishlistGames.length === 0) return null
@@ -233,6 +306,10 @@ export function WishlistPage() {
       list = list.filter(
         (g) => Math.max(g.metacritic_score ?? 0, g.opencritic_score ?? 0) >= 80,
       )
+    }
+
+    if (selectedGenre !== 'all') {
+      list = list.filter((g) => Array.isArray(g.genres) && g.genres.includes(selectedGenre))
     }
 
     if (searchQuery.trim()) {
@@ -270,12 +347,12 @@ export function WishlistPage() {
     }
 
     return list
-  }, [wishlistGames, activeTab, searchQuery, sortBy, wishlistCustomOrder])
+  }, [wishlistGames, activeTab, selectedGenre, searchQuery, sortBy, wishlistCustomOrder])
 
   function handleCardClick(game: Game) {
     playButtonClick()
     if (game.igdb_id) {
-      navigate(`/hub/${game.igdb_id}`)
+      navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })
     } else {
       selectGame(game.id)
     }
@@ -477,6 +554,10 @@ export function WishlistPage() {
                           MC {Math.round(spotlightGame.metacritic_score)}
                         </span>
                       )}
+                      <WishlistSteamPriceBadge
+                        steamAppId={spotlightGame.steam_app_id}
+                        gameName={spotlightGame.name}
+                      />
                     </div>
 
                     <h2
@@ -650,8 +731,84 @@ export function WishlistPage() {
                   </button>
                 )}
               </div>
+
+              <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-bg/90 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    playButtonClick()
+                    setViewMode('grid')
+                  }}
+                  title="Grid View"
+                  className={cn(
+                    'rounded-lg p-1.5 transition-all cursor-pointer',
+                    viewMode === 'grid'
+                      ? 'bg-accent text-white shadow-xs'
+                      : 'text-subtle hover:text-text',
+                  )}
+                >
+                  <LayoutGrid className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playButtonClick()
+                    setViewMode('list')
+                  }}
+                  title="Compact List View"
+                  className={cn(
+                    'rounded-lg p-1.5 transition-all cursor-pointer',
+                    viewMode === 'list'
+                      ? 'bg-accent text-white shadow-xs'
+                      : 'text-subtle hover:text-text',
+                  )}
+                >
+                  <List className="size-3.5" />
+                </button>
+              </div>
             </div>
           </div>
+
+          {topGenres.length > 0 && (
+            <div className="mt-3.5 flex flex-wrap items-center gap-1.5 border-t border-border/40 pt-3">
+              <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-wider text-muted">
+                Genres:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  playButtonClick()
+                  setSelectedGenre('all')
+                }}
+                className={cn(
+                  'rounded-lg border px-2.5 py-1 text-[10px] font-bold transition-all cursor-pointer',
+                  selectedGenre === 'all'
+                    ? 'border-accent/50 bg-accent/15 text-accent'
+                    : 'border-border/60 bg-bg/60 text-subtle hover:text-text',
+                )}
+              >
+                All Genres
+              </button>
+              {topGenres.map((genre) => (
+                <button
+                  key={genre}
+                  type="button"
+                  onClick={() => {
+                    playButtonClick()
+                    setSelectedGenre((prev) => (prev === genre ? 'all' : genre))
+                  }}
+                  className={cn(
+                    'rounded-lg border px-2.5 py-1 text-[10px] font-bold transition-all cursor-pointer',
+                    selectedGenre === genre
+                      ? 'border-accent/50 bg-accent/15 text-accent'
+                      : 'border-border/60 bg-bg/60 text-subtle hover:text-text',
+                  )}
+                >
+                  {genre}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── 2. Wishlist Grid Content Area ──────────────────────────── */}
@@ -689,7 +846,11 @@ export function WishlistPage() {
         ) : (
           <motion.div
             layout
-            className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+            className={cn(
+              viewMode === 'grid'
+                ? 'grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+                : 'grid grid-cols-1 gap-4 lg:grid-cols-2',
+            )}
             transition={{
               layout: { type: 'spring', stiffness: 320, damping: 28 },
             }}
@@ -787,6 +948,10 @@ export function WishlistPage() {
                               ★ {Math.round(topScore)}
                             </span>
                           )}
+                          <WishlistSteamPriceBadge
+                            steamAppId={game.steam_app_id}
+                            gameName={game.name}
+                          />
                         </div>
 
                         {/* Quick Actions: Edit Cover & Remove */}

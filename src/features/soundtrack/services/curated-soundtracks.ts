@@ -1,5 +1,5 @@
 import type { GameIdentity, SoundtrackAlbumWithTracks, SoundtrackTrack } from '../types'
-import { extractCoreGameTitle } from './providers/base-provider'
+import { extractCoreGameTitle, isAlbumValidForGame } from './providers/base-provider'
 
 interface CuratedOstSpec {
   albumTitle: string
@@ -701,6 +701,16 @@ export function lookupCuratedSoundtrack(
   const spec = CURATED_OST_CATALOG[core]
   if (!spec) return null
 
+  if (game.releaseYear && spec.releaseYear) {
+    const gmYear = Number.parseInt(String(game.releaseYear).slice(0, 4), 10)
+    const spYear = Number.parseInt(String(spec.releaseYear).slice(0, 4), 10)
+    if (!Number.isNaN(gmYear) && !Number.isNaN(spYear)) {
+      if (gmYear >= 2024 && Math.abs(gmYear - spYear) > 2) {
+        return null
+      }
+    }
+  }
+
   const slug = core.replace(/\s+/g, '_')
   const albumId = `curated_ost_${slug}`
   let totalDurationMs = 0
@@ -830,7 +840,7 @@ export function resolveAlbumCoverFallback(rawTitle?: string | null): string | nu
   if (!core) return null
   if (CURATED_OST_COVERS[core]) return CURATED_OST_COVERS[core]
   for (const [k, url] of Object.entries(CURATED_OST_COVERS)) {
-    if (core.includes(k) || k.includes(core)) {
+    if (isAlbumValidForGame(rawTitle, k)) {
       return url
     }
   }

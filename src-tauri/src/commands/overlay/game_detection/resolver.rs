@@ -32,7 +32,8 @@ impl GameResolver {
         let proc_exe = normalize_path(&proc.exe_path);
         for (gid, title, exe_opt, install_opt) in known_games {
             if let Some(exe) = exe_opt {
-                if !exe.is_empty() && normalize_path(exe) == proc_exe {
+                let norm_exe = normalize_path(exe);
+                if !norm_exe.is_empty() && norm_exe == proc_exe {
                     return Some((gid.clone(), title.clone()));
                 }
             }
@@ -44,6 +45,22 @@ impl GameResolver {
                     && proc_exe[install.len()..].starts_with('\\')
                 {
                     return Some((gid.clone(), title.clone()));
+                }
+            } else if let Some(exe) = exe_opt {
+                // Derive root folder from executable_path when install_path was not set
+                let norm_exe = normalize_path(exe);
+                if let Some((parent, _)) = norm_exe.rsplit_once('\\') {
+                    let root = parent
+                        .trim_end_matches("\\win64")
+                        .trim_end_matches("\\x64")
+                        .trim_end_matches("\\binaries")
+                        .trim_end_matches("\\bin");
+                    if root.len() >= 6
+                        && proc_exe.starts_with(root)
+                        && proc_exe[root.len()..].starts_with('\\')
+                    {
+                        return Some((gid.clone(), title.clone()));
+                    }
                 }
             }
         }

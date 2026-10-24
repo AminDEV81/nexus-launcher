@@ -169,5 +169,10 @@ unsafe fn window_covers_monitor(hwnd: windows_sys::Win32::Foundation::HWND) -> b
         return false;
     }
     let m = info.rcMonitor;
-    rect.left <= m.left && rect.top <= m.top && rect.right >= m.right && rect.bottom >= m.bottom
+    let w = info.rcWork;
+    let covers_monitor =
+        rect.left <= m.left + 8 && rect.top <= m.top + 8 && rect.right >= m.right - 8 && rect.bottom >= m.bottom - 8;
+    let covers_work =
+        rect.left <= w.left + 4 && rect.top <= w.top + 4 && rect.right >= w.right - 4 && rect.bottom >= w.bottom - 4;
+    covers_monitor || covers_work
 }

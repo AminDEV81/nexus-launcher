@@ -11,6 +11,80 @@ use tauri::{
     Manager,
 };
 
+/// Reliably restores and focuses the main Nexus Launcher window on Windows/Linux/macOS
+/// from system tray or a second desktop shortcut invocation (`single_instance`),
+/// bypassing Windows ForegroundLockTimeout restrictions via Win32 thread attachment & Topmost bounce.
+pub fn restore_and_focus_main_window(app: &tauri::AppHandle) {
+    use tauri::Emitter;
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_skip_taskbar(false);
+        let _ = window.show();
+        let _ = window.unminimize();
+
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(hwnd) = window.hwnd() {
+                unsafe {
+                    use windows_sys::Win32::System::Threading::{
+                        AttachThreadInput, GetCurrentThreadId,
+                    };
+                    use windows_sys::Win32::UI::WindowsAndMessaging::{
+                        BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, IsIconic,
+                        SetForegroundWindow, SetWindowPos, ShowWindow, HWND_NOTOPMOST,
+                        HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_RESTORE, SW_SHOW,
+                    };
+
+                    let h = hwnd.0 as _;
+                    ShowWindow(h, SW_SHOW);
+                    if IsIconic(h) != 0 {
+                        ShowWindow(h, SW_RESTORE);
+                    }
+
+                    let fg_hwnd = GetForegroundWindow();
+                    let cur_tid = GetCurrentThreadId();
+                    let fg_tid = if !fg_hwnd.is_null() {
+                        GetWindowThreadProcessId(fg_hwnd, std::ptr::null_mut())
+                    } else {
+                        0
+                    };
+
+                    if fg_tid != 0 && fg_tid != cur_tid {
+                        AttachThreadInput(fg_tid, cur_tid, 1);
+                    }
+
+                    SetWindowPos(
+                        h,
+                        HWND_TOPMOST,
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+                    );
+                    SetWindowPos(
+                        h,
+                        HWND_NOTOPMOST,
+                        0,
+                        0,
+                        0,
+                        0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW,
+                    );
+                    BringWindowToTop(h);
+                    SetForegroundWindow(h);
+
+                    if fg_tid != 0 && fg_tid != cur_tid {
+                        AttachThreadInput(fg_tid, cur_tid, 0);
+                    }
+                }
+            }
+        }
+
+        let _ = window.set_focus();
+        let _ = app.emit("app://window-restored", ());
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[cfg(target_os = "linux")]
@@ -35,11 +109,7 @@ pub fn run() {
         // window: focus the existing one instead. Must be the FIRST
         // plugin so later plugins don't initialize twice.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
+            restore_and_focus_main_window(app);
         }))
         .plugin(
             tauri_plugin_window_state::Builder::default()
@@ -167,11 +237,7 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "open" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.unminimize();
-                            let _ = window.set_focus();
-                        }
+                        restore_and_focus_main_window(app);
                     }
                     "quit" => app.exit(0),
                     _ => {}
@@ -179,19 +245,13 @@ pub fn run() {
                 .on_tray_icon_event(|tray, event| match event {
                     tauri::tray::TrayIconEvent::Click {
                         button: tauri::tray::MouseButton::Left,
-                        button_state: tauri::tray::MouseButtonState::Up,
                         ..
                     }
                     | tauri::tray::TrayIconEvent::DoubleClick {
                         button: tauri::tray::MouseButton::Left,
                         ..
                     } => {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.unminimize();
-                            let _ = window.set_focus();
-                        }
+                        restore_and_focus_main_window(tray.app_handle());
                     }
                     _ => {}
                 })
@@ -202,6 +262,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::system::health_check,
             commands::system::shutdown_system,
+            commands::system::hide_to_tray,
+            commands::system::restore_main_window,
+            commands::system::exit_application,
             commands::system::get_system_specs,
             commands::system::get_live_metrics,
             commands::games::list_games,
@@ -249,6 +312,8 @@ pub fn run() {
             commands::hub::get_hub_coming_soon,
             commands::hub::get_hub_top_rated,
             commands::hub::get_hub_recommended,
+            commands::hub::get_hub_discounted_games,
+            commands::hub::resolve_nexusmods_url,
             commands::hub::refresh_hub_catalog,
             commands::hub::search_hub_games,
             commands::hub::list_hub_genres,

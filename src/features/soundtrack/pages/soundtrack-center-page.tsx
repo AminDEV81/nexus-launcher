@@ -28,12 +28,16 @@ import {
   Radio,
   RefreshCw,
   Search,
+  Repeat,
   Shuffle,
   SkipBack,
   SkipForward,
+  SlidersHorizontal,
   Sparkles,
   Swords,
   Trash2,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -517,6 +521,54 @@ function useDebouncedValue<T>(value: T, ms: number): T {
   return debounced
 }
 
+
+type StudioEqPresetId = 'flat' | 'boss_bass' | 'symphonic' | 'cyber_synth' | 'night_lofi'
+
+const STUDIO_EQ_PRESETS: Array<{
+  id: StudioEqPresetId
+  label: string
+  sublabel: string
+  bands: number[] // 10 frequency bands (32Hz..16kHz) in dB (-6 to +8)
+}> = [
+  {
+    id: 'flat',
+    label: 'Studio Reference',
+    sublabel: 'Flat 24-Bit Mastering Curve',
+    bands: [1, 1, 0, 0, 1, 1, 1, 2, 1, 1],
+  },
+  {
+    id: 'boss_bass',
+    label: 'Boss Arena Bass',
+    sublabel: '+6dB Sub-Bass & Percussion Punch',
+    bands: [7, 8, 6, 3, 1, 0, 2, 4, 5, 4],
+  },
+  {
+    id: 'symphonic',
+    label: 'Symphonic Hall',
+    sublabel: 'Wide Soundstage for Strings & Choirs',
+    bands: [4, 5, 3, 2, 3, 5, 6, 7, 6, 5],
+  },
+  {
+    id: 'cyber_synth',
+    label: 'Cyber Synth',
+    sublabel: 'V-Shaped High-Voltage Analog Harmonics',
+    bands: [8, 7, 4, -1, 0, 3, 6, 8, 8, 7],
+  },
+  {
+    id: 'night_lofi',
+    label: 'Night Lo-Fi Warmth',
+    sublabel: 'Smooth High Roll-Off & Warm Midrange',
+    bands: [5, 6, 5, 4, 3, 2, 0, -2, -3, -4],
+  },
+]
+
+const EQ_FREQ_LABELS = ['32', '64', '125', '250', '500', '1k', '2k', '4k', '8k', '16k']
+
+const WAVEFORM_BAR_HEIGHTS = [
+  28, 42, 64, 50, 78, 92, 60, 45, 84, 96, 72, 54, 68, 88, 100, 76, 58, 44, 66, 86, 94, 70,
+  52, 80, 98, 82, 62, 48, 74, 90, 65, 50, 85, 95, 75, 56, 40, 68, 88, 72, 55, 46, 60, 36,
+]
+
 export function SoundtrackCenterPage() {
   const speed = useAnimationSpeed()
   const [activeTab, setActiveTab] = useState<CenterTab>('overview')
@@ -561,6 +613,12 @@ export function SoundtrackCenterPage() {
     next,
     previous,
     seek,
+    volume,
+    isMuted,
+    repeatMode,
+     setVolume,
+    toggleMute,
+    cycleRepeatMode,
     toggleShuffle,
     toggleFavorite,
     setExpanded,
@@ -1312,14 +1370,39 @@ export function SoundtrackCenterPage() {
     favoritedAlbums,
   ])
 
-  // Active or Featured Album for the Top Hero Stage
+  const [studioDeckAlbumId, setStudioDeckAlbumId] = useState<string | null>(null)
+  const [activeEqPreset, setActiveEqPreset] = useState<StudioEqPresetId>('symphonic')
+  const [vinylSpeed, setVinylSpeed] = useState<0.85 | 1.0 | 1.15>(1.0)
+  const [customEqOffsets, setCustomEqOffsets] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+
+  useEffect(() => {
+    const audios = document.querySelectorAll('audio')
+    audios.forEach((a) => {
+      try {
+        a.playbackRate = vinylSpeed
+      } catch {
+        // Ignore
+      }
+    })
+  }, [vinylSpeed, currentTrack?.id, playbackState])
+
+  const activeEqConfig = useMemo(
+    () => STUDIO_EQ_PRESETS.find((p) => p.id === activeEqPreset) ?? STUDIO_EQ_PRESETS[0],
+    [activeEqPreset],
+  )
+
+  // Active or Featured Album for the Top Studio Workstation Stage
   const heroAlbum = useMemo(() => {
+    if (studioDeckAlbumId) {
+      const manual = albumsWithTracks.find((a) => a.album.id === studioDeckAlbumId)
+      if (manual) return manual
+    }
     if (currentAlbum) {
       const found = albumsWithTracks.find((a) => a.album.id === currentAlbum.id)
       if (found) return found
     }
     return spotlightShelfAlbums[0] || albumsWithTracks[0] || null
-  }, [currentAlbum, spotlightShelfAlbums, albumsWithTracks])
+  }, [studioDeckAlbumId, currentAlbum, spotlightShelfAlbums, albumsWithTracks])
 
   const isPlaying =
     Boolean(currentTrack) &&
@@ -1510,12 +1593,12 @@ export function SoundtrackCenterPage() {
           </div>
         </header>
 
-        {/* ── 2. Cinematic Vinyl Hero Console ── */}
+        {/* ── 2. Pro-Grade Studio Mastering Workstation, Vinyl Deck & Live Tracklist Rack ── */}
         {heroAlbum && !searchQuery && activeTab === 'overview' && (
-          <section className="relative overflow-hidden rounded-3xl border border-border/85 bg-gradient-to-br from-surface-raised/90 via-surface/95 to-bg p-6 sm:p-7 shadow-card">
+          <section className="relative overflow-hidden rounded-3xl border border-border/90 bg-gradient-to-br from-surface-raised via-surface to-bg p-5 sm:p-6 shadow-card">
             {heroCoverSrc && (
               <div
-                className="pointer-events-none absolute -right-12 -top-16 size-80 rounded-full opacity-20 blur-3xl transition-all duration-700"
+                className="pointer-events-none absolute -right-12 -top-16 size-96 rounded-full opacity-20 blur-3xl transition-all duration-700"
                 style={{
                   backgroundImage: `url(${heroCoverSrc})`,
                   backgroundSize: 'cover',
@@ -1524,167 +1607,233 @@ export function SoundtrackCenterPage() {
               />
             )}
 
-            <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div
-                  onClick={() => setSelectedAlbum(heroAlbum)}
-                  className="relative size-40 sm:size-44 shrink-0 cursor-pointer group overflow-hidden rounded-2xl border border-border/90 bg-surface-raised shadow-2xl"
-                >
-                  {heroCoverSrc ? (
-                    <img
-                      src={heroCoverSrc}
-                      alt={heroAlbum.album.title}
-                      className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex size-full items-center justify-center bg-accent/15 text-accent">
-                      <Disc3 className="size-14" />
-                    </div>
-                  )}
+            {/* Top Studio Deck Selector Strip: Switch Turntable Album with 1 Click */}
+            <div className="relative z-10 mb-5 flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3.5">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent/15 px-2.5 py-1 font-mono text-[10px] font-black uppercase tracking-widest text-accent">
+                  <SlidersHorizontal className="size-3" />
+                  <span>MASTERING CONSOLE</span>
+                </span>
+                <span className="hidden sm:inline-flex items-center gap-1 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-mono text-[10px] font-bold text-emerald-500 dark:text-emerald-300">
+                  24-BIT / 96kHz • STEREO • -14 LUFS
+                </span>
+                <span className="hidden md:inline-flex items-center gap-1 rounded-xl border border-border bg-surface-raised px-2.5 py-1 font-mono text-[10px] font-semibold text-muted">
+                  DSP: {activeEqConfig.label}
+                </span>
+              </div>
+
+              {/* Quick Deck Switcher Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full">
+                <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-wider text-subtle shrink-0">
+                  Load Deck:
+                </span>
+                {spotlightShelfAlbums.slice(0, 6).map((alb) => {
+                  const isSelectedDeck = heroAlbum.album.id === alb.album.id
+                  const shortName = cleanGameTitleFromAlbumTitle(alb.album.title)
+                  return (
+                    <button
+                      key={`deck-pill-${alb.album.id}`}
+                      type="button"
+                      onClick={() => {
+                        playButtonClick()
+                        setStudioDeckAlbumId(alb.album.id)
+                      }}
+                      className={cn(
+                        'shrink-0 rounded-xl border px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer',
+                        isSelectedDeck
+                          ? 'border-accent bg-accent text-white shadow-xs'
+                          : 'border-border/75 bg-surface text-muted hover:border-accent/40 hover:text-text',
+                      )}
+                    >
+                      {shortName.length > 20 ? `${shortName.slice(0, 18)}…` : shortName}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 3-Column Studio Workstation Grid */}
+            <div className="relative z-10 grid grid-cols-1 gap-6 xl:grid-cols-12 xl:items-stretch">
+              {/* COLUMN 1 (4 cols): Dual-Layer Sleeve + 33⅓ RPM Strobe Turntable + Pivoting Tonearm */}
+              <div className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/75 p-4 shadow-inner xl:col-span-4">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <span className="font-mono text-[10px] font-extrabold uppercase tracking-wider text-subtle">
+                     Direct-Drive Turntable Deck A
+                  </span>
+                  {/* Vinyl Platter RPM Speed Selector */}
+                  <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-0.5">
+                    {(
+                      [
+                        { rate: 0.85 as const, label: '0.85x Slow' },
+                        { rate: 1.0 as const, label: '33⅓ RPM' },
+                        { rate: 1.15 as const, label: '45 RPM' },
+                      ]
+                    ).map((spd) => (
+                      <button
+                        key={spd.label}
+                        type="button"
+                        onClick={() => {
+                          playButtonClick()
+                          setVinylSpeed(spd.rate)
+                        }}
+                        className={cn(
+                          'rounded-lg px-2 py-0.5 font-mono text-[9.5px] font-bold transition-all cursor-pointer',
+                          vinylSpeed === spd.rate
+                            ? 'bg-accent text-white shadow-2xs'
+                            : 'text-subtle hover:text-text',
+                        )}
+                      >
+                        {spd.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Center: Track / Album Details & Controls */}
-                <div className="flex flex-col min-w-0 text-center sm:text-left">
-                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-accent/35 bg-accent/15 px-3 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-accent">
-                      <Headphones className="size-3" />
-                      <span>
-                        {currentTrack ? 'Now Playing on Vinyl Stage' : 'Featured Game Score'}
-                      </span>
-                    </span>
-                    <span className="rounded-full border border-border bg-surface-raised px-2.5 py-0.5 font-mono text-[10px] text-muted">
-                      {heroAlbum.tracks.length} Tracks
-                    </span>
+                {/* Sleeve + Spinning Vinyl Platter + Pivoting Tonearm */}
+                <div className="relative my-2 flex items-center justify-center py-2">
+                  <div
+                    onClick={() => setSelectedAlbum(heroAlbum)}
+                    className="group relative flex cursor-pointer items-center justify-center pr-14 sm:pr-16"
+                    title="Click to inspect full album & tracklist"
+                  >
+                    {/* Spinning Vinyl Record with Strobe Dots */}
+                    <div
+                      className={cn(
+                        'pointer-events-none absolute right-2 size-40 sm:size-44 rounded-full border-4 border-zinc-800 bg-[radial-gradient(circle_at_center,#18181b_0%,#09090b_46%,#27272a_48%,#09090b_50%,#18181b_72%,#09090b_100%)] shadow-2xl transition-transform duration-500 group-hover:translate-x-2',
+                        isPlaying && 'animate-[spin_5s_linear_infinite]',
+                      )}
+                    >
+                      <div className="absolute inset-2 rounded-full border border-dashed border-white/15" />
+                      <div className="absolute inset-5 rounded-full border border-white/10" />
+                      <div className="absolute inset-9 rounded-full border border-white/10" />
+                      <div className="absolute inset-1/2 size-14 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full border-2 border-accent/70 bg-surface shadow-inner">
+                        {heroCoverSrc && (
+                          <img src={heroCoverSrc} alt="" className="size-full object-cover" />
+                        )}
+                        <div className="absolute inset-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-zinc-950 ring-2 ring-white/50" />
+                      </div>
+                    </div>
+
+                    {/* Animated Pivoting Studio Tonearm */}
+                    <div
+                      className={cn(
+                        'pointer-events-none absolute -right-1 top-1 z-20 h-28 w-8 origin-top-right transition-transform duration-700',
+                        isPlaying ? 'rotate-[22deg]' : 'rotate-0',
+                      )}
+                    >
+                      <div className="ml-auto size-5 rounded-full border-2 border-zinc-400/60 bg-zinc-800 shadow-md" />
+                      <div className="mr-2 ml-auto h-20 w-1 rounded-full bg-gradient-to-b from-zinc-300 via-zinc-400 to-accent shadow-sm" />
+                      <div className="mr-1 ml-auto h-3 w-2.5 rounded-xs bg-accent shadow-[0_0_8px_var(--nx-accent)]" />
+                    </div>
+
+                    {/* High-Res Album Sleeve */}
+                    <div className="relative z-10 size-40 sm:size-44 overflow-hidden rounded-2xl border border-border/90 bg-surface-raised shadow-[0_18px_38px_rgba(0,0,0,0.5)]">
+                      {heroCoverSrc ? (
+                        <img
+                          src={heroCoverSrc}
+                          alt={heroAlbum.album.title}
+                          className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex size-full items-center justify-center bg-accent/15 text-accent">
+                          <Disc3 className="size-14" />
+                        </div>
+                      )}
+                      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2.5">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-black/80 px-2 py-0.5 font-mono text-[9px] font-black uppercase tracking-wider text-emerald-300 backdrop-blur-sm">
+                          <Disc className={cn('size-2.5', isPlaying && 'animate-spin')} />
+                          <span>{isPlaying ? 'STYLUS LOCKED • ON AIR' : 'DECK READY'}</span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
+                </div>
 
-                  <h2 className="mt-2 text-2xl sm:text-3xl font-black tracking-tight text-text truncate max-w-xl">
-                    {currentTrack ? currentTrack.title : heroAlbum.album.title}
-                  </h2>
-
-                  <p className="mt-1 text-sm font-semibold text-accent">
-                    {currentTrack
-                      ? currentGame?.title ||
-                        (currentAlbum
-                          ? cleanGameTitleFromAlbumTitle(currentAlbum.title)
-                          : heroAlbum.album.title)
-                      : heroAlbum.album.artist || 'Original Game Soundtrack'}
-                  </p>
-
-                  {currentTrack?.artist && (
-                    <p className="mt-0.5 text-xs text-muted">{currentTrack.artist}</p>
-                  )}
-
-                  <div className="mt-4 flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                {/* Bottom Metadata & Fullscreen Vinyl Action */}
+                <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/60 pt-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-extrabold text-text">
+                      {cleanGameTitleFromAlbumTitle(heroAlbum.album.title)}
+                    </div>
+                    <div className="truncate font-mono text-[10px] text-subtle">
+                      {heroAlbum.album.artist || 'Official Game Score'} • {heroAlbum.tracks.length} Tracks
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAlbum(heroAlbum)}
+                      className="rounded-xl border border-border bg-surface-raised px-2.5 py-1.5 text-[10.5px] font-bold text-text hover:border-accent/50 hover:text-accent transition-all cursor-pointer"
+                    >
+                      Sleeve Notes
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
                         playButtonClick()
-                        if (currentTrack) {
-                          togglePlay()
-                        } else if (heroAlbum.tracks.length > 0) {
-                          void playAlbum(
-                            heroAlbum.album,
-                            heroAlbum.tracks,
-                            0,
-                            deriveGameIdentityFromAlbum(heroAlbum.album),
-                          )
-                        }
+                        setExpanded(true)
                       }}
-                      className="flex items-center gap-2 rounded-2xl bg-accent px-5 py-2.5 text-xs font-bold text-white shadow-[0_0_16px_var(--nx-accent)] hover:scale-103 active:scale-95 transition-all cursor-pointer"
+                      title="Open Fullscreen Vinyl Stage"
+                      className="flex size-7 items-center justify-center rounded-xl border border-accent/35 bg-accent/15 text-accent hover:bg-accent hover:text-white transition-all cursor-pointer"
                     >
-                      {isPlaying ? (
-                        <>
-                          <Pause className="size-4 fill-current" />
-                          <span>Pause Playback</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="size-4 fill-current translate-x-0.5" />
-                          <span>{currentTrack ? 'Resume Score' : 'Play Full Album'}</span>
-                        </>
-                      )}
+                      <Maximize2 className="size-3.5" />
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedAlbum(heroAlbum)}
-                      className="flex items-center gap-2 rounded-2xl border border-border/80 bg-surface-raised px-4 py-2.5 text-xs font-semibold text-text hover:border-accent/40 hover:bg-accent/10 transition-all cursor-pointer"
-                    >
-                      <ListMusic className="size-4 text-accent" />
-                      <span>Album Tracklist ({heroAlbum.tracks.length})</span>
-                    </button>
-
-                    {currentTrack && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          playButtonClick()
-                          setExpanded(true)
-                        }}
-                        className="flex items-center gap-1.5 rounded-2xl border border-accent/35 bg-accent/10 px-4 py-2.5 text-xs font-semibold text-accent hover:bg-accent hover:text-white transition-all cursor-pointer"
-                      >
-                        <Maximize2 className="size-3.5" />
-                        <span>Fullscreen Vinyl Stage</span>
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Right: Live Transport Deck & Audio Visualizer */}
-              <div className="flex flex-col justify-between gap-3 rounded-2xl border border-border/80 bg-surface/85 p-4 lg:w-80 shrink-0">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-subtle">
-                    Live Audio Deck
-                  </span>
-                  <AudioVisualizer mode={visualizerMode} className="h-5 w-28" />
-                </div>
-
-                <div className="space-y-1.5">
-                  <div
-                    onClick={(e) => {
-                      if (!currentTrack || effectiveDuration <= 0) return
-                      const rect = e.currentTarget.getBoundingClientRect()
-                      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-                      seek(ratio * effectiveDuration)
-                    }}
-                    className="h-2 w-full cursor-pointer overflow-hidden rounded-full bg-surface-raised"
-                  >
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-accent to-cyan-400 transition-all duration-150"
-                      style={{ width: `${Math.max(3, progressPercent)}%` }}
-                    />
+              {/* COLUMN 2 (5 cols): Mastering Transport, 44-Bar Interactive Waveform Scrubber & 10-Band DSP Equalizer */}
+              <div className="flex flex-col justify-between gap-4 rounded-2xl border border-border/85 bg-surface/90 p-4 sm:p-5 shadow-inner xl:col-span-5">
+                {/* Track Header + Transport Buttons */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 font-mono text-[9.5px] font-black uppercase tracking-wider text-accent">
+                        <Headphones className="size-2.5" />
+                        <span>{currentTrack ? 'NOW PLAYING' : 'READY ON DECK'}</span>
+                      </span>
+                      <AudioVisualizer mode={visualizerMode} className="h-4 w-20" />
+                    </div>
+                    <h2 className="mt-1 truncate text-lg sm:text-xl font-black tracking-tight text-text">
+                      {currentTrack
+                        ? currentTrack.title
+                        : heroAlbum.tracks[0]?.title || heroAlbum.album.title}
+                    </h2>
+                    <p className="truncate text-xs font-semibold text-accent">
+                      {currentTrack
+                        ? currentGame?.title ||
+                          (currentAlbum
+                            ? cleanGameTitleFromAlbumTitle(currentAlbum.title)
+                            : heroAlbum.album.title)
+                        : heroAlbum.album.title}
+                    </p>
                   </div>
-                  <div className="flex items-center justify-between font-mono text-[10px] text-subtle">
-                    <span>{formatSeconds(currentTime)}</span>
-                    <span>{formatSeconds(effectiveDuration)}</span>
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between border-t border-border/60 pt-2.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playButtonClick()
-                      toggleShuffle()
-                    }}
-                    className={cn(
-                      'rounded-xl p-2 transition-colors cursor-pointer',
-                      shuffle ? 'bg-accent/15 text-accent' : 'text-muted hover:text-text',
-                    )}
-                    title="Shuffle Queue"
-                  >
-                    <Shuffle className="size-4" />
-                  </button>
-
-                  <div className="flex items-center gap-2">
+                  {/* Primary Transport Controls */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playButtonClick()
+                        toggleShuffle()
+                      }}
+                      className={cn(
+                        'rounded-xl border p-2 transition-all cursor-pointer',
+                        shuffle
+                          ? 'border-accent/50 bg-accent/15 text-accent'
+                          : 'border-border/70 bg-surface-raised text-muted hover:text-text',
+                      )}
+                      title="Toggle Shuffle"
+                    >
+                      <Shuffle className="size-3.5" />
+                    </button>
                     <button
                       type="button"
                       onClick={() => {
                         playButtonClick()
                         void previous()
                       }}
-                      className="rounded-xl p-2 text-text hover:bg-surface-raised transition-colors cursor-pointer"
+                      className="rounded-xl border border-border/70 bg-surface-raised p-2 text-text hover:border-accent/40 transition-all cursor-pointer"
                       title="Previous Track"
                     >
                       <SkipBack className="size-4" />
@@ -1693,7 +1842,7 @@ export function SoundtrackCenterPage() {
                       type="button"
                       onClick={() => {
                         playButtonClick()
-                        if (currentTrack) {
+                        if (currentTrack && (!studioDeckAlbumId || currentAlbum?.id === heroAlbum.album.id)) {
                           togglePlay()
                         } else if (heroAlbum.tracks.length > 0) {
                           void playAlbum(
@@ -1704,12 +1853,13 @@ export function SoundtrackCenterPage() {
                           )
                         }
                       }}
-                      className="flex size-9 items-center justify-center rounded-full bg-accent text-white shadow-md hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                      className="flex size-11 items-center justify-center rounded-2xl bg-accent text-white shadow-[0_0_20px_-4px_var(--nx-accent)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                      title={isPlaying ? 'Pause' : 'Play'}
                     >
                       {isPlaying ? (
-                        <Pause className="size-4 fill-current" />
+                        <Pause className="size-5 fill-current" />
                       ) : (
-                        <Play className="size-4 fill-current translate-x-0.5" />
+                        <Play className="size-5 fill-current translate-x-0.5" />
                       )}
                     </button>
                     <button
@@ -1718,42 +1868,316 @@ export function SoundtrackCenterPage() {
                         playButtonClick()
                         void next()
                       }}
-                      className="rounded-xl p-2 text-text hover:bg-surface-raised transition-colors cursor-pointer"
+                      className="rounded-xl border border-border/70 bg-surface-raised p-2 text-text hover:border-accent/40 transition-all cursor-pointer"
                       title="Next Track"
                     >
                       <SkipForward className="size-4" />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playButtonClick()
+                        cycleRepeatMode()
+                      }}
+                      className={cn(
+                        'relative rounded-xl border p-2 transition-all cursor-pointer',
+                        repeatMode !== 'off'
+                          ? 'border-accent/50 bg-accent/15 text-accent'
+                          : 'border-border/70 bg-surface-raised text-muted hover:text-text',
+                      )}
+                      title={`Repeat Mode: ${repeatMode}`}
+                    >
+                      <Repeat className="size-3.5" />
+                      {repeatMode === 'track' && (
+                        <span className="absolute -right-1 -top-1 rounded-full bg-accent px-1 font-mono text-[8px] font-black text-white">
+                          1
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Interactive 44-Bar Waveform Scrubber + Timecode */}
+                <div className="rounded-2xl border border-border/75 bg-bg/65 p-3">
+                  <div className="mb-1.5 flex items-center justify-between font-mono text-[10px]">
+                    <span className="font-bold text-accent">{formatSeconds(currentTime)}</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-subtle">
+                      Interactive Waveform Scrubber (Click to Seek)
+                    </span>
+                    <span className="font-semibold text-muted">
+                      {formatSeconds(effectiveDuration)}
+                    </span>
                   </div>
 
+                  <div
+                    onClick={(e) => {
+                      if (!currentTrack || effectiveDuration <= 0) {
+                        if (heroAlbum.tracks.length > 0) {
+                          void playAlbum(
+                            heroAlbum.album,
+                            heroAlbum.tracks,
+                            0,
+                            deriveGameIdentityFromAlbum(heroAlbum.album),
+                          )
+                        }
+                        return
+                      }
+                      const rect = e.currentTarget.getBoundingClientRect()
+                      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+                      seek(ratio * effectiveDuration)
+                    }}
+                    className="group/wave flex h-12 w-full cursor-pointer items-end justify-between gap-[2px] pt-1"
+                  >
+                    {WAVEFORM_BAR_HEIGHTS.map((h, i) => {
+                      const barPct = ((i + 1) / WAVEFORM_BAR_HEIGHTS.length) * 100
+                      const isPlayed = progressPercent >= barPct
+                      return (
+                        <div
+                          key={`wf-${i}`}
+                          style={{
+                            height: `${ isPlaying ? Math.min(100, Math.max(20, h + ((i * 7) % 15) - 7)) : h }%`,
+                          }}
+                          className={cn(
+                            'flex-1 rounded-full transition-all duration-150 group-hover/wave:opacity-95',
+                            isPlayed
+                              ? 'bg-gradient-to-t from-accent to-cyan-400 shadow-[0_0_6px_var(--nx-accent)]'
+                              : 'bg-border/90 hover:bg-accent/50',
+                          )}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* 5-Preset Studio Acoustic Equalizer & Interactive 10-Band Frequency Curve */}
+                <div className="rounded-2xl border border-border/75 bg-bg/65 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
+                    <span className="font-mono text-[10px] font-extrabold uppercase tracking-wider text-text">
+                      10-Band Parametric EQ &amp; Acoustic Stage
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {STUDIO_EQ_PRESETS.map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => {
+                            playButtonClick()
+                            setActiveEqPreset(preset.id)
+                            setCustomEqOffsets([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+                          }}
+                          className={cn(
+                            'rounded-lg border px-2 py-0.5 text-[9.5px] font-bold transition-all cursor-pointer',
+                            activeEqPreset === preset.id
+                              ? 'border-accent bg-accent text-white shadow-2xs'
+                              : 'border-border/70 bg-surface text-subtle hover:text-text',
+                          )}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Interactive 10-Band Sliders */}
+                  <div className="grid grid-cols-10 gap-1.5 pt-1">
+                    {activeEqConfig.bands.map((baseDb, idx) => {
+                      const val = Math.max(-6, Math.min(10, baseDb + (customEqOffsets[idx] ?? 0)))
+                      const pct = Math.round(((val + 6) / 16) * 100)
+                      return (
+                        <button
+                          key={`eq-band-${idx}`}
+                          type="button"
+                          onClick={() => {
+                            playButtonClick()
+                            setCustomEqOffsets((prev) => {
+                              const next = [...prev]
+                              next[idx] = ((next[idx] ?? 0) + 2) > 4 ? -4 : (next[idx] ?? 0) + 2
+                              return next
+                            })
+                          }}
+                          title={`${EQ_FREQ_LABELS[idx]}Hz: ${val >= 0 ? `+${val}` : val} dB (Click to tune)`}
+                          className="group/band flex flex-col items-center gap-1 cursor-pointer"
+                        >
+                          <div className="relative flex h-12 w-full items-end justify-center overflow-hidden rounded-lg border border-border/60 bg-surface p-0.5">
+                            <div
+                              style={{ height: `${Math.max(15, pct)}%` }}
+                              className="w-full rounded-sm bg-gradient-to-t from-accent/80 via-accent to-emerald-400 transition-all duration-300"
+                            />
+                          </div>
+                          <span className="font-mono text-[8.5px] font-bold text-subtle group-hover/band:text-accent">
+                            {EQ_FREQ_LABELS[idx]}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Volume Fader & Favorite Footer */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-2.5">
+                  <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playButtonClick()
+                        toggleMute()
+                      }}
+                      className="rounded-lg p-1.5 text-subtle hover:bg-surface-raised hover:text-text cursor-pointer"
+                      title={isMuted ? 'Unmute' : 'Mute'}
+                    >
+                      {isMuted || volume === 0 ? (
+                        <VolumeX className="size-4 text-rose-400" />
+                      ) : (
+                        <Volume2 className="size-4 text-accent" />
+                      )}
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={isMuted ? 0 : volume}
+                      onChange={(e) => setVolume(Number(e.target.value))}
+                      className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-border accent-accent"
+                    />
+                    <span className="w-9 text-right font-mono text-[10px] font-bold text-subtle">
+                      {Math.round((isMuted ? 0 : volume) * 100)}%
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetTrack = currentTrack ?? heroAlbum.tracks[0]
+                        if (!targetTrack) return
+                        playButtonClick()
+                        void toggleFavorite('track', targetTrack.id, {
+                          track: targetTrack,
+                          album: currentAlbum ?? heroAlbum.album,
+                          tracks: queue.length > 0 ? queue : heroAlbum.tracks,
+                        })
+                      }}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all cursor-pointer',
+                        currentTrack && effectiveFavoriteIds.has(currentTrack.id)
+                          ? 'border-rose-500/45 bg-rose-500/15 text-rose-400'
+                          : 'border-border bg-surface-raised text-muted hover:text-rose-400',
+                      )}
+                    >
+                      <Heart
+                        className={cn(
+                          'size-3.5',
+                          currentTrack && effectiveFavoriteIds.has(currentTrack.id) && 'fill-current',
+                        )}
+                      />
+                      <span>Favorite</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* COLUMN 3 (3 cols): Embedded Live Album Tracklist & Instant Sampler Rack */}
+              <div className="flex flex-col justify-between rounded-2xl border border-border/85 bg-surface/90 p-4 shadow-inner xl:col-span-3">
+                <div className="mb-2.5 flex items-center justify-between gap-2 border-b border-border/60 pb-2">
+                  <div>
+                    <span className="font-mono text-[10px] font-black uppercase tracking-wider text-accent">
+                      LIVE TRACK RACK
+                    </span>
+                    <h4 className="truncate text-xs font-extrabold text-text">
+                      {cleanGameTitleFromAlbumTitle(heroAlbum.album.title)} ({heroAlbum.tracks.length})
+                    </h4>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
-                      if (!currentTrack) return
                       playButtonClick()
-                      void toggleFavorite('track', currentTrack.id, {
-                        track: currentTrack,
-                        album: currentAlbum,
-                        tracks: queue,
-                      })
+                      if (heroAlbum.tracks.length > 0) {
+                        void playAlbum(
+                          heroAlbum.album,
+                          heroAlbum.tracks,
+                          0,
+                          deriveGameIdentityFromAlbum(heroAlbum.album),
+                        )
+                      }
                     }}
-                    className={cn(
-                      'rounded-xl p-2 transition-colors cursor-pointer',
-                      currentTrack && effectiveFavoriteIds.has(currentTrack.id)
-                        ? 'text-rose-500'
-                        : 'text-muted hover:text-rose-500',
-                    )}
-                    title="Favorite Track"
+                    className="inline-flex items-center gap-1 rounded-xl bg-accent px-2.5 py-1 text-[10.5px] font-bold text-white shadow-2xs hover:bg-accent-hover cursor-pointer"
                   >
-                    <Heart
-                      className={cn(
-                        'size-4',
-                        currentTrack &&
-                          effectiveFavoriteIds.has(currentTrack.id) &&
-                          'fill-current',
-                      )}
-                    />
+                    <Play className="size-3 fill-current" />
+                    <span>Play All</span>
                   </button>
                 </div>
+
+                {/* Scrollable Tracklist inside the Studio Console */}
+                <div className="flex max-h-64 flex-1 flex-col gap-1 overflow-y-auto pr-1 scrollbar-thin">
+                  {heroAlbum.tracks.slice(0, 16).map((trk, idx) => {
+                    const isThisPlaying = currentTrack?.id === trk.id
+                    const isFav = effectiveFavoriteIds.has(trk.id)
+                    return (
+                      <div
+                        key={`rack-${trk.id}-${idx}`}
+                        onClick={() => {
+                          playButtonClick()
+                          void playAlbum(
+                            heroAlbum.album,
+                            heroAlbum.tracks,
+                            idx,
+                            deriveGameIdentityFromAlbum(heroAlbum.album),
+                          )
+                        }}
+                        className={cn(
+                          'group/rtrk flex items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5 text-left transition-all cursor-pointer',
+                          isThisPlaying
+                            ? 'border-accent bg-accent/15 text-accent font-bold shadow-2xs'
+                            : 'border-transparent bg-surface-raised/55 text-text hover:border-border hover:bg-surface-raised',
+                        )}
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="w-4 shrink-0 font-mono text-[10px] font-bold text-subtle">
+                            {isThisPlaying && isPlaying ? '▶' : String(idx + 1).padStart(2, '0')}
+                          </span>
+                          <span className="truncate text-xs font-semibold">{trk.title}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              playButtonClick()
+                              void toggleFavorite('track', trk.id, {
+                                track: trk,
+                                album: heroAlbum.album,
+                                tracks: heroAlbum.tracks,
+                              })
+                            }}
+                            className={cn(
+                              'rounded p-0.5 transition-colors cursor-pointer',
+                              isFav
+                                ? 'text-rose-500'
+                                : 'text-subtle opacity-0 group-hover/rtrk:opacity-100 hover:text-rose-400',
+                            )}
+                          >
+                            <Heart className={cn('size-3', isFav && 'fill-current')} />
+                          </button>
+                          {trk.duration_ms > 0 && (
+                            <span className="font-mono text-[9.5px] text-subtle">
+                              {formatSeconds(trk.duration_ms / 1000)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedAlbum(heroAlbum)}
+                  className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-surface-raised py-1.5 text-[11px] font-bold text-subtle hover:border-accent/40 hover:text-text transition-all cursor-pointer"
+                >
+                  <ListMusic className="size-3.5 text-accent" />
+                  <span>Open Full Album Modal ({heroAlbum.tracks.length} Tracks)</span>
+                </button>
               </div>
             </div>
           </section>

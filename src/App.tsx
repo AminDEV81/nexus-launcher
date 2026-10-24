@@ -6,6 +6,7 @@ import { useThemeStore, useActivePalette } from './store/theme-store'
 import { useAppearanceSettingsStore } from './store/appearance-settings-store'
 import { useWindowActive } from './hooks/use-window-active'
 import { setFpsLimitEnabled } from './lib/fps-limiter'
+import { InputContextMenu } from './components/ui/input-context-menu'
 
 const THEME_TRANSITION_MS = 260
 
@@ -100,12 +101,8 @@ function App() {
   }, [fontWeight])
 
   useEffect(() => {
-    const isEditable = (target: EventTarget | null) =>
-      target instanceof HTMLElement &&
-      target.closest('input, textarea, [contenteditable="true"]') !== null
-
     const onContextMenu = (event: MouseEvent) => {
-      if (!isEditable(event.target)) event.preventDefault()
+      event.preventDefault()
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -129,6 +126,7 @@ function App() {
   return (
     <AppProviders>
       <RouterProvider router={router} />
+      <InputContextMenu />
     </AppProviders>
   )
 }

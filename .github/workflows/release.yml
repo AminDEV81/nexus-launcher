@@ -58,23 +58,18 @@ jobs:
 
       - name: Run ESLint / Oxlint
         run: npm run lint
-        continue-on-error: true
 
       - name: Run TypeScript type check
         run: npx tsc -b
-        continue-on-error: true
 
       - name: Run Prettier check
         run: npm run format:check
-        continue-on-error: true
 
       - name: Run Cargo Clippy
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml
-        continue-on-error: true
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
 
       - name: Run Cargo Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
-        continue-on-error: true
 
       - name: Test frontend production build
         run: npm run build
@@ -184,43 +179,72 @@ jobs:
           retryAttempts: 3
           updaterJsonPreferNsis: true
           releaseBody: |
-            # 🚀 Nexus Game Launcher ${{ github.ref_name }} — Maintenance & Bug Fixes Release
+            # 🚀 Nexus Game Launcher ${{ github.ref_name }} — Deep System Tweaks & Storage Clean Up Engine Release
 
-            نسخه رسمی **۰.۷.۵** لانچر نکسوس با هدف **رفع باگ‌ها، بهبود پایداری، بهینه‌سازی عملکرد سیستم و اصلاح مشکلات گزارش‌شده** بدون اعمال تغییرات ساختاری در امکانات اصلی برنامه منتشر شد. این به‌روزرسانی برای تمامی سیستم‌عامل‌های تحت پشتیبانی (ویندوز و لینوکس) ارائه شده است.
-            The official **v0.7.5** release of Nexus Game Launcher is a dedicated **maintenance and bug-fix release** focused on improving system stability, optimizing performance, and resolving reported issues across Windows and Linux platforms.
+            نسخه رسمی **۰.۶.۰** لانچر نکسوس با قابلیت‌های پیشرفته **توییک‌های سیستمی ویندوز (Windows System Tweaks)**، فعال‌سازی **تایمر فوق‌دقیق ۰.۵ میلی‌ثانیه‌ای (0.5ms High-Resolution Timer)**، **موتور پاکسازی هوشمند حافظه (Storage Clean Up Engine)** با حفاظت ۱۰۰٪ از سیوهای فعال، **بازطراحی ماژولار پاپ‌آپ بوست اجرای بازی** هماهنگ با تم دارک و لایت، رفع کامل تداخل فیلترهای چندگانه گیم هاب و بسته‌های پایدار نصبی برای ویندوز و لینوکس منتشر شد!
+            The official **v0.6.0** release of Nexus Game Launcher introduces **Deep Windows System Tweaks & Game Booster**, **0.5ms High-Resolution Multimedia Timer (NtSetTimerResolution)** for ultra-low latency, **Smart Storage Clean Up Engine** with active game saves protection and Master Select All, **Redesigned Launch Boost Modal** with sound FX and full Light/Dark mode polish, Game Hub multi-filter logical intersection fixes, and updated packages for Windows and Linux!
 
             ---
 
-            ### 🛠️ بهبودها و اصلاحات (Improvements & Fixes)
+            ### ⚡ توییک‌های سیستمی و بوستر فوق‌پیشرفته (Deep System Tweaks & Game Booster)
 
-            - ⚡ **بهبود پایداری و عملکرد سیستم (System Stability & Performance Polish):**
-              - بهینه‌سازی مصرف منابع، پایداری ماژول‌های بوستر، و بهبود پاسخ‌دهی رابط کاربری.
-            - 🐛 **رفع باگ‌ها و اصلاحات فنی (Bug Fixes & Maintenance):**
-              - رفع مشکلات گزارش‌شده در بخش‌های مختلف برنامه، بهبود یکپارچگی داده‌ها و رفع ناپایداری‌های احتمالی.
-            - 🐧 **پشتیبانی کامل و پایدار چندسیستمی (Multi-OS Stability):**
-              - بیلد رسمی و پایدار برای ویندوز (Windows 10/11) و تمامی توزیع‌های لینوکس (AppImage, deb, rpm, AUR).
+            - ⏱️ **تایمر فوق‌دقیق ۰.۵ میلی‌ثانیه‌ای (0.5ms High-Resolution Timer):**
+              - فراخوانی مستقیم API بومی `NtSetTimerResolution` در هسته ویندوز جهت کاهش فرکانس تایمر از ۱۵.۶ میلی‌ثانیه استاندارد به ۰.۵ میلی‌ثانیه برای به حداقل رساندن تأخیر ورودی کیبورد/موس و حذف کامل میکرو استاترها (Micro-Stutters).
+            - 🎯 **اولویت پردازشی بلادرنگ (Real-Time / High CPU Priority):**
+              - تخصیص خودکار بالاترین اولویت پردازشی ویندوز به پروسه بازی به محض اجرا.
+            - 🔋 **پاور پلن نهایی (Ultimate Performance Power Plan):**
+              - فعال‌سازی خودکار طرح مصرف انرژی عملکرد نهایی ویندوز و خاموش کردن محدودکننده‌های حرارتی CPU در طول اجرای بازی.
+            - 🎮 **حالت اختصاصی بازی ویندوز (Windows Game Mode):**
+              - فعال‌سازی Game Mode ویندوز و هدایت تمامی توان کارت گرافیک به پنجره بازی.
+            - 🧹 **پاکسازی آنی کش استندبای و حافظه رم (Standby List & RAM Flush):**
+              - پاکسازی حافظه Standby List و Working Set رم قبل از اجرای هر بازی برای در اختیار گذاشتن حداکثر رم آزاد.
+
+            ---
+
+            ### 🧹 موتور هوشمند پاکسازی حافظه (Smart Storage Clean Up Engine)
+
+            - 🛡️ **حفاظت هوشمند از سیوهای زنده (Live Saves Guard):**
+              - ایزوله‌سازی و محافظت کامل از فایل‌های ذخیره بازی‌های موجود در کتابخانه کاربر بدون ریسک حذف تصادفی.
+            - 🔍 **اسکن عمیق فایل‌های بدون استفاده (Deep Orphaned Files Scanner):**
+              - اسکن پوشه‌های سیو بازی‌های حذف‌شده از سیستم، کش تصاویر و پوسترهای بدون استفاده، تاریخچه اسنپ‌شات‌های سیو و بافرهای موقت.
+            - 📊 **رابط کاربری شیک و نوار Master Select All:**
+              - تفکیک شفاف حجم‌ها بر اساس دسته‌بندی، انتخاب یکجا یا انتخابی، محاسبه لحظه‌ای فضای آزادشونده و هماهنگی کامل با پالت‌های رنگی و تم‌های تیره و روشن.
+
+            ---
+
+            ### 🎬 بازطراحی پاپ‌آپ بوست اجرای بازی (Launch Boost Modal Redesign)
+
+            - 🚀 انیمیشن سایبرپانک چندمرحله‌ای برای پایش عملیات‌های بهینه‌سازی قبل از ورود به بازی.
+            - 🔊 افکت‌های صوتی بومی موتور صدا در مراحل پاکسازی رم و اعمال تایمر.
+            - 🌓 بهینه‌سازی دقیق رنگ‌ها، گرادینت‌ها و کادربندی برای حالت روشن (Light Mode) و حالت تاریک (Dark Mode).
+
+            ---
+
+            ### 🎯 رفع باگ فیلترهای چندگانه گیم هاب (Game Hub Multi-Filter Fix)
+
+            - منطق اشتراک ریاضی (Logical AND) برای فیلترهای سبک و ژانر: بازی‌ها دقیقاً باید شامل تمامی تگ‌های انتخابی کاربر باشند تا نمایش داده شوند.
 
             ---
 
             ### 📦 راهنمای دانلود و نصب (Download & Installation)
 
             - 🪟 **ویندوز (Windows 10/11 x64):**
-              - فایل نصبی `Nexus_0.7.5_x64-setup.exe` را دانلود کرده و با یک کلیک اجرا کنید.
+              - فایل نصبی `Nexus_0.6.0_x64-setup.exe` را دانلود کرده و با یک کلیک اجرا کنید.
               - کاربران فعلی در صورت باز بودن برنامه، اعلان به‌روزرسانی خودکار درون‌برنامه‌ای را دریافت خواهند کرد.
 
             - 🐧 **لینوکس (آرچ، مانجارو، استیم‌دک، فدورا، اوبونتو و تمام توزیع‌ها):**
               - **پکیج همه‌منظوره AppImage (پیشنهادی):**
                 ```bash
-                chmod +x Nexus_0.7.5_amd64.AppImage
-                ./Nexus_0.7.5_amd64.AppImage
+                chmod +x Nexus_0.6.0_amd64.AppImage
+                ./Nexus_0.6.0_amd64.AppImage
                 ```
               - **پکیج دبیان و اوبونتو (.deb):**
                 ```bash
-                sudo dpkg -i nexus_0.7.5_amd64.deb
+                sudo dpkg -i nexus_0.6.0_amd64.deb
                 ```
               - **پکیج فدورا و ردهت (.rpm):**
                 ```bash
-                sudo dnf install ./Nexus-0.7.5-1.x86_64.rpm
+                sudo dnf install ./Nexus-0.6.0-1.x86_64.rpm
                 ```
           releaseDraft: false
           prerelease: false

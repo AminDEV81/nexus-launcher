@@ -38,14 +38,17 @@ impl AutoGameWatcher {
             let mut known_games_at: Option<Instant> = None;
 
             while is_running.load(Ordering::SeqCst) {
-                tokio::time::sleep(Duration::from_millis(1000)).await;
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                if is_hud_active(&app) {
+                    OverlayWindowManager::reassert_topmost(&app);
+                }
 
                 let cfg = current_config(&app);
                 let state = app.state::<OverlayState>();
 
                 // Overlay switched off in settings: close anything we opened.
                 if !cfg.enabled {
-                    if auto_opened && is_hud_active(&app) {
+                    if auto_opened && !state.manually_opened.load(Ordering::SeqCst) && is_hud_active(&app) {
                         let _ = apply_visibility(&app, Some(false), ToggleSource::Auto).await;
                     }
                     auto_opened = false;
@@ -114,7 +117,7 @@ impl AutoGameWatcher {
                         active_game_pid = None;
                         state.foreground_game_pid.store(0, Ordering::SeqCst);
                         state.suppressed_pid.store(0, Ordering::SeqCst);
-                        if auto_opened && is_hud_active(&app) {
+                        if auto_opened && !state.manually_opened.load(Ordering::SeqCst) && is_hud_active(&app) {
                             let _ = apply_visibility(&app, Some(false), ToggleSource::Auto).await;
                         }
                         auto_opened = false;

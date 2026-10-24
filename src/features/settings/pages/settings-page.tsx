@@ -386,7 +386,7 @@ export function SettingsPage() {
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-black tracking-tight text-text sm:text-3xl">Settings</h1>
               <span className="rounded-full border border-border bg-surface-raised px-3 py-0.5 font-mono text-xs font-bold text-text/90 shadow-2xs">
-                v{currentVersion || '0.7.0'} • {themeMode === 'dark' ? 'Dark Theme' : 'Light Theme'}
+                v{currentVersion || '0.7.5'} • {themeMode === 'dark' ? 'Dark Theme' : 'Light Theme'}
               </span>
             </div>
           </div>

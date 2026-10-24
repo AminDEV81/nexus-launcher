@@ -13,11 +13,13 @@ import {
   Plus,
   RotateCcw,
   Sparkles,
+  Tag,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useStartDownloadModalStore } from '@/features/downloads/store/start-download-modal-store'
 import { useAddGameFromHub, useAddGameToWishlist } from '../hooks/use-hub'
+import { useDefaultSteamRegion, useSteamPrice } from '../hooks/use-steam-price'
 import { useHubSearchStore } from '../store/hub-search-store'
 import { useGames, useRestoreGameFromMemory } from '@/features/library/hooks/use-games'
 import { findLibraryEntry } from '../utils/in-library'
@@ -82,10 +84,23 @@ export function HubGameCard({
   const addGame = useAddGameFromHub()
   const addToWishlist = useAddGameToWishlist()
   const restoreGame = useRestoreGameFromMemory()
+  const { defaultRegion } = useDefaultSteamRegion()
+
+  const [hasHovered, setHasHovered] = useState(false)
 
   const isUnreleased = Boolean(game.release_date && game.release_date > localDateKey())
   const typeInfo = getGameTypeInfo(game.game_type)
   const activeGenreIds = useHubSearchStore((s) => s.genreIds)
+
+  const libraryEntry = useMemo(() => findLibraryEntry(games, game), [games, game])
+
+  // Fetch live Steam price & discount percentage on hover (cached for 10 mins)
+  const { data: livePrice, isFetching: isFetchingPrice } = useSteamPrice(
+    libraryEntry?.steam_app_id ?? game.steam_app_id ?? null,
+    defaultRegion,
+    game.name,
+    hasHovered && !isUnreleased,
+  )
 
   const coverCandidates = useMemo(
     () => buildCoverFallbackChain(game.cover_url, game.backdrop_url),
@@ -104,30 +119,54 @@ export function HubGameCard({
     const matchId = (gg: string, gid: number): boolean => {
       const low = gg.trim().toLowerCase()
       switch (gid) {
-        case 2: return low === 'point-and-click' || low === 'point and click'
-        case 4: return low === 'fighting'
-        case 5: return low === 'shooter'
-        case 7: return low === 'music'
-        case 8: return low === 'platform' || low === 'platformer'
-        case 9: return low === 'puzzle'
-        case 10: return low === 'racing'
-        case 11: return low.includes('real time strategy') || low === 'rts'
-        case 12: return low.includes('role-playing') || low === 'rpg'
-        case 13: return low === 'simulator' || low === 'simulation'
-        case 14: return low === 'sport' || low === 'sports'
-        case 15: return low === 'strategy'
-        case 16: return low.includes('turn-based strategy') || low === 'tbs'
-        case 24: return low === 'tactical'
-        case 25: return low.includes('hack and slash') || low.includes("beat 'em up")
-        case 26: return low.includes('quiz') || low.includes('trivia')
-        case 30: return low === 'pinball'
-        case 31: return low === 'adventure'
-        case 32: return low === 'indie'
-        case 33: return low === 'arcade'
-        case 34: return low === 'visual novel'
-        case 35: return low.includes('card') || low.includes('board')
-        case 36: return low === 'moba'
-        default: return false
+        case 2:
+          return low === 'point-and-click' || low === 'point and click'
+        case 4:
+          return low === 'fighting'
+        case 5:
+          return low === 'shooter'
+        case 7:
+          return low === 'music'
+        case 8:
+          return low === 'platform' || low === 'platformer'
+        case 9:
+          return low === 'puzzle'
+        case 10:
+          return low === 'racing'
+        case 11:
+          return low.includes('real time strategy') || low === 'rts'
+        case 12:
+          return low.includes('role-playing') || low === 'rpg'
+        case 13:
+          return low === 'simulator' || low === 'simulation'
+        case 14:
+          return low === 'sport' || low === 'sports'
+        case 15:
+          return low === 'strategy'
+        case 16:
+          return low.includes('turn-based strategy') || low === 'tbs'
+        case 24:
+          return low === 'tactical'
+        case 25:
+          return low.includes('hack and slash') || low.includes("beat 'em up")
+        case 26:
+          return low.includes('quiz') || low.includes('trivia')
+        case 30:
+          return low === 'pinball'
+        case 31:
+          return low === 'adventure'
+        case 32:
+          return low === 'indie'
+        case 33:
+          return low === 'arcade'
+        case 34:
+          return low === 'visual novel'
+        case 35:
+          return low.includes('card') || low.includes('board')
+        case 36:
+          return low === 'moba'
+        default:
+          return false
       }
     }
     const sorted = [...game.genres].sort((a, b) => {
@@ -141,7 +180,6 @@ export function HubGameCard({
     return extra > 0 ? `${shown.join(' · ')} +${extra}` : shown.join(' · ')
   }, [game.genres, activeGenreIds])
 
-  const libraryEntry = useMemo(() => findLibraryEntry(games, game), [games, game])
   const isMem = Boolean(inMemory || (libraryEntry && libraryEntry.is_memory))
   const installed = Boolean(!isMem && (isInstalled || (libraryEntry && libraryEntry.is_installed)))
   const inLib = Boolean(!isMem && inLibrary)
@@ -150,6 +188,9 @@ export function HubGameCard({
 
   return (
     <div
+      onMouseEnter={() => {
+        if (!hasHovered) setHasHovered(true)
+      }}
       className={cn(
         'group/card relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface/95 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-accent/70 hover:shadow-[0_18px_36px_-12px_rgba(0,0,0,0.65),0_0_20px_-6px_var(--nx-accent)]',
         className,
@@ -160,7 +201,7 @@ export function HubGameCard({
 
       {/* Cover Image Container with 3:4 Aspect Ratio */}
       <div
-        onClick={() => navigate(`/hub/${game.igdb_id}`)}
+        onClick={() => navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })}
         className="relative aspect-[3/4] w-full shrink-0 cursor-pointer overflow-hidden bg-surface-raised"
       >
         {activeCoverUrl ? (
@@ -194,7 +235,6 @@ export function HubGameCard({
         {/* Top Badges */}
         <div className="absolute inset-x-2.5 top-2.5 z-10 flex items-start justify-between gap-1 pointer-events-none">
           <div className="flex flex-wrap items-center gap-1">
-            {/* Status Badge */}
             {installed ? (
               <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-emerald-400/40 backdrop-blur-md">
                 <Check className="size-3" strokeWidth={3} />
@@ -222,7 +262,6 @@ export function HubGameCard({
               </span>
             ) : null}
 
-            {/* Game Type Badge (Remake / Remaster / Expanded / Standalone / Expansion) */}
             {typeInfo && (
               <span
                 className={cn(
@@ -262,7 +301,7 @@ export function HubGameCard({
         </div>
 
         {/* Bottom-left Platform & Hype micro-badges (visible when not hovered) */}
-        {(platformChips.length > 0 || (game.hypes && game.hypes >= 25)) && (
+        {(platformChips.length > 0 || (game.hypes && game.hypes >= 25) || livePrice || (game.discount_percent && game.discount_percent > 0)) && (
           <div className="pointer-events-none absolute inset-x-2.5 bottom-2 z-10 flex items-center justify-between gap-1 transition-opacity duration-200 group-hover/card:opacity-0">
             <div className="flex items-center gap-1">
               {platformChips.map((plat) => (
@@ -274,19 +313,92 @@ export function HubGameCard({
                 </span>
               ))}
             </div>
-            {game.hypes != null && game.hypes >= 25 && (
+            {livePrice ? (
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[9.5px] font-extrabold shadow-sm backdrop-blur-md',
+                  livePrice.is_free
+                    ? 'border-emerald-400/40 bg-emerald-600/90 text-white'
+                    : livePrice.discount_percent > 0
+                      ? 'border-emerald-400/50 bg-black/85 text-emerald-300'
+                      : 'border-white/20 bg-black/80 text-white',
+                )}
+              >
+                {livePrice.discount_percent > 0 && (
+                  <span className="rounded bg-emerald-500 px-1 py-0.2 text-[8.5px] font-black text-black">
+                    -{livePrice.discount_percent}%
+                  </span>
+                )}
+                <span>{livePrice.is_free ? 'FREE' : livePrice.final_formatted}</span>
+              </span>
+            ) : game.discount_percent && game.discount_percent > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-400/50 bg-black/85 px-1.5 py-0.5 font-mono text-[9.5px] font-extrabold text-emerald-300 shadow-sm backdrop-blur-md">
+                <span className="rounded bg-emerald-500 px-1 py-0.2 text-[8.5px] font-black text-black">
+                  -{game.discount_percent}%
+                </span>
+                <span>{game.sale_price_formatted || 'ON SALE'}</span>
+              </span>
+            ) : game.hypes != null && game.hypes >= 25 ? (
               <span className="inline-flex items-center gap-0.5 rounded-md border border-amber-400/30 bg-black/65 px-1.5 py-0.5 text-[9px] font-bold text-amber-300 backdrop-blur-sm">
                 <Flame className="size-2.5 fill-current text-amber-400" />
                 <span>{game.hypes}</span>
               </span>
-            )}
+            ) : null}
           </div>
         )}
 
-        {/* Quick Action Overlay (Reveals smoothly on hover) */}
-        <div className="absolute inset-0 z-20 flex flex-col justify-end bg-gradient-to-t from-black/95 via-black/55 to-transparent p-3 opacity-0 transition-opacity duration-200 group-hover/card:opacity-100">
+        {/* Quick Action + Live Price Overlay (Reveals smoothly on hover) */}
+        <div className="absolute inset-0 z-20 flex flex-col justify-end gap-2 bg-gradient-to-t from-black/95 via-black/65 to-transparent p-3 opacity-0 transition-opacity duration-200 group-hover/card:opacity-100">
+          {/* Live Steam Price & Discount Showcase Pill on Hover */}
+          {!isUnreleased && (
+            <div className="pointer-events-none flex items-center justify-between rounded-xl border border-white/15 bg-black/85 px-2.5 py-1.5 shadow-lg backdrop-blur-md">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Tag className="size-3 shrink-0 text-emerald-400" />
+                <span className="truncate text-[10px] font-bold uppercase tracking-wider text-white/80">
+                  {livePrice?.flag_emoji ? `${livePrice.flag_emoji} Live Price` : 'Steam Price'}
+                </span>
+              </div>
+
+              {livePrice ? (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {livePrice.is_free ? (
+                    <span className="rounded-md bg-emerald-500/20 border border-emerald-400/40 px-2 py-0.5 font-mono text-[10px] font-black uppercase text-emerald-300">
+                      Free to Play
+                    </span>
+                  ) : (
+                    <>
+                      {livePrice.discount_percent > 0 && (
+                        <span className="rounded-md bg-emerald-500 px-1.5 py-0.5 font-mono text-[10px] font-black text-black shadow-xs">
+                          -{livePrice.discount_percent}%
+                        </span>
+                      )}
+                      <div className="flex flex-col items-end leading-none">
+                        {livePrice.discount_percent > 0 && livePrice.initial_formatted && (
+                          <span className="font-mono text-[9px] text-white/50 line-through">
+                            {livePrice.initial_formatted}
+                          </span>
+                        )}
+                        <span className="font-mono text-xs font-black text-emerald-300">
+                          {livePrice.final_formatted}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : isFetchingPrice ? (
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-white/70">
+                  <Loader2 className="size-3 animate-spin text-accent" />
+                  <span>Checking…</span>
+                </span>
+              ) : (
+                <span className="font-mono text-[10px] font-semibold text-white/60">
+                  Check Store
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-1.5">
-            {/* If In Memory: Direct Restore */}
             {isMem && libraryEntry ? (
               <button
                 type="button"
@@ -322,7 +434,6 @@ export function HubGameCard({
                 <span className="text-xs font-bold">Play</span>
               </button>
             ) : (
-              /* Download Button (released games that are NOT installed) */
               !isUnreleased && (
                 <button
                   type="button"
@@ -345,7 +456,6 @@ export function HubGameCard({
               )
             )}
 
-            {/* Wishlist Status Button (already in wishlist) */}
             {!isMem && !inLib && !installed && inWish && (
               <button
                 type="button"
@@ -362,7 +472,6 @@ export function HubGameCard({
               </button>
             )}
 
-            {/* Library / Wishlist Button (hidden if installed, in memory, or already in wishlist) */}
             {!isMem && !inLib && !installed && !inWish && (
               <button
                 type="button"
@@ -405,14 +514,13 @@ export function HubGameCard({
               </button>
             )}
 
-            {/* View Details Button */}
             <button
               type="button"
               title="View Game Details"
               aria-label={`View details for ${game.name}`}
               onClick={(e) => {
                 e.stopPropagation()
-                navigate(`/hub/${game.igdb_id}`)
+                navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })
               }}
               className="flex size-9 items-center justify-center rounded-xl border border-white/20 bg-black/75 text-white shadow-sm transition-all hover:bg-black/90 hover:scale-105 active:scale-95"
             >
@@ -425,7 +533,7 @@ export function HubGameCard({
       {/* Card Info Footer */}
       <button
         type="button"
-        onClick={() => navigate(`/hub/${game.igdb_id}`)}
+        onClick={() => navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })}
         className="flex flex-1 flex-col justify-between p-3 text-left transition-colors"
       >
         <div className="flex flex-col min-w-0">

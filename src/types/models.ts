@@ -127,6 +127,10 @@ export interface HubGame {
   hypes: number | null
   genres: string[]
   platforms: string[]
+  steam_app_id?: string | null
+  discount_percent?: number | null
+  sale_price_formatted?: string | null
+  original_price_formatted?: string | null
 }
 
 export interface HubVideo {
@@ -146,6 +150,7 @@ export interface HubGameDetails extends HubGame {
   opencritic_score?: number | null
   steam_app_id?: string | null
   system_requirements?: SystemRequirements | null
+  download_size?: string | null
 }
 
 export interface SystemRequirementDetail {
@@ -198,6 +203,7 @@ export interface HubSearchFilters {
   gameCategory?: string | null
   gameMode?: string | null
   onlyReleased?: boolean | null
+  onSale?: boolean | null
 }
 
 /** Mirrors `DailyActivity`/`RecentSession` in `src-tauri/src/commands/stats.rs`. */

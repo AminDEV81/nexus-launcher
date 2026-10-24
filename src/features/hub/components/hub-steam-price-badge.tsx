@@ -12,16 +12,12 @@ interface HubSteamPriceBadgeProps {
 
 export function HubSteamPriceBadge({
   steamAppId,
-  gameName: _gameName,
+  gameName,
   onOpenRegionalModal,
 }: HubSteamPriceBadgeProps) {
   const speed = useAnimationSpeed()
   const { defaultRegion } = useDefaultSteamRegion()
-  const { data: price, isLoading, isError } = useSteamPrice(steamAppId, defaultRegion)
-
-  if (!steamAppId) {
-    return null
-  }
+  const { data: price, isLoading, isError } = useSteamPrice(steamAppId, defaultRegion, gameName)
 
   const activeRegion = POPULAR_REGIONS.find((r) => r.code === defaultRegion) || {
     code: 'us',
@@ -118,9 +114,9 @@ export function HubSteamPriceBadge({
       </div>
 
       {/* SteamDB Compare Regions Cue */}
-      <div className="hidden sm:flex items-center gap-1.5 border-l border-white/20 pl-2.5 text-xs font-bold text-accent transition-colors group-hover:text-accent-hover">
+      <div className="flex items-center gap-1 rounded-xl bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/90 transition-colors group-hover:bg-accent group-hover:text-white">
         <Globe2 className="size-3.5" />
-        <span>Regions</span>
+        <span>Compare Regions</span>
         <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
       </div>
     </motion.button>

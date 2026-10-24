@@ -248,6 +248,7 @@ impl MetadataProvider for DirectIgdbProvider {
             opencritic_score,
             steam_app_id: None,
             system_requirements: None,
+            download_size: None,
         }))
     }
 

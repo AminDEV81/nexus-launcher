@@ -200,16 +200,32 @@ const QUICK_GENRES = [
   { label: 'Platformer', id: 8, match: 'platform' },
 ] as const
 
-const QUICK_SEARCH_SUGGESTIONS = [
-  { term: 'Grand Theft Auto V', tag: 'Action / Open World' },
-  { term: 'Elden Ring', tag: 'Action RPG' },
-  { term: 'Cyberpunk 2077', tag: 'Sci-Fi RPG' },
-  { term: 'The Witcher 3', tag: 'Fantasy RPG' },
-  { term: "Baldur's Gate 3", tag: 'CRPG Masterpiece' },
-  { term: 'Red Dead Redemption 2', tag: 'Open World Epic' },
-  { term: 'Resident Evil 4', tag: 'Survival Horror' },
-  { term: 'Black Myth: Wukong', tag: 'Action Mythology' },
-] as const
+const FALLBACK_DYNAMIC_SUGGESTIONS: Array<{
+  igdb_id?: number
+  term: string
+  tag: string
+  score?: number
+  cover?: string
+}> = [
+  { igdb_id: 119133, term: 'Elden Ring', tag: 'Action RPG • 2022', score: 96, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1245620/library_600x900_2x.jpg' },
+  { igdb_id: 1877, term: 'Cyberpunk 2077', tag: 'Sci-Fi RPG • 2020', score: 86, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1091500/library_600x900_2x.jpg' },
+  { igdb_id: 1942, term: 'The Witcher 3: Wild Hunt', tag: 'Dark Fantasy RPG • 2015', score: 93, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900_2x.jpg' },
+  { igdb_id: 119171, term: "Baldur's Gate 3", tag: 'CRPG Masterpiece • 2023', score: 96, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1086940/library_600x900_2x.jpg' },
+  { igdb_id: 25076, term: 'Red Dead Redemption 2', tag: 'Open World Epic • 2018', score: 97, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1174180/library_600x900_2x.jpg' },
+  { igdb_id: 204359, term: 'Black Myth: Wukong', tag: 'Action Mythology • 2024', score: 82, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2358720/library_600x900_2x.jpg' },
+  { igdb_id: 305152, term: 'Clair Obscur: Expedition 33', tag: 'Turn-Based RPG • 2025', score: 92, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1903340/header.jpg' },
+  { igdb_id: 279661, term: 'Kingdom Come: Deliverance II', tag: 'Medieval RPG • 2025', score: 89, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg' },
+  { igdb_id: 279650, term: 'Monster Hunter Wilds', tag: 'Co-op Action RPG • 2025', score: 89, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2246340/library_600x900_2x.jpg' },
+  { igdb_id: 112875, term: 'God of War Ragnarök', tag: 'Norse Action Epic • 2022', score: 94, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2322010/library_600x900_2x.jpg' },
+  { igdb_id: 221560, term: "Ghost of Tsushima Director's Cut", tag: 'Samurai Open World • 2024', score: 89, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2215430/library_600x900_2x.jpg' },
+  { igdb_id: 219588, term: 'Silent Hill 2', tag: 'Psychological Horror • 2024', score: 86, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2124490/library_600x900_2x.jpg' },
+  { igdb_id: 196867, term: 'Resident Evil 4', tag: 'Survival Horror • 2023', score: 93, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2050650/library_600x900_2x.jpg' },
+  { igdb_id: 252651, term: 'Metaphor: ReFantazio', tag: 'Fantasy JRPG • 2024', score: 94, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2679460/library_600x900_2x.jpg' },
+  { igdb_id: 228530, term: 'Hades II', tag: 'Roguelike Action • 2024', score: 90, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145350/library_600x900_2x.jpg' },
+  { igdb_id: 1020, term: 'Grand Theft Auto V', tag: 'Action / Open World', score: 97, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg' },
+  { igdb_id: 76882, term: 'Sekiro: Shadows Die Twice', tag: 'Shinobi Action • 2019', score: 90, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/814380/library_600x900_2x.jpg' },
+  { igdb_id: 250619, term: 'Helldivers 2', tag: 'Co-op Shooter • 2024', score: 83, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/553850/library_600x900_2x.jpg' },
+]
 
 const DROPDOWN_SPRING = {
   type: 'spring' as const,
@@ -253,6 +269,8 @@ export function HubPage() {
   const setGameMode = useHubSearchStore((s) => s.setGameMode)
   const onlyReleased = useHubSearchStore((s) => s.onlyReleased)
   const setOnlyReleased = useHubSearchStore((s) => s.setOnlyReleased)
+  const onSale = useHubSearchStore((s) => s.onSale)
+  const setOnSale = useHubSearchStore((s) => s.setOnSale)
   const hideInLibrary = useHubSearchStore((s) => s.hideInLibrary)
   const setHideInLibrary = useHubSearchStore((s) => s.setHideInLibrary)
   const clearFilters = useHubSearchStore((s) => s.clearFilters)
@@ -260,6 +278,7 @@ export function HubPage() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<DropdownKey>(null)
   const [searchFocused, setSearchFocused] = useState(false)
+  const [suggestionSeed, setSuggestionSeed] = useState(() => Date.now())
   const [genreSearchTerm, setGenreSearchTerm] = useState('')
 
   const speed = useAnimationSpeed()
@@ -312,6 +331,7 @@ export function HubPage() {
       gameCategory,
       gameMode,
       onlyReleased,
+      onSale,
     }),
     [
       genreId,
@@ -326,6 +346,7 @@ export function HubPage() {
       gameCategory,
       gameMode,
       onlyReleased,
+      onSale,
     ],
   )
 
@@ -340,6 +361,7 @@ export function HubPage() {
     (gameCategory !== null && gameCategory !== 'all') ||
     (gameMode !== null && gameMode !== 'all') ||
     onlyReleased ||
+    onSale ||
     hideInLibrary
 
   const isQuerying = debouncedQuery.trim().length >= 2 || hasFilter
@@ -375,6 +397,51 @@ export function HubPage() {
     }
     return Array.from(map.values())
   }, [newReleases.data, topRated.data, recommended.data, comingSoon.data])
+
+  // Dynamic rotating search suggestions built from live Hub feeds + curated fallback pool
+  const dynamicSearchSuggestions = useMemo(() => {
+    const pool: Array<{
+      igdb_id?: number
+      term: string
+      tag: string
+      score?: number | null
+      cover?: string | null
+    }> = []
+    const seen = new Set<string>()
+
+    for (const g of homeFeedPool) {
+      const key = g.name.toLowerCase().trim()
+      if (seen.has(key)) continue
+      seen.add(key)
+      const primaryGenre = g.genres?.[0] || 'Featured Game'
+      const yr = g.release_date ? g.release_date.slice(0, 4) : ''
+      pool.push({
+        igdb_id: g.igdb_id,
+        term: g.name,
+        tag: yr ? `${primaryGenre} • ${yr}` : primaryGenre,
+        score: g.metacritic_score ?? g.opencritic_score ?? g.rating ?? null,
+        cover: g.cover_url ?? g.backdrop_url ?? null,
+      })
+    }
+
+    for (const fb of FALLBACK_DYNAMIC_SUGGESTIONS) {
+      const key = fb.term.toLowerCase().trim()
+      if (seen.has(key)) continue
+      seen.add(key)
+      pool.push(fb)
+    }
+
+    // Deterministic Fisher-Yates shuffle driven by suggestionSeed so suggestions rotate dynamically!
+    const shuffled = [...pool]
+    let state = (suggestionSeed ^ 0x9e3779b9) >>> 0
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+      const j = state % (i + 1)
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+
+    return shuffled.slice(0, 8)
+  }, [homeFeedPool, suggestionSeed])
 
   // Featured hero uses combined top newReleases + topRated with high-res backdrops
   const heroCandidates = useMemo(() => {
@@ -431,6 +498,7 @@ export function HubPage() {
     (gameCategory !== null && gameCategory !== 'all' ? 1 : 0) +
     (gameMode !== null && gameMode !== 'all' ? 1 : 0) +
     (onlyReleased ? 1 : 0) +
+    (onSale ? 1 : 0) +
     (hideInLibrary ? 1 : 0)
 
   const selectedGenres = useMemo(
@@ -496,16 +564,18 @@ export function HubPage() {
 
   const activeQuickMode = useMemo(() => {
     if (!isQuerying) return 'featured'
-    if (release === 'new' && !query && minRating === null) return 'new'
-    if (release === 'upcoming' && !query && minRating === null) return 'upcoming'
-    if (minRating === 85 && sort === 'rating' && !query && release === null) return 'hall'
+    if (onSale && !query && release === null) return 'deals'
+    if (release === 'new' && !query && minRating === null && !onSale) return 'new'
+    if (release === 'upcoming' && !query && minRating === null && !onSale) return 'upcoming'
+    if (minRating === 85 && sort === 'rating' && !query && release === null && !onSale) return 'hall'
     return null
-  }, [isQuerying, release, query, minRating, sort])
+  }, [isQuerying, onSale, release, query, minRating, sort])
 
   const editionModeActiveCount =
     (gameCategory && gameCategory !== 'all' ? 1 : 0) +
     (gameMode && gameMode !== 'all' ? 1 : 0) +
     (onlyReleased ? 1 : 0) +
+    (onSale ? 1 : 0) +
     (hideInLibrary ? 1 : 0)
 
   return (
@@ -590,6 +660,17 @@ export function HubPage() {
                     onClick: () => {
                       clearFilters()
                       setQuery('')
+                    },
+                  },
+                  {
+                    id: 'deals',
+                    label: 'Hot Deals (On Sale)',
+                    icon: Tag,
+                    iconColor: 'text-emerald-400',
+                    onClick: () => {
+                      clearFilters()
+                      setQuery('')
+                      setOnSale(true)
                     },
                   },
                   {
@@ -700,6 +781,7 @@ export function HubPage() {
                     value={query}
                     onFocus={() => {
                       setSearchFocused(true)
+                      setSuggestionSeed(Date.now())
                       setOpenDropdown(null)
                     }}
                     onChange={(e) => setQuery(e.target.value)}
@@ -717,6 +799,7 @@ export function HubPage() {
                         aria-label="Clear search"
                         onClick={() => {
                           setQuery('')
+                          setSuggestionSeed(Date.now())
                           searchInputRef.current?.focus()
                         }}
                         className="flex size-7 items-center justify-center rounded-xl border border-border bg-surface-raised text-subtle transition-colors hover:border-accent/40 hover:text-text cursor-pointer"
@@ -731,7 +814,7 @@ export function HubPage() {
                   </div>
                 </div>
 
-                {/* Floating Search Suggestions Dropdown when input is focused & empty */}
+                {/* Dynamic Live Search Suggestions Dropdown when input is focused & empty */}
                 <AnimatePresence>
                   {searchFocused && query.trim().length === 0 && (
                     <motion.div
@@ -741,36 +824,81 @@ export function HubPage() {
                       transition={DROPDOWN_SPRING}
                       className="solid-panel absolute left-0 right-0 top-[calc(100%+8px)] z-50 rounded-2xl border border-border p-3.5 shadow-elevated ring-1 ring-border/70"
                     >
-                      <div className="mb-2.5 flex items-center justify-between px-1">
-                        <span className=" flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-subtle">
+                      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 px-1">
+                        <span className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-subtle">
                           <Sparkles className="size-3 text-accent" />
-                          <span>Trending & Quick Searches</span>
+                          <span>Live Dynamic Game Suggestions</span>
                         </span>
-                        <span className="text-[10px] font-medium text-subtle">
-                          Supports shorthand like GTA 5, RDR2, BG3, RE4, TW3
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
-                        {QUICK_SEARCH_SUGGESTIONS.map((item) => (
+                        <div className="flex items-center gap-2">
+                          <span className="hidden md:inline text-[10px] font-medium text-subtle">
+                            Supports shorthand like GTA 5, RDR2, BG3, RE4, TW3
+                          </span>
                           <button
-                            key={item.term}
                             type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSuggestionSeed(Date.now() + Math.floor(Math.random() * 100000))
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-border/80 bg-surface-raised px-2 py-1 text-[10px] font-bold text-accent transition-all hover:border-accent/50 hover:bg-accent/10 active:scale-95 cursor-pointer"
+                          >
+                            <Shuffle className="size-3" />
+                            <span>Refresh Picks</span>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        {dynamicSearchSuggestions.map((item) => (
+                          <div
+                            key={item.term}
                             onClick={() => {
                               setQuery(item.term)
                               setSearchFocused(false)
                             }}
-                            className="group flex items-center justify-between rounded-xl border border-border/70 bg-surface-raised/55 px-3 py-2 text-left transition-all hover:border-accent/50 hover:bg-surface-raised cursor-pointer"
+                            className="group flex items-center justify-between gap-2.5 rounded-xl border border-border/70 bg-surface-raised/55 p-2 text-left transition-all hover:border-accent/50 hover:bg-surface-raised cursor-pointer"
                           >
-                            <div className="min-w-0">
-                              <div className="truncate text-xs font-bold text-text group-hover:text-accent transition-colors">
-                                {item.term}
-                              </div>
-                              <div className="truncate text-[10px] text-subtle">
-                                {item.tag}
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {item.cover ? (
+                                <img
+                                  src={item.cover}
+                                  alt={item.term}
+                                  className="h-10 w-7.5 shrink-0 rounded-lg object-cover ring-1 ring-border/60"
+                                />
+                              ) : (
+                                <div className="flex h-10 w-7.5 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                                  <Gamepad2 className="size-4" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="truncate text-xs font-bold text-text group-hover:text-accent transition-colors">
+                                  {item.term}
+                                </div>
+                                <div className="mt-0.5 flex items-center gap-1.5 truncate text-[10px] text-subtle">
+                                  <span className="truncate">{item.tag}</span>
+                                  {item.score != null && item.score > 0 && (
+                                    <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-0.2 font-mono text-[9px] font-bold text-emerald-500 dark:text-emerald-300">
+                                      {item.score}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                            <ArrowRight className="size-3.5 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
-                          </button>
+                            {item.igdb_id ? (
+                              <button
+                                type="button"
+                                title="Open Game Page"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSearchFocused(false)
+                                  navigate(`/hub/${item.igdb_id}`, { state: { expectedName: item.term } })
+                                }}
+                                className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-surface text-subtle transition-all hover:border-accent hover:bg-accent hover:text-white cursor-pointer"
+                              >
+                                <ArrowRight className="size-3.5" />
+                              </button>
+                            ) : (
+                              <ArrowRight className="size-3.5 shrink-0 text-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-accent" />
+                            )}
+                          </div>
                         ))}
                       </div>
                     </motion.div>
@@ -1438,16 +1566,31 @@ export function HubPage() {
                 onClick={() => {
                   setGenreIds([])
                   setGameCategory(null)
+                  setOnSale(false)
                 }}
                 className={cn(
                   'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all active:scale-95 cursor-pointer',
-                  genreIds.length === 0 && (!gameCategory || gameCategory === 'all')
+                  genreIds.length === 0 && (!gameCategory || gameCategory === 'all') && !onSale
                     ? 'border-accent bg-accent text-white shadow-xs'
                     : 'border-border bg-surface text-muted hover:border-accent/40 hover:text-text',
                 )}
               >
                 <Sparkles className="size-3" />
                 <span>All Genres</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOnSale(!onSale)}
+                className={cn(
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-extrabold transition-all active:scale-95 cursor-pointer',
+                  onSale
+                    ? 'border-emerald-500 bg-emerald-500 text-black shadow-sm shadow-emerald-500/25'
+                    : 'border-emerald-500/35 bg-emerald-500/10 text-emerald-500 dark:text-emerald-300 hover:border-emerald-500/60 hover:bg-emerald-500/20',
+                )}
+              >
+                <Tag className="size-3" />
+                <span>Popular On Sale</span>
               </button>
 
               <div className="mx-1 h-4 w-px shrink-0 bg-border" />
@@ -1521,6 +1664,13 @@ export function HubPage() {
                   <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-subtle">
                     Active Filters:
                   </span>
+                  {onSale && (
+                    <FilterPill
+                      icon={Tag}
+                      label="Popular On Sale (Discounted)"
+                      onClear={() => setOnSale(false)}
+                    />
+                  )}
                   {selectedGenres.map((g) => (
                     <FilterPill
                       key={`g-${g.id}`}

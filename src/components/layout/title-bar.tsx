@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import { LogoMark } from '@/components/brand/logo-mark'
 import { ProfileBadgeButton } from './profile-badge-button'
 import { useUpdaterStore } from '@/store/updater-store'
+import { useCloseFlowStore } from '@/store/close-flow-store'
 import { useLaunchStore } from '@/store/launch-store'
 import { useWindowActive } from '@/hooks/use-window-active'
 import { getLiveMetrics } from '@/services/system'
@@ -284,7 +285,7 @@ export function TitleBar() {
         >
           {isMaximized ? <Copy className="size-3" /> : <Square className="size-3" />}
         </TitleBarButton>
-        <TitleBarButton label="Close" onClick={() => void appWindow.close()} danger>
+        <TitleBarButton label="Close" onClick={() => useCloseFlowStore.getState().openConfirm()} danger>
           <X className="size-4" />
         </TitleBarButton>
       </div>

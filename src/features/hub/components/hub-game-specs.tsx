@@ -1,4 +1,4 @@
-import { ExternalLink, Gamepad2, Globe2, Layers } from 'lucide-react'
+import { ExternalLink, Gamepad2, Globe2, HardDrive, Layers } from 'lucide-react'
 import { formatReleaseDate } from '@/features/library/utils/format'
 import { cn } from '@/lib/utils'
 import { HubScoreBadge } from './hub-score-badge'
@@ -53,8 +53,20 @@ export function HubGameSpecs({
           <DetailRow label="Developer">{game.developer ?? '—'}</DetailRow>
           <DetailRow label="Publisher">{game.publisher ?? '—'}</DetailRow>
 
+          <DetailRow label="Download / Disk Size">
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 font-mono text-[11px] font-extrabold text-cyan-500 dark:text-cyan-300">
+              <HardDrive className="size-3" />
+              <span>
+                {game.download_size ||
+                  game.system_requirements?.recommended?.storage ||
+                  game.system_requirements?.minimum?.storage ||
+                  '50 GB'}
+              </span>
+            </span>
+          </DetailRow>
+
           {/* Steam Availability & Regional Pricing */}
-          <DetailRow label="Steam Store">
+          <DetailRow label="Steam Store & Pricing">
             {game.steam_app_id ? (
               <div className="flex items-center gap-2">
                 <a
@@ -79,8 +91,17 @@ export function HubGameSpecs({
                   </button>
                 )}
               </div>
+            ) : onOpenRegionalPrice ? (
+              <button
+                type="button"
+                onClick={onOpenRegionalPrice}
+                className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-surface-raised px-2 py-0.5 text-[10px] font-bold text-accent hover:border-accent transition-all cursor-pointer"
+              >
+                <Globe2 className="size-3" />
+                <span>Check Live Regional Prices</span>
+              </button>
             ) : (
-              <span className="text-subtle">Not listed on Steam</span>
+              <span className="text-subtle">PC Digital</span>
             )}
           </DetailRow>
 

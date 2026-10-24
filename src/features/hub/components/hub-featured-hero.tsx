@@ -137,14 +137,12 @@ export function HubFeaturedHero({
               </span>
             )}
 
-            <HubScoreBadge
-              variant="card"
-              metacriticScore={game.metacritic_score}
-              opencriticScore={game.opencritic_score}
-              igdbRating={game.rating}
-              gameName={game.name}
-              releaseDate={game.release_date}
-            />
+            {game.discount_percent && game.discount_percent > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-0.5 font-mono text-[10px] font-black text-black shadow-md">
+                <span>-{game.discount_percent}% OFF</span>
+                {game.sale_price_formatted && <span>• {game.sale_price_formatted}</span>}
+              </span>
+            )}
           </div>
 
           {/* Quick Navigation Controls */}
@@ -234,17 +232,30 @@ export function HubFeaturedHero({
 
                 {/* Summary */}
                 {game.summary && (
-                  <p className="mt-2 line-clamp-2 text-xs sm:text-sm leading-relaxed text-white/75 max-w-xl drop-shadow-sm">
+                  <p className="mt-1.5 line-clamp-2 text-xs sm:text-sm leading-relaxed text-white/75 max-w-xl drop-shadow-sm">
                     {game.summary}
                   </p>
                 )}
+
+                {/* Flagship Metacritic & OpenCritic Dual Telemetry HUD in Spotlight Header */}
+                <div className="mt-3">
+                  <HubScoreBadge
+                    variant="hero"
+                    metacriticScore={game.metacritic_score}
+                    opencriticScore={game.opencritic_score}
+                    igdbRating={game.rating}
+                    igdbRatingCount={game.rating_count}
+                    gameName={game.name}
+                    releaseDate={game.release_date}
+                  />
+                </div>
 
                 {/* Action Buttons Row */}
                 <div className="mt-4 flex flex-wrap items-center gap-2.5">
                   {/* View Game */}
                   <button
                     type="button"
-                    onClick={() => navigate(`/hub/${game.igdb_id}`)}
+                    onClick={() => navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })}
                     className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-[0_10px_24px_-8px_var(--nx-accent)] transition-all hover:bg-accent-hover hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <span>View Game</span>
@@ -273,7 +284,7 @@ export function HubFeaturedHero({
                   {inMem ? (
                     <button
                       type="button"
-                      onClick={() => navigate(`/hub/${game.igdb_id}`)}
+                      onClick={() => navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })}
                       className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/20 px-3 py-2 text-xs font-bold text-amber-300 backdrop-blur-md transition-colors hover:bg-amber-500/30 cursor-pointer"
                     >
                       <RotateCcw className="size-3.5 text-amber-400" />

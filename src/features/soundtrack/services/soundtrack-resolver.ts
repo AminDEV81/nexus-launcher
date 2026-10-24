@@ -533,7 +533,8 @@ export class SoundtrackResolver {
     forceRefresh = false,
   ): Promise<SoundtrackAlbumWithTracks[]> {
     const coreTitle = extractCoreGameTitle(game.title)
-    const cacheKey = `game_ost_v6_${game.gameId}_${coreTitle.toLowerCase().replace(/\s+/g, '_')}`
+    const yrTag = (game.releaseYear || '0').slice(0, 4)
+    const cacheKey = `game_ost_v7_${game.gameId}_${coreTitle.toLowerCase().replace(/\s+/g, '_')}_${yrTag}`
 
     if (forceRefresh) {
       this.memoryCache.delete(cacheKey)
@@ -543,7 +544,7 @@ export class SoundtrackResolver {
     if (!forceRefresh && this.memoryCache.has(cacheKey)) {
       const mem = this.memoryCache.get(cacheKey)!
       const verifiedMem = mem.filter(
-        (a) => a.tracks.length > 0 && isAlbumValidForGame(a.album.title, game.title),
+        (a) => a.tracks.length > 0 && isAlbumValidForGame(a.album.title, game.title, a.album.release_date, game.releaseYear),
       )
       if (verifiedMem.length > 0) {
         return verifiedMem
@@ -564,7 +565,7 @@ export class SoundtrackResolver {
           const verifiedSaved = saved.filter(
             (a) =>
               a.tracks.length > 0 &&
-              isAlbumValidForGame(a.album.title, game.title) &&
+              isAlbumValidForGame(a.album.title, game.title, a.album.release_date, game.releaseYear) &&
               a.tracks.some(
                 (t) =>
                   t.local_path ||
@@ -592,7 +593,7 @@ export class SoundtrackResolver {
           if (Array.isArray(parsed)) {
             const verifiedCached = parsed.filter(
               (a) =>
-                a.tracks && a.tracks.length > 0 && isAlbumValidForGame(a.album.title, game.title),
+                a.tracks && a.tracks.length > 0 && isAlbumValidForGame(a.album.title, game.title, a.album.release_date, game.releaseYear),
             )
             if (verifiedCached.length > 0) {
               this.memoryCache.set(cacheKey, verifiedCached)
@@ -622,7 +623,7 @@ export class SoundtrackResolver {
       try {
         const albums = await withTimeout(khinsiderProvider.getAlbums(game), 3500, [])
         const top = albums
-          .map((alb) => ({ alb, score: scoreAlbumMatchForGame(alb.title, game.title) }))
+          .map((alb) => ({ alb, score: scoreAlbumMatchForGame(alb.title, game.title, alb.release_date, game.releaseYear) }))
           .filter((x) => x.score > 0)
           .sort((a, b) => b.score - a.score)
           .slice(0, 2)
@@ -638,7 +639,7 @@ export class SoundtrackResolver {
         )
         return fetched.filter(
           (f): f is SoundtrackAlbumWithTracks =>
-            Boolean(f && f.tracks.length > 0 && isAlbumValidForGame(f.album.title, game.title)),
+            Boolean(f && f.tracks.length > 0 && isAlbumValidForGame(f.album.title, game.title, f.album.release_date, game.releaseYear)),
         )
       } catch {
         return []
@@ -655,7 +656,7 @@ export class SoundtrackResolver {
       discoveredAlbumsWithTracks.push(alb)
     }
     for (const alb of cdnAlbums) {
-      if (isAlbumValidForGame(alb.album.title, game.title) || discoveredAlbumsWithTracks.length === 0) {
+      if (isAlbumValidForGame(alb.album.title, game.title, alb.album.release_date, game.releaseYear) || discoveredAlbumsWithTracks.length === 0) {
         alb.album.game_id = game.gameId
         discoveredAlbumsWithTracks.push(alb)
       }
@@ -716,8 +717,8 @@ export class SoundtrackResolver {
     canonical.sort((a, b) => {
       const aCurated = a.album.provider_id === 'curated' ? 25 : 0
       const bCurated = b.album.provider_id === 'curated' ? 25 : 0
-      const sa = scoreAlbumMatchForGame(a.album.title, game.title) + aCurated
-      const sb = scoreAlbumMatchForGame(b.album.title, game.title) + bCurated
+      const sa = scoreAlbumMatchForGame(a.album.title, game.title, a.album.release_date, game.releaseYear) + aCurated
+      const sb = scoreAlbumMatchForGame(b.album.title, game.title, b.album.release_date, game.releaseYear) + bCurated
       return sb - sa || b.tracks.length - a.tracks.length
     })
 
