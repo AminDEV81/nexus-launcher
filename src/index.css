@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,700&family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Orbitron:wght@400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Rajdhani:wght@300;400;500;600;700&family=Russo+One&family=Teko:wght@300;400;500;600;700&display=swap');
+/* Secondary Google Fonts are loaded asynchronously on-demand in App.tsx when online and selected, preventing offline/startup CSS render blocking. */
 @import 'tailwindcss';
 @import './styles/fonts.css';
 @import './styles/theme.css';

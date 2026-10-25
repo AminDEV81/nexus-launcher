@@ -1,28 +1,44 @@
 import { useEffect } from 'react'
 import { listen } from '@tauri-apps/api/event'
-import { useQueryClient } from '@tanstack/react-query'
+import { queryClient } from '@/app/query-client'
+import { gamesKey } from './use-games'
 
 /**
- * Epic 6's metadata pipeline runs entirely in the background — the
- * command that adds a game returns immediately, and description/cover/
- * banner show up later once IGDB (and SteamGridDB, if configured)
- * respond. The Rust side emits `metadata-updated` with the game's id
- * once it's done; this just invalidates that game so React Query
- * refetches it and the new artwork/details appear without the user
- * having to do anything.
+ * Listens for backend `metadata-updated` and `wishlist-metadata-synced` events
+ * and refreshes the games query cache without leaking listeners on fast remounts.
  */
 export function useMetadataUpdatedListener() {
-  const queryClient = useQueryClient()
-
   useEffect(() => {
-    const unlisten = listen<string>('metadata-updated', (event) => {
-      const gameId = event.payload
-      queryClient.invalidateQueries({ queryKey: ['games'] })
-      queryClient.invalidateQueries({ queryKey: ['games', gameId] })
+    let disposed = false
+    let unlistenMeta: (() => void) | null = null
+    let unlistenWishlist: (() => void) | null = null
+
+    listen<string | { id?: string }>('metadata-updated', () => {
+      if (!disposed) {
+        void queryClient.invalidateQueries({ queryKey: gamesKey })
+      }
     })
+      .then((fn) => {
+        if (disposed) fn()
+        else unlistenMeta = fn
+      })
+      .catch(() => {})
+
+    listen('wishlist-metadata-synced', () => {
+      if (!disposed) {
+        void queryClient.invalidateQueries({ queryKey: gamesKey })
+      }
+    })
+      .then((fn) => {
+        if (disposed) fn()
+        else unlistenWishlist = fn
+      })
+      .catch(() => {})
 
     return () => {
-      unlisten.then((fn) => fn())
+      disposed = true
+      if (unlistenMeta) unlistenMeta()
+      if (unlistenWishlist) unlistenWishlist()
     }
-  }, [queryClient])
+  }, [])
 }

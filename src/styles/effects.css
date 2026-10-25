@@ -316,3 +316,23 @@
     animation: none;
   }
 }
+
+/* Low-End PC & GPU Eco Mode optimizations:
+   Eliminate large Gaussian blur filters on decorative ambient elements and pause
+   continuous decorative animations when GPU Eco Mode is active or window is unfocused. */
+[data-gpu-eco='true'] .nx-spin-cw,
+[data-gpu-eco='true'] .nx-spin-ccw,
+[data-gpu-eco='true'] .nx-mascot-bob,
+[data-gpu-eco='true'] .nx-spin-fast,
+[data-gpu-eco='true'] .nx-ping,
+[data-gpu-eco='true'] .glow-hover-pulse {
+  animation: none !important;
+}
+
+[data-gpu-eco='true'] .pointer-events-none[class*='blur-2xl'],
+[data-gpu-eco='true'] .pointer-events-none[class*='blur-3xl'],
+[data-window-active='false'] .pointer-events-none[class*='blur-2xl'],
+[data-window-active='false'] .pointer-events-none[class*='blur-3xl'] {
+  filter: none !important;
+  opacity: 0.12 !important;
+}

@@ -3,17 +3,28 @@ import { QueryClient } from '@tanstack/react-query'
 /**
  * Single shared QueryClient for the whole app.
  *
- * `retry: 1` (rather than the default 3) because failures here are almost
- * always "the Rust command errored" (bad path, missing file, parse
- * failure) rather than a flaky network call — retrying a broken local
- * command three times just delays showing the user the real error.
+ * CRITICAL FOR TAURI DESKTOP:
+ * `networkMode: 'always'` is set on both `queries` and `mutations` because
+ * 90% of queries and mutations in Nexus Launcher invoke local Rust/SQLite
+ * IPC commands (`get_game`, `list_games`, `get_game_screenshots`, `list_tags`,
+ * `get_game_save_details`, etc.), NOT remote HTTP servers.
+ * Without `networkMode: 'always'`, disconnecting the internet while inside
+ * the app causes `@tanstack/react-query` to pause all queries/mutations,
+ * preventing the right-hand GameDetailsPanel from loading!
  */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       staleTime: 30_000,
+      gcTime: 10 * 60_000,
       refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      networkMode: 'always',
+    },
+    mutations: {
+      retry: 0,
+      networkMode: 'always',
     },
   },
 })

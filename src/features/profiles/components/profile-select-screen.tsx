@@ -114,10 +114,19 @@ export function ProfileSelectScreen() {
         .then(setIsMaximized)
         .catch(() => {})
     }
+    let disposed = false
+    let unlistenFn: (() => void) | null = null
     syncMaximized()
-    const unlisten = appWindow.onResized(syncMaximized)
+    appWindow
+      .onResized(syncMaximized)
+      .then((fn) => {
+        if (disposed) fn()
+        else unlistenFn = fn
+      })
+      .catch(() => {})
     return () => {
-      unlisten.then((fn) => fn())
+      disposed = true
+      unlistenFn?.()
     }
   }, [isOpen])
 

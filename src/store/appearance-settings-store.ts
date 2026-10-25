@@ -194,7 +194,13 @@ export const useAppearanceSettingsStore = create<AppearanceSettingsState>()(
       reduceMotion: false,
       setReduceMotion: (reduceMotion) => set({ reduceMotion }),
 
-      gpuEcoMode: false,
+      gpuEcoMode:
+        typeof navigator !== 'undefined' &&
+        ((typeof navigator.hardwareConcurrency === 'number' &&
+          navigator.hardwareConcurrency > 0 &&
+          navigator.hardwareConcurrency <= 4) ||
+          (typeof (navigator as { deviceMemory?: number }).deviceMemory === 'number' &&
+            ((navigator as { deviceMemory?: number }).deviceMemory ?? 8) <= 4)),
       setGpuEcoMode: (gpuEcoMode) => set({ gpuEcoMode }),
 
       fpsLimit60: true,

@@ -208,13 +208,30 @@ pub fn copy_local_artwork(
     source_path: &str,
 ) -> AppResult<String> {
     let source = Path::new(source_path);
-    let extension = source
+    if !source.is_file() {
+        return Err(AppError::Invalid("selected artwork file does not exist".into()));
+    }
+    if let Ok(meta) = source.metadata() {
+        if meta.len() > MAX_ARTWORK_BYTES {
+            return Err(AppError::Invalid("selected artwork file exceeds 150 MB limit".into()));
+        }
+    }
+    let raw_ext = source
         .extension()
         .and_then(|ext| ext.to_str())
-        .unwrap_or("png");
+        .map(|s| s.to_ascii_lowercase())
+        .unwrap_or_else(|| "png".to_string());
+    if !matches!(
+        raw_ext.as_str(),
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "ico" | "avif"
+    ) {
+        return Err(AppError::Invalid(
+            "selected file must be a valid image (.png, .jpg, .webp, .gif, .bmp, .ico)".into(),
+        ));
+    }
 
     let dir = artwork_dir(app, game_id)?;
-    let dest = prepare_unique_path(&dir, file_stem, extension);
+    let dest = prepare_unique_path(&dir, file_stem, &raw_ext);
     std::fs::copy(source, &dest)?;
 
     Ok(dest.to_string_lossy().to_string())

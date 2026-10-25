@@ -135,6 +135,7 @@ export function CoverMedia({
       className={className}
       draggable={false}
       loading="lazy"
+      decoding="async"
       onError={handleFail}
     />
   )

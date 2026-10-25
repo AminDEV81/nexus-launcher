@@ -44,7 +44,8 @@ export function useSteamPrice(
     queryKey: ['steam-price', cleanId, cleanName, cleanCountry],
     queryFn: () =>
       getSteamGamePrice(hasId ? cleanId : null, cleanCountry, hasName ? cleanName : null),
-    enabled: Boolean(enabled) && (hasId || hasName),
+    enabled: Boolean(enabled) && (hasId || hasName) && (typeof navigator === 'undefined' || navigator.onLine !== false),
+    retry: false,
     staleTime: 10 * 60 * 1000, // 10 minutes fresh
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,

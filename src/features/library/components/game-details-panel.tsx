@@ -56,6 +56,7 @@ import { toast } from 'sonner'
 import { playButtonClick } from '@/lib/sound-engine'
 import {
   useGame,
+  useGames,
   useUpdateGameFlags,
   useGameScreenshots,
   useUpdateLaunchArguments,
@@ -103,7 +104,12 @@ const autoSyncedGameIds = new Set<string>()
 export function GameDetailsPanel() {
   const selectedId = useUiStore((s) => s.selectedGameId)
   const selectGame = useUiStore((s) => s.selectGame)
-  const { data: game } = useGame(selectedId ?? undefined)
+  const { data: allGames } = useGames()
+  const { data: fetchedGame } = useGame(selectedId ?? undefined)
+  const game = useMemo(
+    () => fetchedGame ?? allGames?.find((g) => g.id === selectedId),
+    [fetchedGame, allGames, selectedId],
+  )
   const speed = useAnimationSpeed()
 
   // Close panel on Escape key
@@ -157,6 +163,20 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
   const openDownloadModal = useStartDownloadModalStore((s) => s.open)
   const updateFlags = useUpdateGameFlags()
   const syncMetadataMutation = useSyncGameMetadata()
+  const silentAutoSyncMutation = useSyncGameMetadata({ silent: true })
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator === 'undefined' ? true : navigator.onLine !== false,
+  )
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true)
+    const onOffline = () => setIsOnline(false)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+  }, [])
   const { data: screenshots = [] } = useGameScreenshots(game.id)
   const [lightbox, setLightbox] = useState<number | null>(null)
   const [coverPickerOpen, setCoverPickerOpen] = useState(false)
@@ -186,23 +206,35 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
     setLogoLoadFailed(false)
   }, [game.id, game.logo_path, game.steam_app_id])
 
-  const steamCdnLogoUrl = game.steam_app_id
-    ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${game.steam_app_id}/logo.png`
-    : null
+  const steamCdnLogoUrl =
+    isOnline && game.steam_app_id
+      ? `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${game.steam_app_id}/logo.png`
+      : null
   const effectiveLogoSrc = !logoLoadFailed ? (logoSrc ?? steamCdnLogoUrl) : null
   const nexusModsTarget = useMemo(() => resolveNexusModsTarget(game.name), [game.name])
 
-  // Automatically sync IGDB + high-res cover/banner/logo once if missing
+  // Automatically sync IGDB + high-res cover/banner/logo once if missing AND online
   useEffect(() => {
+    if (!isOnline) return
     if (
       (!game.logo_path || !game.banner_path || !game.cover_path || !game.description) &&
       !autoSyncedGameIds.has(game.id) &&
+      !silentAutoSyncMutation.isPending &&
       !syncMetadataMutation.isPending
     ) {
       autoSyncedGameIds.add(game.id)
-      syncMetadataMutation.mutate(game.id)
+      silentAutoSyncMutation.mutate(game.id)
     }
-  }, [game.id, game.logo_path, game.banner_path, game.cover_path, game.description, syncMetadataMutation])
+  }, [
+    isOnline,
+    game.id,
+    game.logo_path,
+    game.banner_path,
+    game.cover_path,
+    game.description,
+    silentAutoSyncMutation,
+    syncMetadataMutation.isPending,
+  ])
 
   const heroRawPath = game.banner_path ?? game.background_path ?? game.cover_path
   const galleryImages = [heroRawPath, ...screenshots].filter(

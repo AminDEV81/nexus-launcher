@@ -1166,7 +1166,7 @@ async fn track_external_session(
     exe_name: Option<String>,
     post_launch_command: Option<String>,
 ) {
-    let mut system = System::new_all();
+    let mut system = System::new();
     let started_at = Utc::now();
     let sys_pid = Pid::from_u32(pid);
 
@@ -1250,7 +1250,7 @@ pub fn start_external_game_detector(app: AppHandle) {
         tokio::time::sleep(Duration::from_secs(4)).await;
 
         loop {
-            tokio::time::sleep(Duration::from_secs(4)).await;
+            tokio::time::sleep(Duration::from_secs(6)).await;
 
             let candidates: Vec<(String, Option<String>, Option<String>)> = {
                 let db = app.state::<Database>();
@@ -1293,6 +1293,23 @@ pub fn start_external_game_detector(app: AppHandle) {
                 let mut sys = System::new();
                 sys.refresh_processes(ProcessesToUpdate::All, true);
 
+                // Pre-normalize running processes once per tick (O(M) instead of O(N*M))
+                let proc_snapshots: Vec<(u32, String, String, Option<String>)> = sys
+                    .processes()
+                    .values()
+                    .filter_map(|proc| {
+                        let proc_name = proc.name().to_string_lossy().to_string();
+                        let proc_name_low = proc_name.to_lowercase();
+                        if IGNORED_EXTERNAL_EXES.contains(&proc_name_low.as_str()) {
+                            return None;
+                        }
+                        let proc_exe_norm = proc
+                            .exe()
+                            .map(|p| p.to_string_lossy().replace('/', "\\").to_lowercase());
+                        Some((proc.pid().as_u32(), proc_name, proc_name_low, proc_exe_norm))
+                    })
+                    .collect();
+
                 let mut matches: Vec<(String, u32, String)> = Vec::new();
 
                 for (game_id, exe_opt, install_opt) in &candidates {
@@ -1319,34 +1336,26 @@ pub fn start_external_game_detector(app: AppHandle) {
                             norm.trim_end_matches('\\').to_string()
                         });
 
-                    for proc in sys.processes().values() {
-                        let proc_name = proc.name().to_string_lossy().to_string();
-                        let proc_name_low = proc_name.to_lowercase();
-                        if IGNORED_EXTERNAL_EXES.contains(&proc_name_low.as_str()) {
-                            continue;
-                        }
-
+                    for (pid, proc_name, proc_name_low, proc_exe_norm) in &proc_snapshots {
                         let mut is_match = false;
                         if let Some(ref exp_name) = expected_exe_name {
-                            if &proc_name_low == exp_name {
+                            if proc_name_low == exp_name {
                                 is_match = true;
                             }
                         }
 
                         if !is_match {
-                            if let Some(proc_exe) = proc.exe() {
-                                let proc_exe_norm =
-                                    proc_exe.to_string_lossy().replace('/', "\\").to_lowercase();
+                            if let Some(ref exe_norm) = proc_exe_norm {
                                 if let Some(ref exp_full) = expected_full_exe {
-                                    if &proc_exe_norm == exp_full {
+                                    if exe_norm == exp_full {
                                         is_match = true;
                                     }
                                 }
                                 if !is_match {
                                     if let Some(ref inst_dir) = expected_install_dir {
                                         if !inst_dir.is_empty()
-                                            && proc_exe_norm.starts_with(inst_dir)
-                                            && proc_exe_norm[inst_dir.len()..].starts_with('\\')
+                                            && exe_norm.starts_with(inst_dir)
+                                            && exe_norm[inst_dir.len()..].starts_with('\\')
                                         {
                                             is_match = true;
                                         }
@@ -1356,7 +1365,7 @@ pub fn start_external_game_detector(app: AppHandle) {
                         }
 
                         if is_match {
-                            matches.push((game_id.clone(), proc.pid().as_u32(), proc_name));
+                            matches.push((game_id.clone(), *pid, proc_name.clone()));
                             break;
                         }
                     }

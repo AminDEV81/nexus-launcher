@@ -52,6 +52,15 @@ impl Database {
         );
 
         connection.pragma_update(None, "foreign_keys", "ON")?;
+        let _ = connection.pragma_update(None, "mmap_size", "67108864");
+
+        // Ensure composite indexes exist on hot-path columns for fast low-end PC filtering & sorting
+        let _ = connection.execute_batch(
+            "CREATE INDEX IF NOT EXISTS idx_games_library_filter ON games(is_wishlist, is_memory, is_installed);
+             CREATE INDEX IF NOT EXISTS idx_games_sort_order ON games(sort_order, name);
+             CREATE INDEX IF NOT EXISTS idx_playtime_sessions_profile_started ON playtime_sessions(profile_id, started_at);
+             CREATE INDEX IF NOT EXISTS idx_metadata_cache_cat_updated ON metadata_cache(category, updated_at);",
+        );
 
         Ok(Self {
             connection: Mutex::new(connection),

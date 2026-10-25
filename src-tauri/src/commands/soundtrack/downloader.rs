@@ -57,9 +57,19 @@ pub async fn start_download(
     req: DownloadSoundtrackRequest,
 ) -> AppResult<()> {
     let trimmed_url = req.url.trim();
-    if !trimmed_url.starts_with("https://") && !trimmed_url.starts_with("http://") {
+    let parsed_url = reqwest::Url::parse(trimmed_url)
+        .map_err(|_| AppError::Invalid("Invalid soundtrack download URL.".into()))?;
+    if !matches!(parsed_url.scheme(), "http" | "https") {
         return Err(AppError::Invalid(
             "Soundtrack download URL must use http or https.".into(),
+        ));
+    }
+    let Some(host) = parsed_url.host_str() else {
+        return Err(AppError::Invalid("Soundtrack URL is missing a host.".into()));
+    };
+    if crate::commands::profiles::is_blocked_host_or_ip(host) {
+        return Err(AppError::Invalid(
+            "Private or local network URLs are not permitted.".into(),
         ));
     }
 
@@ -70,6 +80,21 @@ pub async fn start_download(
     {
         return Err(AppError::Invalid(
             "Invalid target path: path traversal is not allowed.".into(),
+        ));
+    }
+    let valid_audio_ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|ext| {
+            matches!(
+                ext.to_ascii_lowercase().as_str(),
+                "mp3" | "flac" | "ogg" | "m4a" | "wav" | "opus" | "webm" | "aac"
+            )
+        })
+        .unwrap_or(false);
+    if !valid_audio_ext {
+        return Err(AppError::Invalid(
+            "Target soundtrack file must have a valid audio extension (.mp3, .flac, .m4a, .ogg, .wav, .opus).".into(),
         ));
     }
 
@@ -197,6 +222,10 @@ pub async fn start_download(
                 chunk_opt = stream.next() => {
                     match chunk_opt {
                         Some(Ok(chunk)) => {
+                            if downloaded_bytes + (chunk.len() as i64) > 250 * 1024 * 1024 {
+                                fail_download(&app_clone, &download_id_clone, "Soundtrack file exceeds 250 MB safety limit").await;
+                                return;
+                            }
                             if let Err(e) = file.write_all(&chunk) {
                                 fail_download(&app_clone, &download_id_clone, &format!("Write failed: {e}")).await;
                                 return;

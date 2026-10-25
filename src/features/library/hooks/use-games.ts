@@ -45,6 +45,7 @@ export function useGames(profileId?: string) {
 }
 
 export function useGame(id: string | undefined, profileId?: string) {
+  const queryClient = useQueryClient()
   const activeProfileId = useProfileStore((s) => s.activeProfile?.id)
   const targetId = profileId ?? activeProfileId
 
@@ -52,6 +53,23 @@ export function useGame(id: string | undefined, profileId?: string) {
     queryKey: gameKey(id ?? '', targetId),
     queryFn: () => gamesService.getGame(id as string, targetId),
     enabled: Boolean(id),
+    networkMode: 'always',
+    placeholderData: () => {
+      if (!id) return undefined
+      const directList = queryClient.getQueryData<Game[]>(profileGamesKey(targetId))
+      if (Array.isArray(directList)) {
+        const found = directList.find((g) => g.id === id)
+        if (found) return found
+      }
+      const queries = queryClient.getQueriesData<Game[]>({ queryKey: gamesKey })
+      for (const [, list] of queries) {
+        if (Array.isArray(list)) {
+          const found = list.find((g) => g.id === id)
+          if (found) return found
+        }
+      }
+      return undefined
+    },
   })
 }
 
@@ -246,8 +264,13 @@ export function useUpdateLaunchArguments() {
     mutationFn: ({ id, launchArguments }: { id: string; launchArguments: string | null }) =>
       gamesService.updateLaunchArguments(id, launchArguments),
     onSuccess: (updatedGame) => {
+      queryClient.setQueriesData<Game[]>({ queryKey: gamesKey }, (games) =>
+        Array.isArray(games)
+          ? games.map((game) => (game.id === updatedGame.id ? updatedGame : game))
+          : games,
+      )
       queryClient.setQueriesData<Game>({ queryKey: gamesKey }, (old) =>
-        old && old.id === updatedGame.id ? updatedGame : old,
+        old && !Array.isArray(old) && old.id === updatedGame.id ? updatedGame : old,
       )
       queryClient.invalidateQueries({ queryKey: gamesKey })
       toast.success('Launch options saved.')
@@ -265,8 +288,13 @@ export function useUpdatePreLaunchCommand() {
     mutationFn: ({ id, preLaunchCommand }: { id: string; preLaunchCommand: string | null }) =>
       gamesService.updatePreLaunchCommand(id, preLaunchCommand),
     onSuccess: (updatedGame) => {
+      queryClient.setQueriesData<Game[]>({ queryKey: gamesKey }, (games) =>
+        Array.isArray(games)
+          ? games.map((game) => (game.id === updatedGame.id ? updatedGame : game))
+          : games,
+      )
       queryClient.setQueriesData<Game>({ queryKey: gamesKey }, (old) =>
-        old && old.id === updatedGame.id ? updatedGame : old,
+        old && !Array.isArray(old) && old.id === updatedGame.id ? updatedGame : old,
       )
       queryClient.invalidateQueries({ queryKey: gamesKey })
       toast.success('Pre-launch command saved.')
@@ -284,8 +312,13 @@ export function useUpdatePostLaunchCommand() {
     mutationFn: ({ id, postLaunchCommand }: { id: string; postLaunchCommand: string | null }) =>
       gamesService.updatePostLaunchCommand(id, postLaunchCommand),
     onSuccess: (updatedGame) => {
+      queryClient.setQueriesData<Game[]>({ queryKey: gamesKey }, (games) =>
+        Array.isArray(games)
+          ? games.map((game) => (game.id === updatedGame.id ? updatedGame : game))
+          : games,
+      )
       queryClient.setQueriesData<Game>({ queryKey: gamesKey }, (old) =>
-        old && old.id === updatedGame.id ? updatedGame : old,
+        old && !Array.isArray(old) && old.id === updatedGame.id ? updatedGame : old,
       )
       queryClient.invalidateQueries({ queryKey: gamesKey })
       toast.success('Post-exit command saved.')
@@ -401,8 +434,9 @@ export function useSetGameUserRating() {
   })
 }
 
-export function useSyncGameMetadata() {
+export function useSyncGameMetadata(options?: { silent?: boolean }) {
   const queryClient = useQueryClient()
+  const silent = options?.silent ?? false
 
   return useMutation({
     mutationFn: (gameId: string) => metadataService.syncGameMetadata(gameId),
@@ -410,12 +444,18 @@ export function useSyncGameMetadata() {
       queryClient.setQueriesData<Game[]>({ queryKey: gamesKey }, (old) =>
         Array.isArray(old) ? old.map((g) => (g.id === updatedGame.id ? updatedGame : g)) : old,
       )
-      queryClient.setQueryData(['games', updatedGame.id], updatedGame)
+      queryClient.setQueriesData<Game>({ queryKey: gamesKey }, (old) =>
+        old && !Array.isArray(old) && old.id === updatedGame.id ? updatedGame : old,
+      )
       queryClient.invalidateQueries({ queryKey: gamesKey })
-      toast.success(`Metadata updated for ${updatedGame.name}`)
+      if (!silent) {
+        toast.success(`Metadata updated for ${updatedGame.name}`)
+      }
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : 'Failed to sync metadata from IGDB.')
+      if (!silent) {
+        toast.error(error instanceof Error ? error.message : 'Failed to sync metadata from IGDB.')
+      }
     },
   })
 }

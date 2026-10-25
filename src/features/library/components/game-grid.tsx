@@ -14,7 +14,7 @@ const CARD_GAP = 20
 const CARD_META_HEIGHT = 56
 /** Cover aspect ratio is 3:4 (width:height), so height = width * (4/3). */
 const COVER_ASPECT = 4 / 3
-const VIRTUALIZE_THRESHOLD = 48
+const VIRTUALIZE_THRESHOLD = 24
 
 interface GameGridProps {
   games: Game[]
@@ -63,7 +63,7 @@ export function GameGrid({ games, selectedId, onSelect, onContextMenu }: GameGri
     count: shouldVirtualize ? rowCount : 0,
     getScrollElement: () => parentRef.current,
     estimateSize: () => rowHeight + CARD_GAP,
-    overscan: 3,
+    overscan: 2,
     enabled: shouldVirtualize,
   })
 

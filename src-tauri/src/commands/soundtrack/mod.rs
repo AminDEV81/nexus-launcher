@@ -56,7 +56,7 @@ fn validate_soundtrack_url(raw_url: &str) -> AppResult<reqwest::Url> {
         .ok_or_else(|| AppError::Invalid("URL is missing a host.".into()))?
         .to_ascii_lowercase();
 
-    if host == "localhost" || host.ends_with(".local") || host.ends_with(".internal") {
+    if crate::commands::profiles::is_blocked_host_or_ip(&host) || host == "localhost" || host.ends_with(".local") || host.ends_with(".internal") {
         return Err(AppError::Invalid(
             "Local network URLs are not permitted.".into(),
         ));
@@ -328,6 +328,19 @@ pub async fn soundtrack_http_get(
 
     if let Some(hdrs) = headers {
         for (k, v) in hdrs {
+            let k_low = k.trim().to_ascii_lowercase();
+            if matches!(
+                k_low.as_str(),
+                "host"
+                    | "cookie"
+                    | "authorization"
+                    | "proxy-authorization"
+                    | "transfer-encoding"
+                    | "connection"
+                    | "content-length"
+            ) {
+                continue;
+            }
             req = req.header(k, v);
         }
     }

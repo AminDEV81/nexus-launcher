@@ -92,7 +92,23 @@ function App() {
 
   const fontFamily = useAppearanceSettingsStore((s) => s.fontFamily)
   useEffect(() => {
-    document.documentElement.setAttribute('data-font', fontFamily || 'sora')
+    const activeFont = fontFamily || 'sora'
+    document.documentElement.setAttribute('data-font', activeFont)
+
+    if (activeFont === 'sora') return
+    const loadOptionalFonts = () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return
+      if (document.getElementById('nx-optional-google-fonts')) return
+      const link = document.createElement('link')
+      link.id = 'nx-optional-google-fonts'
+      link.rel = 'stylesheet'
+      link.href =
+        'https://fonts.googleapis.com/css2?family=Audiowide&family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,700&family=JetBrains+Mono:wght@300;400;500;600;700;800&family=Orbitron:wght@400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Rajdhani:wght@300;400;500;600;700&family=Russo+One&family=Teko:wght@300;400;500;600;700&display=swap'
+      document.head.appendChild(link)
+    }
+    loadOptionalFonts()
+    window.addEventListener('online', loadOptionalFonts)
+    return () => window.removeEventListener('online', loadOptionalFonts)
   }, [fontFamily])
 
   const fontWeight = useAppearanceSettingsStore((s) => s.fontWeight)

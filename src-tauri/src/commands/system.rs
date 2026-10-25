@@ -6,6 +6,7 @@ use sysinfo::{Disks, System};
 use tauri::State;
 
 static LIVE_METRICS_SYSTEM: OnceLock<Mutex<System>> = OnceLock::new();
+static LIVE_METRICS_CACHE: OnceLock<Mutex<Option<(std::time::Instant, LiveSystemMetrics)>>> = OnceLock::new();
 
 fn shared_metrics_system() -> &'static Mutex<System> {
     LIVE_METRICS_SYSTEM.get_or_init(|| {
@@ -446,11 +447,20 @@ pub fn shutdown_system(action: Option<String>) -> AppResult<()> {
 /// between polls without blocking the main UI thread.
 #[tauri::command]
 pub async fn get_live_metrics() -> AppResult<LiveSystemMetrics> {
-    tokio::task::spawn_blocking(|| {
+    let cache_mutex = LIVE_METRICS_CACHE.get_or_init(|| Mutex::new(None));
+    if let Ok(guard) = cache_mutex.lock() {
+        if let Some((ts, ref cached)) = *guard {
+            if ts.elapsed() < std::time::Duration::from_millis(1500) {
+                return Ok(cached.clone());
+            }
+        }
+    }
+
+    tokio::task::spawn_blocking(move || {
         let mut sys = shared_metrics_system()
             .lock()
             .expect("live metrics system mutex poisoned");
-        sys.refresh_cpu_all();
+        sys.refresh_cpu_usage();
         sys.refresh_memory();
 
         let total_memory = sys.total_memory();
@@ -472,11 +482,15 @@ pub async fn get_live_metrics() -> AppResult<LiveSystemMetrics> {
             0.0
         };
 
-        Ok(LiveSystemMetrics {
+        let snapshot = LiveSystemMetrics {
             memory,
             cpu_usage_percent: (cpu_usage * 10.0).round() / 10.0,
             cpu_frequency_mhz: cpu_freq,
-        })
+        };
+        if let Ok(mut guard) = cache_mutex.lock() {
+            *guard = Some((std::time::Instant::now(), snapshot.clone()));
+        }
+        Ok(snapshot)
     })
     .await
     .map_err(|e| AppError::Other(e.to_string()))?

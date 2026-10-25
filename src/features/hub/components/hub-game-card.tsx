@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bookmark,
@@ -64,7 +64,7 @@ function compactPlatformLabels(platforms?: string[]): string[] {
   return Array.from(out)
 }
 
-export function HubGameCard({
+export const HubGameCard = memo(function HubGameCard({
   game,
   feed: _feed,
   inLibrary,
@@ -209,6 +209,7 @@ export function HubGameCard({
             src={activeCoverUrl}
             alt={game.name}
             loading="lazy"
+            decoding="async"
             draggable={false}
             onError={() => {
               setCoverIdx((prev) => prev + 1)
@@ -569,4 +570,4 @@ export function HubGameCard({
       </button>
     </div>
   )
-}
+})

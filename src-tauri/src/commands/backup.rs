@@ -438,6 +438,10 @@ async fn reimport_artwork(app: AppHandle) {
     }
     log::info!("re-importing {} artwork files from source URLs", urls.len());
 
+    let Ok(app_dir) = crate::paths::app_data_dir(&app) else {
+        return;
+    };
+    let allowed_artwork_root = app_dir.join("artwork");
     let http = app.state::<crate::commands::metadata::HttpClient>();
     for (local_path, url) in urls {
         let parsed = match reqwest::Url::parse(&url) {
@@ -447,11 +451,47 @@ async fn reimport_artwork(app: AppHandle) {
         if !matches!(parsed.scheme(), "http" | "https") {
             continue;
         }
+        let Some(host) = parsed.host_str() else {
+            continue;
+        };
+        if crate::commands::profiles::is_blocked_host_or_ip(host) {
+            log::warn!("blocked SSRF attempt in backup artwork restore: {url}");
+            continue;
+        }
+
+        // Prevent arbitrary file write / path traversal from crafted backup JSON
+        let target_path = std::path::Path::new(&local_path);
+        if target_path
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+            || !target_path.starts_with(&allowed_artwork_root)
+        {
+            log::warn!("blocked out-of-bounds artwork restore path: {local_path}");
+            continue;
+        }
+        let valid_ext = target_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|ext| {
+                matches!(
+                    ext.to_ascii_lowercase().as_str(),
+                    "jpg" | "jpeg" | "png" | "webp" | "gif" | "ico" | "bmp" | "avif"
+                )
+            })
+            .unwrap_or(false);
+        if !valid_ext {
+            log::warn!("blocked non-image extension in artwork restore: {local_path}");
+            continue;
+        }
+        if let Some(parent) = target_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+
         match http.0.get(&url).send().await {
             Ok(response) if response.status().is_success() => match response.bytes().await {
                 Ok(bytes) => {
                     if bytes.len() as u64 <= 25 * 1024 * 1024 {
-                        if let Err(err) = std::fs::write(&local_path, &bytes) {
+                        if let Err(err) = std::fs::write(target_path, &bytes) {
                             log::warn!("could not restore artwork {local_path}: {err}");
                         }
                     }
@@ -460,8 +500,6 @@ async fn reimport_artwork(app: AppHandle) {
             },
             _ => log::warn!("artwork download failed for {url}"),
         }
-        // Sequential on purpose — a restored library can reference a
-        // few hundred images and they're not worth a rate-limit hit.
         tokio::time::sleep(std::time::Duration::from_millis(150)).await;
     }
 

@@ -21,6 +21,7 @@ import { useUpdaterStore } from '@/store/updater-store'
 import { useCloseFlowStore } from '@/store/close-flow-store'
 import { useLaunchStore } from '@/store/launch-store'
 import { useWindowActive } from '@/hooks/use-window-active'
+import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
 import { getLiveMetrics } from '@/services/system'
 import { runGameBoost } from '@/services/booster'
 import { formatBytes } from '@/features/library/utils/guess-name'
@@ -62,25 +63,38 @@ export function TitleBar() {
   const [sessionSeconds, setSessionSeconds] = useState<number>(0)
   const targetBreakMins = BREAK_PRESETS_MINS[breakPresetIdx]
 
+  const gpuEcoMode = useAppearanceSettingsStore((s) => s.gpuEcoMode)
+
   useEffect(() => {
+    let disposed = false
+    let unlistenFn: (() => void) | null = null
     const syncMaximized = () => {
       appWindow
         .isMaximized()
-        .then(setIsMaximized)
+        .then((val) => {
+          if (!disposed) setIsMaximized(val)
+        })
         .catch(() => {})
     }
 
     syncMaximized()
-    const unlisten = appWindow.onResized(syncMaximized)
+    appWindow
+      .onResized(syncMaximized)
+      .then((fn) => {
+        if (disposed) fn()
+        else unlistenFn = fn
+      })
+      .catch(() => {})
 
     return () => {
-      unlisten.then((fn) => fn())
+      disposed = true
+      unlistenFn?.()
     }
   }, [])
 
-  // Lightweight hardware + controller poll every 4 seconds ONLY while window is focused
+  // Lightweight hardware + controller poll ONLY while window is focused and no game is actively running
   useEffect(() => {
-    if (!windowActive) return
+    if (!windowActive || isAnyGameRunning) return
     let cancelled = false
 
     const pollTelemetry = async () => {
@@ -108,12 +122,13 @@ export function TitleBar() {
     }
 
     void pollTelemetry()
-    const id = window.setInterval(pollTelemetry, 4000)
+    const pollIntervalMs = gpuEcoMode ? 8000 : 4000
+    const id = window.setInterval(pollTelemetry, pollIntervalMs)
     return () => {
       cancelled = true
       window.clearInterval(id)
     }
-  }, [windowActive])
+  }, [windowActive, isAnyGameRunning, gpuEcoMode])
 
   // Gaming Session & Break Reminder Ticker
   useEffect(() => {

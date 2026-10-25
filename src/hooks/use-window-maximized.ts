@@ -36,12 +36,19 @@ export function useWindowFillsScreen() {
       }
     }
 
-    const unlistenPromise = current.onResized(() => void refresh())
+    let unlistenFn: (() => void) | null = null
+    current
+      .onResized(() => void refresh())
+      .then((fn) => {
+        if (disposed) fn()
+        else unlistenFn = fn
+      })
+      .catch(() => {})
     void refresh()
 
     return () => {
       disposed = true
-      void unlistenPromise.then((unlisten) => unlisten())
+      unlistenFn?.()
     }
   }, [])
 

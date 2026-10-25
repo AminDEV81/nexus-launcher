@@ -181,16 +181,25 @@ export function HubTrailerModal({
 
   // Listen for Google login success event emitted by Rust backend
   useEffect(() => {
-    const unlistenPromise = listen('google-auth-success', () => {
+    let disposed = false
+    let unlistenFn: (() => void) | null = null
+    listen('google-auth-success', () => {
+      if (disposed) return
       setIsGoogleConnected(true)
       setIsDockedSigningIn(false)
       localStorage.setItem('google_auth_active', 'true')
       setPlayerKey((k) => k + 1)
       toast.success('Google account verified! 18+ age-restricted trailers unlocked.')
     })
+      .then((fn) => {
+        if (disposed) fn()
+        else unlistenFn = fn
+      })
+      .catch(() => {})
 
     return () => {
-      void unlistenPromise.then((unlisten) => unlisten())
+      disposed = true
+      unlistenFn?.()
     }
   }, [])
 
