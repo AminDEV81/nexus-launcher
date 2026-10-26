@@ -4,15 +4,15 @@
  */
 
 const CONFIG = {
-  defaultVersion: 'v0.6.0',
+  defaultVersion: 'v0.7.5',
   defaultDownloadUrl:
-    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.6.0_x64-setup.exe',
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.7.5_x64-setup.exe',
   defaultAppImageUrl:
-    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.6.0_amd64.AppImage',
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus_0.7.5_amd64.AppImage',
   defaultDebUrl:
-    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.6.0_amd64.deb',
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/nexus_0.7.5_amd64.deb',
   defaultRpmUrl:
-    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus-0.6.0-1.x86_64.rpm',
+    'https://github.com/AminDEV81/nexus-launcher/releases/latest/download/Nexus-0.7.5-1.x86_64.rpm',
   githubApiUrl: 'https://api.github.com/repos/AminDEV81/nexus-launcher/releases/latest',
   githubRepoUrl: 'https://github.com/AminDEV81/nexus-launcher',
 }
@@ -20,8 +20,8 @@ const CONFIG = {
 const TRANSLATIONS = {
   fa: {
     top_bar_msg:
-      'نسخه ۰.۶.۰ لانچر نکسوس منتشر شد — مجهز به گیم بوستر و توئیک‌های سیستمی ویندوز، تنظیم رزولوشن تایمر 0.5ms، پاک‌کننده هوشمند حافظه و کش، بازطراحی پاپ‌آپ بوست و پایداری کامل!',
-    top_bar_cta: 'دانلود نسخه ۰.۶.۰ ←',
+      'نسخه ۰.۷.۵ لانچر نکسوس منتشر شد — پایداری حداکثری، بهینه‌سازی پیشرفته پلیر ساندترک، شبیه‌ساز دسته DualSense، گیم هاب هوشمند و بهبود عملکرد!',
+    top_bar_cta: 'دانلود نسخه ۰.۷.۵ ←',
     nav_showcase: 'نمای زنده برنامه',
     nav_features: 'ویژگی‌های کلیدی',
     nav_booster: 'بوستر رم',
@@ -34,7 +34,7 @@ const TRANSLATIONS = {
     hero_title_2: 'برای تمام بازی‌های شما در ویندوز و لینوکس',
     hero_subtitle:
       'توسعه یافته بر پایه معماری بومی Rust و Tauri 2. فقط ۶۰ مگابایت مصرف رم، همراه با گیم بوستر و بهینه‌ساز سیستم، پاک‌کننده هوشمند دیسک، منوی شناور بازی (Overlay HUD)، ردیابی فریم ETW و پشتیبانی رسمی لینوکس بدون تبلیغات.',
-    hero_download_btn: 'دانلود نسخه رسمی ویندوز v0.6.0',
+    hero_download_btn: 'دانلود نسخه رسمی ویندوز v0.7.5',
     hero_download_linux: 'دانلود نسخه لینوکس',
     hero_download_deb: 'پکیج دبیان و اوبونتو (.deb)',
     hero_source_btn: 'مشاهده پروژه در گیت‌هاب',
@@ -181,19 +181,19 @@ const TRANSLATIONS = {
     faq_q6: 'اسکنر خودکار سیستم (System Scanner) چه بازی‌هایی را پیدا می‌کند؟',
     faq_a6:
       'این اسکنر به صورت خودکار بازی‌های نصب‌شده از ۸ لانچر معتبر شامل Steam, Epic Games Launcher, GOG Galaxy, EA App, Ubisoft Connect, Battle.net, Amazon Games و Xbox PC Game Pass را اسکن کرده و امکان افزودن یکباره آنها با دریافت خودکار پوستر و متادیتا را به شما می‌دهد.',
-    bento_v6_title: 'توییک‌های سیستمی ویندوز و موتور هوشمند پاکسازی حافظه (جدید v0.6.0)',
+    bento_v6_title: 'توییک‌های سیستمی ویندوز و موتور هوشمند پاکسازی حافظه (v0.7.5)',
     bento_v6_desc:
       'فعال‌سازی تایمر فوق‌دقیق ۰.۵ میلی‌ثانیه‌ای ویندوز (NtSetTimerResolution) برای به حداقل رساندن تأخیر ورودی، اولویت بلادرنگ پردازنده (Real-Time Priority)، به همراه موتور پاکسازی اختصاصی حافظه (Storage Clean Up) با محافظت هوشمند از سیوهای فعال و آزاد‌سازی گیگابایت‌ها فضای هرز دیسک.',
 
     cta_heading: 'همین حالا Nexus Launcher را تجربه کنید',
     cta_subheading:
       'لذت مدیریت یکپارچه بازی‌ها با نهایت سرعت، بدون کرومیوم و با کمترین مصرف رم در ویندوز و لینوکس.',
-    cta_btn_download: 'دانلود نسخه رسمی ویندوز v0.6.0',
+    cta_btn_download: 'دانلود نسخه رسمی ویندوز v0.7.5',
     cta_btn_linux: 'دانلود نسخه لینوکس',
     cta_btn_all_releases: 'سایر نسخه‌ها در گیت‌هاب',
     cta_github_badge: 'مخزن',
     linux_select_format: 'انتخاب فرمت',
-    linux_modal_title: 'دانلود لانچر نکسوس نسخه ۰.۶.۰ برای لینوکس',
+    linux_modal_title: 'دانلود لانچر نکسوس نسخه ۰.۷.۵ برای لینوکس',
     linux_modal_subtitle: 'فرمت متناسب با توزیع سیستم‌عامل خود را انتخاب و دانلود نمایید:',
     linux_tab_appimage_title: 'بسته همه‌منظوره AppImage (پیشنهادی)',
     linux_tab_appimage_desc:
@@ -212,14 +212,14 @@ const TRANSLATIONS = {
     linux_steamos_tip:
       '🎮 کاربران کنسول دستی استیم‌دک (Steam Deck): فایل AppImage را دانلود کرده و در حالت Desktop به عنوان یک Non-Steam Game به کتابخانه استیم خود اضافه کنید تا مستقیماً در Gaming Mode اجرا شود.',
     linux_wayland_tip:
-      '🐧 کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت باز نشدن پنجره AppImage، برنامه را در ترمینال با دستور GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Nexus_0.6.0_amd64.AppImage اجرا فرمایید.',
+      '🐧 کاربران محیط‌های Wayland و Hyprland (مثل Omarchy): در صورت باز نشدن پنجره AppImage، برنامه را در ترمینال با دستور GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Nexus_0.7.5_amd64.AppImage اجرا فرمایید.',
     footer_license: 'منتشر شده تحت مجوز رسمی و آزاد MIT',
     footer_author: 'طراحی و توسعه توسط',
   },
   en: {
     top_bar_msg:
-      'Nexus Launcher v0.6.0 released — featuring Deep Windows System Tweaks, 0.5ms High-Resolution Timer, Smart Storage & Cache Cleaner, Redesigned Boost Modal & Performance Polish!',
-    top_bar_cta: 'Download v0.6.0 &rarr;',
+      'Nexus Launcher v0.7.5 released — featuring maximum stability, optimized Soundtrack Player, DualSense Controller Emulation, Smart Game Hub & Performance Polish!',
+    top_bar_cta: 'Download v0.7.5 &rarr;',
     nav_showcase: 'Live Showcase',
     nav_features: 'Features',
     nav_booster: 'RAM Booster',
@@ -232,7 +232,7 @@ const TRANSLATIONS = {
     hero_title_2: 'Game Launcher for Windows & Linux',
     hero_subtitle:
       'Built natively with Rust and Tauri 2. Ultra-light ~60MB RAM footprint, advanced Game Booster & System Tweaks, smart Storage Cleaner, Gaming Overlay HUD, ETW frame tracking, and official Linux support with zero ads.',
-    hero_download_btn: 'Download Official Windows v0.6.0',
+    hero_download_btn: 'Download Official Windows v0.7.5',
     hero_download_linux: 'Download for Linux',
     hero_download_deb: 'Debian / Ubuntu Package (.deb)',
     hero_source_btn: 'View Project on GitHub',
@@ -377,25 +377,25 @@ const TRANSLATIONS = {
     faq_q4: 'Is my data or account sent to any server?',
     faq_a4:
       'Never. All data and game stats reside strictly inside your local SQLite database on your machine.',
-    faq_q5: 'How does Linux and Arch Linux support work in v0.6.0?',
+    faq_q5: 'How does Linux and Arch Linux support work in v0.7.5?',
     faq_a5:
       'Nexus Launcher now officially provides portable AppImage packages for Arch Linux (Manjaro, EndeavourOS), SteamOS (Steam Deck), plus Debian/Ubuntu .deb and Fedora .rpm packages. Just download and run (chmod +x).',
     faq_q6: 'What stores and games does the automated System Scanner detect?',
     faq_a6:
       'The scanner automatically discovers games installed from 8 major storefronts: Steam, Epic Games Launcher, GOG Galaxy, EA App, Ubisoft Connect, Battle.net, Amazon Games, and Xbox PC Game Pass, allowing one-click import with auto-fetched covers and metadata.',
-    bento_v6_title: 'Windows Deep System Tweaks & Smart Storage Clean Up Engine (NEW v0.6.0)',
+    bento_v6_title: 'Windows Deep System Tweaks & Smart Storage Clean Up Engine (v0.7.5)',
     bento_v6_desc:
       '0.5ms high-resolution multimedia timer via NtSetTimerResolution for ultra-low latency, real-time CPU process priority, Ultimate Performance power plan, and dedicated Storage Clean Up engine with active saves safeguard to reclaim gigabytes of orphaned disk space.',
 
     cta_heading: 'Experience Nexus Launcher Today',
     cta_subheading:
       'Take control of your gaming library with unprecedented speed and native Rust efficiency on Windows and Linux.',
-    cta_btn_download: 'Download Official Windows v0.6.0',
+    cta_btn_download: 'Download Official Windows v0.7.5',
     cta_btn_linux: 'Download for Linux',
     cta_btn_all_releases: 'All Releases on GitHub',
     cta_github_badge: 'Repo',
     linux_select_format: 'Select Format',
-    linux_modal_title: 'Download Nexus Launcher v0.6.0 for Linux',
+    linux_modal_title: 'Download Nexus Launcher v0.7.5 for Linux',
     linux_modal_subtitle: 'Choose the package format matching your Linux distribution:',
     linux_tab_appimage_title: 'Universal AppImage Package (Recommended)',
     linux_tab_appimage_desc:
@@ -413,7 +413,7 @@ const TRANSLATIONS = {
     linux_steamos_tip:
       '🎮 Steam Deck users: Download the AppImage and add it as a Non-Steam Game in Desktop Mode.',
     linux_wayland_tip:
-      '🐧 Wayland & Hyprland users (e.g. Omarchy): If the AppImage window does not appear, launch via terminal with GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Nexus_0.6.0_amd64.AppImage.',
+      '🐧 Wayland & Hyprland users (e.g. Omarchy): If the AppImage window does not appear, launch via terminal with GDK_BACKEND=wayland WEBKIT_DISABLE_DMABUF_RENDERER=1 ./Nexus_0.7.5_amd64.AppImage.',
     footer_license: 'Released under the official MIT License',
     footer_author: 'Designed & developed by',
   },
