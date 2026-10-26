@@ -2,8 +2,8 @@ use crate::commands::save_manager::detector::SaveDetector;
 use crate::commands::save_manager::error::{SaveManagerError, SaveResult};
 use crate::commands::save_manager::fs_ops::{
     calculate_tree_hash, copy_dir_recursive, expand_save_path, flush_file_or_dir_buffers,
-    get_nexus_profiles_root, remove_path_all_with_retry, safe_replace_dir, scan_path_file_stats,
-    verify_disk_space,
+    get_nexus_profiles_root, remove_path_all_with_retry, safe_replace_dir, sanitize_safe_id_segment,
+    scan_path_file_stats, validate_safe_save_location_path, verify_disk_space,
 };
 use crate::commands::save_manager::journal::JournalManager;
 use crate::commands::save_manager::snapshots::SnapshotEngine;
@@ -57,7 +57,17 @@ impl TransactionCoordinator {
 
         let mut list = Vec::new();
         for r in rows {
-            list.push(r?);
+            let cfg = r?;
+            if let Err(err) = validate_safe_save_location_path(&cfg.raw_path) {
+                log::warn!(
+                    "Skipping unsafe save location '{}' for game {}: {}",
+                    cfg.raw_path,
+                    game_id,
+                    err
+                );
+                continue;
+            }
+            list.push(cfg);
         }
         Ok(list)
     }
@@ -66,11 +76,11 @@ impl TransactionCoordinator {
     /// `%APPDATA%\Nexus\profiles\<profile_id>\games\<game_id>\current\<location_id>\`
     pub fn get_profile_current_path(profile_id: &str, game_id: &str, location_id: &str) -> PathBuf {
         get_nexus_profiles_root()
-            .join(profile_id)
+            .join(sanitize_safe_id_segment(profile_id))
             .join("games")
-            .join(game_id)
+            .join(sanitize_safe_id_segment(game_id))
             .join("current")
-            .join(location_id)
+            .join(sanitize_safe_id_segment(location_id))
     }
 
     /// Transaction staging root path:
@@ -81,11 +91,11 @@ impl TransactionCoordinator {
         op_id: &str,
     ) -> PathBuf {
         get_nexus_profiles_root()
-            .join(profile_id)
+            .join(sanitize_safe_id_segment(profile_id))
             .join("games")
-            .join(game_id)
+            .join(sanitize_safe_id_segment(game_id))
             .join("staging")
-            .join(op_id)
+            .join(sanitize_safe_id_segment(op_id))
     }
 
     /// Transaction staging path:
@@ -97,12 +107,12 @@ impl TransactionCoordinator {
         location_id: &str,
     ) -> PathBuf {
         get_nexus_profiles_root()
-            .join(profile_id)
+            .join(sanitize_safe_id_segment(profile_id))
             .join("games")
-            .join(game_id)
+            .join(sanitize_safe_id_segment(game_id))
             .join("staging")
-            .join(op_id)
-            .join(location_id)
+            .join(sanitize_safe_id_segment(op_id))
+            .join(sanitize_safe_id_segment(location_id))
     }
 
     /// Transaction backup path:
@@ -114,12 +124,12 @@ impl TransactionCoordinator {
         location_id: &str,
     ) -> PathBuf {
         get_nexus_profiles_root()
-            .join(profile_id)
+            .join(sanitize_safe_id_segment(profile_id))
             .join("games")
-            .join(game_id)
+            .join(sanitize_safe_id_segment(game_id))
             .join("staging")
-            .join(op_id)
-            .join(format!("backup_{}", location_id))
+            .join(sanitize_safe_id_segment(op_id))
+            .join(format!("backup_{}", sanitize_safe_id_segment(location_id)))
     }
 
     /// PREPARE GAME SAVES (Launch Preparation Transaction).
@@ -165,10 +175,8 @@ impl TransactionCoordinator {
                 |row| row.get(0),
             )
             .ok();
-        if total_profiles <= 1 && cur_profile_state.as_deref() != Some("empty") {
-            let _ = JournalManager::update_operation_state(conn, &op_id, "completed");
-            return Ok(op_id);
-        }
+        let single_profile_in_place =
+            total_profiles <= 1 && cur_profile_state.as_deref() != Some("empty");
 
         let any_profile_has_saves: bool = conn
             .query_row(
@@ -281,7 +289,7 @@ impl TransactionCoordinator {
                 false
             }
         });
-        if all_already_in_sync {
+        if single_profile_in_place || all_already_in_sync {
             let _ = JournalManager::update_operation_state(conn, &op_id, "completed");
             return Ok(op_id);
         }
@@ -398,12 +406,7 @@ impl TransactionCoordinator {
         JournalManager::update_operation_state(conn, &op_id, "final_verified")?;
 
         // 6. Cleanup Staging & Backup
-        let staging_root = get_nexus_profiles_root()
-            .join(profile_id)
-            .join("games")
-            .join(game_id)
-            .join("staging")
-            .join(&op_id);
+        let staging_root = Self::get_staging_root(profile_id, game_id, &op_id);
         let _ = remove_path_all_with_retry(&staging_root);
 
         // 7. Update DB state
@@ -622,12 +625,7 @@ impl TransactionCoordinator {
 
         JournalManager::update_operation_state(conn, &op_id, "final_verified")?;
 
-        let staging_root = get_nexus_profiles_root()
-            .join(profile_id)
-            .join("games")
-            .join(game_id)
-            .join("staging")
-            .join(&op_id);
+        let staging_root = Self::get_staging_root(profile_id, game_id, &op_id);
         let _ = remove_path_all_with_retry(&staging_root);
         let _ = SnapshotEngine::prune_snapshots(conn, profile_id, game_id);
 
@@ -745,9 +743,9 @@ impl TransactionCoordinator {
                     let candidate = entry
                         .path()
                         .join("games")
-                        .join(game_id)
+                        .join(sanitize_safe_id_segment(game_id))
                         .join("snapshots")
-                        .join(snapshot_id);
+                        .join(sanitize_safe_id_segment(snapshot_id));
                     if candidate.exists() {
                         snap_dir = candidate;
                         break;
@@ -800,7 +798,7 @@ impl TransactionCoordinator {
 
             let mut src_loc: Option<PathBuf> = None;
 
-            let direct = snap_dir.join(&loc.id);
+            let direct = snap_dir.join(sanitize_safe_id_segment(&loc.id));
             if direct.exists() {
                 src_loc = Some(direct);
             }
@@ -814,7 +812,7 @@ impl TransactionCoordinator {
                                 .to_string_lossy()
                                 .eq_ignore_ascii_case(&loc.os_path.to_string_lossy())
                         {
-                            let p = snap_dir.join(&loc_meta.location_id);
+                            let p = snap_dir.join(sanitize_safe_id_segment(&loc_meta.location_id));
                             if p.exists() {
                                 src_loc = Some(p);
                                 break;

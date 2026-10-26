@@ -170,7 +170,7 @@ const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
 export class KHInsiderProvider extends BaseSoundtrackProvider {
   public id = 'khinsider'
   public name = 'KHInsider (VGM)'
-  public priority = 15
+  public priority = 20
 
   public capabilities: ProviderCapabilities = {
     metadata: true,
@@ -392,6 +392,13 @@ export class KHInsiderProvider extends BaseSoundtrackProvider {
           } else if (!title) {
             songPath = lm[1]
             title = text
+          }
+        }
+
+        if (durationMs === 0) {
+          const fallbackDur = row.match(/>(\d+):(\d{2})<\/(?:a|td)>/i)
+          if (fallbackDur) {
+            durationMs = (Number(fallbackDur[1]) * 60 + Number(fallbackDur[2])) * 1000
           }
         }
 

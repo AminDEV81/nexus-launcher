@@ -413,16 +413,156 @@ pub fn remove_path_all_with_retry(path: &Path) -> SaveResult<()> {
 /// If `target_path` exists and `backup_path` is given:
 ///   1. Moves/copies `target_path` to `backup_path` and flushes.
 ///   2. Moves/copies `staging_path` to `target_path` and flushes.
+/// Validates that a single identifier segment (`profile_id`, `game_id`, `location_id`, `op_id`, `snapshot_id`)
+/// cannot escape its parent directory or override a base path in `Path::join`.
+pub fn is_valid_id_segment(raw: &str) -> bool {
+    let trimmed = raw.trim();
+    !trimmed.is_empty()
+        && trimmed.len() <= 128
+        && trimmed != "."
+        && trimmed != ".."
+        && trimmed
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+}
+
+/// Sanitizes an identifier into a safe single path segment.
+pub fn sanitize_safe_id_segment(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if is_valid_id_segment(trimmed) {
+        return trimmed.to_string();
+    }
+    let cleaned: String = trimmed
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+        .take(128)
+        .collect();
+    if cleaned.is_empty() || cleaned == "." || cleaned == ".." {
+        "_invalid_id_".to_string()
+    } else {
+        cleaned
+    }
+}
+
+fn normalize_for_guard(p: &Path) -> String {
+    p.to_string_lossy()
+        .replace('/', "\\")
+        .trim_end_matches('\\')
+        .to_lowercase()
+}
+
+/// Validates that a candidate save location path is not a drive root, user home root,
+/// system directory, or top-level user shell folder (Documents, AppData, Saved Games root, Desktop, Downloads).
+pub fn validate_safe_save_location_path(raw: &str) -> Result<PathBuf, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("Save path cannot be empty.".into());
+    }
+    let expanded = expand_save_path(trimmed);
+    if !expanded.is_absolute() {
+        return Err("Save path must be an absolute path.".into());
+    }
+    for comp in expanded.components() {
+        if matches!(comp, std::path::Component::ParentDir | std::path::Component::CurDir) {
+            return Err("Save path cannot contain relative traversal segments ('.' or '..').".into());
+        }
+    }
+
+    let normal_count = expanded
+        .components()
+        .filter(|c| matches!(c, std::path::Component::Normal(_)))
+        .count();
+    if normal_count < 3 {
+        return Err(
+            "Save path is too shallow; root and top-level system/user directories cannot be used as a game save path."
+                .into(),
+        );
+    }
+
+    let norm = normalize_for_guard(&expanded);
+    let profiles_root_norm = normalize_for_guard(&get_nexus_profiles_root());
+    if norm == profiles_root_norm || norm.starts_with(&format!("{profiles_root_norm}\\")) {
+        return Err("Nexus internal profile storage cannot be configured as an OS save path.".into());
+    }
+
+    let mut protected_exact: Vec<String> = vec![
+        "c:".into(),
+        "c:\\users".into(),
+        "c:\\Users\\public".to_lowercase(),
+        "c:\\users\\public\\documents".into(),
+        "c:\\programdata".into(),
+        "c:\\windows".into(),
+        "c:\\program files".into(),
+        "c:\\program files (x86)".into(),
+        "/".into(),
+        "/home".into(),
+        "/users".into(),
+        "/root".into(),
+        "/etc".into(),
+        "/usr".into(),
+        "/var".into(),
+        "/bin".into(),
+        "/sbin".into(),
+    ];
+
+    if let Some(home) = dirs::home_dir() {
+        protected_exact.push(normalize_for_guard(&home));
+        protected_exact.push(normalize_for_guard(&home.join("Saved Games")));
+        protected_exact.push(normalize_for_guard(&home.join("OneDrive")));
+    }
+    for dir_opt in [
+        dirs::document_dir(),
+        dirs::config_dir(),
+        dirs::data_local_dir(),
+        dirs::desktop_dir(),
+        dirs::download_dir(),
+        dirs::picture_dir(),
+        dirs::video_dir(),
+        dirs::audio_dir(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        protected_exact.push(normalize_for_guard(&dir_opt));
+    }
+
+    if protected_exact.iter().any(|p| p == &norm) {
+        return Err(format!(
+            "Refusing to use top-level system or user directory '{}' as a save folder; please select a game-specific subfolder.",
+            expanded.display()
+        ));
+    }
+
+    for sys_prefix in ["c:\\windows\\", "c:\\program files\\system32\\", "/etc/", "/usr/", "/bin/", "/sbin/"] {
+        if norm.starts_with(sys_prefix) {
+            return Err("System operating directories cannot be used as game save paths.".into());
+        }
+    }
+
+    Ok(expanded)
+}
+
 pub fn safe_replace_dir(
     staging_path: &Path,
     target_path: &Path,
     backup_path: Option<&Path>,
 ) -> SaveResult<()> {
+    // Defense-in-depth: if target_path is outside Nexus profiles vault, enforce safe save location depth/blacklist
+    let profiles_root_norm = normalize_for_guard(&get_nexus_profiles_root());
+    let target_norm = normalize_for_guard(target_path);
+    if !target_norm.starts_with(&format!("{profiles_root_norm}\\")) {
+        if let Err(msg) = validate_safe_save_location_path(&target_path.to_string_lossy()) {
+            return Err(SaveManagerError::IoError(msg));
+        }
+    }
+
     let same_vol = if let Some(bp) = backup_path {
         is_same_volume(staging_path, target_path) && is_same_volume(target_path, bp)
     } else {
         is_same_volume(staging_path, target_path)
     };
+
+    let mut backed_up_to: Option<&Path> = None;
 
     // Step 1: Backup existing target if present
     if target_path.exists() {
@@ -444,25 +584,43 @@ pub fn safe_replace_dir(
                 flush_file_or_dir_buffers(bp)?;
                 remove_path_all_with_retry(target_path)?;
             }
+            backed_up_to = Some(bp);
         } else {
             remove_path_all_with_retry(target_path)?;
         }
     }
 
-    // Step 2: Move staging to target
-    if let Some(parent) = target_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    if same_vol {
-        with_locked_retry(staging_path, || fs::rename(staging_path, target_path))?;
+    // Step 2: Move staging to target (with self-contained rollback from `backed_up_to` on failure)
+    let step2_res: SaveResult<()> = (|| {
         if let Some(parent) = target_path.parent() {
-            flush_file_or_dir_buffers(parent)?;
+            fs::create_dir_all(parent)?;
         }
-    } else {
-        copy_dir_recursive(staging_path, target_path)?;
-        flush_file_or_dir_buffers(target_path)?;
-        remove_path_all_with_retry(staging_path)?;
+
+        if same_vol {
+            with_locked_retry(staging_path, || fs::rename(staging_path, target_path))?;
+            if let Some(parent) = target_path.parent() {
+                flush_file_or_dir_buffers(parent)?;
+            }
+        } else {
+            copy_dir_recursive(staging_path, target_path)?;
+            flush_file_or_dir_buffers(target_path)?;
+            remove_path_all_with_retry(staging_path)?;
+        }
+        Ok(())
+    })();
+
+    if let Err(err) = step2_res {
+        if let Some(bp) = backed_up_to {
+            if bp.exists() {
+                let _ = remove_path_all_with_retry(target_path);
+                if same_vol {
+                    let _ = with_locked_retry(bp, || fs::rename(bp, target_path));
+                } else if copy_dir_recursive(bp, target_path).is_ok() {
+                    let _ = flush_file_or_dir_buffers(target_path);
+                }
+            }
+        }
+        return Err(err);
     }
 
     Ok(())

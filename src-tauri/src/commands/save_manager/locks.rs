@@ -28,7 +28,7 @@ impl SaveManagerLocks {
 
     /// Retrieves or initializes the Arc<AsyncMutex<()>> for a given game.
     pub fn get_game_lock(&self, game_id: &str) -> Arc<AsyncMutex<()>> {
-        let mut map = self.game_locks.lock().expect("game_locks mutex poisoned");
+        let mut map = self.game_locks.lock().unwrap_or_else(|e| e.into_inner());
         map.entry(game_id.to_string())
             .or_insert_with(|| Arc::new(AsyncMutex::new(())))
             .clone()

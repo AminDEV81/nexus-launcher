@@ -26,7 +26,7 @@ pub fn scan_directories(
 ) -> AppResult<Vec<SoundtrackLocalFile>> {
     // 1. Load library games for matching
     let games: Vec<(String, String, String)> = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn.prepare("SELECT id, name FROM games")?;
         let rows = stmt.query_map([], |row| {
             let id: String = row.get(0)?;
@@ -137,7 +137,7 @@ pub fn scan_directories(
 
     // Persist to database
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         for file in &found_files {
             let _ = conn.execute(
                 "INSERT INTO soundtrack_local_files (

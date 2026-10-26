@@ -111,38 +111,38 @@ export function usePlaytimeTracking() {
           },
         })
       }
-    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn))).catch(() => {})
 
     listen<LaunchBoostProgressPayload>('launch-boost-progress', (event) => {
       useLaunchBoostStore.getState().onProgress(event.payload)
-    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn))).catch(() => {})
 
     listen<LaunchBoostCompletePayload>('launch-boost-complete', (event) => {
       useLaunchBoostStore.getState().onComplete(event.payload.report.closed_apps)
-    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn))).catch(() => {})
 
     listen<{ game_id: string; error?: string }>('launch-boost-failed', (event) => {
       useLaunchBoostStore.getState().close()
       if (event.payload?.error) {
         toast.error(event.payload.error, { duration: 5000 })
       }
-    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn))).catch(() => {})
 
     listen<ExternalGameDetectedPayload>('external-game-detected', (event) => {
       useLaunchStore.getState().markLaunched(event.payload.game_id)
       toast.success(
         `Detected "${event.payload.game_name}" running externally — tracking playtime & saves automatically!`,
       )
-    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn))).catch(() => {})
 
     listen<string>('game-launched', (event) => {
       useLaunchStore.getState().markLaunched(event.payload)
       useLaunchBoostStore.getState().onGameLaunched(event.payload)
-    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn))).catch(() => {})
 
     listen<PlaytimeUpdatedPayload>('playtime-updated', (event) => {
       useLaunchStore.getState().updateElapsed(event.payload.game_id, event.payload.elapsed_seconds)
-    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn))).catch(() => {})
 
     listen<GameExitedPayload>('game-exited', (event) => {
       useLaunchStore.getState().markExited(event.payload.game_id)
@@ -150,7 +150,7 @@ export function usePlaytimeTracking() {
       queryClient.invalidateQueries({ queryKey: ['games'] })
       queryClient.invalidateQueries({ queryKey: ['stats'] })
       queryClient.invalidateQueries({ queryKey: ['collections'] })
-    }).then((fn) => (cancelled ? fn() : unlisten.push(fn)))
+    }).then((fn) => (cancelled ? fn() : unlisten.push(fn))).catch(() => {})
 
     return () => {
       cancelled = true

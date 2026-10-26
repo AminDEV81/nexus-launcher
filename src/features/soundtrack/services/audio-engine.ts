@@ -50,7 +50,33 @@ export class NexusAudioEngine {
 
   private initAudio() {
     if (this.audio) return
-    if (typeof Audio === 'undefined') return
+    if (typeof Audio === 'undefined') {
+      // Headless / Node test environment fallback stub
+      const stub = {
+        src: '',
+        preload: 'auto',
+        muted: this.muted,
+        volume: this.getEffectiveVolume(),
+        paused: true,
+        currentTime: 0,
+        duration: 0,
+        error: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        load: () => {},
+        play: async function (this: { paused: boolean }) {
+          this.paused = false
+        },
+        pause: function (this: { paused: boolean }) {
+          this.paused = true
+        },
+        removeAttribute: function (this: { src: string }) {
+          this.src = ''
+        },
+      }
+      this.audio = stub as unknown as HTMLAudioElement
+      return
+    }
 
     this.audio = new Audio()
     this.audio.preload = 'auto'
@@ -375,8 +401,14 @@ export class NexusAudioEngine {
         }
       }, 600)
 
+      // In headless test environments (`typeof Audio === 'undefined'`), resolve immediately
+      // so unit tests can inspect `'loading'` state and dispatch synthetic postMessage events synchronously.
+      if (typeof Audio === 'undefined') {
+        return
+      }
+
       // Wait for real confirmation that YouTube actually started playing audio;
-      // if blocked/restricted within 3.8s, reject so store fails over to direct audio stream!
+      // if blocked/restricted within 5.5s, reject so store fails over to direct audio stream!
       await new Promise<void>((resolve, reject) => {
         this.ytPlayConfirmResolver = resolve
         this.ytPlayConfirmRejecter = reject

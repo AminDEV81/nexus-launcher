@@ -92,3 +92,7 @@ export function getLiveMetrics(): Promise<LiveSystemMetrics> {
 export function boostRam(): Promise<BoostStepResult> {
   return call<BoostStepResult>('boost_ram_only')
 }
+
+export function cancelShutdown(): Promise<void> {
+  return call<void>('cancel_shutdown')
+}

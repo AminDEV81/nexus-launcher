@@ -83,7 +83,7 @@ pub struct ImportSummary {
 
 #[tauri::command]
 pub fn get_backup_stats(db: State<'_, Database>) -> AppResult<BackupStats> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let count = |table: &str| -> usize {
         conn.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get::<_, i64>(0))
             .map(|n| n.max(0) as usize)
@@ -203,7 +203,7 @@ pub fn export_backup(
         None => TABLES.to_vec(),
     };
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let mut backup = Map::new();
     backup.insert("version".into(), Value::Number(BACKUP_VERSION.into()));
     let mut total_rows = 0usize;
@@ -286,15 +286,69 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
         ));
     }
 
-    // Semantic check on games only if games were included in the backup
-    if let Some((_, game_rows)) = tables.iter().find(|(table, _)| *table == "games") {
-        for game in game_rows {
-            let has_identity = game.get("id").is_some_and(Value::is_string)
-                && game.get("name").is_some_and(Value::is_string);
-            if !has_identity {
-                return Err(AppError::Invalid(
-                    "backup contains a game row without an id or name.".into(),
-                ));
+    // Validate IDs against path traversal and validate save location paths before touching the DB
+    for (table, rows) in &mut tables {
+        if matches!(
+            *table,
+            "games" | "profiles" | "collections" | "tags" | "game_save_locations" | "save_operations"
+        ) {
+            for row in rows.iter() {
+                if let Some(id_str) = row.get("id").and_then(Value::as_str) {
+                    if !crate::commands::save_manager::fs_ops::is_valid_id_segment(id_str) {
+                        return Err(AppError::Invalid(format!(
+                            "backup section '{table}' contains an unsafe or malformed id: '{id_str}'"
+                        )));
+                    }
+                }
+            }
+        }
+        if *table == "games" {
+            for game in rows.iter_mut() {
+                let has_identity = game.get("id").is_some_and(Value::is_string)
+                    && game.get("name").is_some_and(Value::is_string);
+                if !has_identity {
+                    return Err(AppError::Invalid(
+                        "backup contains a game row without an id or name.".into(),
+                    ));
+                }
+                // Strip arbitrary shell hooks and executable paths from backup files to prevent RCE on Play
+                game.insert("pre_launch_command".to_string(), Value::Null);
+                game.insert("post_launch_command".to_string(), Value::Null);
+                if game.get("executable_path").is_some_and(|v| !v.is_null()) {
+                    game.insert("executable_path".to_string(), Value::Null);
+                    if game.get("source").and_then(Value::as_str) != Some("steam") {
+                        game.insert("is_installed".to_string(), Value::Number(0.into()));
+                    }
+                }
+            }
+        }
+        if *table == "game_save_locations" {
+            for loc in rows.iter() {
+                if let Some(p) = loc.get("path").and_then(Value::as_str) {
+                    if let Err(reason) =
+                        crate::commands::save_manager::fs_ops::validate_safe_save_location_path(p)
+                    {
+                        return Err(AppError::Invalid(format!(
+                            "backup contains an unsafe save location path '{p}': {reason}"
+                        )));
+                    }
+                }
+            }
+        }
+        if *table == "downloads" {
+            for dl in rows.iter_mut() {
+                if let Some(url) = dl.get("url").and_then(Value::as_str) {
+                    if let Err(err) = crate::commands::download::validate_download_url(url) {
+                        return Err(AppError::Invalid(format!(
+                            "backup contains an unsafe download URL '{url}': {err}"
+                        )));
+                    }
+                }
+                let sp = dl.get("save_path").and_then(Value::as_str).unwrap_or("");
+                let fp = dl.get("file_path").and_then(Value::as_str).unwrap_or("");
+                if !fp.is_empty() && !crate::commands::download::is_safe_download_file_path(fp, sp) {
+                    dl.insert("file_path".to_string(), Value::Null);
+                }
             }
         }
     }
@@ -330,7 +384,7 @@ pub fn import_backup(
 
     // Phase 2: replace everything in a single transaction.
     {
-        let mut conn = db.connection.lock().expect("db mutex poisoned");
+        let mut conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let tx = conn.transaction()?;
 
         // Delete in reverse order so FK children are deleted before parents

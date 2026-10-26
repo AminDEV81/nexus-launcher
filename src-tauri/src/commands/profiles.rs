@@ -1,6 +1,6 @@
 use base64::Engine;
 use crate::commands::save_manager::error::SaveManagerError;
-use crate::commands::save_manager::fs_ops::{get_nexus_profiles_root, remove_path_all_with_retry};
+use crate::commands::save_manager::fs_ops::{get_nexus_profiles_root, is_valid_id_segment, remove_path_all_with_retry, sanitize_safe_id_segment};
 use crate::commands::save_manager::locks::SaveManagerLocks;
 use crate::commands::save_manager::session::SessionManager;
 use crate::commands::save_manager::transaction::TransactionCoordinator;
@@ -169,7 +169,7 @@ pub async fn create_profile(
     .map_err(|e| e.to_string())?;
 
     // Create profile folder on disk
-    let prof_dir = get_nexus_profiles_root().join(&id).join("games");
+    let prof_dir = get_nexus_profiles_root().join(sanitize_safe_id_segment(&id)).join("games");
     let _ = fs::create_dir_all(&prof_dir);
 
     conn.query_row(
@@ -267,6 +267,9 @@ pub async fn delete_profile(
     if id == "default" {
         return Err("Cannot delete default profile".to_string());
     }
+    if !is_valid_id_segment(&id) {
+        return Err("Invalid profile ID".to_string());
+    }
 
     if session_mgr.has_session_for_profile(&id) {
         return Err(SaveManagerError::GameRunning("Cannot delete profile while its game is running".into()).to_string());
@@ -283,7 +286,7 @@ pub async fn delete_profile(
         let id_c = id.clone();
         tokio::task::spawn_blocking(move || {
             let db_state = app_c.state::<Database>();
-            let conn = db_state.connection.lock().expect("db mutex poisoned");
+            let conn = db_state.connection.lock().unwrap_or_else(|e| e.into_inner());
             TransactionCoordinator::swap_all_games_to_profile(&conn, &id_c, "default")
                 .map_err(|e| format!("Failed to swap saves to default: {}", e))?;
             conn.execute(
@@ -307,9 +310,13 @@ pub async fn delete_profile(
     conn.execute("DELETE FROM profiles WHERE id = ?1", params![id])
         .map_err(|e| e.to_string())?;
 
-    // Cleanup filesystem
-    let prof_dir = get_nexus_profiles_root().join(&id);
-    let _ = remove_path_all_with_retry(&prof_dir);
+    // Cleanup filesystem safely inside profiles root
+    let profiles_root = get_nexus_profiles_root();
+    let safe_id = sanitize_safe_id_segment(&id);
+    let prof_dir = profiles_root.join(&safe_id);
+    if prof_dir.starts_with(&profiles_root) && prof_dir != profiles_root {
+        let _ = remove_path_all_with_retry(&prof_dir);
+    }
 
     Ok(())
 }
@@ -378,8 +385,7 @@ pub async fn switch_profile(
             let db_state = app_c.state::<Database>();
             let conn = db_state
                 .connection
-                .lock()
-                .expect("db mutex poisoned");
+                .lock().unwrap_or_else(|e| e.into_inner());
             TransactionCoordinator::swap_all_games_to_profile(&conn, &prev, &new_id)
                 .map_err(|e| format!("Failed to swap saves to profile {}: {}", new_id, e))?;
 
@@ -875,33 +881,98 @@ async fn search_steam_store_avatars(
 
 const MAX_AVATAR_BYTES: usize = 10 * 1024 * 1024;
 
+pub(crate) fn is_blocked_ip(ip: std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            let o = v4.octets();
+            v4.is_loopback()
+                || v4.is_private()
+                || v4.is_link_local()
+                || v4.is_broadcast()
+                || v4.is_unspecified()
+                || v4.is_multicast()
+                || v4.is_documentation()
+                || o[0] == 0
+                // Shared Address Space / CGNAT (100.64.0.0/10)
+                || (o[0] == 100 && (o[1] & 0b1100_0000) == 64)
+                // IETF Protocol Assignments (192.0.0.0/24)
+                || (o[0] == 192 && o[1] == 0 && o[2] == 0)
+                // Benchmarking (198.18.0.0/15)
+                || (o[0] == 198 && (o[1] & 0xfe) == 18)
+                // Reserved for future use (240.0.0.0/4)
+                || o[0] >= 240
+        }
+        std::net::IpAddr::V6(v6) => {
+            if let Some(mapped_v4) = v6.to_ipv4_mapped().or_else(|| v6.to_ipv4()) {
+                return is_blocked_ip(std::net::IpAddr::V4(mapped_v4));
+            }
+            let segs = v6.segments();
+            v6.is_loopback()
+                || v6.is_unspecified()
+                || v6.is_multicast()
+                // Unique Local Address (fc00::/7)
+                || (segs[0] & 0xfe00) == 0xfc00
+                // Link-Local (fe80::/10)
+                || (segs[0] & 0xffc0) == 0xfe80
+                // Documentation (2001:db8::/32)
+                || (segs[0] == 0x2001 && segs[1] == 0x0db8)
+        }
+    }
+}
+
 pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
-    let lower = host.trim().trim_matches(['[', ']']).to_ascii_lowercase();
+    let lower = host
+        .trim()
+        .trim_matches(['[', ']'])
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
     if lower.is_empty()
         || lower == "localhost"
+        || lower.ends_with(".localhost")
         || lower.ends_with(".local")
         || lower.ends_with(".internal")
+        || lower.ends_with(".lan")
+        || lower.ends_with(".home")
+        || lower.ends_with(".arpa")
     {
         return true;
     }
     if let Ok(ip) = lower.parse::<std::net::IpAddr>() {
-        return match ip {
-            std::net::IpAddr::V4(v4) => {
-                v4.is_loopback()
-                    || v4.is_private()
-                    || v4.is_link_local()
-                    || v4.is_broadcast()
-                    || v4.is_unspecified()
+        return is_blocked_ip(ip);
+    }
+    // Reject numeric/hex/octal IPv4 encodings (e.g. 0x7f000001 or 2130706433)
+    if lower.chars().all(|c| c.is_ascii_digit() || c == '.' || c == 'x' || c == 'X') {
+        return true;
+    }
+    // Resolve hostname via system DNS and block if any resolved IP is private/local
+    use std::net::ToSocketAddrs;
+    if let Ok(addrs) = (lower.as_str(), 80u16).to_socket_addrs() {
+        for sock in addrs {
+            if is_blocked_ip(sock.ip()) {
+                return true;
             }
-            std::net::IpAddr::V6(v6) => {
-                v6.is_loopback()
-                    || v6.is_unspecified()
-                    || (v6.segments()[0] & 0xfe00) == 0xfc00
-                    || (v6.segments()[0] & 0xffc0) == 0xfe80
-            }
-        };
+        }
     }
     false
+}
+
+pub(crate) fn safe_ssrf_redirect_policy() -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(|attempt| {
+        if attempt.previous().len() >= 10 {
+            return attempt.error("too many redirects");
+        }
+        let url = attempt.url();
+        if !matches!(url.scheme(), "http" | "https") {
+            return attempt.error("redirect to unsupported URL scheme blocked");
+        }
+        let Some(host) = url.host_str() else {
+            return attempt.error("redirect URL missing host");
+        };
+        if is_blocked_host_or_ip(host) {
+            return attempt.error("redirect to private or local network address blocked");
+        }
+        attempt.follow()
+    })
 }
 
 fn validate_avatar_url(raw_url: &str) -> Result<reqwest::Url, String> {

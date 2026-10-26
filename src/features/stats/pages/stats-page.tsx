@@ -91,7 +91,15 @@ export function StatsPage() {
 
   const timeline = toHours(timelineData ?? [])
   const daily = toHours(dailyData ?? [])
-  const genres = toHours(genreData ?? [])
+  const genres = toHours(genreData ?? []).map((item) => {
+    const count = (games ?? []).filter((g) =>
+      g.genres.some((gg) => gg.toLowerCase() === item.genre.toLowerCase()),
+    ).length
+    return {
+      ...item,
+      game_count: item.game_count ?? (count > 0 ? count : 1),
+    }
+  })
   const recentHours = sumHours(timeline.slice(-4))
   const previousHours = sumHours(timeline.slice(-8, -4))
   const streak = currentStreak(dailyData ?? [])
@@ -116,7 +124,7 @@ export function StatsPage() {
       ? Math.max(
           1,
           Math.round(
-            sessions.reduce((acc, s) => acc + s.duration_seconds, 0) / sessions.length / 60,
+            sessions.reduce((acc, s) => acc + (s.duration_seconds ?? 0), 0) / sessions.length / 60,
           ),
         )
       : 0

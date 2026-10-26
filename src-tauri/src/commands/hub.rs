@@ -510,7 +510,7 @@ fn unix_to_date(timestamp: i64) -> Option<String> {
 }
 
 fn igdb_credentials(db: &Database) -> AppResult<(String, String)> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let read = |key: &str| -> Option<String> {
         conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
             row.get::<_, String>(0)
@@ -561,7 +561,7 @@ async fn feed_where_clause(
         ))),
         "recommended" => {
             let top_genres: Vec<String> = {
-                let conn = db.connection.lock().expect("db mutex poisoned");
+                let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                 let active_profile: String = conn
                     .query_row(
                         "SELECT value FROM settings WHERE key = 'active_profile_id'",
@@ -678,7 +678,7 @@ fn map_genre_name_to_igdb_id(name: &str) -> Option<i64> {
 /// Dynamically computes the user's preferred IGDB genre IDs from their active profile's
 /// playtime history, favorite games, and library/wishlist collection.
 fn extract_user_taste_genres_csv(db: &Database) -> Option<String> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let active_profile: String = conn
         .query_row(
             "SELECT value FROM settings WHERE key = 'active_profile_id'",
@@ -766,7 +766,7 @@ fn extract_user_taste_genres_csv(db: &Database) -> Option<String> {
 }
 
 fn get_hub_refresh_nonce(db: &Database) -> i64 {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.query_row(
         "SELECT value FROM settings WHERE key = 'hub_refresh_nonce'",
         [],
@@ -782,7 +782,7 @@ fn get_hub_refresh_nonce(db: &Database) -> i64 {
 #[tauri::command]
 pub async fn refresh_hub_catalog(db: State<'_, Database>) -> AppResult<i64> {
     let next_nonce = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let current: i64 = conn
             .query_row(
                 "SELECT value FROM settings WHERE key = 'hub_refresh_nonce'",
@@ -850,7 +850,7 @@ async fn fetch_feed(
             games.truncate(limit);
         }
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             crate::services::scores::enrich_hub_games_batch(Some(&conn), &mut games);
         }
         return Ok(games);
@@ -873,7 +873,7 @@ async fn fetch_feed(
     )
     .await?;
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         crate::services::scores::enrich_hub_games_batch(Some(&conn), &mut games);
     }
     Ok(games)
@@ -917,7 +917,7 @@ async fn fetch_shelf_feed_rotated(
     let cache_key = format!("shelf_rot:v5:{mode_str}:{feed}:{taste_sig}:{epoch}");
 
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
             if !is_stale {
                 if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
@@ -959,7 +959,7 @@ async fn fetch_shelf_feed_rotated(
 
     if pool.is_empty() {
         if let Some(err) = first_err {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
                 if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
                     crate::services::scores::enrich_hub_games_batch(Some(&conn), &mut games);
@@ -982,7 +982,7 @@ async fn fetch_shelf_feed_rotated(
 
     if !rotated.is_empty() {
         if let Ok(json) = serde_json::to_string(&rotated) {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             let ttl = rotation_hours.max(1) * 3600; // 12-hour fresh cache per rotation window
             let _ = MetadataCache::set(&conn, &cache_key, "shelf_rotation", &json, ttl);
         }
@@ -3235,7 +3235,7 @@ pub async fn fetch_popular_discounted_hub_games(
 ) -> Vec<HubGame> {
     let cache_key = "hub:discounted_games:v3";
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((payload, is_stale)) = MetadataCache::get(&conn, cache_key) {
             if !is_stale {
                 if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
@@ -3491,7 +3491,7 @@ pub async fn fetch_popular_discounted_hub_games(
     });
 
     if let Ok(json) = serde_json::to_string(&discounted_games) {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let _ = MetadataCache::set(&conn, cache_key, "discounted", &json, 1800);
     }
 
@@ -3527,7 +3527,7 @@ pub async fn resolve_nexusmods_url(
 
     let cache_key = "nexusmods:games_catalog:v1";
     let cached_json = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         MetadataCache::get(&conn, cache_key).and_then(|(payload, is_stale)| {
             if !is_stale && !payload.is_empty() {
                 Some(payload)
@@ -3556,7 +3556,7 @@ pub async fn resolve_nexusmods_url(
                                 .map(|e| serde_json::json!({ "name": e.name, "domain_name": e.domain_name }))
                                 .collect();
                             if let Ok(compact_str) = serde_json::to_string(&compact) {
-                                let conn = db.connection.lock().expect("db mutex poisoned");
+                                let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                                 let _ = MetadataCache::set(
                                     &conn,
                                     cache_key,
@@ -3949,7 +3949,7 @@ async fn insert_hub_game(
     let id = Uuid::new_v4().to_string();
 
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
         let existing: Option<(String, bool)> = conn
             .query_row(
@@ -4011,7 +4011,7 @@ async fn insert_hub_game(
         igdb_cover_url,
     );
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let sql = format!("SELECT {} FROM games WHERE id = ?1", Game::SELECT_COLUMNS);
     let game = conn.query_row(&sql, [&id], Game::from_row)?;
     Ok(game)

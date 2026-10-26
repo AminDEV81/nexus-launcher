@@ -4,7 +4,6 @@ import {
   ExternalLink,
   Play,
   Film,
-  ShieldAlert,
   ShieldCheck,
   LogIn,
   Check,

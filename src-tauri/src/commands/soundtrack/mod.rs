@@ -98,7 +98,7 @@ pub fn soundtrack_resolve_game(
     game_id: String,
     db: State<'_, Database>,
 ) -> AppResult<Vec<SoundtrackAlbumWithTracks>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::get_albums_for_game(&conn, &game_id)
 }
 
@@ -107,7 +107,7 @@ pub fn soundtrack_clear_game(
     game_id: String,
     db: State<'_, Database>,
 ) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::clear_game_soundtracks(&conn, &game_id)
 }
 
@@ -116,7 +116,7 @@ pub fn soundtrack_get_album(
     album_id: String,
     db: State<'_, Database>,
 ) -> AppResult<Option<SoundtrackAlbumWithTracks>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::get_album(&conn, &album_id)
 }
 
@@ -124,7 +124,7 @@ pub fn soundtrack_get_album(
 pub fn soundtrack_get_all_albums(
     db: State<'_, Database>,
 ) -> AppResult<Vec<SoundtrackAlbum>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::get_all_albums(&conn)
 }
 
@@ -134,7 +134,7 @@ pub fn soundtrack_save_album(
     tracks: Vec<SoundtrackTrack>,
     db: State<'_, Database>,
 ) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::save_album(&conn, &album, &tracks)
 }
 
@@ -144,7 +144,7 @@ pub fn soundtrack_toggle_favorite(
     target_id: String,
     db: State<'_, Database>,
 ) -> AppResult<bool> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::toggle_favorite(&conn, &target_type, &target_id)
 }
 
@@ -152,7 +152,7 @@ pub fn soundtrack_toggle_favorite(
 pub fn soundtrack_get_favorites(
     db: State<'_, Database>,
 ) -> AppResult<Vec<SoundtrackFavorite>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::get_favorites(&conn)
 }
 
@@ -165,7 +165,7 @@ pub fn soundtrack_record_play(
     completed: bool,
     db: State<'_, Database>,
 ) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::record_play(
         &conn,
         &track_id,
@@ -181,7 +181,7 @@ pub fn soundtrack_get_history(
     limit: Option<u32>,
     db: State<'_, Database>,
 ) -> AppResult<Vec<SoundtrackPlayHistory>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::get_play_history(&conn, limit.unwrap_or(50))
 }
 
@@ -190,7 +190,7 @@ pub fn soundtrack_cache_get(
     key: String,
     db: State<'_, Database>,
 ) -> AppResult<Option<String>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::get_cache(&conn, &key)
 }
 
@@ -201,7 +201,7 @@ pub fn soundtrack_cache_set(
     ttl_secs: u64,
     db: State<'_, Database>,
 ) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::set_cache(&conn, &key, &data_json, ttl_secs)
 }
 
@@ -227,7 +227,7 @@ pub fn soundtrack_cancel_download(
 pub fn soundtrack_get_downloads(
     db: State<'_, Database>,
 ) -> AppResult<Vec<SoundtrackDownload>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::get_downloads(&conn)
 }
 
@@ -235,7 +235,7 @@ pub fn soundtrack_get_downloads(
 pub fn soundtrack_get_download_directory(
     db: State<'_, Database>,
 ) -> AppResult<String> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let custom: Option<String> = conn
         .query_row(
             "SELECT value FROM settings WHERE key = 'soundtrack_download_dir'",
@@ -258,7 +258,7 @@ pub fn soundtrack_set_download_directory(
     path: String,
     db: State<'_, Database>,
 ) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
         "INSERT INTO settings (key, value) VALUES ('soundtrack_download_dir', ?1)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -297,7 +297,7 @@ pub async fn soundtrack_scan_library(
 pub fn soundtrack_get_local_files(
     db: State<'_, Database>,
 ) -> AppResult<Vec<SoundtrackLocalFile>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     db::get_local_files(&conn)
 }
 

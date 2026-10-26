@@ -17,7 +17,7 @@ fn get_active_profile_id(conn: &rusqlite::Connection) -> String {
 
 #[tauri::command]
 pub fn list_games(db: State<'_, Database>, profile_id: Option<String>) -> AppResult<Vec<Game>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
 
     let sql = format!(
@@ -36,7 +36,7 @@ pub fn list_games(db: State<'_, Database>, profile_id: Option<String>) -> AppRes
 
 #[tauri::command]
 pub fn get_game(db: State<'_, Database>, id: String, profile_id: Option<String>) -> AppResult<Game> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
 
     let sql = format!(
@@ -75,7 +75,7 @@ pub fn create_game(
     db: State<'_, Database>,
     input: CreateGameInput,
 ) -> AppResult<Game> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     if input.name.trim().is_empty() {
         return Err(AppError::Invalid("game name cannot be empty".into()));
@@ -194,7 +194,7 @@ pub fn update_game_installation(
     }
 
     let is_installed = executable_path.is_some() || install_path.is_some();
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     if let Some(path) = &executable_path {
         let already_used: bool = conn.query_row(
@@ -251,7 +251,7 @@ pub fn update_game_flags(
     id: String,
     input: UpdateGameFlagsInput,
 ) -> AppResult<Game> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let changed = conn.execute(
         "UPDATE games
@@ -287,7 +287,7 @@ pub fn update_game_name(
         return Err(AppError::Invalid("game name cannot be empty".into()));
     }
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let changed = conn.execute(
         "UPDATE games SET name = ?1 WHERE id = ?2",
         rusqlite::params![trimmed, &id],
@@ -307,7 +307,7 @@ pub fn update_game_name(
 /// all playtime history, achievements, and stats permanently.
 #[tauri::command]
 pub fn delete_game(db: State<'_, Database>, id: String) -> AppResult<()> {
-    let mut conn = db.connection.lock().expect("db mutex poisoned");
+    let mut conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let tx = conn.transaction()?;
 
     // 1. Preserve download history! Snapshot game_name and cover_url onto downloads so removing a game from Library never deletes its download history.
@@ -342,7 +342,7 @@ pub fn restore_game_from_memory(
     id: String,
     profile_id: Option<String>,
 ) -> AppResult<Game> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
 
     let changed = conn.execute(
@@ -368,7 +368,7 @@ pub fn permanently_delete_game(
     db: State<'_, Database>,
     id: String,
 ) -> AppResult<()> {
-    let mut conn = db.connection.lock().expect("db mutex poisoned");
+    let mut conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let tx = conn.transaction()?;
 
     // 1. Clean up save operation locations referencing locations or operations of this game
@@ -579,7 +579,7 @@ pub fn set_game_playtime(
     total_seconds: i64,
     days_span: Option<i64>,
 ) -> AppResult<Game> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
     let target_seconds = total_seconds.max(0);
 
@@ -671,7 +671,7 @@ pub fn set_game_playtime(
 /// clears the wishlist flag so the game shows up in the main grid.
 #[tauri::command]
 pub fn promote_wishlist_game(db: State<'_, Database>, id: String) -> AppResult<Game> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let changed = conn.execute(
         "UPDATE games SET is_wishlist = 0 WHERE id = ?1 AND is_wishlist = 1",
@@ -693,7 +693,7 @@ pub fn promote_wishlist_game(db: State<'_, Database>, id: String) -> AppResult<G
 /// details panel's gallery.
 #[tauri::command]
 pub fn get_game_screenshots(db: State<'_, Database>, id: String) -> AppResult<Vec<String>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let mut stmt = conn.prepare(
         "SELECT local_path FROM artwork_cache
@@ -713,7 +713,7 @@ pub fn get_game_screenshots(db: State<'_, Database>, id: String) -> AppResult<Ve
 /// matching, which keys on `igdb_id`) work directly.
 #[tauri::command]
 pub fn set_game_igdb_id(db: State<'_, Database>, id: String, igdb_id: i64) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let changed = conn.execute(
         "UPDATE games SET igdb_id = ?1 WHERE id = ?2",
@@ -736,7 +736,7 @@ pub fn update_launch_arguments(
     id: String,
     launch_arguments: Option<String>,
 ) -> AppResult<Game> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let normalized = launch_arguments.filter(|value| !value.trim().is_empty());
     let changed = conn.execute(
@@ -760,7 +760,7 @@ pub fn update_pre_launch_command(
     id: String,
     pre_launch_command: Option<String>,
 ) -> AppResult<Game> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let normalized = pre_launch_command.filter(|value| !value.trim().is_empty());
     let changed = conn.execute(
@@ -784,7 +784,7 @@ pub fn update_post_launch_command(
     id: String,
     post_launch_command: Option<String>,
 ) -> AppResult<Game> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let normalized = post_launch_command.filter(|value| !value.trim().is_empty());
     let changed = conn.execute(
@@ -815,7 +815,7 @@ pub fn set_game_user_rating(
         }
     }
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let changed = conn.execute(
         "UPDATE games SET user_rating = ?1 WHERE id = ?2",
         rusqlite::params![rating, id],

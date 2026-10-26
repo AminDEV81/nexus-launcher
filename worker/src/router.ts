@@ -1,5 +1,5 @@
 import type { Env, ArtworkOption } from './types'
-import { isAllowlistedPath, canonicalizeQuery, validateGameId } from './security/validation'
+import { isAllowlistedPath, canonicalizeQuery, validateGameId, clampOffset, buildCanonicalCacheUrl, resolveCorsOrigin } from './security/validation'
 import { checkRateLimit } from './security/rate-limit'
 import { deduplicate } from './cache/deduplication'
 import { matchEdgeCache, putEdgeCache, TTL } from './cache/edge-cache'
@@ -21,7 +21,8 @@ export async function handleRequest(
     return new Response(null, {
       status: 204,
       headers: {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': resolveCorsOrigin(request.headers.get('Origin')),
+        Vary: 'Origin',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         'Access-Control-Max-Age': '86400',
@@ -36,7 +37,7 @@ export async function handleRequest(
 
   // 2. Rate Limiting Check
   const clientIp = request.headers.get('cf-connecting-ip') || '127.0.0.1'
-  const rateLimit = checkRateLimit(clientIp)
+  const rateLimit = await checkRateLimit(clientIp, env)
   if (!rateLimit.allowed) {
     return createErrorResponse(
       'RATE_LIMITED',
@@ -69,7 +70,8 @@ export async function handleRequest(
   }
 
   // 5. Route to specific handler with Single-Flight deduplication
-  const cacheKey = `${request.method}:${url.pathname}:${url.search}`
+  const canonicalUrl = buildCanonicalCacheUrl(request.url)
+  const cacheKey = `${request.method}:${canonicalUrl.pathname}:${canonicalUrl.search}`
 
   try {
     const response = await deduplicate(cacheKey, async () => {
@@ -77,7 +79,7 @@ export async function handleRequest(
       if (pathname.startsWith('/api/v1/games/feed/')) {
         const rawFeedName = pathname.replace('/api/v1/games/feed/', '')
         const feedName = rawFeedName.toLowerCase().replace(/-/g, '_')
-        const offset = parseInt(url.searchParams.get('offset') || '0', 10) || 0
+        const offset = clampOffset(url.searchParams.get('offset'))
         const genres = url.searchParams.get('genres') || undefined
 
         let ttlSeconds = TTL.RELEASES_FEED
@@ -126,7 +128,7 @@ export async function handleRequest(
       // Game Search
       if (pathname === '/api/v1/games/search') {
         const q = canonicalizeQuery(url.searchParams.get('q'))
-        const offset = parseInt(url.searchParams.get('offset') || '0', 10) || 0
+        const offset = clampOffset(url.searchParams.get('offset'))
         const genres = url.searchParams
           .getAll('genre')
           .map((id) => parseInt(id, 10))

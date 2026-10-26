@@ -1156,23 +1156,6 @@ function ReviewStep({
   onBack,
   onConfirm,
 }: ReviewStepProps) {
-  if (isResolving) {
-    return (
-      <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 text-center">
-        <div className="relative flex size-16 items-center justify-center rounded-2xl bg-accent/10 text-accent shadow-[0_0_24px_var(--nx-accent)]/20">
-          <Loader2 className="size-7 animate-spin" />
-        </div>
-        <div>
-          <h3 className="text-base font-bold text-text">Scanning Target Game Files</h3>
-          <p className="mt-1 text-xs text-muted max-w-sm">
-            Detecting executable entry points, resolving symbolic targets, and calculating disk
-            footprint…
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   const [debouncedName, setDebouncedName] = useState(draft.name.trim())
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedName(draft.name.trim()), 200)
@@ -1196,6 +1179,23 @@ function ReviewStep({
   useEffect(() => {
     setPreviewCoverIdx(0)
   }, [primaryMatch?.igdb_id])
+
+  if (isResolving) {
+    return (
+      <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 text-center">
+        <div className="relative flex size-16 items-center justify-center rounded-2xl bg-accent/10 text-accent shadow-[0_0_24px_var(--nx-accent)]/20">
+          <Loader2 className="size-7 animate-spin" />
+        </div>
+        <div>
+          <h3 className="text-base font-bold text-text">Scanning Target Game Files</h3>
+          <p className="mt-1 text-xs text-muted max-w-sm">
+            Detecting executable entry points, resolving symbolic targets, and calculating disk
+            footprint…
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const needsExecutable = draft.candidates.length > 0 && !draft.executablePath
   const canSubmit = Boolean(draft.executablePath?.trim() && draft.name.trim()) && !isSaving

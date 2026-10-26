@@ -39,7 +39,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (23, include_str!("./sql/0023_preserve_download_history.sql")),
 ];
 
-pub fn run(conn: &mut Connection) -> AppResult<()> {
+pub fn run(conn: &mut Connection, db_path: Option<&std::path::Path>) -> AppResult<()> {
     conn.execute(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
             version     INTEGER PRIMARY KEY,
@@ -53,6 +53,24 @@ pub fn run(conn: &mut Connection) -> AppResult<()> {
         [],
         |row| row.get(0),
     )?;
+
+    let latest_known: i64 = MIGRATIONS.last().map(|(v, _)| *v).unwrap_or(0);
+    if already_applied > latest_known {
+        return Err(crate::error::AppError::Other(format!(
+            "Database schema version ({already_applied}) is newer than this version of Nexus Launcher supports ({latest_known}). Please update Nexus Launcher to the latest release."
+        )));
+    }
+
+    if already_applied > 0 && already_applied < latest_known {
+        if let Some(path) = db_path {
+            let backup_path = path.with_extension(format!("db.pre_migration_v{already_applied}.bak"));
+            if let Err(err) = std::fs::copy(path, &backup_path) {
+                log::warn!("Could not create pre-migration DB backup at {:?}: {}", backup_path, err);
+            } else {
+                log::info!("Created pre-migration DB backup at {:?}", backup_path);
+            }
+        }
+    }
 
     let tx = conn.transaction()?;
     for (version, sql) in MIGRATIONS {

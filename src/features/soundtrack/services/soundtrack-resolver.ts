@@ -616,7 +616,10 @@ export class SoundtrackResolver {
     }
 
     const searchTarget = coreTitle || game.title
-    const khinsiderProvider = providerRegistry.getProvider('khinsider')
+    const enabledMetaProviders = providerRegistry.getMetadataProviders()
+    const khinsiderProvider = providerRegistry.isProviderEnabled('khinsider')
+      ? providerRegistry.getProvider('khinsider')
+      : undefined
 
     const khinsiderTask = (async (): Promise<SoundtrackAlbumWithTracks[]> => {
       if (!khinsiderProvider) return []
@@ -647,7 +650,9 @@ export class SoundtrackResolver {
     })()
 
     const [cdnAlbums, khAlbums] = await Promise.all([
-      this.fetchItunesAndDeezerAlbumsSinglePass(searchTarget, game),
+      enabledMetaProviders.length > 0
+        ? this.fetchItunesAndDeezerAlbumsSinglePass(searchTarget, game)
+        : Promise.resolve([]),
       khinsiderTask,
     ])
 
@@ -686,7 +691,7 @@ export class SoundtrackResolver {
           artist: t.channel || `${game.title} Soundtrack`,
           duration_ms: (t.duration_seconds || 0) * 1000,
           preview_url: null,
-          stream_url: null,
+          stream_url: t.video_id,
           download_url: null,
           local_path: null,
           provider_id: 'youtube_direct',
@@ -788,7 +793,7 @@ export class SoundtrackResolver {
     if (cached && cached.length > 0 && !this.isPreviewClipUrl(cached[0].url)) {
       return cached[0]
     }
-    if (track.stream_url && !this.isPreviewClipUrl(track.stream_url)) {
+    if (track.stream_url && /^https?:\/\//i.test(track.stream_url) && !this.isPreviewClipUrl(track.stream_url)) {
       return {
         type: 'stream',
         url: track.stream_url,
@@ -842,7 +847,7 @@ export class SoundtrackResolver {
     }
 
     // 2. Instant already-resolved full-length stream URL hit (0ms)
-    if (track.stream_url && !this.isPreviewClipUrl(track.stream_url)) {
+    if (track.stream_url && /^https?:\/\//i.test(track.stream_url) && !this.isPreviewClipUrl(track.stream_url)) {
       const fastList: PlaybackSource[] = [
         {
           type: 'stream',

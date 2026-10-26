@@ -164,7 +164,7 @@ fn default_exchange_rates() -> HashMap<String, f64> {
 async fn get_exchange_rates(db: &Database, client: &reqwest::Client) -> HashMap<String, f64> {
     let cache_key = "fx_rates:usd:v1";
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((payload, is_stale)) = MetadataCache::get(&conn, cache_key) {
             if !is_stale {
                 if let Ok(rates) = serde_json::from_str::<HashMap<String, f64>>(&payload) {
@@ -193,7 +193,7 @@ async fn get_exchange_rates(db: &Database, client: &reqwest::Client) -> HashMap<
                         }
                     }
                     if let Ok(json) = serde_json::to_string(&rates) {
-                        let conn = db.connection.lock().expect("db mutex poisoned");
+                        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                         let _ = MetadataCache::set(&conn, cache_key, "fx_rates", &json, 3600);
                     }
                 }
@@ -223,7 +223,7 @@ async fn resolve_effective_steam_app_id(
 
     let cache_key = format!("steam_appid:v2:{norm}");
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
             if !is_stale && !payload.trim().is_empty() && payload != "NONE" {
                 return Some(payload);
@@ -234,7 +234,7 @@ async fn resolve_effective_steam_app_id(
     let provider = SteamArtworkProvider::new(client.clone());
     let resolved = provider.resolve_app_id(name).await;
     if let Some(ref aid) = resolved {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let _ = MetadataCache::set(&conn, &cache_key, "steam_appid", aid, 7 * 86_400);
     }
     resolved
@@ -395,7 +395,7 @@ pub async fn get_steam_game_price(
 
     let price_cache_key = format!("steam_price:v2:{effective_app_id}:{clean_code}");
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((payload, is_stale)) = MetadataCache::get(&conn, &price_cache_key) {
             if !is_stale {
                 if let Ok(cached) = serde_json::from_str::<SteamRegionalPrice>(&payload) {
@@ -431,7 +431,7 @@ pub async fn get_steam_game_price(
     let parsed = parse_steam_price(&region, &price_val, is_free, &rates, None);
     if let Some(ref p) = parsed {
         if let Ok(json) = serde_json::to_string(p) {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             // 10-minute live price cache so hovering cards is instant while staying fresh
             let _ = MetadataCache::set(&conn, &price_cache_key, "steam_price", &json, 600);
         }

@@ -1,3 +1,5 @@
+import { buildCanonicalCacheUrl, resolveCorsOrigin } from '../security/validation'
+
 export const TTL = {
   GAME_DETAILS: 3 * 86_400, // 3 days
   ARTWORK: 14 * 86_400, // 14 days
@@ -9,23 +11,28 @@ export const TTL = {
   GENRES_PLATFORMS: 7 * 86_400, // 7 days
 }
 
-export function buildCacheHeaders(ttlSeconds: number, swrSeconds = 86_400): HeadersInit {
+export function buildCacheHeaders(
+  ttlSeconds: number,
+  swrSeconds = 86_400,
+  requestOrigin?: string | null,
+): HeadersInit {
   return {
     'Cache-Control': `public, max-age=${ttlSeconds}, stale-while-revalidate=${swrSeconds}`,
     'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': resolveCorsOrigin(requestOrigin),
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    Vary: 'Origin',
   }
 }
 
-const CACHE_VERSION = 'v7'
+const CACHE_VERSION = 'v8'
 
 export async function matchEdgeCache(request: Request): Promise<Response | null> {
   try {
-    const url = new URL(request.url)
-    url.searchParams.set('_cv', CACHE_VERSION)
-    const versionedRequest = new Request(url.toString(), request)
+    const canonicalUrl = buildCanonicalCacheUrl(request.url)
+    canonicalUrl.searchParams.set('_cv', CACHE_VERSION)
+    const versionedRequest = new Request(canonicalUrl.toString(), { method: 'GET' })
     const cache = caches.default
     return (await cache.match(versionedRequest)) ?? null
   } catch {
@@ -35,9 +42,9 @@ export async function matchEdgeCache(request: Request): Promise<Response | null>
 
 export async function putEdgeCache(request: Request, response: Response): Promise<void> {
   try {
-    const url = new URL(request.url)
-    url.searchParams.set('_cv', CACHE_VERSION)
-    const versionedRequest = new Request(url.toString(), request)
+    const canonicalUrl = buildCanonicalCacheUrl(request.url)
+    canonicalUrl.searchParams.set('_cv', CACHE_VERSION)
+    const versionedRequest = new Request(canonicalUrl.toString(), { method: 'GET' })
     const cache = caches.default
     await cache.put(versionedRequest, response.clone())
   } catch {

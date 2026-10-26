@@ -6,7 +6,6 @@ import {
   Gauge,
   HardDriveDownload,
   Layers,
-  Sparkles,
   Zap,
 } from 'lucide-react'
 import type { DownloadInfo } from '@/services/download'

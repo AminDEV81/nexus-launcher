@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 #[tauri::command]
 pub fn list_collections(db: State<'_, Database>) -> AppResult<Vec<Collection>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let mut stmt = conn
         .prepare("SELECT id, name, created_at FROM collections ORDER BY name COLLATE NOCASE ASC")?;
@@ -28,7 +28,7 @@ pub fn create_collection(
     db: State<'_, Database>,
     input: CreateCollectionInput,
 ) -> AppResult<Collection> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     if input.name.trim().is_empty() {
         return Err(AppError::Invalid("collection name cannot be empty".into()));
@@ -50,7 +50,7 @@ pub fn create_collection(
 
 #[tauri::command]
 pub fn delete_collection(db: State<'_, Database>, id: String) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let changed = conn.execute("DELETE FROM collections WHERE id = ?1", [&id])?;
     if changed == 0 {
@@ -66,7 +66,7 @@ pub fn add_game_to_collection(
     collection_id: String,
     game_id: String,
 ) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let is_installed: bool = conn
         .query_row(
@@ -95,7 +95,7 @@ pub fn remove_game_from_collection(
     collection_id: String,
     game_id: String,
 ) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     conn.execute(
         "DELETE FROM collection_games WHERE collection_id = ?1 AND game_id = ?2",
@@ -111,7 +111,7 @@ pub fn list_games_in_collection(
     collection_id: String,
     profile_id: Option<String>,
 ) -> AppResult<Vec<crate::db::models::Game>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let target_profile = profile_id.unwrap_or_else(|| {
         conn.query_row(
@@ -158,7 +158,7 @@ pub struct CollectionSummary {
 pub fn list_collections_with_previews(
     db: State<'_, Database>,
 ) -> AppResult<Vec<CollectionSummary>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let mut stmt = conn
         .prepare("SELECT id, name, created_at FROM collections ORDER BY name COLLATE NOCASE ASC")?;
@@ -204,7 +204,7 @@ pub fn list_collection_ids_for_game(
     db: State<'_, Database>,
     game_id: String,
 ) -> AppResult<Vec<String>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let mut stmt = conn.prepare("SELECT collection_id FROM collection_games WHERE game_id = ?1")?;
     let ids = stmt
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn test_list_games_in_collection_query_resolves_columns_cleanly() {
         let mut conn = Connection::open_in_memory().unwrap();
-        crate::db::migrations::run(&mut conn).unwrap();
+        crate::db::migrations::run(&mut conn, None).unwrap();
 
         // Insert a game
         conn.execute(

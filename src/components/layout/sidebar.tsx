@@ -3,7 +3,6 @@ import {
   Disc3,
   Maximize2,
   Moon,
-  Music,
   PanelLeftClose,
   PanelLeftOpen,
   Pause,
@@ -65,7 +64,7 @@ export function Sidebar() {
 
   return (
     <motion.aside
-      animate={{ width: collapsed ? WIDTH_EXPANDED * 0 + WIDTH_COLLAPSED : WIDTH_EXPANDED }}
+      animate={{ width: collapsed ? WIDTH_COLLAPSED : WIDTH_EXPANDED }}
       transition={{ duration: 0.28 * speed, ease: [0.16, 1, 0.3, 1] }}
       className="chrome-surface relative z-10 flex shrink-0 flex-col overflow-hidden border-r border-border"
     >

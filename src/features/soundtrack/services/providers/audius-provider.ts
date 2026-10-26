@@ -354,7 +354,7 @@ export class AudiusProvider extends BaseSoundtrackProvider {
       })
 
       if (matched && matched.id) {
-        const streamUrl = `https://api.audius.co/v1/tracks/${matched.id}/stream?app_name=nexus_launcher`
+        const streamUrl = `https://discoveryprovider.audius.co/v1/tracks/${matched.id}/stream?app_name=nexus_launcher`
         this.streamCache.set(cacheKey, streamUrl)
         return {
           type: 'stream',

@@ -218,10 +218,15 @@ fn current_exe_dos_device_path() -> Option<String> {
 
     let exe = std::env::current_exe().ok()?;
     let exe_str = exe.to_string_lossy().replace(r"\\?\", "");
-    if exe_str.len() < 3 || &exe_str[1..3] != r":\" {
+    let mut ch_iter = exe_str.chars();
+    let drive_letter = ch_iter.next()?;
+    let colon = ch_iter.next()?;
+    let sep = ch_iter.next()?;
+    if !drive_letter.is_ascii_alphabetic() || colon != ':' || (sep != '\\' && sep != '/') {
         return None;
     }
-    let drive = &exe_str[0..2];
+    let rest: String = std::iter::once('\\').chain(ch_iter).collect();
+    let drive = format!("{drive_letter}:");
     let mut drive_wide: Vec<u16> = drive.encode_utf16().collect();
     drive_wide.push(0);
     let mut target_buf = vec![0u16; 512];
@@ -233,5 +238,5 @@ fn current_exe_dos_device_path() -> Option<String> {
     let device_prefix = String::from_utf16_lossy(&target_buf[..end]);
     let _ = std::mem::size_of::<Guid>();
     let _ = std::mem::size_of::<SpDeviceInterfaceData>();
-    Some(format!("{}{}", device_prefix, &exe_str[2..]))
+    Some(format!("{}{}", device_prefix, rest))
 }

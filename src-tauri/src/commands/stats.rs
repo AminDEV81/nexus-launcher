@@ -35,7 +35,7 @@ pub fn get_stats_summary(
     db: State<'_, Database>,
     profile_id: Option<String>,
 ) -> AppResult<StatsSummary> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
 
     let total_games: i64 = conn.query_row("SELECT COUNT(*) FROM games", [], |row| row.get(0))?;
@@ -95,7 +95,7 @@ pub fn get_playtime_by_genre(
     db: State<'_, Database>,
     profile_id: Option<String>,
 ) -> AppResult<Vec<GenrePlaytime>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
 
     let mut stmt = conn.prepare(
@@ -137,7 +137,7 @@ pub fn get_playtime_timeline(
     db: State<'_, Database>,
     profile_id: Option<String>,
 ) -> AppResult<Vec<WeeklyPlaytime>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
 
     let mut stmt = conn.prepare(
@@ -189,7 +189,7 @@ pub fn get_daily_activity(
     db: State<'_, Database>,
     profile_id: Option<String>,
 ) -> AppResult<Vec<DailyActivity>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
 
     let mut stmt = conn.prepare(
@@ -238,7 +238,7 @@ pub fn get_recent_sessions(
     db: State<'_, Database>,
     profile_id: Option<String>,
 ) -> AppResult<Vec<RecentSession>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let target_profile = profile_id.unwrap_or_else(|| get_active_profile_id(&conn));
 
     let mut stmt = conn.prepare(

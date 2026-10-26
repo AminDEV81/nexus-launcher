@@ -25,12 +25,7 @@ impl CrashRecoveryEngine {
             let profile_id = op.profile_id.as_deref().unwrap_or("default");
             let game_id = op.game_id.as_deref().unwrap_or("unknown");
 
-            let staging_root = get_nexus_profiles_root()
-                .join(profile_id)
-                .join("games")
-                .join(game_id)
-                .join("staging")
-                .join(&op.id);
+            let staging_root = TransactionCoordinator::get_staging_root(profile_id, game_id, &op.id);
 
             match op.state.as_str() {
                 "started" | "validated" | "preflight_verified" => {

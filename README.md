@@ -142,7 +142,7 @@
 
 ## 🛠️ Technical Architecture
 
-`mermaid
+```mermaid
 flowchart TD
 subgraph Frontend["Frontend Layer (React 19 + TypeScript + Vite 8)"]
 UI["Cyberpunk Glassmorphism UI (Tailwind 4 + Sora)"]
@@ -181,7 +181,7 @@ Worker --> IGDB
 Worker --> SGDB
 Worker --> SteamStore
 Backend --> DB
-`
+```
 
 ---
 
@@ -197,7 +197,7 @@ Ensure you have the following installed on your Windows machine:
 
 ### Installation &amp; Launch
 
-`ash
+```bash
 
 # 1. Clone the repository
 
@@ -211,14 +211,14 @@ npm install
 # 3. Run development desktop app (Hot Module Replacement enabled)
 
 npm run tauri dev
-`
+```
 
 ### Production Build
 
 To build a standalone, optimized Windows .exe installer:
-`ash
+```bash
 npm run tauri build
-`
+```
 The resulting executable will be available in src-tauri/target/release/bundle/msi/.
 
 ---
@@ -292,7 +292,7 @@ The resulting executable will be available in src-tauri/target/release/bundle/ms
 
 ### 💻 دستورات و راه‌اندازی سریع
 
-`ash
+```bash
 
 # دریافت سورس کد پروژه
 
@@ -310,7 +310,7 @@ npm run tauri dev
 # بیلد نهایی و ساخت فایل نصبی ویندوز (.exe)
 
 npm run tauri build
-`
+```
 
 ---
 

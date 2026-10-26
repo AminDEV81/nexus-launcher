@@ -1,5 +1,5 @@
 import React from 'react'
-import { Activity, CheckCircle2, CircleAlert, Cpu, Tv, Thermometer } from 'lucide-react'
+import { Activity, CheckCircle2, CircleAlert, Tv, Thermometer } from 'lucide-react'
 import { useOverlayStore } from '../store/overlay-store'
 
 interface RowProps {

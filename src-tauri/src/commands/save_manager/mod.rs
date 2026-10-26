@@ -696,8 +696,9 @@ pub async fn configure_save_location(
     if trimmed_path.is_empty() {
         return Err("Save path cannot be empty".into());
     }
+    let validated_expanded = crate::commands::save_manager::fs_ops::validate_safe_save_location_path(&trimmed_path)?;
 
-    let norm_target = normalize_path_for_compare(&expand_save_path(&trimmed_path));
+    let norm_target = normalize_path_for_compare(&validated_expanded);
     let existing_locations = get_game_locations_dto_internal(&conn, &game_id)
         .map_err(|e| e.to_string())?;
 

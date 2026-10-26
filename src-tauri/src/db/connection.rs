@@ -42,14 +42,26 @@ impl Database {
         // (RENAME -> CREATE -> INSERT -> DROP) run safely without constraint conflicts.
         connection.pragma_update(None, "foreign_keys", "OFF")?;
 
-        super::migrations::run(&mut connection)?;
+        super::migrations::run(&mut connection, Some(&db_path))?;
 
-        // Clean up any orphaned save_operation_locations before enabling foreign keys
+        // Clean up any orphaned child rows before enabling foreign keys
         // so that foreign key integrity checks pass cleanly.
-        let _ = connection.execute(
-            "DELETE FROM save_operation_locations WHERE location_id NOT IN (SELECT id FROM game_save_locations) OR operation_id NOT IN (SELECT id FROM save_operations)",
-            [],
+        let _ = connection.execute_batch(
+            "DELETE FROM save_operation_locations WHERE location_id NOT IN (SELECT id FROM game_save_locations) OR operation_id NOT IN (SELECT id FROM save_operations);
+             DELETE FROM collection_games WHERE game_id NOT IN (SELECT id FROM games) OR collection_id NOT IN (SELECT id FROM collections);
+             DELETE FROM game_tags WHERE game_id NOT IN (SELECT id FROM games) OR tag_id NOT IN (SELECT id FROM tags);
+             DELETE FROM artwork_cache WHERE game_id NOT IN (SELECT id FROM games);",
         );
+
+        if let Ok(mut fk_stmt) = connection.prepare("PRAGMA foreign_key_check") {
+            let violations: usize = fk_stmt
+                .query_map([], |_row| Ok(()))
+                .map(|rows| rows.count())
+                .unwrap_or(0);
+            if violations > 0 {
+                log::warn!("Detected {} SQLite foreign key violation(s) after migration", violations);
+            }
+        }
 
         connection.pragma_update(None, "foreign_keys", "ON")?;
         let _ = connection.pragma_update(None, "mmap_size", "67108864");

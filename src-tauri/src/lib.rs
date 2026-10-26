@@ -154,7 +154,7 @@ pub fn run() {
             // being ready from the very first frontend render.
             let database = Database::init(app.handle())?;
             {
-                let conn = database.connection.lock().expect("db mutex poisoned");
+                let conn = database.connection.lock().unwrap_or_else(|e| e.into_inner());
                 if let Err(err) = commands::save_manager::recovery::CrashRecoveryEngine::recover_interrupted_operations(&conn) {
                     log::error!("Failed to recover interrupted save operations: {}", err);
                 }
@@ -262,6 +262,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::system::health_check,
             commands::system::shutdown_system,
+            commands::system::cancel_shutdown,
             commands::system::hide_to_tray,
             commands::system::restore_main_window,
             commands::system::exit_application,

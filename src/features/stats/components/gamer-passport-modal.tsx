@@ -22,10 +22,10 @@ import { cn } from '@/lib/utils'
 import { ModalCloseButton } from '@/components/ui/modal'
 import { playButtonClick } from '@/lib/sound-engine'
 
-interface GenreHourItem {
+export interface GenreHourItem {
   genre: string
-  total_seconds: number
-  game_count: number
+  total_playtime_seconds: number
+  game_count?: number
   hours: number
 }
 
@@ -511,7 +511,7 @@ export function GamerPassportModal({
         label: 'DOMINANT GENRE DNA',
         value: topGenre?.genre || 'Multi-Genre',
         sub: topGenre
-          ? `${(topGenre.total_seconds / 3600).toFixed(1)}h (${topGenre.game_count} Titles)`
+          ? `${((topGenre.total_playtime_seconds ?? 0) / 3600).toFixed(1)}h (${topGenre.game_count ?? genres[0]?.game_count ?? 1} Titles)`
           : 'Balanced Catalog',
         accent: isLight ? '#db2777' : '#ec4899',
       },
@@ -682,7 +682,7 @@ export function GamerPassportModal({
     ctx.font = '800 13px monospace'
     ctx.fillText('GENRE DNA & PLAYSTYLE SPECTRUM', 842, 636)
 
-    const displayGenres =
+    const displayGenres: GenreHourItem[] =
       genres.length > 0
         ? genres.slice(0, 4)
         : [
@@ -690,25 +690,25 @@ export function GamerPassportModal({
               genre: topGenre?.genre || 'Action / RPG',
               hours: levelInfo.totalHours || 12,
               game_count: 3,
-              total_seconds: 43200,
+              total_playtime_seconds: 43200,
             },
             {
               genre: 'Adventure',
               hours: Math.max(2, Math.round(levelInfo.totalHours * 0.45)),
               game_count: 2,
-              total_seconds: 18000,
+              total_playtime_seconds: 18000,
             },
             {
               genre: 'Shooter / Tactical',
               hours: Math.max(1, Math.round(levelInfo.totalHours * 0.25)),
               game_count: 2,
-              total_seconds: 9000,
+              total_playtime_seconds: 9000,
             },
             {
               genre: 'Indie / Strategy',
               hours: Math.max(1, Math.round(levelInfo.totalHours * 0.15)),
               game_count: 1,
-              total_seconds: 5400,
+              total_playtime_seconds: 5400,
             },
           ]
     const maxGenreHours = Math.max(1, ...displayGenres.map((g) => g.hours || 1))
@@ -731,7 +731,7 @@ export function GamerPassportModal({
       ctx.textAlign = 'right'
       ctx.fillStyle = textMuted
       ctx.font = '800 14px monospace'
-      ctx.fillText(`${g.hours.toFixed(1)}h • ${g.game_count} Games`, 1500, gy)
+      ctx.fillText(`${g.hours.toFixed(1)}h • ${g.game_count ?? 1} Games`, 1500, gy)
 
       drawRoundedRect(ctx, 842, gy + 12, 658, 14, 7)
       ctx.fillStyle = trackBg

@@ -1,7 +1,7 @@
 use crate::commands::save_manager::error::{SaveManagerError, SaveResult};
 use crate::commands::save_manager::fs_ops::{
     calculate_tree_hash, copy_dir_recursive, flush_file_or_dir_buffers,
-    get_nexus_profiles_root, remove_path_all_with_retry, verify_disk_space,
+    get_nexus_profiles_root, remove_path_all_with_retry, sanitize_safe_id_segment, verify_disk_space,
 };
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -35,14 +35,14 @@ pub struct SnapshotEngine;
 impl SnapshotEngine {
     pub fn get_snapshots_dir(profile_id: &str, game_id: &str) -> PathBuf {
         get_nexus_profiles_root()
-            .join(profile_id)
+            .join(sanitize_safe_id_segment(profile_id))
             .join("games")
-            .join(game_id)
+            .join(sanitize_safe_id_segment(game_id))
             .join("snapshots")
     }
 
     pub fn get_snapshot_dir(profile_id: &str, game_id: &str, snapshot_id: &str) -> PathBuf {
-        Self::get_snapshots_dir(profile_id, game_id).join(snapshot_id)
+        Self::get_snapshots_dir(profile_id, game_id).join(sanitize_safe_id_segment(snapshot_id))
     }
 
     /// Creates and verifies a snapshot for all configured save locations of a game (Section 8).
@@ -74,7 +74,7 @@ impl SnapshotEngine {
         let mut overall_size = 0u64;
 
         for (loc_id, src_path, expected_hash) in locations {
-            let loc_dest = snap_dir.join(loc_id);
+            let loc_dest = snap_dir.join(sanitize_safe_id_segment(loc_id));
             if src_path.exists() {
                 copy_dir_recursive(src_path, &loc_dest)?;
                 flush_file_or_dir_buffers(&loc_dest)?;
@@ -288,7 +288,7 @@ impl SnapshotEngine {
             let prof_root = get_nexus_profiles_root();
             if let Ok(entries) = fs::read_dir(&prof_root) {
                 for entry in entries.flatten() {
-                    let candidate = entry.path().join("games").join(game_id).join("snapshots").join(snapshot_id);
+                    let candidate = entry.path().join("games").join(sanitize_safe_id_segment(game_id)).join("snapshots").join(sanitize_safe_id_segment(snapshot_id));
                     if candidate.exists() {
                         snap_dir = candidate;
                         break;

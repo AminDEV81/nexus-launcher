@@ -27,7 +27,7 @@ pub struct LaunchTracker {
 
 impl LaunchTracker {
     fn try_start(&self, game_id: &str) -> bool {
-        let mut running = self.running.lock().expect("launch tracker mutex poisoned");
+        let mut running = self.running.lock().unwrap_or_else(|e| e.into_inner());
         if running.contains_key(game_id) {
             return false;
         }
@@ -38,8 +38,7 @@ impl LaunchTracker {
     fn set_pid(&self, game_id: &str, pid: u32) {
         if let Some(slot) = self
             .running
-            .lock()
-            .expect("launch tracker mutex poisoned")
+            .lock().unwrap_or_else(|e| e.into_inner())
             .get_mut(game_id)
         {
             *slot = Some(pid);
@@ -48,8 +47,7 @@ impl LaunchTracker {
 
     fn pid_of(&self, game_id: &str) -> Option<u32> {
         self.running
-            .lock()
-            .expect("launch tracker mutex poisoned")
+            .lock().unwrap_or_else(|e| e.into_inner())
             .get(game_id)
             .copied()
             .flatten()
@@ -57,15 +55,13 @@ impl LaunchTracker {
 
     fn finish(&self, game_id: &str) {
         self.running
-            .lock()
-            .expect("launch tracker mutex poisoned")
+            .lock().unwrap_or_else(|e| e.into_inner())
             .remove(game_id);
     }
 
     pub fn is_running(&self, game_id: &str) -> bool {
         self.running
-            .lock()
-            .expect("launch tracker mutex poisoned")
+            .lock().unwrap_or_else(|e| e.into_inner())
             .contains_key(game_id)
     }
 }
@@ -74,8 +70,7 @@ impl LaunchTracker {
 pub fn get_running_games(tracker: State<'_, LaunchTracker>) -> Vec<String> {
     tracker
         .running
-        .lock()
-        .expect("launch tracker mutex poisoned")
+        .lock().unwrap_or_else(|e| e.into_inner())
         .keys()
         .cloned()
         .collect()
@@ -182,7 +177,7 @@ struct LaunchTarget {
 }
 
 fn fetch_launch_target(db: &Database, game_id: &str) -> AppResult<LaunchTarget> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.query_row(
         "SELECT name, cover_path, source, steam_app_id, executable_path, install_path, launch_arguments,
                 pre_launch_command, post_launch_command
@@ -206,7 +201,7 @@ fn fetch_launch_target(db: &Database, game_id: &str) -> AppResult<LaunchTarget> 
 }
 
 fn auto_boost_enabled(db: &Database) -> bool {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.query_row(
         "SELECT value FROM settings WHERE key = 'auto_boost_enabled'",
         [],
@@ -235,7 +230,14 @@ enum LaunchedProcess {
 
 fn launch_via_steam(app: &AppHandle, steam_app_id: Option<&str>) -> AppResult<LaunchedProcess> {
     let steam_app_id = steam_app_id
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
         .ok_or_else(|| AppError::Invalid("This game is missing its Steam App ID.".into()))?;
+    if !steam_app_id.chars().all(|c| c.is_ascii_digit()) {
+        return Err(AppError::Invalid(
+            "Invalid Steam App ID: must contain digits only.".into(),
+        ));
+    }
     let url = format!("steam://rungameid/{steam_app_id}");
     app.opener()
         .open_url(&url, None::<&str>)
@@ -302,8 +304,16 @@ fn launch_directly(target: &LaunchTarget) -> AppResult<LaunchedProcess> {
         .to_ascii_lowercase();
 
     let mut command = if cfg!(windows) && (ext == "bat" || ext == "cmd") {
+        if executable_path.contains(['"', '!', '\r', '\n', '\0']) || !path_obj.is_file() {
+            return Err(AppError::Invalid(
+                "Invalid or unsafe batch script path.".into(),
+            ));
+        }
+        // Pass batch path via environment variable with delayed expansion (`!NEXUS_BATCH_TARGET!`)
+        // so `cmd.exe` never parses `&`, `|`, `^`, `<`, `>`, or `%` in the path as shell metacharacters.
         let mut cmd = StdCommand::new("cmd.exe");
-        cmd.arg("/C").arg(executable_path);
+        cmd.env("NEXUS_BATCH_TARGET", executable_path);
+        cmd.args(["/d", "/v:on", "/c", "call \"!NEXUS_BATCH_TARGET!\""]);
         cmd
     } else if cfg!(windows) && ext == "ps1" {
         let mut cmd = StdCommand::new("powershell.exe");
@@ -360,15 +370,14 @@ fn launch_directly(target: &LaunchTarget) -> AppResult<LaunchedProcess> {
         StdCommand::new(executable_path)
     };
 
-    // Bypass Windows Attachment Manager / Zone.Identifier network checks so offline game launches never stall!
-    command.env("SEE_MASK_NOZONECHECKS", "1");
+    // Preserve Windows Mark-of-the-Web (MotW) and SmartScreen zone checks on downloaded executables.
 
     // Provide SteamAppId / SteamGameId environment variables when available so Steamworks games launch directly without `steam://` network delays
     if let Some(app_id) = target
         .steam_app_id
         .as_deref()
         .map(str::trim)
-        .filter(|s| !s.is_empty())
+        .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit()))
     {
         command.env("SteamAppId", app_id);
         command.env("SteamGameId", app_id);
@@ -465,7 +474,7 @@ pub async fn launch_game(
     }
 
     let active_profile_id = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT value FROM settings WHERE key = 'active_profile_id'",
             [],
@@ -500,7 +509,7 @@ pub async fn launch_game(
 
         let tx_id = match tokio::task::spawn_blocking(move || {
             let db = app_c.state::<Database>();
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             TransactionCoordinator::prepare_game_saves(&conn, &active_profile_id_c, &game_id_c)
         })
         .await
@@ -783,8 +792,19 @@ async fn track_session(
         })
         .unwrap_or(false);
 
+    let session_id = Uuid::new_v4().to_string();
+    init_session_row(&app, &session_id, &game_id, &session_profile_id, started_at);
+
+    let mut active_elapsed_ms: u64 = 0;
+    let mut checkpointed_seconds: i64 = 0;
+    let mut last_tick_instant = tokio::time::Instant::now();
+    let max_tick_ms: u64 = (POLL_INTERVAL.as_millis() as u64).saturating_mul(3).max(6000);
+
     loop {
         tokio::time::sleep(POLL_INTERVAL).await;
+        let now_instant = tokio::time::Instant::now();
+        let tick_ms = (now_instant.duration_since(last_tick_instant).as_millis() as u64).min(max_tick_ms);
+        last_tick_instant = now_instant;
 
         let still_running = if let Some(ref jt) = job_tracker {
             jt.is_active()
@@ -813,7 +833,15 @@ async fn track_session(
             break;
         }
 
-        let elapsed = (Utc::now() - started_at).num_seconds().max(0);
+        active_elapsed_ms = active_elapsed_ms.saturating_add(tick_ms);
+        let elapsed = (active_elapsed_ms / 1000) as i64;
+        if elapsed - checkpointed_seconds >= 30 {
+            let delta = elapsed - checkpointed_seconds;
+            if checkpoint_session(&app, &session_id, &game_id, Utc::now(), elapsed, delta) {
+                checkpointed_seconds = elapsed;
+            }
+        }
+
         let _ = app.emit(
             "playtime-updated",
             PlaytimeUpdatedPayload {
@@ -822,6 +850,22 @@ async fn track_session(
             },
         );
     }
+
+    // Record exit timestamp and finalize playtime BEFORE save sync so large save backups
+    // never inflate gameplay duration.
+    let ended_at = Utc::now();
+    let duration_seconds = ((active_elapsed_ms / 1000) as i64).max(checkpointed_seconds);
+    let remaining_delta = (duration_seconds - checkpointed_seconds).max(0);
+    record_session(
+        &app,
+        &session_id,
+        &game_id,
+        &session_profile_id,
+        started_at,
+        ended_at,
+        duration_seconds,
+        remaining_delta,
+    );
 
     {
         let locks = app.state::<SaveManagerLocks>();
@@ -832,7 +876,7 @@ async fn track_session(
 
         let sync_res = tokio::task::spawn_blocking(move || {
             let db = app_c.state::<Database>();
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             let res = TransactionCoordinator::sync_game_saves_after_exit(&conn, &session_profile_c, &game_id_c);
 
             let active_profile_id: String = conn
@@ -856,10 +900,6 @@ async fn track_session(
         }
     }
     app.state::<SessionManager>().remove_session(&game_id);
-
-    let ended_at = Utc::now();
-    let duration_seconds = (ended_at - started_at).num_seconds().max(0);
-    record_session(&app, &game_id, &session_profile_id, started_at, ended_at, duration_seconds);
 
     if let Some(hook) = post_launch_command.filter(|value| !value.trim().is_empty()) {
         run_hook(&hook);
@@ -894,7 +934,7 @@ async fn track_session(
 fn handle_launch_window_action(app: &AppHandle) {
     let action = {
         let db = app.state::<Database>();
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT value FROM settings WHERE key = 'game_launch_window_action'",
             [],
@@ -919,7 +959,7 @@ fn handle_launch_window_action(app: &AppHandle) {
 fn restore_launcher_window(app: &AppHandle) {
     let action = {
         let db = app.state::<Database>();
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT value FROM settings WHERE key = 'game_launch_window_action'",
             [],
@@ -1008,35 +1048,93 @@ fn finish_without_session(app: &AppHandle, game_id: &str) {
     app.state::<LaunchTracker>().finish(game_id);
 }
 
+fn init_session_row(
+    app: &AppHandle,
+    session_id: &str,
+    game_id: &str,
+    profile_id: &str,
+    started_at: DateTime<Utc>,
+) {
+    let db = app.state::<Database>();
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
+    let started_iso = started_at.to_rfc3339();
+    let _ = conn.execute(
+        "INSERT OR IGNORE INTO playtime_sessions (id, game_id, profile_id, started_at, ended_at, duration_seconds)
+         VALUES (?1, ?2, ?3, ?4, ?5, 0)",
+        params![session_id, game_id, profile_id, &started_iso, &started_iso],
+    );
+    let _ = conn.execute(
+        "UPDATE games SET last_played_at = ?1 WHERE id = ?2",
+        params![&started_iso, game_id],
+    );
+}
+
+fn checkpoint_session(
+    app: &AppHandle,
+    session_id: &str,
+    game_id: &str,
+    now: DateTime<Utc>,
+    total_session_seconds: i64,
+    delta_seconds: i64,
+) -> bool {
+    if delta_seconds <= 0 {
+        return true;
+    }
+    let db = app.state::<Database>();
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
+    let now_iso = now.to_rfc3339();
+    let res = (|| -> rusqlite::Result<()> {
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "UPDATE playtime_sessions SET ended_at = ?1, duration_seconds = ?2 WHERE id = ?3",
+            params![&now_iso, total_session_seconds, session_id],
+        )?;
+        tx.execute(
+            "UPDATE games SET total_playtime_seconds = total_playtime_seconds + ?1, last_played_at = ?2 WHERE id = ?3",
+            params![delta_seconds, &now_iso, game_id],
+        )?;
+        tx.commit()
+    })();
+    res.is_ok()
+}
+
+#[allow(clippy::too_many_arguments)]
 fn record_session(
     app: &AppHandle,
+    session_id: &str,
     game_id: &str,
     profile_id: &str,
     started_at: DateTime<Utc>,
     ended_at: DateTime<Utc>,
     duration_seconds: i64,
+    remaining_delta: i64,
 ) {
     let db = app.state::<Database>();
-    let conn = db.connection.lock().expect("db mutex poisoned");
-    let session_id = Uuid::new_v4().to_string();
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let result = (|| -> rusqlite::Result<()> {
         let tx = conn.unchecked_transaction()?;
-        tx.execute(
-            "INSERT INTO playtime_sessions (id, game_id, profile_id, started_at, ended_at, duration_seconds)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                session_id,
-                game_id,
-                profile_id,
-                started_at.to_rfc3339(),
-                ended_at.to_rfc3339(),
-                duration_seconds
-            ],
+        let updated = tx.execute(
+            "UPDATE playtime_sessions SET ended_at = ?1, duration_seconds = ?2 WHERE id = ?3",
+            params![ended_at.to_rfc3339(), duration_seconds, session_id],
         )?;
+        if updated == 0 {
+            tx.execute(
+                "INSERT INTO playtime_sessions (id, game_id, profile_id, started_at, ended_at, duration_seconds)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    session_id,
+                    game_id,
+                    profile_id,
+                    started_at.to_rfc3339(),
+                    ended_at.to_rfc3339(),
+                    duration_seconds
+                ],
+            )?;
+        }
         tx.execute(
             "UPDATE games SET total_playtime_seconds = total_playtime_seconds + ?1, last_played_at = ?2 WHERE id = ?3",
-            params![duration_seconds, ended_at.to_rfc3339(), game_id],
+            params![remaining_delta.max(0), ended_at.to_rfc3339(), game_id],
         )?;
         tx.commit()
     })();
@@ -1109,7 +1207,7 @@ pub fn attach_external_game_if_not_running(
     };
 
     let active_profile_id = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT value FROM settings WHERE key = 'active_profile_id'",
             [],
@@ -1169,9 +1267,19 @@ async fn track_external_session(
     let mut system = System::new();
     let started_at = Utc::now();
     let sys_pid = Pid::from_u32(pid);
+    let session_id = Uuid::new_v4().to_string();
+    init_session_row(&app, &session_id, &game_id, &session_profile_id, started_at);
+
+    let mut active_elapsed_ms: u64 = 0;
+    let mut checkpointed_seconds: i64 = 0;
+    let mut last_tick_instant = tokio::time::Instant::now();
+    let max_tick_ms: u64 = (POLL_INTERVAL.as_millis() as u64).saturating_mul(3).max(6000);
 
     loop {
         tokio::time::sleep(POLL_INTERVAL).await;
+        let now_instant = tokio::time::Instant::now();
+        let tick_ms = (now_instant.duration_since(last_tick_instant).as_millis() as u64).min(max_tick_ms);
+        last_tick_instant = now_instant;
 
         system.refresh_processes(ProcessesToUpdate::Some(&[sys_pid]), true);
         let still_running = match system.process(sys_pid) {
@@ -1189,7 +1297,15 @@ async fn track_external_session(
             break;
         }
 
-        let elapsed = (Utc::now() - started_at).num_seconds().max(0);
+        active_elapsed_ms = active_elapsed_ms.saturating_add(tick_ms);
+        let elapsed = (active_elapsed_ms / 1000) as i64;
+        if elapsed - checkpointed_seconds >= 30 {
+            let delta = elapsed - checkpointed_seconds;
+            if checkpoint_session(&app, &session_id, &game_id, Utc::now(), elapsed, delta) {
+                checkpointed_seconds = elapsed;
+            }
+        }
+
         let _ = app.emit(
             "playtime-updated",
             PlaytimeUpdatedPayload {
@@ -1198,6 +1314,20 @@ async fn track_external_session(
             },
         );
     }
+
+    let ended_at = Utc::now();
+    let duration_seconds = ((active_elapsed_ms / 1000) as i64).max(checkpointed_seconds);
+    let remaining_delta = (duration_seconds - checkpointed_seconds).max(0);
+    record_session(
+        &app,
+        &session_id,
+        &game_id,
+        &session_profile_id,
+        started_at,
+        ended_at,
+        duration_seconds,
+        remaining_delta,
+    );
 
     {
         let locks = app.state::<SaveManagerLocks>();
@@ -1208,7 +1338,7 @@ async fn track_external_session(
 
         let _ = tokio::task::spawn_blocking(move || {
             let db = app_c.state::<Database>();
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             let _ = TransactionCoordinator::sync_game_saves_after_exit(
                 &conn,
                 &session_profile_c,
@@ -1219,17 +1349,6 @@ async fn track_external_session(
     }
 
     app.state::<SessionManager>().remove_session(&game_id);
-
-    let ended_at = Utc::now();
-    let duration_seconds = (ended_at - started_at).num_seconds().max(0);
-    record_session(
-        &app,
-        &game_id,
-        &session_profile_id,
-        started_at,
-        ended_at,
-        duration_seconds,
-    );
 
     if let Some(hook) = post_launch_command.filter(|value| !value.trim().is_empty()) {
         run_hook(&hook);

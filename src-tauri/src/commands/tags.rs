@@ -11,7 +11,7 @@ const DEFAULT_TAG_COLOR: &str = "#7c5cff";
 
 #[tauri::command]
 pub fn list_tags(db: State<'_, Database>) -> AppResult<Vec<Tag>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let mut stmt =
         conn.prepare("SELECT id, name, color FROM tags ORDER BY name COLLATE NOCASE ASC")?;
@@ -80,7 +80,7 @@ pub fn create_tag(db: State<'_, Database>, input: TagInput) -> AppResult<Tag> {
         None => DEFAULT_TAG_COLOR.to_string(),
     };
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let id = Uuid::new_v4().to_string();
     conn.execute(
         "INSERT INTO tags (id, name, color) VALUES (?1, ?2, ?3)",
@@ -103,7 +103,7 @@ pub fn update_tag(db: State<'_, Database>, id: String, input: TagInput) -> AppRe
     let name = validate_name(&input.name)?;
     let color = validate_color(input.color.as_deref().unwrap_or(DEFAULT_TAG_COLOR))?;
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let changed = conn
         .execute(
             "UPDATE tags SET name = ?1, color = ?2 WHERE id = ?3",
@@ -126,7 +126,7 @@ pub fn update_tag(db: State<'_, Database>, id: String, input: TagInput) -> AppRe
 /// `ON DELETE CASCADE` — no game data is touched.
 #[tauri::command]
 pub fn delete_tag(db: State<'_, Database>, id: String) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let changed = conn.execute("DELETE FROM tags WHERE id = ?1", [&id])?;
     if changed == 0 {
@@ -146,7 +146,7 @@ pub fn set_game_tags(
     game_id: String,
     tag_ids: Vec<String>,
 ) -> AppResult<()> {
-    let mut conn = db.connection.lock().expect("db mutex poisoned");
+    let mut conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let game_exists: bool = conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM games WHERE id = ?1)",

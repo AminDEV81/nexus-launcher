@@ -24,6 +24,7 @@ export interface TimeOfDayBucket {
 export interface CircadianHabits {
   buckets: TimeOfDayBucket[]
   personaTitle: string
+  peakHourLabel: string
   dominantPersona: {
     title: string
     tag: string
@@ -193,5 +194,6 @@ export function calculateCircadianHabits(sessions: RecentSession[]): CircadianHa
     }
   }
 
-  return { buckets, personaTitle: persona.title, dominantPersona: persona }
+  const peakHourLabel = top && top.hours > 0 ? top.timeRange : '20:00 – 23:00'
+  return { buckets, personaTitle: persona.title, peakHourLabel, dominantPersona: persona }
 }

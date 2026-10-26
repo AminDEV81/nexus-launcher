@@ -27,6 +27,7 @@ impl Default for HttpClient {
         Self(
             reqwest::Client::builder()
                 .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
+                .redirect(crate::commands::profiles::safe_ssrf_redirect_policy())
                 .connect_timeout(std::time::Duration::from_millis(1500))
                 .timeout(std::time::Duration::from_secs(5))
                 .build()
@@ -45,7 +46,7 @@ struct Credentials {
 /// point in every function below, so the connection mutex is never held
 /// across network I/O.
 fn get_credentials(db: &Database) -> Credentials {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     // Empty strings count as missing — the Settings UI saves a cleared
     // field as "" rather than deleting the row.
     let read = |key: &str| -> Option<String> {
@@ -64,7 +65,7 @@ fn get_credentials(db: &Database) -> Credentials {
 }
 
 fn get_game_lookup_fields(db: &Database, game_id: &str) -> (Option<String>, String) {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let steam_app_id = conn
         .query_row(
             "SELECT steam_app_id FROM games WHERE id = ?1",
@@ -164,7 +165,7 @@ async fn apply_igdb_text_metadata(
     )
     .await;
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
         "UPDATE games SET
             description = COALESCE(?1, description),
@@ -260,7 +261,7 @@ async fn auto_fetch_steam_store_text(
     };
 
     let already_has_screenshots: bool = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM artwork_cache WHERE game_id = ?1 AND kind = 'screenshot')",
             [game_id],
@@ -297,7 +298,7 @@ async fn auto_fetch_steam_store_text(
     )
     .await;
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let changed = conn
         .execute(
             "UPDATE games SET
@@ -412,7 +413,7 @@ async fn auto_fetch_steamgriddb_artwork(
     }
 
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE games SET
                 cover_path = COALESCE(?1, cover_path),
@@ -463,7 +464,7 @@ async fn fetch_steamgriddb_screenshot_fallback(
     const MAX_FALLBACK_SCREENSHOTS: usize = 5;
 
     let already_has_screenshots: bool = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM artwork_cache WHERE game_id = ?1 AND kind = 'screenshot')",
             [game_id],
@@ -492,7 +493,7 @@ async fn fetch_steamgriddb_screenshot_fallback(
         return;
     }
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     for (ordinal, path, url) in saved {
         conn.execute(
             "INSERT INTO artwork_cache (game_id, kind, ordinal, local_path, source_url, is_custom)
@@ -536,7 +537,7 @@ async fn auto_fetch_highres_artwork_and_logo(
     fallback_cover_url: Option<&str>,
 ) -> bool {
     let (mut steam_app_id, existing_cover, existing_banner, existing_logo) = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let row_opt = conn
             .query_row(
                 "SELECT steam_app_id, cover_path, banner_path, logo_path FROM games WHERE id = ?1",
@@ -560,7 +561,7 @@ async fn auto_fetch_highres_artwork_and_logo(
     if steam_app_id.as_deref().map(str::trim).filter(|s| !s.is_empty()).is_none() {
         let steam_provider = crate::services::providers::SteamArtworkProvider::new(http.clone());
         if let Some(resolved_aid) = steam_provider.resolve_app_id(game_name).await {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             conn.execute(
                 "UPDATE games SET steam_app_id = COALESCE(steam_app_id, ?1) WHERE id = ?2",
                 rusqlite::params![&resolved_aid, game_id],
@@ -636,7 +637,7 @@ async fn auto_fetch_highres_artwork_and_logo(
             }
         }
         if let Some((path, url, is_anim)) = downloaded_cover {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             conn.execute(
                 "UPDATE games SET cover_path = ?1, cover_is_animated = ?2 WHERE id = ?3",
                 rusqlite::params![&path, is_anim, game_id],
@@ -650,7 +651,7 @@ async fn auto_fetch_highres_artwork_and_logo(
     if need_banner {
         for opt in &hero_opts {
             if let Ok(path) = artwork::download_artwork(http, app, game_id, "banner", &opt.url, false).await {
-                let conn = db.connection.lock().expect("db mutex poisoned");
+                let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                 conn.execute(
                     "UPDATE games SET banner_path = ?1 WHERE id = ?2",
                     rusqlite::params![&path, game_id],
@@ -666,7 +667,7 @@ async fn auto_fetch_highres_artwork_and_logo(
     if need_logo {
         for opt in &logo_opts {
             if let Ok(path) = artwork::download_artwork(http, app, game_id, "logo", &opt.url, false).await {
-                let conn = db.connection.lock().expect("db mutex poisoned");
+                let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                 conn.execute(
                     "UPDATE games SET logo_path = ?1 WHERE id = ?2",
                     rusqlite::params![&path, game_id],
@@ -694,7 +695,7 @@ async fn auto_fetch_one(app: &AppHandle, game_id: &str, game_name: &str) {
 
     // 1. Automatic full IGDB / Nexus Cloud metadata sync (same pipeline as manual Sync button)
     let existing_igdb_id: Option<i64> = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT igdb_id FROM games WHERE id = ?1",
             [game_id],
@@ -773,7 +774,7 @@ async fn auto_fetch_one(app: &AppHandle, game_id: &str, game_name: &str) {
 
     // 4. Ensure Metacritic & OpenCritic scores are always resolved and persisted
     let release_date_opt: Option<String> = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT release_date FROM games WHERE id = ?1",
             [game_id],
@@ -793,7 +794,7 @@ async fn auto_fetch_one(app: &AppHandle, game_id: &str, game_name: &str) {
     )
     .await;
     if live_scores.metacritic.is_some() || live_scores.opencritic.is_some() {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let changed = conn
             .execute(
                 "UPDATE games SET
@@ -872,7 +873,7 @@ pub fn spawn_hub_artwork_fetch(
 
         if let Some(url) = igdb_cover_url {
             let has_cover: Option<String> = {
-                let conn = db.connection.lock().expect("db mutex poisoned");
+                let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                 conn.query_row(
                     "SELECT cover_path FROM games WHERE id = ?1",
                     [&game_id],
@@ -885,7 +886,7 @@ pub fn spawn_hub_artwork_fetch(
                 if let Ok(path) =
                     artwork::download_artwork(&http.0, &app, &game_id, "cover", &url, false).await
                 {
-                    let conn = db.connection.lock().expect("db mutex poisoned");
+                    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                     conn.execute(
                         "UPDATE games SET cover_path = ?1, cover_is_animated = 0 WHERE id = ?2",
                         rusqlite::params![path, game_id],
@@ -953,7 +954,7 @@ pub(crate) async fn apply_hub_details_to_game(
     .await;
 
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE games SET
                 description = COALESCE(?1, description),
@@ -996,7 +997,7 @@ pub(crate) async fn apply_hub_details_to_game(
     }
 
     if let Some(ref aid) = details.steam_app_id {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE games SET steam_app_id = COALESCE(steam_app_id, ?1) WHERE id = ?2",
             rusqlite::params![aid, game_id],
@@ -1018,7 +1019,7 @@ pub(crate) async fn apply_hub_details_to_game(
 
     // Fallback banner from first 1080p screenshot if banner_path is still None
     if let Some(ref bg) = background_path {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE games SET banner_path = COALESCE(banner_path, ?1) WHERE id = ?2",
             rusqlite::params![bg, game_id],
@@ -1093,7 +1094,7 @@ pub async fn apply_metadata(
         apply_igdb_text_metadata(&app, &db, &http.0, &token_cache, &game_id, igdb_id).await?;
     }
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let sql = format!("SELECT {} FROM games WHERE id = ?1", Game::SELECT_COLUMNS);
     let game = conn.query_row(&sql, [&game_id], Game::from_row)?;
     Ok(game)
@@ -1111,7 +1112,7 @@ pub async fn sync_game_metadata(
     game_id: String,
 ) -> AppResult<Game> {
     let (igdb_id_opt, name) = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT igdb_id, name FROM games WHERE id = ?1",
             rusqlite::params![game_id],
@@ -1139,7 +1140,7 @@ pub async fn sync_game_metadata(
 
     apply_hub_details_to_game(&app, &db, &http.0, &game_id, &details).await?;
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let sql = format!("SELECT {} FROM games WHERE id = ?1", Game::SELECT_COLUMNS);
     let game = conn.query_row(&sql, [&game_id], Game::from_row)?;
     let _ = app.emit("metadata-updated", &game_id);
@@ -1157,7 +1158,7 @@ pub async fn sync_wishlist_metadata(
     resolver: State<'_, Arc<MetadataProviderResolver>>,
 ) -> AppResult<Vec<Game>> {
     let games_to_sync: Vec<(String, String, Option<i64>)> = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn.prepare(
             "SELECT id, name, igdb_id FROM games
              WHERE is_wishlist = 1 OR (release_date IS NOT NULL AND release_date >= date('now') AND is_installed = 0)",
@@ -1196,7 +1197,7 @@ pub async fn sync_wishlist_metadata(
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let sql = format!(
         "SELECT {} FROM games WHERE is_wishlist = 1 OR (release_date IS NOT NULL AND release_date >= date('now') AND is_installed = 0)",
         Game::SELECT_COLUMNS
@@ -1255,7 +1256,7 @@ pub async fn apply_cover(
     )
     .await?;
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
         "UPDATE games SET cover_path = ?1, cover_is_animated = ?2 WHERE id = ?3",
         rusqlite::params![cover_path, is_animated, game_id],
@@ -1289,7 +1290,7 @@ pub fn apply_custom_cover(
 
     let cover_path = artwork::copy_local_artwork(&app, &game_id, "cover", &file_path)?;
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
         "UPDATE games SET cover_path = ?1, cover_is_animated = ?2 WHERE id = ?3",
         rusqlite::params![cover_path, is_animated, game_id],
@@ -1362,7 +1363,7 @@ pub async fn apply_logo(
         allow_large.unwrap_or(false),
     )
     .await?;
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
         "UPDATE games SET logo_path = ?1 WHERE id = ?2",
         rusqlite::params![logo_path, game_id],
@@ -1396,7 +1397,7 @@ pub async fn apply_banner(
     )
     .await?;
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
         "UPDATE games SET banner_path = ?1 WHERE id = ?2",
         rusqlite::params![banner_path, game_id],
@@ -1419,7 +1420,7 @@ pub fn apply_custom_banner(
 ) -> AppResult<Game> {
     let banner_path = artwork::copy_local_artwork(&app, &game_id, "banner", &file_path)?;
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
         "UPDATE games SET banner_path = ?1 WHERE id = ?2",
         rusqlite::params![banner_path, game_id],
@@ -1467,8 +1468,52 @@ pub fn crop_and_save_image(
     target_kind: String,
 ) -> AppResult<Game> {
     let column = artwork_column(&target_kind)?;
+    if width == 0 || height == 0 {
+        return Err(AppError::Invalid("crop dimensions must be greater than zero".into()));
+    }
 
-    let source = image::open(&source_path)
+    let src = std::path::Path::new(&source_path);
+    if src.components().any(|c| matches!(c, std::path::Component::ParentDir)) || !src.is_file() {
+        return Err(AppError::Invalid("selected image file does not exist or is invalid".into()));
+    }
+    let file_len = src.metadata().map(|m| m.len()).unwrap_or(0);
+    if file_len == 0 || file_len > artwork::MAX_ARTWORK_BYTES {
+        return Err(AppError::Invalid("selected image file exceeds maximum allowed size (150 MB)".into()));
+    }
+    let ext_ok = src
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|ext| {
+            matches!(
+                ext.to_ascii_lowercase().as_str(),
+                "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "ico" | "avif"
+            )
+        })
+        .unwrap_or(false);
+    if !ext_ok {
+        return Err(AppError::Invalid(
+            "selected file must be a supported image (.png, .jpg, .webp, .gif, .bmp, .ico)".into(),
+        ));
+    }
+
+    // Check image header dimensions BEFORE decoding the full bitmap into memory
+    let (img_w, img_h) = image::ImageReader::open(src)
+        .map_err(|err| AppError::Other(format!("could not open image: {err}")))?
+        .with_guessed_format()
+        .map_err(|err| AppError::Other(format!("could not inspect image format: {err}")))?
+        .into_dimensions()
+        .map_err(|err| AppError::Other(format!("could not read image dimensions: {err}")))?;
+
+    if img_w == 0 || img_h == 0 || img_w > 16384 || img_h > 16384 || (img_w as u64) * (img_h as u64) > 64_000_000 {
+        return Err(AppError::Invalid(
+            "image dimensions exceed the maximum safe limit (16384x16384 / 64 MP)".into(),
+        ));
+    }
+    if x >= img_w || y >= img_h {
+        return Err(AppError::Invalid("crop coordinates are outside the image bounds".into()));
+    }
+
+    let source = image::open(src)
         .map_err(|err| AppError::Other(format!("could not read image: {err}")))?;
     let cropped = source.crop_imm(x, y, width, height);
 
@@ -1479,7 +1524,7 @@ pub fn crop_and_save_image(
         .map_err(|err| AppError::Other(format!("could not save cropped image: {err}")))?;
     let saved_path = dest.to_string_lossy().to_string();
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     if target_kind == "cover" {
         conn.execute(
             "UPDATE games SET cover_path = ?1, cover_is_animated = 0 WHERE id = ?2",
@@ -1518,7 +1563,7 @@ pub async fn reset_artwork(
         // resetting re-downloads that same source URL rather than
         // querying anything fresh.
         let source_url: Option<String> = {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             conn.query_row(
                 "SELECT source_url FROM artwork_cache WHERE game_id = ?1 AND kind = 'screenshot' AND ordinal = 0",
                 [&game_id],
@@ -1534,7 +1579,7 @@ pub async fn reset_artwork(
         };
         let background_path =
             artwork::download_artwork(&http.0, &app, &game_id, "background", &url, false).await?;
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE games SET background_path = ?1 WHERE id = ?2",
             rusqlite::params![background_path, game_id],
@@ -1615,7 +1660,7 @@ pub async fn reset_artwork(
         _ => return Err(AppError::Invalid(format!("unknown artwork kind '{kind}'"))),
     };
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     if kind == "cover" {
         conn.execute(
             "UPDATE games SET cover_path = ?1, cover_is_animated = ?2 WHERE id = ?3",
@@ -1674,7 +1719,7 @@ pub async fn repair_missing_covers(
 
     // 1. Gather all games whose cover_path is null or points to a non-existent file
     let targets: Vec<MissingTarget> = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn.prepare("SELECT id, name, cover_path, steam_app_id, igdb_id FROM games")?;
         let rows = stmt.query_map([], |row| {
             let id: String = row.get(0)?;
@@ -1712,7 +1757,7 @@ pub async fn repair_missing_covers(
     for target in targets {
         // a) First check artwork_cache for existing source_url
         let cached_source_url: Option<String> = {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             conn.query_row(
                 "SELECT source_url FROM artwork_cache WHERE game_id = ?1 AND kind = 'cover' AND source_url IS NOT NULL ORDER BY ordinal ASC LIMIT 1",
                 [&target.id],
@@ -1759,7 +1804,7 @@ pub async fn repair_missing_covers(
                 .map(|ext| ext.eq_ignore_ascii_case("gif") || ext.eq_ignore_ascii_case("webm") || ext.eq_ignore_ascii_case("mp4"))
                 .unwrap_or(false);
             if let Ok(local_path) = artwork::download_artwork(&http.0, &app, &target.id, "cover", &url, false).await {
-                let conn = db.connection.lock().expect("db mutex poisoned");
+                let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                 let _ = conn.execute(
                     "UPDATE games SET cover_path = ?1, cover_is_animated = ?2 WHERE id = ?3",
                     rusqlite::params![local_path, is_anim, target.id],

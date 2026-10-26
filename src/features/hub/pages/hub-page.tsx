@@ -244,6 +244,7 @@ function useDebouncedValue<T>(value: T, ms: number): T {
 }
 
 export function HubPage() {
+  const navigate = useNavigate()
   const query = useHubSearchStore((s) => s.query)
   const setQuery = useHubSearchStore((s) => s.setQuery)
   const genreId = useHubSearchStore((s) => s.genreId)
@@ -2641,7 +2642,7 @@ function SearchResults({
               <span>Clear Active Filters</span>
             </button>
           )}
-          {QUICK_SEARCH_SUGGESTIONS.slice(0, 5).map((sug) => (
+          {FALLBACK_DYNAMIC_SUGGESTIONS.slice(0, 5).map((sug) => (
             <button
               key={sug.term}
               type="button"

@@ -20,7 +20,7 @@ impl IgdbTokenCache {
     /// Returns a cached token if it still has more than 5 minutes of
     /// life left, otherwise `None` so the caller fetches a fresh one.
     pub fn get_valid(&self) -> Option<String> {
-        let guard = self.inner.lock().expect("igdb token cache mutex poisoned");
+        let guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         guard.as_ref().and_then(|cached| {
             let still_valid = cached.expires_at - Utc::now() > chrono::Duration::minutes(5);
             still_valid.then(|| cached.access_token.clone())
@@ -28,7 +28,7 @@ impl IgdbTokenCache {
     }
 
     pub fn store(&self, access_token: String, expires_in_seconds: u64) {
-        let mut guard = self.inner.lock().expect("igdb token cache mutex poisoned");
+        let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         *guard = Some(CachedToken {
             access_token,
             expires_at: Utc::now() + chrono::Duration::seconds(expires_in_seconds as i64),

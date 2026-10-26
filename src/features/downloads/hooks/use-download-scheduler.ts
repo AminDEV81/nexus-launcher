@@ -76,6 +76,7 @@ export function useDownloadScheduler() {
 
       if (activeDownloads.length > 0 || queuedDownloads.length > 0) {
         hadActiveDownloads.current = true
+        hasTriggeredShutdown.current = false
       }
 
       if (isWindowActive) {
@@ -105,8 +106,25 @@ export function useDownloadScheduler() {
         !hasTriggeredShutdown.current
       ) {
         hasTriggeredShutdown.current = true
-        toast.warning(`Downloads completed. System will ${action} in 30 seconds.`)
-        call('shutdown_system', { action }).catch(() => undefined)
+        hadActiveDownloads.current = false
+        if (action === 'shutdown') {
+          toast.warning('Downloads completed. System will shut down in 30 seconds.', {
+            duration: 30000,
+            action: {
+              label: 'Cancel Shutdown',
+              onClick: () => {
+                call('cancel_shutdown')
+                  .then(() => toast.info('Scheduled system shutdown cancelled.'))
+                  .catch(() => undefined)
+              },
+            },
+          })
+        } else {
+          toast.warning(`Downloads completed. System will enter ${action} mode now.`)
+        }
+        call('shutdown_system', { action }).catch((err) => {
+          toast.error(`Scheduled power action failed: ${String(err)}`)
+        })
       }
     }
 

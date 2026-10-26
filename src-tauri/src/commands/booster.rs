@@ -204,7 +204,7 @@ fn format_bytes(bytes: u64) -> String {
 }
 
 fn enabled_modules(db: &Database) -> Vec<String> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let raw: Option<String> = conn
         .query_row(
             "SELECT value FROM settings WHERE key = 'booster_enabled_modules'",
@@ -224,7 +224,7 @@ fn enabled_modules(db: &Database) -> Vec<String> {
 }
 
 fn excluded_apps(db: &Database) -> Vec<String> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let raw: Option<String> = conn
         .query_row(
             "SELECT value FROM settings WHERE key = 'booster_excluded_apps'",
@@ -538,6 +538,8 @@ fn temp_dirs_to_clean() -> Vec<PathBuf> {
 fn clear_temp_files() -> BoostStepResult {
     let mut freed: u64 = 0;
     let mut deleted = 0u32;
+    let min_age = std::time::Duration::from_secs(2 * 60 * 60);
+    let now = std::time::SystemTime::now();
 
     for dir in temp_dirs_to_clean() {
         let Ok(entries) = std::fs::read_dir(&dir) else {
@@ -548,6 +550,17 @@ fn clear_temp_files() -> BoostStepResult {
                 continue;
             };
             if !metadata.is_file() {
+                continue;
+            }
+            // Skip recently modified temp files (< 2 hours old) so active installers
+            // and other running applications are never disrupted.
+            let is_old_enough = metadata
+                .modified()
+                .ok()
+                .and_then(|mtime| now.duration_since(mtime).ok())
+                .map(|age| age >= min_age)
+                .unwrap_or(false);
+            if !is_old_enough {
                 continue;
             }
             if std::fs::remove_file(entry.path()).is_ok() {
@@ -611,8 +624,7 @@ mod power_plan {
             if let Some(guid) = parse_active_scheme_guid(&String::from_utf8_lossy(&output.stdout)) {
                 *state
                     .previous_power_scheme
-                    .lock()
-                    .expect("booster mutex poisoned") = Some(guid);
+                    .lock().unwrap_or_else(|e| e.into_inner()) = Some(guid);
             }
         }
 
@@ -659,8 +671,7 @@ mod power_plan {
     pub fn restore(state: &BoosterState) {
         let guid = state
             .previous_power_scheme
-            .lock()
-            .expect("booster mutex poisoned")
+            .lock().unwrap_or_else(|e| e.into_inner())
             .take();
         if let Some(guid) = guid {
             let _ = Command::new("powercfg")

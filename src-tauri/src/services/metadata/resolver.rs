@@ -87,7 +87,7 @@ impl MetadataProviderResolver {
     }
 
     pub fn get_config(&self, db: &Database) -> ResolvedConfig {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let read = |key: &str| -> Option<String> {
             conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |row| {
                 row.get::<_, String>(0)
@@ -141,7 +141,7 @@ impl MetadataProviderResolver {
         let cache_key = format!("feed:v8:{mode_str}:{feed}:{offset}:{genre_suffix}");
 
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
                 if !is_stale {
                     if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
@@ -152,7 +152,7 @@ impl MetadataProviderResolver {
             }
         }
         if self.circuit_breaker.is_open() {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
                 if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
                     scores::enrich_hub_games_batch(Some(&conn), &mut games);
@@ -190,7 +190,7 @@ impl MetadataProviderResolver {
             Ok(mut games) => {
                 self.circuit_breaker.record_success();
                 {
-                    let conn = db.connection.lock().expect("db mutex poisoned");
+                    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                     scores::enrich_hub_games_batch(Some(&conn), &mut games);
                     if let Ok(json) = serde_json::to_string(&games) {
                         let _ = feed;
@@ -211,7 +211,7 @@ impl MetadataProviderResolver {
                 } else {
                     self.circuit_breaker.record_failure();
                 }
-                let conn = db.connection.lock().expect("db mutex poisoned");
+                let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                 if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
                     if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
                         scores::enrich_hub_games_batch(Some(&conn), &mut games);
@@ -275,7 +275,7 @@ impl MetadataProviderResolver {
         );
 
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
                 if !is_stale {
                     if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
@@ -289,7 +289,7 @@ impl MetadataProviderResolver {
         }
 
         if self.circuit_breaker.is_open() {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
                 if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
                     scores::enrich_hub_games_batch(Some(&conn), &mut games);
@@ -327,7 +327,7 @@ impl MetadataProviderResolver {
             Ok(mut games) => {
                 self.circuit_breaker.record_success();
                 {
-                    let conn = db.connection.lock().expect("db mutex poisoned");
+                    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                     scores::enrich_hub_games_batch(Some(&conn), &mut games);
                     if !games.is_empty() {
                         if let Ok(json) = serde_json::to_string(&games) {
@@ -349,7 +349,7 @@ impl MetadataProviderResolver {
                 } else {
                     self.circuit_breaker.record_failure();
                 }
-                let conn = db.connection.lock().expect("db mutex poisoned");
+                let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                 if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
                     if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
                         scores::enrich_hub_games_batch(Some(&conn), &mut games);
@@ -393,7 +393,7 @@ impl MetadataProviderResolver {
         let cache_key = format!("details:v10:{igdb_id}:{norm_hint}");
 
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
                 if !is_stale {
                     if let Ok(mut details) = serde_json::from_str::<HubGameDetails>(&payload) {
@@ -557,7 +557,7 @@ impl MetadataProviderResolver {
                     .opencritic_score
                     .or(details.game.opencritic_score);
                 if let Ok(json) = serde_json::to_string(&details) {
-                    let conn = db.connection.lock().expect("db mutex poisoned");
+                    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                     let _ = MetadataCache::set(&conn, &cache_key, "details", &json, 12 * 3600);
                 }
                 Ok(Some(details))
@@ -575,7 +575,7 @@ impl MetadataProviderResolver {
         let cache_key = format!("similar:v6:{igdb_id}");
 
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
                 if !is_stale {
                     if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
@@ -587,7 +587,7 @@ impl MetadataProviderResolver {
         }
 
         if self.circuit_breaker.is_open() {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
                 if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
                     scores::enrich_hub_games_batch(Some(&conn), &mut games);
@@ -626,7 +626,7 @@ impl MetadataProviderResolver {
             Ok(mut games) => {
                 self.circuit_breaker.record_success();
                 {
-                    let conn = db.connection.lock().expect("db mutex poisoned");
+                    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                     scores::enrich_hub_games_batch(Some(&conn), &mut games);
                     if let Ok(json) = serde_json::to_string(&games) {
                         let _ = MetadataCache::set(&conn, &cache_key, "similar", &json, 86_400);
@@ -645,7 +645,7 @@ impl MetadataProviderResolver {
                 } else {
                     self.circuit_breaker.record_failure();
                 }
-                let conn = db.connection.lock().expect("db mutex poisoned");
+                let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                 if let Some((payload, _)) = MetadataCache::get(&conn, &cache_key) {
                     if let Ok(mut games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
                         scores::enrich_hub_games_batch(Some(&conn), &mut games);
@@ -660,7 +660,7 @@ impl MetadataProviderResolver {
     pub async fn list_genres(&self, db: &Database) -> AppResult<Vec<NameIdItem>> {
         let cache_key = "genres:list:v2";
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((payload, is_stale)) = MetadataCache::get(&conn, cache_key) {
                 if !is_stale {
                     if let Ok(items) = serde_json::from_str::<Vec<NameIdItem>>(&payload) {
@@ -696,7 +696,7 @@ impl MetadataProviderResolver {
         match result {
             Ok(items) if !items.is_empty() => {
                 if let Ok(json) = serde_json::to_string(&items) {
-                    let conn = db.connection.lock().expect("db mutex poisoned");
+                    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                     let _ = MetadataCache::set(&conn, cache_key, "genres", &json, 7 * 86_400);
                 }
                 Ok(items)
@@ -708,7 +708,7 @@ impl MetadataProviderResolver {
     pub async fn list_platforms(&self, db: &Database) -> AppResult<Vec<NameIdItem>> {
         let cache_key = "platforms:list:v2";
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some((payload, is_stale)) = MetadataCache::get(&conn, cache_key) {
                 if !is_stale {
                     if let Ok(items) = serde_json::from_str::<Vec<NameIdItem>>(&payload) {
@@ -744,7 +744,7 @@ impl MetadataProviderResolver {
         match result {
             Ok(items) if !items.is_empty() => {
                 if let Ok(json) = serde_json::to_string(&items) {
-                    let conn = db.connection.lock().expect("db mutex poisoned");
+                    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                     let _ = MetadataCache::set(&conn, cache_key, "platforms", &json, 7 * 86_400);
                 }
                 Ok(items)

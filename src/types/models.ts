@@ -103,6 +103,7 @@ export interface StatsSummary {
 export interface GenrePlaytime {
   genre: string
   total_playtime_seconds: number
+  game_count?: number
 }
 
 export interface WeeklyPlaytime {

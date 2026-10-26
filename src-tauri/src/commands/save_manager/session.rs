@@ -31,22 +31,22 @@ impl SessionManager {
     }
 
     pub fn has_any_running_session(&self) -> bool {
-        let guard = self.sessions.lock().expect("session manager mutex poisoned");
+        let guard = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
         !guard.is_empty()
     }
 
     pub fn has_session_for_profile(&self, profile_id: &str) -> bool {
-        let guard = self.sessions.lock().expect("session manager mutex poisoned");
+        let guard = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
         guard.values().any(|s| s.profile_id == profile_id)
     }
 
     pub fn get_session_by_game(&self, game_id: &str) -> Option<ActiveGameSession> {
-        let guard = self.sessions.lock().expect("session manager mutex poisoned");
+        let guard = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
         guard.get(game_id).cloned()
     }
 
     pub fn register_session(&self, session: ActiveGameSession) -> Result<(), SaveManagerError> {
-        let mut guard = self.sessions.lock().expect("session manager mutex poisoned");
+        let mut guard = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
         if guard.contains_key(&session.game_id) {
             return Err(SaveManagerError::GameSessionActive(format!(
                 "Game {} already has an active session",
@@ -58,13 +58,13 @@ impl SessionManager {
     }
 
     pub fn remove_session(&self, game_id: &str) -> Option<ActiveGameSession> {
-        let mut guard = self.sessions.lock().expect("session manager mutex poisoned");
+        let mut guard = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
         guard.remove(game_id)
     }
 
     #[allow(dead_code)]
     pub fn list_active_sessions(&self) -> Vec<ActiveGameSession> {
-        let guard = self.sessions.lock().expect("session manager mutex poisoned");
+        let guard = self.sessions.lock().unwrap_or_else(|e| e.into_inner());
         guard.values().cloned().collect()
     }
 }

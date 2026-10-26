@@ -215,14 +215,15 @@ mod imp {
             let _ = mmcss.set_value("NetworkThrottlingIndex", &0xffffffffu32);
         }
 
-        // Run netsh optimization (preserving autotuninglevel=normal and heuristics=default for full download speed)
-        let _ = Command::new("netsh").args(["int", "tcp", "set", "global", "autotuninglevel=normal"]).creation_flags(CREATE_NO_WINDOW).status();
-        let _ = Command::new("netsh").args(["int", "tcp", "set", "heuristics", "default"]).creation_flags(CREATE_NO_WINDOW).status();
-        let _ = Command::new("netsh").args(["int", "tcp", "set", "global", "rss=enabled"]).creation_flags(CREATE_NO_WINDOW).status();
-        let _ = Command::new("ipconfig").args(["/flushdns"]).creation_flags(CREATE_NO_WINDOW).status();
+        // Run netsh optimization and verify command exit statuses
+        let s1 = Command::new("netsh").args(["int", "tcp", "set", "global", "autotuninglevel=normal"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
+        let s2 = Command::new("netsh").args(["int", "tcp", "set", "heuristics", "default"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
+        let s3 = Command::new("netsh").args(["int", "tcp", "set", "global", "rss=enabled"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
+        let s4 = Command::new("ipconfig").args(["/flushdns"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
+        let net_ok = s1 && s2 && s3 && s4;
 
         TweakActionResult {
-            success: true,
+            success: net_ok,
             message: if enable {
                 "Gaming TCP NoDelay enabled, 10 Mbps MMCSS cap removed, and full bandwidth restored.".into()
             } else {
@@ -419,18 +420,20 @@ mod imp {
             };
         }
 
-        if enable {
-            let _ = Command::new("bcdedit").args(["/set", "useplatformclock", "false"]).creation_flags(CREATE_NO_WINDOW).status();
-            let _ = Command::new("bcdedit").args(["/set", "disabledynamictick", "yes"]).creation_flags(CREATE_NO_WINDOW).status();
-            let _ = Command::new("bcdedit").args(["/set", "tscsyncpolicy", "Enhanced"]).creation_flags(CREATE_NO_WINDOW).status();
+        let bcd_ok = if enable {
+            let b1 = Command::new("bcdedit").args(["/set", "useplatformclock", "false"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
+            let b2 = Command::new("bcdedit").args(["/set", "disabledynamictick", "yes"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
+            let b3 = Command::new("bcdedit").args(["/set", "tscsyncpolicy", "Enhanced"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
+            b1 && b2 && b3
         } else {
-            let _ = Command::new("bcdedit").args(["/deletevalue", "useplatformclock"]).creation_flags(CREATE_NO_WINDOW).status();
-            let _ = Command::new("bcdedit").args(["/deletevalue", "disabledynamictick"]).creation_flags(CREATE_NO_WINDOW).status();
-            let _ = Command::new("bcdedit").args(["/deletevalue", "tscsyncpolicy"]).creation_flags(CREATE_NO_WINDOW).status();
-        }
+            let b1 = Command::new("bcdedit").args(["/deletevalue", "useplatformclock"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
+            let b2 = Command::new("bcdedit").args(["/deletevalue", "disabledynamictick"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
+            let b3 = Command::new("bcdedit").args(["/deletevalue", "tscsyncpolicy"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
+            b1 || b2 || b3
+        };
 
         TweakActionResult {
-            success: true,
+            success: bcd_ok,
             message: if enable {
                 "BCD Dynamic Tick disabled and TSC sync enhanced for consistent frame delivery.".into()
             } else {
@@ -490,29 +493,39 @@ mod imp {
             };
         }
 
-        // Direct Service Manager invocation
+        // Direct Service Manager invocation: use `demand` (manual) rather than permanent `disabled`
+        // for delivery optimization (`DoSvc`) and error reporting (`WerSvc`) so Windows Store / updates never break if the app exits unexpectedly,
+        // and verify command exit statuses.
         let services = ["DiagTrack", "dmwappushservice", "WerSvc", "DoSvc"];
+        let mut any_service_updated = false;
         for s in services {
             if enable {
-                let _ = Command::new("sc").args(["config", s, "start=", "disabled"]).creation_flags(CREATE_NO_WINDOW).status();
+                let target_start = if s == "DiagTrack" { "disabled" } else { "demand" };
+                if Command::new("sc").args(["config", s, "start=", target_start]).creation_flags(CREATE_NO_WINDOW).status().map(|st| st.success()).unwrap_or(false) {
+                    any_service_updated = true;
+                }
                 let _ = Command::new("net").args(["stop", s]).creation_flags(CREATE_NO_WINDOW).status();
             } else {
                 let start_type = if s == "WerSvc" || s == "dmwappushservice" { "demand" } else { "auto" };
-                let _ = Command::new("sc").args(["config", s, "start=", start_type]).creation_flags(CREATE_NO_WINDOW).status();
+                if Command::new("sc").args(["config", s, "start=", start_type]).creation_flags(CREATE_NO_WINDOW).status().map(|st| st.success()).unwrap_or(false) {
+                    any_service_updated = true;
+                }
             }
         }
 
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
         if let Ok((policy, _)) = hklm.create_subkey(r"SOFTWARE\Policies\Microsoft\Windows\DataCollection") {
             if enable {
-                let _ = policy.set_value("AllowTelemetry", &0u32);
-            } else {
-                let _ = policy.delete_value("AllowTelemetry");
+                if policy.set_value("AllowTelemetry", &0u32).is_ok() {
+                    any_service_updated = true;
+                }
+            } else if policy.delete_value("AllowTelemetry").is_ok() {
+                any_service_updated = true;
             }
         }
 
         TweakActionResult {
-            success: true,
+            success: any_service_updated,
             message: if enable {
                 "Background telemetry and diagnostic tracking services disabled.".into()
             } else {

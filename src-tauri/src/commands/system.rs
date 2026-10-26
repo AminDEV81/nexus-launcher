@@ -401,7 +401,7 @@ pub async fn get_system_specs(app: tauri::AppHandle) -> AppResult<SystemSpecs> {
 /// `State<Database>` pattern.
 #[tauri::command]
 pub fn health_check(db: State<'_, Database>) -> AppResult<HealthStatus> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let applied_migrations: i64 = conn.query_row(
         "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
@@ -416,30 +416,91 @@ pub fn health_check(db: State<'_, Database>) -> AppResult<HealthStatus> {
 }
 
 /// Safely performs a scheduled power action (shutdown / sleep / hibernate) on completion.
+/// Fail-safe: rejects unknown actions rather than defaulting to system shutdown.
 #[tauri::command]
 pub fn shutdown_system(action: Option<String>) -> AppResult<()> {
-    let act = action.as_deref().unwrap_or("shutdown");
+    let act = action.as_deref().unwrap_or("shutdown").trim().to_ascii_lowercase();
+    if !matches!(act.as_str(), "shutdown" | "sleep" | "hibernate") {
+        return Err(AppError::Invalid(format!(
+            "Unsupported power action '{act}'. Expected 'shutdown', 'sleep', or 'hibernate'."
+        )));
+    }
+
     #[cfg(target_os = "windows")]
     {
-        match act {
+        #[link(name = "powrprof")]
+        extern "system" {
+            fn SetSuspendState(
+                bHibernate: u8,
+                bForce: u8,
+                bWakeupEventsDisabled: u8,
+            ) -> u8;
+        }
+
+        match act.as_str() {
             "sleep" => {
-                let _ = std::process::Command::new("rundll32.exe")
-                    .args(["powrprof.dll,SetSuspendState", "0,1,0"])
-                    .spawn();
+                // Direct Win32 FFI call with bHibernate = 0 (FALSE) so Windows enters S3/Modern Standby
+                // instead of hibernating (rundll32 powrprof.dll,SetSuspendState passes a non-zero string pointer).
+                let ok = unsafe { SetSuspendState(0, 0, 0) };
+                if ok == 0 {
+                    return Err(AppError::Other("Failed to enter sleep state.".into()));
+                }
             }
             "hibernate" => {
-                let _ = std::process::Command::new("shutdown")
-                    .args(["/h"])
-                    .spawn();
+                let ok = unsafe { SetSuspendState(1, 0, 0) };
+                if ok == 0 {
+                    std::process::Command::new("shutdown")
+                        .args(["/h"])
+                        .spawn()
+                        .map_err(|e| AppError::Other(format!("Failed to hibernate system: {e}")))?;
+                }
             }
-            _ => {
-                let _ = std::process::Command::new("shutdown")
-                    .args(["/s", "/t", "30", "/c", "Nexus Launcher completed scheduled downloads."])
-                    .spawn();
+            "shutdown" => {
+                std::process::Command::new("shutdown")
+                    .args([
+                        "/s",
+                        "/t",
+                        "30",
+                        "/c",
+                        "Nexus Launcher completed scheduled downloads.",
+                    ])
+                    .spawn()
+                    .map_err(|e| AppError::Other(format!("Failed to schedule shutdown: {e}")))?;
             }
+            _ => unreachable!(),
         }
+        return Ok(());
     }
-    Ok(())
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err(AppError::Other(
+            "Scheduled system power actions are currently supported on Windows only.".into(),
+        ))
+    }
+}
+
+/// Aborts a pending scheduled Windows shutdown (`shutdown /a`).
+#[tauri::command]
+pub fn cancel_shutdown() -> AppResult<()> {
+    #[cfg(target_os = "windows")]
+    {
+        let status = std::process::Command::new("shutdown")
+            .args(["/a"])
+            .status()
+            .map_err(|e| AppError::Other(format!("Failed to invoke shutdown /a: {e}")))?;
+        if !status.success() {
+            return Err(AppError::Other("No pending shutdown to cancel.".into()));
+        }
+        return Ok(());
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err(AppError::Other(
+            "Cancel shutdown is only supported on Windows.".into(),
+        ))
+    }
 }
 
 /// Returns lightweight, real-time memory and CPU metrics for live UI updating.
@@ -458,8 +519,7 @@ pub async fn get_live_metrics() -> AppResult<LiveSystemMetrics> {
 
     tokio::task::spawn_blocking(move || {
         let mut sys = shared_metrics_system()
-            .lock()
-            .expect("live metrics system mutex poisoned");
+            .lock().unwrap_or_else(|e| e.into_inner());
         sys.refresh_cpu_usage();
         sys.refresh_memory();
 

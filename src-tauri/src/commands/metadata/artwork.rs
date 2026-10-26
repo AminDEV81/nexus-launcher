@@ -283,7 +283,7 @@ pub fn get_orphaned_artwork_summary(
         });
     }
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let mut stmt = conn.prepare("SELECT id FROM games")?;
     let game_ids: std::collections::HashSet<String> = stmt
         .query_map([], |row| row.get::<_, String>(0))?
@@ -325,7 +325,7 @@ pub fn cleanup_orphaned_artworks(
         });
     }
 
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let mut stmt = conn.prepare("SELECT id FROM games")?;
     let game_ids: std::collections::HashSet<String> = stmt
         .query_map([], |row| row.get::<_, String>(0))?

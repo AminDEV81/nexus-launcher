@@ -129,6 +129,7 @@ enum EngineOutcome {
 fn download_client() -> reqwest::Client {
     reqwest::Client::builder()
         .user_agent(concat!("NexusLauncher/", env!("CARGO_PKG_VERSION")))
+        .redirect(crate::commands::profiles::safe_ssrf_redirect_policy())
         .tcp_nodelay(true)
         .tcp_keepalive(Some(Duration::from_secs(15)))
         .pool_max_idle_per_host(32)
@@ -265,7 +266,7 @@ fn sniff_kind(magic: &[u8]) -> Option<&'static str> {
 /// Only http(s) links reach the downloader — same defense-in-depth as
 /// `trailer_url`: reqwest itself rejects other schemes, but the friendly
 /// error beats a generic network failure.
-fn validate_download_url(url: &str) -> AppResult<()> {
+pub(crate) fn validate_download_url(url: &str) -> AppResult<()> {
     let parsed = reqwest::Url::parse(url.trim())
         .map_err(|e| AppError::Invalid(format!("invalid download URL: {e}")))?;
     if !matches!(parsed.scheme(), "http" | "https") {
@@ -282,6 +283,40 @@ fn validate_download_url(url: &str) -> AppResult<()> {
         ));
     }
     Ok(())
+}
+
+/// Ensures `file_path` is a regular file path located directly inside `save_path`
+/// (with no `..` traversal segments and never pointing to a root or protected OS directory).
+pub(crate) fn is_safe_download_file_path(file_path: &str, save_path: &str) -> bool {
+    let fp_trimmed = file_path.trim();
+    let sp_trimmed = save_path.trim();
+    if fp_trimmed.is_empty() || sp_trimmed.is_empty() {
+        return false;
+    }
+    let fp = std::path::Path::new(fp_trimmed);
+    let sp = std::path::Path::new(sp_trimmed);
+    if fp.components().any(|c| matches!(c, std::path::Component::ParentDir))
+        || sp.components().any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return false;
+    }
+    if fp.file_name().is_none() {
+        return false;
+    }
+    let norm_fp = fp_trimmed.replace('/', "\\").trim_end_matches('\\').to_lowercase();
+    let norm_sp = sp_trimmed.replace('/', "\\").trim_end_matches('\\').to_lowercase();
+    if norm_sp.len() < 4 || norm_fp == norm_sp {
+        return false;
+    }
+    if !norm_fp.starts_with(&norm_sp) || !norm_fp[norm_sp.len()..].starts_with('\\') {
+        return false;
+    }
+    // Ensure there are no extra nested directory levels or drive roots
+    let rel_tail = &norm_fp[norm_sp.len() + 1..];
+    if rel_tail.is_empty() || rel_tail.contains('\\') {
+        return false;
+    }
+    true
 }
 
 // ── DB + event helpers ───────────────────────────────────────────────
@@ -314,7 +349,7 @@ fn persist_progress_with_extract(
 ) {
     {
         let db = app.state::<Database>();
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let _ = conn.execute(
             "UPDATE downloads SET downloaded_bytes=?1, total_bytes=?2, speed_bps=?3, status=?4, updated_at=datetime('now')
              WHERE id=?5 AND status IN ('downloading','extracting','queued')",
@@ -339,7 +374,19 @@ fn persist_progress_with_extract(
 
 /// Snapshots the in-memory chunk layout (with each connection's current
 /// offset) into the row so a pause/crash can resume mid-chunk.
-fn save_chunk_state(app: &AppHandle, id: &str, plans: &[ChunkPlan], dones: &[AtomicU64]) {
+#[derive( serde::Serialize, serde::Deserialize)]
+struct PersistedChunkState {
+    validator: Option<String>,
+    chunks: Vec<ChunkPlan>,
+}
+
+fn save_chunk_state(
+    app: &AppHandle,
+    id: &str,
+    plans: &[ChunkPlan],
+    dones: &[AtomicU64],
+    validator: Option<&str>,
+) {
     let snapshot: Vec<ChunkPlan> = plans
         .iter()
         .zip(dones.iter())
@@ -349,9 +396,13 @@ fn save_chunk_state(app: &AppHandle, id: &str, plans: &[ChunkPlan], dones: &[Ato
             done: d.load(Ordering::Relaxed),
         })
         .collect();
-    let json = serde_json::to_string(&snapshot).ok();
+    let state_payload = PersistedChunkState {
+        validator: validator.map(str::to_string),
+        chunks: snapshot,
+    };
+    let json = serde_json::to_string(&state_payload).ok();
     let db = app.state::<Database>();
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let _ = conn.execute(
         "UPDATE downloads SET chunk_state=?1 WHERE id=?2",
         rusqlite::params![json, id],
@@ -361,7 +412,7 @@ fn save_chunk_state(app: &AppHandle, id: &str, plans: &[ChunkPlan], dones: &[Ato
 fn mark_failed(app: &AppHandle, id: &str, msg: &str, total: u64, downloaded: u64) {
     {
         let db = app.state::<Database>();
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let _ = conn.execute(
             "UPDATE downloads SET status='failed', error_message=?1, speed_bps=0, total_bytes=?2, downloaded_bytes=?3, updated_at=datetime('now')
              WHERE id=?4 AND status IN ('downloading','extracting','queued')",
@@ -389,7 +440,7 @@ fn mark_completed(app: &AppHandle, id: &str, total: u64, downloaded: u64) {
     // extraction phase must win over this late completion write.
     let changed = {
         let db = app.state::<Database>();
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE downloads SET status='completed', speed_bps=0, downloaded_bytes=?2, error_message=NULL, chunk_state=NULL, updated_at=datetime('now') WHERE id=?1 AND status IN ('downloading','extracting')",
             rusqlite::params![id, downloaded as i64],
@@ -418,7 +469,7 @@ fn mark_completed(app: &AppHandle, id: &str, total: u64, downloaded: u64) {
 /// `(url, save_path, file_path, game_id, chunk_state)` for a row.
 fn load_row(app: &AppHandle, id: &str) -> Option<(String, String, String, String, Option<String>)> {
     let db = app.state::<Database>();
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.query_row(
         "SELECT url, save_path, COALESCE(file_path,''), game_id, chunk_state FROM downloads WHERE id=?1",
         [id],
@@ -438,6 +489,7 @@ struct ProbeResult {
     total: Option<u64>,
     disposition: Option<String>,
     content_type: Option<String>,
+    validator: Option<String>,
     magic: Option<Vec<u8>>,
 }
 
@@ -475,6 +527,12 @@ async fn probe_remote(client: &reqwest::Client, url: &str) -> Result<ProbeResult
         .get("content-type")
         .and_then(|v| v.to_str().ok())
         .map(str::to_string);
+    let validator = resp
+        .headers()
+        .get("etag")
+        .or_else(|| resp.headers().get("last-modified"))
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
 
     let magic = {
         let mut stream = resp.bytes_stream();
@@ -495,6 +553,7 @@ async fn probe_remote(client: &reqwest::Client, url: &str) -> Result<ProbeResult
         }),
         disposition,
         content_type,
+        validator,
         magic,
     })
 }
@@ -563,7 +622,7 @@ fn resolve_target_path(
     // Never silently hop onto another download's target file.
     let conflict = {
         let db = app.state::<Database>();
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row(
             "SELECT id FROM downloads WHERE file_path=?1 AND status IN ('downloading','extracting') AND id != ?2 LIMIT 1",
             rusqlite::params![desired, id],
@@ -577,7 +636,7 @@ fn resolve_target_path(
     // Drop the partial written under the guessed URL name, then adopt.
     let _ = std::fs::remove_file(current);
     let db = app.state::<Database>();
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let _ = conn.execute(
         "UPDATE downloads SET file_path=?1, updated_at=datetime('now') WHERE id=?2",
         rusqlite::params![desired, id],
@@ -677,6 +736,30 @@ async fn chunk_task(
             ));
         }
 
+        // Verify Content-Range header matches requested start offset `pos`
+        let valid_content_range = resp
+            .headers()
+            .get(reqwest::header::CONTENT_RANGE)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.strip_prefix("bytes "))
+            .and_then(|s| s.split('-').next())
+            .and_then(|start_str| start_str.trim().parse::<u64>().ok())
+            .map(|start_offset| start_offset == pos)
+            .unwrap_or(false);
+        if !valid_content_range {
+            if attempt + 1 < CHUNK_ATTEMPTS {
+                tokio::select! {
+                    biased;
+                    _ = token.cancelled() => return Err(ChunkError::Cancelled),
+                    _ = tokio::time::sleep(Duration::from_millis(500 * (attempt as u64 + 1))) => {}
+                }
+                continue;
+            }
+            return Err(ChunkError::Failed(
+                "server returned mismatched or missing Content-Range header".into(),
+            ));
+        }
+
         let file = match std::fs::OpenOptions::new().write(true).open(&file_path) {
             Ok(f) => f,
             Err(e) => return Err(ChunkError::Failed(e.to_string())),
@@ -686,6 +769,7 @@ async fn chunk_task(
             return Err(ChunkError::Failed(e.to_string()));
         }
 
+        let chunk_capacity = (plan.end - plan.start) + 1;
         let mut stream = resp.bytes_stream();
         let mut retryable = false;
         loop {
@@ -707,11 +791,23 @@ async fn chunk_task(
                             retryable = true;
                         }
                         Ok(Some(Ok(bytes))) => {
-                            if let Err(e) = writer.write_all(&bytes) {
+                            let cur_done = done.load(Ordering::Relaxed);
+                            let remaining = chunk_capacity.saturating_sub(cur_done);
+                            if remaining == 0 {
+                                let _ = writer.flush();
+                                return Ok(());
+                            }
+                            let write_len = (bytes.len() as u64).min(remaining) as usize;
+                            if let Err(e) = writer.write_all(&bytes[..write_len]) {
                                 return Err(ChunkError::Failed(e.to_string()));
                             }
-                            done.fetch_add(bytes.len() as u64, Ordering::Relaxed);
-                            limiter.throttle(bytes.len()).await;
+                            let new_done = cur_done + write_len as u64;
+                            done.store(new_done, Ordering::Relaxed);
+                            limiter.throttle(write_len).await;
+                            if new_done >= chunk_capacity {
+                                let _ = writer.flush();
+                                return Ok(());
+                            }
                         }
                         Ok(Some(Err(_))) => {
                             let _ = writer.flush();
@@ -856,7 +952,7 @@ async fn plain_task(
 
 fn get_max_connections(app: &AppHandle) -> u64 {
     let db = app.state::<Database>();
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let val: Option<String> = conn
         .query_row(
             "SELECT value FROM settings WHERE key = 'download_streams'",
@@ -894,9 +990,23 @@ fn fresh_plans(total: u64, max_connections: u64) -> Vec<ChunkPlan> {
 /// Restores a persisted chunk plan if it exactly tiles the file;
 /// otherwise the on-disk layout is unknown (partial multi-writer state)
 /// and a fresh start is the only safe option.
-fn restore_plans(saved: Option<&str>, total: u64) -> Option<Vec<ChunkPlan>> {
+fn restore_plans(
+    saved: Option<&str>,
+    total: u64,
+    current_validator: Option<&str>,
+) -> Option<Vec<ChunkPlan>> {
     let saved = saved?;
-    let plans: Vec<ChunkPlan> = serde_json::from_str(saved).ok()?;
+    let plans: Vec<ChunkPlan> = if let Ok(wrapped) = serde_json::from_str::<PersistedChunkState>(saved) {
+        if let (Some(saved_val), Some(curr_val)) = (wrapped.validator.as_deref(), current_validator) {
+            if saved_val != curr_val {
+                log::warn!("Remote file validator changed ({} -> {}), discarding stale chunk state", saved_val, curr_val);
+                return None;
+            }
+        }
+        wrapped.chunks
+    } else {
+        serde_json::from_str(saved).ok()?
+    };
     if plans.is_empty() {
         return None;
     }
@@ -915,7 +1025,7 @@ fn restore_plans(saved: Option<&str>, total: u64) -> Option<Vec<ChunkPlan>> {
 
 fn get_speed_limit_bps(app: &AppHandle) -> u64 {
     let db = app.state::<Database>();
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let val: Option<String> = conn
         .query_row(
             "SELECT value FROM settings WHERE key = 'download_speed_limit'",
@@ -948,9 +1058,10 @@ async fn run_engine(
 
     if ranged {
         let total = total.unwrap_or(0);
+        let validator = probe.validator.clone();
         let file_len = std::fs::metadata(file_path).map(|m| m.len()).unwrap_or(0);
         let restored = if file_len == total {
-            restore_plans(saved_chunk_state.as_deref(), total)
+            restore_plans(saved_chunk_state.as_deref(), total, validator.as_deref())
         } else {
             None
         };
@@ -999,7 +1110,7 @@ async fn run_engine(
             app,
             id,
             total,
-            Some((plans, dones.clone())),
+            Some((plans, dones.clone(), validator)),
             &dones,
             &mut tasks,
             token,
@@ -1032,7 +1143,7 @@ async fn run_engine(
     }
 }
 
-type SharedPlans = Option<(Arc<Vec<ChunkPlan>>, Arc<Vec<AtomicU64>>)>;
+type SharedPlans = Option<(Arc<Vec<ChunkPlan>>, Arc<Vec<AtomicU64>>, Option<String>)>;
 type ChunkTaskSet = FuturesUnordered<tokio::task::JoinHandle<Result<(), ChunkError>>>;
 
 /// Shared supervisor: ticks progress (DB + `download-updated` event)
@@ -1077,7 +1188,7 @@ async fn run_supervisor(
                 } else {
                     0
                 };
-                let chunks: Option<Vec<u8>> = plan.as_ref().map(|(plans, dones)| {
+                let chunks: Option<Vec<u8>> = plan.as_ref().map(|(plans, dones, _)| {
                     plans
                         .iter()
                         .zip(dones.iter())
@@ -1102,16 +1213,16 @@ async fn run_supervisor(
         // Only ranged downloads have a layout worth persisting — a plain
         // single-stream download has nothing to resume from.
         (_, true, _) if reason.load(Ordering::SeqCst) == REASON_PAUSE => {
-            if let Some((plans, _)) = &plan {
-                save_chunk_state(app, id, plans, dones);
+            if let Some((plans, _, validator)) = &plan {
+                save_chunk_state(app, id, plans, dones, validator.as_deref());
             }
             persist_progress(app, id, downloaded, total, 0, "paused", None);
             EngineOutcome::Paused
         }
         (_, true, _) => EngineOutcome::Cancelled,
         (_, false, Some(msg)) => {
-            if let Some((plans, _)) = &plan {
-                save_chunk_state(app, id, plans, dones);
+            if let Some((plans, _, validator)) = &plan {
+                save_chunk_state(app, id, plans, dones, validator.as_deref());
             }
             mark_failed(app, id, msg, total, downloaded);
             EngineOutcome::Failed
@@ -1144,6 +1255,11 @@ fn is_subsequent_multipart(file_path: &str) -> bool {
     false
 }
 
+const MAX_ZIP_ENTRIES: usize = 100_000;
+const MAX_ZIP_TOTAL_BYTES: u64 = 150 * 1024 * 1024 * 1024; // 150 GB
+const MAX_ZIP_ENTRY_BYTES: u64 = 64 * 1024 * 1024 * 1024; // 64 GB per single file
+const MAX_ZIP_COMPRESSION_RATIO: u64 = 200;
+
 fn extract_zip(
     app: &AppHandle,
     id: &str,
@@ -1151,20 +1267,89 @@ fn extract_zip(
     save_path: &str,
     token: &CancellationToken,
 ) -> Result<(), String> {
+    use std::io::Read;
+
     let file =
         std::fs::File::open(file_path).map_err(|e| format!("cannot open archive: {e}"))?;
     let mut archive =
         zip::ZipArchive::new(file).map_err(|e| format!("corrupt archive: {e}"))?;
-    let dest = std::path::Path::new(save_path);
-    std::fs::create_dir_all(dest).map_err(|e| format!("cannot create folder: {e}"))?;
     let total = archive.len();
+    if total > MAX_ZIP_ENTRIES {
+        return Err(format!(
+            "archive contains too many entries ({total} > {MAX_ZIP_ENTRIES}); aborted for safety"
+        ));
+    }
+
+    let base_dest = std::path::Path::new(save_path);
+    std::fs::create_dir_all(base_dest).map_err(|e| format!("cannot create folder: {e}"))?;
+
+    // Pre-scan archive headers for zip-bomb anomalies and total required disk space
+    let mut declared_total_bytes = 0u64;
+    for i in 0..total {
+        let entry = archive
+            .by_index_raw(i)
+            .map_err(|e| format!("bad archive header at {i}: {e}"))?;
+        let uncomp = entry.size();
+        let comp = entry.compressed_size().max(1);
+        if uncomp > MAX_ZIP_ENTRY_BYTES {
+            return Err(format!(
+                "archive entry exceeds maximum allowed file size ({uncomp} bytes)"
+            ));
+        }
+        // Flag extreme compression ratios on non-trivial entries (> 10 MB uncompressed)
+        if uncomp > 10 * 1024 * 1024 && (uncomp / comp) > MAX_ZIP_COMPRESSION_RATIO {
+            return Err(
+                "suspected zip bomb detected (extreme compression ratio); extraction aborted"
+                    .into(),
+            );
+        }
+        declared_total_bytes = declared_total_bytes.saturating_add(uncomp);
+        if declared_total_bytes > MAX_ZIP_TOTAL_BYTES {
+            return Err(
+                "archive total uncompressed size exceeds 150 GB safety limit; extraction aborted"
+                    .into(),
+            );
+        }
+    }
+
+    crate::commands::save_manager::fs_ops::verify_disk_space(base_dest, declared_total_bytes)
+        .map_err(|e| e.to_string())?;
+
+    // If `base_dest` already has unrelated files (besides the archive itself), isolate into a subfolder
+    // named after the archive stem so existing files in `save_path` are never silently overwritten.
+    let archive_file_path = std::path::Path::new(file_path);
+    let has_unrelated_files = std::fs::read_dir(base_dest)
+        .ok()
+        .map(|entries| {
+            entries.flatten().any(|e| {
+                let p = e.path();
+                p != archive_file_path
+            })
+        })
+        .unwrap_or(false);
+
+    let dest = if has_unrelated_files {
+        let stem = archive_file_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(sanitize_file_name)
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| format!("extracted_{id}"));
+        let sub = base_dest.join(stem);
+        std::fs::create_dir_all(&sub).map_err(|e| format!("cannot create folder: {e}"))?;
+        sub
+    } else {
+        base_dest.to_path_buf()
+    };
+
+    let mut cumulative_written = 0u64;
     let mut last_reported = 0u8;
 
     for i in 0..total {
         if token.is_cancelled() {
             return Err("extraction cancelled".into());
         }
-        let mut entry = archive
+        let entry = archive
             .by_index(i)
             .map_err(|e| format!("bad archive entry: {e}"))?;
         let Some(safe_rel_path) = entry.enclosed_name().map(|p| p.to_path_buf()) else {
@@ -1179,10 +1364,25 @@ fn extract_zip(
                 std::fs::create_dir_all(parent)
                     .map_err(|e| format!("cannot create folder: {e}"))?;
             }
-            let mut out = std::fs::File::create(&entry_path)
+            let remaining_budget = MAX_ZIP_TOTAL_BYTES.saturating_sub(cumulative_written);
+            let max_this_file = entry.size().min(MAX_ZIP_ENTRY_BYTES).min(remaining_budget);
+            let mut bounded_reader = entry.take(max_this_file + 1);
+            let mut out = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&entry_path)
+                .or_else(|_| std::fs::File::create(&entry_path))
                 .map_err(|e| format!("cannot write {entry_path:?}: {e}"))?;
-            std::io::copy(&mut entry, &mut out)
+            let written = std::io::copy(&mut bounded_reader, &mut out)
                 .map_err(|e| format!("cannot extract {entry_path:?}: {e}"))?;
+            if written > max_this_file {
+                let _ = std::fs::remove_file(&entry_path);
+                return Err(
+                    "archive stream exceeded declared uncompressed size (zip bomb protection)"
+                        .into(),
+                );
+            }
+            cumulative_written = cumulative_written.saturating_add(written);
         }
 
         if total > 0 {
@@ -1385,7 +1585,7 @@ fn dir_size(dir: &std::path::Path) -> u64 {
 fn link_game_install(app: &AppHandle, game_id: &str, save_path: &str) {
     let game_name: Option<String> = {
         let db = app.state::<Database>();
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.query_row("SELECT name FROM games WHERE id=?1", [game_id], |row| {
             row.get(0)
         })
@@ -1400,7 +1600,7 @@ fn link_game_install(app: &AppHandle, game_id: &str, save_path: &str) {
     let size = dir_size(std::path::Path::new(&install_dir)) as i64;
 
     let db = app.state::<Database>();
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let _ = conn.execute(
         "UPDATE games SET is_installed=1, install_path=?2, executable_path=COALESCE(?3, executable_path), install_size_bytes=?4 WHERE id=?1",
         rusqlite::params![game_id, install_dir, exe, size],
@@ -1522,32 +1722,34 @@ fn find_extractable_master(app: &AppHandle, game_id: &Option<String>, save_path:
 fn cleanup_bundle_archives(app: &AppHandle, game_id: &Option<String>, save_path: &str) {
     let db = app.state::<Database>();
     let Ok(conn) = db.connection.lock() else { return; };
-    let mut file_paths: Vec<String> = Vec::new();
+    let mut file_paths: Vec<(String, String)> = Vec::new();
 
     if let Some(gid) = game_id {
-        if let Ok(mut stmt) = conn.prepare("SELECT file_path FROM downloads WHERE game_id = ?1 AND file_path IS NOT NULL") {
-            if let Ok(rows) = stmt.query_map(rusqlite::params![gid], |row| row.get::<_, String>(0)) {
-                for p in rows.flatten() {
-                    file_paths.push(p);
+        if let Ok(mut stmt) = conn.prepare("SELECT file_path, save_path FROM downloads WHERE game_id = ?1 AND file_path IS NOT NULL") {
+            if let Ok(rows) = stmt.query_map(rusqlite::params![gid], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))) {
+                for pair in rows.flatten() {
+                    file_paths.push(pair);
                 }
             }
         }
-    } else if let Ok(mut stmt) = conn.prepare("SELECT file_path FROM downloads WHERE save_path = ?1 AND file_path IS NOT NULL") {
-        if let Ok(rows) = stmt.query_map(rusqlite::params![save_path], |row| row.get::<_, String>(0)) {
-            for p in rows.flatten() {
-                file_paths.push(p);
+    } else if let Ok(mut stmt) = conn.prepare("SELECT file_path, save_path FROM downloads WHERE save_path = ?1 AND file_path IS NOT NULL") {
+        if let Ok(rows) = stmt.query_map(rusqlite::params![save_path], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))) {
+            for pair in rows.flatten() {
+                file_paths.push(pair);
             }
         }
     }
 
-    for path in file_paths {
-        let _ = std::fs::remove_file(path);
+    for (path, sp) in file_paths {
+        if is_safe_download_file_path(&path, &sp) {
+            let _ = std::fs::remove_file(path);
+        }
     }
 }
 
 fn start_next_global_queued_download(app: &AppHandle) -> bool {
     let state = app.state::<DownloadState>();
-    if !state.active.lock().expect("mutex poisoned").is_empty() {
+    if !state.active.lock().unwrap_or_else(|e| e.into_inner()).is_empty() {
         return false;
     }
 
@@ -1561,18 +1763,27 @@ fn start_next_global_queued_download(app: &AppHandle) -> bool {
     ).ok();
 
     if let Some((next_id, url, stored_path, save_path, gid, saved_chunk_state)) = next {
-        let file_path = if stored_path.is_empty() {
+        if let Err(err) = validate_download_url(&url) {
+            let _ = conn.execute(
+                "UPDATE downloads SET status = 'failed', error_message = ?1, updated_at = datetime('now') WHERE id = ?2",
+                rusqlite::params![err.to_string(), next_id],
+            );
+            return false;
+        }
+        let file_path = if stored_path.is_empty() || !is_safe_download_file_path(&stored_path, &save_path) {
             format!("{save_path}/{}", file_name_from_url(&url))
         } else {
             stored_path
         };
-        let _ = conn.execute(
-            "UPDATE downloads SET status = 'downloading', file_path = ?1, error_message = NULL, updated_at = datetime('now') WHERE id = ?2",
+        let changed = conn.execute(
+            "UPDATE downloads SET status = 'downloading', file_path = ?1, error_message = NULL, updated_at = datetime('now') WHERE id = ?2 AND status = 'queued'",
             rusqlite::params![file_path, next_id],
-        );
+        ).unwrap_or(0);
+        if changed == 0 {
+            return false;
+        }
         let gid_opt = gid.filter(|s| !s.is_empty());
-        begin_download(app, &state, next_id, url, file_path, save_path, gid_opt, saved_chunk_state);
-        true
+        begin_download(app, &state, next_id, url, file_path, save_path, gid_opt, saved_chunk_state)
     } else {
         false
     }
@@ -1597,19 +1808,28 @@ fn start_next_sequential_part(app: &AppHandle, game_id: &Option<String>, save_pa
     };
 
     if let Some((next_id, url, stored_path, save_path, gid, saved_chunk_state)) = next {
-        let file_path = if stored_path.is_empty() {
+        if let Err(err) = validate_download_url(&url) {
+            let _ = conn.execute(
+                "UPDATE downloads SET status = 'failed', error_message = ?1, updated_at = datetime('now') WHERE id = ?2",
+                rusqlite::params![err.to_string(), next_id],
+            );
+            return false;
+        }
+        let file_path = if stored_path.is_empty() || !is_safe_download_file_path(&stored_path, &save_path) {
             format!("{save_path}/{}", file_name_from_url(&url))
         } else {
             stored_path
         };
-        let _ = conn.execute(
-            "UPDATE downloads SET status = 'downloading', file_path = ?1, error_message = NULL, updated_at = datetime('now') WHERE id = ?2",
+        let changed = conn.execute(
+            "UPDATE downloads SET status = 'downloading', file_path = ?1, error_message = NULL, updated_at = datetime('now') WHERE id = ?2 AND status = 'queued'",
             rusqlite::params![file_path, next_id],
-        );
+        ).unwrap_or(0);
+        if changed == 0 {
+            return false;
+        }
         let state = app.state::<DownloadState>();
         let gid_opt = gid.filter(|s| !s.is_empty());
-        begin_download(app, &state, next_id, url, file_path, save_path, gid_opt, saved_chunk_state);
-        true
+        begin_download(app, &state, next_id, url, file_path, save_path, gid_opt, saved_chunk_state)
     } else {
         false
     }
@@ -1704,7 +1924,7 @@ async fn run_download(
 
                             let auto_cleanup: bool = {
                                 let db = app.state::<Database>();
-                                let conn = db.connection.lock().expect("db mutex poisoned");
+                                let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                                 conn.query_row(
                                     "SELECT value FROM settings WHERE key = 'download_auto_cleanup'",
                                     [],
@@ -1786,8 +2006,7 @@ async fn run_download(
 fn cleanup_active(app: &AppHandle, id: &str) {
     app.state::<DownloadState>()
         .active
-        .lock()
-        .expect("mutex poisoned")
+        .lock().unwrap_or_else(|e| e.into_inner())
         .remove(id);
 }
 
@@ -1803,7 +2022,7 @@ fn insert_download_row(
     auto_extract: bool,
 ) -> AppResult<()> {
     let db = app.state::<Database>();
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
         "INSERT INTO downloads (
             id, game_id, url, save_path, file_path, status, auto_extract, game_name, cover_url
@@ -1822,7 +2041,7 @@ fn insert_download_row(
 /// task exists.
 fn reject_duplicate_file(app: &AppHandle, file_path: &str) -> AppResult<()> {
     let db = app.state::<Database>();
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let dup: Option<String> = conn
         .query_row(
             "SELECT id FROM downloads WHERE file_path=?1 AND status IN ('downloading','extracting') LIMIT 1",
@@ -1848,33 +2067,36 @@ fn begin_download(
     save_path: String,
     game_id: Option<String>,
     saved_chunk_state: Option<String>,
-) {
+) -> bool {
     let token = CancellationToken::new();
     let reason = Arc::new(AtomicU8::new(REASON_PAUSE));
-    let task_id = id.clone();
+    let active_entry = Arc::new(ActiveDownload {
+        cancel: token.clone(),
+        reason: reason.clone(),
+        handle: Mutex::new(None),
+    });
+
+    {
+        let mut active_map = state.active.lock().unwrap_or_else(|e| e.into_inner());
+        if active_map.contains_key(&id) {
+            return false;
+        }
+        active_map.insert(id.clone(), active_entry.clone());
+    }
+
     let handle = tokio::spawn(run_download(
         app.clone(),
-        task_id,
+        id,
         url,
         file_path,
         save_path,
         game_id,
         saved_chunk_state,
-        token.clone(),
-        reason.clone(),
+        token,
+        reason,
     ));
-    state
-        .active
-        .lock()
-        .expect("mutex poisoned")
-        .insert(
-            id,
-            Arc::new(ActiveDownload {
-                cancel: token,
-                reason,
-                handle: Mutex::new(Some(handle)),
-            }),
-        );
+    *active_entry.handle.lock().unwrap_or_else(|e| e.into_inner()) = Some(handle);
+    true
 }
 
 /// Raw URL download (no game linkage) — kept for "skip search" flows.
@@ -1893,7 +2115,7 @@ pub async fn start_download(
     let resolved_save_path = {
         let game_name: Option<String> = {
             let db = app.state::<Database>();
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             conn.query_row("SELECT name FROM games WHERE id=?1", [&game_id], |row| {
                 row.get(0)
             })
@@ -1983,7 +2205,7 @@ pub async fn start_game_download(
                 }
             };
             let new_id = uuid::Uuid::new_v4().to_string();
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Ok(existing_id) = conn.query_row(
                 "SELECT id FROM games WHERE igdb_id = ?1 LIMIT 1",
                 [igdb_id],
@@ -2081,7 +2303,7 @@ pub async fn start_batch_downloads(
         (Some(game.id), final_path)
     } else if let Some(gid) = game_id {
         let game_name: Option<String> = {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             conn.query_row("SELECT name FROM games WHERE id=?1", [&gid], |row| row.get(0)).ok()
         };
         let final_path = if let Some(name) = game_name {
@@ -2113,7 +2335,7 @@ pub async fn start_batch_downloads(
         let initial_status = if sequential && idx > 0 {
             "queued"
         } else if sequential && idx == 0 {
-            if state.active.lock().expect("mutex poisoned").is_empty() {
+            if state.active.lock().unwrap_or_else(|e| e.into_inner()).is_empty() {
                 "downloading"
             } else {
                 "queued"
@@ -2123,7 +2345,7 @@ pub async fn start_batch_downloads(
         };
 
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             conn.execute(
                 "INSERT INTO downloads (
                     id, game_id, url, save_path, file_path, status, auto_extract, game_name, cover_url
@@ -2173,7 +2395,7 @@ pub async fn queue_download(
 ) -> AppResult<()> {
     if queue {
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             conn.execute(
                 "UPDATE downloads SET status='queued', speed_bps=0, updated_at=datetime('now') WHERE id=?1 AND status IN ('paused','failed')",
                 [&id],
@@ -2181,18 +2403,18 @@ pub async fn queue_download(
         }
         start_next_global_queued_download(&app);
     } else {
-        let active = state.active.lock().expect("mutex poisoned").get(&id).cloned();
+        let active = state.active.lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned();
         if let Some(active) = active {
             active.reason.store(REASON_PAUSE, Ordering::SeqCst);
             active.cancel.cancel();
-            let handle = active.handle.lock().expect("mutex poisoned").take();
+            let handle = active.handle.lock().unwrap_or_else(|e| e.into_inner()).take();
             if let Some(handle) = handle {
                 let _ = tokio::time::timeout(Duration::from_millis(250), handle).await;
-                state.active.lock().expect("mutex poisoned").remove(&id);
+                state.active.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
             }
         }
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             conn.execute(
                 "UPDATE downloads SET status='paused', speed_bps=0, updated_at=datetime('now') WHERE id=?1 AND status IN ('queued','downloading','extracting')",
                 [&id],
@@ -2214,7 +2436,7 @@ pub async fn queue_bundle(
 ) -> AppResult<()> {
     if queue {
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(gid) = &game_id {
                 conn.execute(
                     "UPDATE downloads SET status='queued', speed_bps=0, updated_at=datetime('now') WHERE game_id=?1 AND status IN ('paused','failed')",
@@ -2230,7 +2452,7 @@ pub async fn queue_bundle(
         start_next_global_queued_download(&app);
     } else {
         let to_pause: Vec<String> = {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(gid) = &game_id {
                 let mut stmt = conn.prepare("SELECT id FROM downloads WHERE game_id=?1 AND status IN ('downloading','extracting','queued')")?;
                 let rows = stmt.query_map([gid], |r| r.get(0))?;
@@ -2243,7 +2465,7 @@ pub async fn queue_bundle(
         };
 
         for id in to_pause {
-            let active = state.active.lock().expect("mutex poisoned").get(&id).cloned();
+            let active = state.active.lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned();
             if let Some(active) = active {
                 active.reason.store(REASON_PAUSE, Ordering::SeqCst);
                 active.cancel.cancel();
@@ -2251,7 +2473,7 @@ pub async fn queue_bundle(
         }
 
         {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(gid) = &game_id {
                 conn.execute(
                     "UPDATE downloads SET status='paused', speed_bps=0, updated_at=datetime('now') WHERE game_id=?1 AND status IN ('downloading','extracting','queued')",
@@ -2276,7 +2498,7 @@ pub async fn resume_queue_sequential(
     db: State<'_, Database>,
 ) -> AppResult<()> {
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE downloads SET status='queued', speed_bps=0, updated_at=datetime('now') WHERE status IN ('paused','failed')",
             [],
@@ -2292,19 +2514,19 @@ pub async fn pause_download(
     state: State<'_, DownloadState>,
     id: String,
 ) -> AppResult<()> {
-    let active = state.active.lock().expect("mutex poisoned").get(&id).cloned();
+    let active = state.active.lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned();
     if let Some(active) = active {
         active.reason.store(REASON_PAUSE, Ordering::SeqCst);
         active.cancel.cancel();
-        let handle = active.handle.lock().expect("mutex poisoned").take();
+        let handle = active.handle.lock().unwrap_or_else(|e| e.into_inner()).take();
         if let Some(handle) = handle {
             let _ = tokio::time::timeout(Duration::from_millis(250), handle).await;
-            state.active.lock().expect("mutex poisoned").remove(&id);
+            state.active.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
         }
     }
     {
         let db = app.state::<Database>();
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE downloads SET status='paused', speed_bps=0, updated_at=datetime('now') WHERE id=?1 AND status IN ('downloading','extracting','queued')",
             [&id],
@@ -2336,13 +2558,15 @@ pub async fn resume_download(
     state: State<'_, DownloadState>,
     id: String,
 ) -> AppResult<()> {
-    if state.active.lock().expect("mutex poisoned").contains_key(&id) {
+    if state.active.lock().unwrap_or_else(|e| e.into_inner()).contains_key(&id) {
         return Err(AppError::Invalid("download is already running".into()));
     }
     let (url, save_path, stored_path, game_id, saved_chunk_state) =
         load_row(&app, &id).ok_or_else(|| AppError::NotFound("download not found".into()))?;
 
-    let file_path = if stored_path.is_empty() {
+    validate_download_url(&url)?;
+
+    let file_path = if stored_path.is_empty() || !is_safe_download_file_path(&stored_path, &save_path) {
         format!("{save_path}/{}", file_name_from_url(&url))
     } else {
         stored_path
@@ -2350,11 +2574,16 @@ pub async fn resume_download(
 
     {
         let db = app.state::<Database>();
-        let conn = db.connection.lock().expect("db mutex poisoned");
-        conn.execute(
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
+        let changed = conn.execute(
             "UPDATE downloads SET status='downloading', file_path=?1, error_message=NULL, updated_at=datetime('now') WHERE id=?2 AND status IN ('paused','failed')",
             rusqlite::params![file_path, id],
         )?;
+        if changed == 0 {
+            return Err(AppError::Invalid(
+                "download cannot be resumed in its current state".into(),
+            ));
+        }
         // Instantly notify UI so cards immediately switch to downloading with no delay
         if let Ok(info) = conn.query_row(
             "SELECT id, total_bytes, downloaded_bytes, speed_bps, status, error_message FROM downloads WHERE id=?1",
@@ -2382,7 +2611,7 @@ pub async fn resume_download(
         Some(game_id)
     };
 
-    begin_download(
+    if !begin_download(
         &app,
         &state,
         id,
@@ -2391,7 +2620,9 @@ pub async fn resume_download(
         save_path,
         game_id,
         saved_chunk_state,
-    );
+    ) {
+        return Err(AppError::Invalid("download is already running".into()));
+    }
     Ok(())
 }
 
@@ -2401,26 +2632,28 @@ pub async fn cancel_download(
     state: State<'_, DownloadState>,
     id: String,
 ) -> AppResult<()> {
-    let active = state.active.lock().expect("mutex poisoned").get(&id).cloned();
+    let active = state.active.lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned();
     if let Some(active) = active {
         active.reason.store(REASON_CANCEL, Ordering::SeqCst);
         active.cancel.cancel();
-        let handle = active.handle.lock().expect("mutex poisoned").take();
+        let handle = active.handle.lock().unwrap_or_else(|e| e.into_inner()).take();
         if let Some(handle) = handle {
             let _ = tokio::time::timeout(Duration::from_millis(250), handle).await;
-            state.active.lock().expect("mutex poisoned").remove(&id);
+            state.active.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
         }
     }
-    let file_path = load_row(&app, &id).map(|(_, _, fp, _, _)| fp);
+    let row_paths = load_row(&app, &id).map(|(_, sp, fp, _, _)| (sp, fp));
     {
         let db = app.state::<Database>();
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute("DELETE FROM downloads WHERE id=?1", [&id])?;
     }
-    if let Some(fp) = file_path {
-        if !fp.is_empty() {
+    if let Some((sp, fp)) = row_paths {
+        if is_safe_download_file_path(&fp, &sp) {
             tokio::task::spawn_blocking(move || {
-                let _ = std::fs::remove_file(&fp);
+                if std::fs::symlink_metadata(&fp).map(|m| m.is_file()).unwrap_or(false) {
+                    let _ = std::fs::remove_file(&fp);
+                }
             });
         }
     }
@@ -2453,34 +2686,36 @@ pub async fn delete_download(
     delete_file: Option<bool>,
 ) -> AppResult<()> {
     // 1. If actively downloading/extracting, cancel background task first
-    let active = state.active.lock().expect("mutex poisoned").get(&id).cloned();
+    let active = state.active.lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned();
     if let Some(active) = active {
         active.reason.store(REASON_CANCEL, Ordering::SeqCst);
         active.cancel.cancel();
-        let handle = active.handle.lock().expect("mutex poisoned").take();
+        let handle = active.handle.lock().unwrap_or_else(|e| e.into_inner()).take();
         if let Some(handle) = handle {
             let _ = tokio::time::timeout(Duration::from_millis(250), handle).await;
-            state.active.lock().expect("mutex poisoned").remove(&id);
+            state.active.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
         }
     }
 
     // 2. Delete file if requested (in background task so disk I/O doesn't block IPC)
-    let file_path = if delete_file.unwrap_or(false) {
-        load_row(&app, &id).map(|(_, _, fp, _, _)| fp)
+    let row_paths = if delete_file.unwrap_or(false) {
+        load_row(&app, &id).map(|(_, sp, fp, _, _)| (sp, fp))
     } else {
         None
     };
 
     // 3. Delete row from SQLite unconditionally
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute("DELETE FROM downloads WHERE id=?1", [&id])?;
     }
 
-    if let Some(fp) = file_path {
-        if !fp.is_empty() {
+    if let Some((sp, fp)) = row_paths {
+        if is_safe_download_file_path(&fp, &sp) {
             tokio::task::spawn_blocking(move || {
-                let _ = std::fs::remove_file(&fp);
+                if std::fs::symlink_metadata(&fp).map(|m| m.is_file()).unwrap_or(false) {
+                    let _ = std::fs::remove_file(&fp);
+                }
             });
         }
     }
@@ -2504,7 +2739,7 @@ pub async fn delete_download(
 
 #[tauri::command]
 pub fn get_downloads(db: State<'_, Database>) -> AppResult<Vec<DownloadInfo>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let mut stmt = conn.prepare(
         "SELECT
             d.id,
@@ -2553,7 +2788,7 @@ pub fn get_download_progress(
     db: State<'_, Database>,
     id: String,
 ) -> AppResult<DownloadProgress> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.query_row(
         "SELECT id, downloaded_bytes, total_bytes, speed_bps, status, error_message FROM downloads WHERE id=?1",
         [&id],
@@ -2585,7 +2820,7 @@ pub fn get_download_progress(
 /// from the persisted chunk state instead of staring at a frozen bar.
 pub fn recover_orphaned_downloads(app: &AppHandle) {
     let db = app.state::<Database>();
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let _ = conn.execute(
         "UPDATE downloads SET status='paused', speed_bps=0, updated_at=datetime('now') WHERE status IN ('downloading','extracting')",
         [],

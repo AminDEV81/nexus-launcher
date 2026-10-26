@@ -62,6 +62,9 @@ jobs:
       - name: Run TypeScript type check
         run: npx tsc -b
 
+      - name: Run Frontend Unit Tests (Vitest)
+        run: npm test
+
       - name: Run Prettier check
         run: npm run format:check
 

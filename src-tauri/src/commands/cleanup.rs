@@ -59,7 +59,7 @@ pub async fn scan_cleanup_targets(
     db: State<'_, Database>,
 ) -> AppResult<CleanupScanReport> {
     let (active_games, archived_games, profile_names) = {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let mut active = HashMap::new();
         let mut archived = HashMap::new();
         let mut stmt = conn

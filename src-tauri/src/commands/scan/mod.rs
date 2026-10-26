@@ -90,7 +90,7 @@ pub fn scan_all_stores(db: State<'_, Database>) -> AppResult<ScanResult> {
 
     // Drop anything that's already in the library so re-running the scan
     // doesn't keep re-surfacing games the user already added.
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     games.retain(|game| {
         let already_exists: bool = conn
             .query_row(
@@ -120,7 +120,7 @@ pub fn import_scanned_games(
     db: State<'_, Database>,
     games: Vec<ScannedGame>,
 ) -> AppResult<usize> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let mut imported = 0;
     let mut imported_games: Vec<(String, String)> = Vec::new();
 

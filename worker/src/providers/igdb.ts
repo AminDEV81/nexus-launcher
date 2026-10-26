@@ -102,24 +102,25 @@ export async function fetchFeed(
   const threeYearsAgo = now - 3 * 365 * 86_400
   let query = ''
 
+  const safeOffset = Math.max(0, Math.min(1000, Number.isFinite(offset) ? Math.floor(offset) : 0))
   const normFeed = feed.toLowerCase().replace(/-/g, '_')
 
   switch (normFeed) {
     case 'new_releases':
-      query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date < ${now} & first_release_date > ${ninetyDaysAgo} & (hypes > 2 | total_rating_count > 10); sort hypes desc; limit 24; offset ${offset};`
+      query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date < ${now} & first_release_date > ${ninetyDaysAgo} & (hypes > 2 | total_rating_count > 10); sort hypes desc; limit 24; offset ${safeOffset};`
       break
     case 'coming_soon':
-      query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date > ${now} & hypes > 1; sort first_release_date asc; limit 24; offset ${offset};`
+      query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date > ${now} & hypes > 1; sort first_release_date asc; limit 24; offset ${safeOffset};`
       break
     case 'top_rated':
-      query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date < ${now} & first_release_date > ${threeYearsAgo} & total_rating_count > 75; sort total_rating_count desc; limit 24; offset ${offset};`
+      query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date < ${now} & first_release_date > ${threeYearsAgo} & total_rating_count > 75; sort total_rating_count desc; limit 24; offset ${safeOffset};`
       break
     case 'recommended':
       if (genresParam && genresParam.trim()) {
         const cleanGenres = genresParam.replace(/[^0-9,]/g, '')
-        query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & genres = (${cleanGenres}) & first_release_date < ${now} & total_rating_count > 30; sort total_rating_count desc; limit 24; offset ${offset};`
+        query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & genres = (${cleanGenres}) & first_release_date < ${now} & total_rating_count > 30; sort total_rating_count desc; limit 24; offset ${safeOffset};`
       } else {
-        query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date < ${now} & total_rating_count > 60; sort total_rating_count desc; limit 24; offset ${offset};`
+        query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date < ${now} & total_rating_count > 60; sort total_rating_count desc; limit 24; offset ${safeOffset};`
       }
       break
     default:
@@ -316,7 +317,7 @@ export async function searchGames(
     const wc = buildNameWildcardClause(cleanQ)
     const searchQuery = `search "${cleanQ}"; ${FIELDS_LIST}; where game_type = ${SEARCH_TYPES} & cover != null; limit 30; offset ${offset};`
     if (wc) {
-      const wildcardQuery = `${FIELDS_LIST}; where game_type = ${SEARCH_TYPES} & cover != null & ${wc}; sort total_rating_count desc; limit 24; offset ${offset};`
+      const wildcardQuery = `${FIELDS_LIST}; where game_type = ${SEARCH_TYPES} & cover != null & ${wc}; sort total_rating_count desc; limit 24; offset ${safeOffset};`
       const [wildRaw, searchRaw] = await Promise.all([
         queryIgdb('games', wildcardQuery, env).catch(() => []),
         queryIgdb('games', searchQuery, env).catch(() => []),

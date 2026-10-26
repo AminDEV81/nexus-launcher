@@ -8,7 +8,7 @@ use tauri::State;
 /// (e.g. theme mode "dark") without special-casing a "not found" error.
 #[tauri::command]
 pub fn get_setting(db: State<'_, Database>, key: String) -> AppResult<Option<String>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let value = conn
         .query_row("SELECT value FROM settings WHERE key = ?1", [&key], |row| {
@@ -21,7 +21,7 @@ pub fn get_setting(db: State<'_, Database>, key: String) -> AppResult<Option<Str
 
 #[tauri::command]
 pub fn set_setting(db: State<'_, Database>, key: String, value: String) -> AppResult<()> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     conn.execute(
         "INSERT INTO settings (key, value) VALUES (?1, ?2)
@@ -45,7 +45,7 @@ pub fn set_setting(db: State<'_, Database>, key: String, value: String) -> AppRe
 /// trip instead of one `get_setting` call per key.
 #[tauri::command]
 pub fn get_all_settings(db: State<'_, Database>) -> AppResult<HashMap<String, String>> {
-    let conn = db.connection.lock().expect("db mutex poisoned");
+    let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     let mut stmt = conn.prepare("SELECT key, value FROM settings")?;
     let map = stmt

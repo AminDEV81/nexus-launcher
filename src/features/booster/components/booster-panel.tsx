@@ -20,7 +20,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sliders,
-  Sparkles,
   Trash2,
   Zap,
 } from 'lucide-react'

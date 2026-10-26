@@ -1,4 +1,4 @@
-# Nexus Launcher — وضعیت فنی پروژه (نسخه `0.6.0`)
+# Nexus Launcher — وضعیت فنی پروژه (نسخه `0.7.5`)
 
 _آخرین به‌روزرسانی: ۲۰۲۶-۱۰-۱۵_
 
@@ -26,7 +26,7 @@ _آخرین به‌روزرسانی: ۲۰۲۶-۱۰-۱۵_
    - فراخوانی `timeEndPeriod(1)` در `booster::restore_power_plan` هنگام بسته شدن بازی، حذف فراخوانی غیرضروری `ProcessesToUpdate::All` در `launch.rs` هنگام فعال بودن `ProcessJobTracker`، و افزودن کش ۵ ثانیه‌ای بازی‌های نصب‌شده در `OverlayState` برای حذف کوئری‌های مکرر SQLite در هر تیک اورلی.
 7. **انطباق کامل انیمیشن‌ها با `useAnimationSpeed()` و جلوگیری از انباشت درخواست‌های اورلی (`mini-player.tsx`، `expanded-player.tsx`، `queue-drawer.tsx`، `album-detail-modal.tsx`، `update-modal.tsx`، `download-card.tsx`، `grouped-download-card.tsx`، `overlay-window-page.tsx`).**
 
-## خلاصه معماری فعلی (`v0.6.0`)
+## خلاصه معماری فعلی (`v0.7.5`)
 
 - **Frontend**: React 19 + TypeScript 6 + Vite 8 + Tailwind CSS 4 + Framer Motion 13 + React Router (Hash) + Zustand + TanStack Query v5
 - **Backend**: Tauri v2 (Rust 2021) + rusqlite (SQLite, WAL + busy_timeout) + reqwest + tokio + sysinfo + windows-sys (Win32, ETW, PDH, Power) + steamlocate + winreg + zip / sevenz-rust / unrar

@@ -1117,7 +1117,7 @@ pub async fn resolve_critic_scores_live(
     let expected_year = extract_release_year(release_date);
 
     {
-        let conn = db.connection.lock().expect("db mutex poisoned");
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
             if !is_stale {
                 if let Ok(cached) = serde_json::from_str::<CriticScores>(&payload) {
@@ -1186,7 +1186,7 @@ pub async fn resolve_critic_scores_live(
 
     if final_scores.metacritic.is_some() || final_scores.opencritic.is_some() {
         if let Ok(json) = serde_json::to_string(&final_scores) {
-            let conn = db.connection.lock().expect("db mutex poisoned");
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
             let _ = MetadataCache::set(&conn, &cache_key, "critic_scores", &json, 7 * 86_400);
         }
     }

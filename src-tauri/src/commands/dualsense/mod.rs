@@ -253,7 +253,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
         let loop_start = Instant::now();
 
         let force_rescan = {
-            let mut guard = inner.lock().unwrap();
+            let mut guard = inner.lock().unwrap_or_else(|e| e.into_inner());
             let fr = guard.force_rescan;
             guard.force_rescan = false;
             fr
@@ -264,7 +264,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
         {
             for slot_idx in 0..MAX_CONTROLLER_SLOTS {
                 let (mode_changed, emulation_active, hide_ps5) = {
-                    let mut guard = inner.lock().unwrap();
+                    let mut guard = inner.lock().unwrap_or_else(|e| e.into_inner());
                     let mc = guard.slots[slot_idx].mode_changed;
                     guard.slots[slot_idx].mode_changed = false;
                     (
@@ -289,7 +289,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                         ) {
                             Ok((h, is_excl)) => {
                                 active_handles[slot_idx] = h;
-                                let mut guard = inner.lock().unwrap();
+                                let mut guard = inner.lock().unwrap_or_else(|e| e.into_inner());
                                 guard.slots[slot_idx].xbox.ps5_hidden_exclusive =
                                     is_excl || hidhide_ok;
                                 guard.slots[slot_idx].xbox.hidhide_active = hidhide_ok;
@@ -307,7 +307,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                                 ));
                             }
                             Err(e) => {
-                                let mut guard = inner.lock().unwrap();
+                                let mut guard = inner.lock().unwrap_or_else(|e| e.into_inner());
                                 guard.push_log(format!(
                                     "Controller #{} handle transition warning: {}",
                                     slot_idx + 1,
@@ -342,7 +342,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                         (0..MAX_CONTROLLER_SLOTS).find(|&idx| active_handles[idx] == -1)
                     {
                         let (emulation_active, hide_ps5) = {
-                            let guard = inner.lock().unwrap();
+                            let guard = inner.lock().unwrap_or_else(|e| e.into_inner());
                             (
                                 guard.slots[free_slot].xbox.emulation_active,
                                 guard.slots[free_slot].config.hide_ps5_controller,
@@ -372,7 +372,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                             hw_states[free_slot].vendor_id = dev.vendor_id;
                             hw_states[free_slot].product_id = dev.product_id;
 
-                            let mut guard = inner.lock().unwrap();
+                            let mut guard = inner.lock().unwrap_or_else(|e| e.into_inner());
                             // Clear any stale web gamepad override when a real physical HID controller connects
                             guard.slots[free_slot].virtual_override = VirtualControllerOverride {
                                 slot_index: free_slot as u8,
@@ -427,7 +427,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                                 if !old_instance.is_empty() {
                                     let _ = configure_hidhide_cloaking(&old_instance, false);
                                 }
-                                let mut guard = inner.lock().unwrap();
+                                let mut guard = inner.lock().unwrap_or_else(|e| e.into_inner());
                                 guard.slots[slot_idx].virtual_override.web_gamepad_connected =
                                     false;
                                 guard.slots[slot_idx].virtual_override.active = false;
@@ -460,7 +460,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
         let mut pending_hid_writes: Vec<(isize, Vec<u8>)> = Vec::new();
 
         {
-            let mut guard = inner.lock().unwrap();
+            let mut guard = inner.lock().unwrap_or_else(|e| e.into_inner());
             for slot_idx in 0..MAX_CONTROLLER_SLOTS {
                 let slot = &mut guard.slots[slot_idx];
                 if any_physical_hid_open && !hw_states[slot_idx].connected {
@@ -888,20 +888,45 @@ pub fn dualsense_install_driver(
     };
 
     #[cfg(target_os = "windows")]
-    {
+    let launch_res: Result<std::process::ExitStatus, String> = {
         let ps_arg = format!(
-            "Start-Process powershell -Verb RunAs -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command \"winget install --id {} -e --accept-source-agreements --accept-package-agreements\"'",
+            "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command \"winget install --id {} -e --accept-source-agreements --accept-package-agreements\"'",
             pkg_id
         );
-        let _ = std::process::Command::new("powershell")
+        std::process::Command::new("powershell")
             .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps_arg])
-            .spawn();
-    }
+            .status()
+            .map_err(|e| e.to_string())
+    };
+    #[cfg(not(target_os = "windows"))]
+    let launch_res: Result<std::process::ExitStatus, String> =
+        Err("Driver installer is only supported on Windows.".to_string());
 
-    let mut guard = state.inner.lock().map_err(|e| e.to_string())?;
-    guard.push_log(format!(
-        "Launched elevated WinGet installer for {} ({})...",
-        driver_type, pkg_id
-    ));
+    let mut guard = state.inner.lock().unwrap_or_else(|e| e.into_inner());
+    match launch_res {
+        Ok(status) if status.success() => {
+            guard.driver_status.vigembus_installed = VigemXbox360Client::is_driver_installed();
+            guard.driver_status.hidhide_installed = is_hidhide_installed();
+            guard.push_log(format!(
+                "WinGet installer completed for {} ({}).",
+                driver_type, pkg_id
+            ));
+        }
+        Ok(status) => {
+            guard.push_log(format!(
+                "WinGet installer for {} ({}) exited with code {:?}.",
+                driver_type,
+                pkg_id,
+                status.code()
+            ));
+        }
+        Err(err) => {
+            guard.push_log(format!(
+                "Failed to launch WinGet installer for {} ({}): {}",
+                driver_type, pkg_id, err
+            ));
+            return Err(format!("Failed to launch driver installer: {err}"));
+        }
+    }
     Ok(guard.build_snapshot())
 }

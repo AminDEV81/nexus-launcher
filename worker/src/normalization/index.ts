@@ -1,5 +1,6 @@
 import type { ApiResponse } from '../types'
 import { buildCacheHeaders } from '../cache/edge-cache'
+import { resolveCorsOrigin } from '../security/validation'
 
 export function createSuccessResponse<T>(
   data: T,
@@ -9,6 +10,7 @@ export function createSuccessResponse<T>(
     cached?: boolean
     stale?: boolean
     ttlSeconds?: number
+    requestOrigin?: string | null
   } = {},
 ): Response {
   const body: ApiResponse<T> = {
@@ -23,11 +25,16 @@ export function createSuccessResponse<T>(
   const ttl = options.ttlSeconds ?? 3600
   return new Response(JSON.stringify(body), {
     status: 200,
-    headers: buildCacheHeaders(ttl),
+    headers: buildCacheHeaders(ttl, 86_400, options.requestOrigin),
   })
 }
 
-export function createErrorResponse(code: string, message: string, statusCode = 400): Response {
+export function createErrorResponse(
+  code: string,
+  message: string,
+  statusCode = 400,
+  requestOrigin?: string | null,
+): Response {
   const body: ApiResponse<null> = {
     success: false,
     error: {
@@ -40,8 +47,9 @@ export function createErrorResponse(code: string, message: string, statusCode = 
     status: statusCode,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': resolveCorsOrigin(requestOrigin),
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      Vary: 'Origin',
     },
   })
 }
