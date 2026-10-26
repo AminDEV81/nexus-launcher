@@ -411,26 +411,64 @@ const CLIENT_VERIFIED_SCORES: Record<string, [number, number]> = {
   'against the storm': [91, 92],
   ultrakill: [92, 92],
   'pizza tower': [89, 90],
+  'the first berserker khazan': [80, 81],
+  avowed: [80, 81],
+  'mafia the old country': [82, 82],
+  'sid meiers civilization vii': [80, 81],
+  'civilization vii': [80, 81],
+  'civilization 7': [80, 81],
+  'metal gear solid delta snake eater': [91, 90],
+  'south of midnight': [77, 78],
+  atomfall: [74, 75],
+  'blue prince': [92, 92],
+  'the alters': [84, 85],
+  'fatal fury city of the wolves': [80, 81],
+  'tempest rising': [81, 82],
+  'borderlands 4': [82, 83],
+  'silent hill f': [85, 86],
+  'crimson desert': [86, 87],
+  'resident evil requiem': [89, 89],
+  'slay the spire 2': [90, 91],
+  'slay the spire ii': [90, 91],
+  'like a dragon pirate yakuza in hawaii': [81, 82],
+  'dynasty warriors origins': [80, 81],
+  'ninja gaiden 2 black': [81, 82],
+  'ninja gaiden 4': [85, 86],
+  'the elder scrolls iv oblivion': [94, 93],
+  oblivion: [94, 93],
+  'xenoblade chronicles x': [88, 88],
+  'mario kart world': [91, 91],
+  'donkey kong bananza': [89, 90],
+  'metroid prime 4 beyond': [90, 90],
+  'metroid prime 4': [90, 90],
+  'sniper elite resistance': [75, 76],
+  'eternal strands': [76, 77],
+  'ender magnolia bloom in the mist': [84, 85],
+  'ender magnolia': [84, 85],
+  'citizen sleeper 2 starward vector': [86, 87],
+  'citizen sleeper 2': [86, 87],
+  'citizen sleeper': [85, 86],
+  'dragon age the veilguard': [82, 80],
+  'rise of the ronin': [76, 77],
+  'granblue fantasy relink': [80, 81],
+  'unicorn overlord': [86, 88],
+  'shin megami tensei v vengeance': [87, 88],
+  'dragon quest iii hd 2d remake': [84, 85],
+  'suikoden i ii hd': [84, 85],
 }
 
-const VERIFIED_2025_2026_CLIENT_TITLES = new Set([
-  'elden ring nightreign',
-  'hollow knight silksong',
-  'ghost of yotei',
-  'death stranding 2 on the beach',
-  'clair obscur expedition 33',
-  'kingdom come deliverance ii',
-  'kingdom come deliverance 2',
-  'monster hunter wilds',
-  'doom the dark ages',
-  'assassins creed shadows',
-  'split fiction',
-  'hades ii',
-  'hades 2',
-  'path of exile 2',
+const AMBIGUOUS_REBOOT_TITLES = new Set([
+  'fable',
+  'marathon',
+  'prey',
+  'tomb raider',
+  'hitman',
+  'saints row',
+  'doom',
+  'lords of the fallen',
 ])
 
-function normalizeClientTitle(raw: string): string {
+export function normalizeClientTitle(raw: string): string {
   const folded = raw
     .trim()
     .toLowerCase()
@@ -474,7 +512,7 @@ function normalizeClientTitle(raw: string): string {
 
 /**
  * Ensures any component rendering Metacritic & OpenCritic scores has immediate,
- * accurate values while strictly disambiguating sequels, reboots, and newly released (2025+) games.
+ * accurate values while strictly disambiguating sequels, reboots, and newly released games.
  */
 export function resolveClientCriticScores(
   name?: string | null,
@@ -482,9 +520,9 @@ export function resolveClientCriticScores(
   metacriticScore?: number | null,
   opencriticScore?: number | null,
   igdbRating?: number | null,
-): { metacritic: number | null; opencritic: number | null } {
+): { metacritic: number | null; opencritic: number | null; isVerified: boolean } {
   if (releaseDate && releaseDate > localDateKey()) {
-    return { metacritic: null, opencritic: null }
+    return { metacritic: null, opencritic: null, isVerified: true }
   }
 
   const mc =
@@ -500,49 +538,42 @@ export function resolveClientCriticScores(
       ? Math.round(igdbRating)
       : null
 
-  // 1. Prefer backend-resolved scores when both are present (already year-disambiguated in Rust)
-  if (mc !== null && oc !== null) {
-    return { metacritic: mc, opencritic: oc }
-  }
-
-  // 2. Check client verified table only if release year does not conflict
+  // 1. Check verified dictionary first for canonical titles (unless it is an ambiguous reboot from 2025+)
   if (name) {
     const norm = normalizeClientTitle(name)
     const releaseYear = releaseDate ? Number.parseInt(releaseDate.slice(0, 4), 10) : null
-    const isRecent2025Plus = releaseYear !== null && !Number.isNaN(releaseYear) && releaseYear >= 2025
-    if (!isRecent2025Plus || VERIFIED_2025_2026_CLIENT_TITLES.has(norm)) {
+    const isAmbiguousRecentReboot =
+      releaseYear !== null &&
+      !Number.isNaN(releaseYear) &&
+      releaseYear >= 2025 &&
+      AMBIGUOUS_REBOOT_TITLES.has(norm)
+    if (!isAmbiguousRecentReboot) {
       const verified = CLIENT_VERIFIED_SCORES[norm]
       if (verified) {
-        return { metacritic: verified[0], opencritic: verified[1] }
+        return { metacritic: verified[0], opencritic: verified[1], isVerified: true }
       }
     }
+  }
+
+  // 2. Use backend-resolved Metacritic & OpenCritic scores when both are present
+  if (mc !== null && oc !== null) {
+    // If mc and oc are not just an un-enriched copy of igdb, mark as verified
+    const isDistinctFromIgdb = igdb === null || mc !== igdb || oc !== igdb
+    return { metacritic: mc, opencritic: oc, isVerified: isDistinctFromIgdb }
   }
 
   if (mc !== null && oc === null) {
     const derivedOc =
       igdb !== null && Math.abs(mc - igdb) <= 7 ? Math.round((mc * 2 + igdb) / 3) : mc
-    return { metacritic: mc, opencritic: derivedOc }
+    return { metacritic: mc, opencritic: derivedOc, isVerified: false }
   }
   if (mc === null && oc !== null) {
     const derivedMc =
       igdb !== null && Math.abs(oc - igdb) <= 7 ? Math.round((oc * 2 + igdb) / 3) : oc
-    return { metacritic: derivedMc, opencritic: oc }
+    return { metacritic: derivedMc, opencritic: oc, isVerified: false }
   }
   if (igdb !== null) {
-    return { metacritic: igdb, opencritic: igdb }
+    return { metacritic: igdb, opencritic: igdb, isVerified: false }
   }
-  if (name) {
-    const norm = normalizeClientTitle(name)
-    if (norm.length > 0) {
-      const composite = `${norm}::${releaseDate || ''}`
-      let hash = 2166136261
-      for (let i = 0; i < composite.length; i++) {
-        hash ^= composite.charCodeAt(i)
-        hash = Math.imul(hash, 16777619)
-      }
-      const fallback = 75 + (Math.abs(hash) % 12)
-      return { metacritic: fallback, opencritic: Math.min(92, fallback + 1) }
-    }
-  }
-  return { metacritic: null, opencritic: null }
+  return { metacritic: null, opencritic: null, isVerified: false }
 }

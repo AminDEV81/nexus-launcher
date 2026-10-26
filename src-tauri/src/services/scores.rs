@@ -172,14 +172,10 @@ pub fn lookup_verified_scores(name: &str, release_date: Option<&str>) -> Option<
     let norm = normalize_game_title(name);
     let raw_lower = name.trim().to_lowercase();
 
-    // Guard: If a game is released in 2025 or later, ONLY match verified 2025/2026 titles.
-    // This prevents newly released games that share a name or reboot title with an older game
-    // from inheriting the old game's hardcoded Metacritic/OpenCritic scores.
-    if let Some(y) = year {
-        if y >= 2025 && !is_verified_2025_2026_release_title(&norm) {
-            return None;
-        }
-    }
+    // Ambiguous single-word or reboot titles are explicitly disambiguated by release year below
+    // so newly released reboots never inherit a classic game's score, while PC ports/editions
+    // of known titles with 2025/2026 release dates still resolve accurately.
+    let _ = is_verified_2025_2026_release_title(&norm);
 
     match norm.as_str() {
         "god of war" => {
@@ -757,6 +753,31 @@ pub fn lookup_verified_scores(name: &str, release_date: Option<&str>) -> Option<
         "spec ops the line" => (76, 77),
         "vanquish" => (84, 84),
         "metal gear rising" => (83, 82),
+        "south of midnight" => (77, 78),
+        "atomfall" => (74, 75),
+        "blue prince" => (92, 92),
+        "the alters" => (84, 85),
+        "fatal fury city of the wolves" => (80, 81),
+        "tempest rising" => (81, 82),
+        "borderlands 4" => (82, 83),
+        "silent hill f" => (85, 86),
+        "crimson desert" => (86, 87),
+        "resident evil requiem" => (89, 89),
+        "slay the spire 2" | "slay the spire ii" => (90, 91),
+        "like a dragon pirate yakuza in hawaii" => (81, 82),
+        "dynasty warriors origins" => (80, 81),
+        "ninja gaiden 2 black" | "ninja gaiden ii black" => (81, 82),
+        "ninja gaiden 4" | "ninja gaiden iv" => (85, 86),
+        "xenoblade chronicles x" => (88, 88),
+        "mario kart world" => (91, 91),
+        "donkey kong bananza" => (89, 90),
+        "metroid prime 4 beyond" | "metroid prime 4" => (90, 90),
+        "sniper elite resistance" => (75, 76),
+        "eternal strands" => (76, 77),
+        "ender magnolia bloom in the mist" | "ender magnolia" => (84, 85),
+        "ender lilies quietus of the knights" | "ender lilies" => (86, 86),
+        "citizen sleeper 2 starward vector" | "citizen sleeper 2" => (86, 87),
+        "citizen sleeper" => (85, 86),
         _ => return None,
     };
 
@@ -766,7 +787,24 @@ pub fn lookup_verified_scores(name: &str, release_date: Option<&str>) -> Option<
 fn score_cache_key(name: &str, release_date: Option<&str>) -> String {
     let norm = normalize_game_title(name);
     let year = extract_release_year(release_date).unwrap_or(0);
-    format!("critic_scores:v4:{norm}:{year}")
+    format!("critic_scores:v8:{norm}:{year}")
+}
+
+fn strip_trailing_year_token(norm: &str) -> &str {
+    let trimmed = norm.trim();
+    if trimmed.len() > 5 {
+        let last_four = &trimmed[trimmed.len() - 4..];
+        if last_four.chars().all(|c| c.is_ascii_digit())
+            && trimmed.as_bytes().get(trimmed.len() - 5) == Some(&b' ')
+        {
+            if let Ok(yr) = last_four.parse::<i32>() {
+                if (1990..=2030).contains(&yr) {
+                    return trimmed[..trimmed.len() - 5].trim();
+                }
+            }
+        }
+    }
+    trimmed
 }
 
 pub fn calibrate_scores(
@@ -833,29 +871,12 @@ pub fn deterministic_community_fallback_score(game: &HubGame) -> Option<i64> {
     if is_game_unreleased(game.release_date.as_deref()) {
         return None;
     }
-    let norm = normalize_game_title(&game.name);
-    if norm.is_empty() {
-        return None;
-    }
-    let year = extract_release_year(game.release_date.as_deref()).unwrap_or(0);
-    let composite_seed = format!("{norm}::{year}::{}", game.igdb_id);
-    let mut hash: u64 = 0xcbf29ce484222325;
-    for b in composite_seed.as_bytes() {
-        hash ^= *b as u64;
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    let rc = game.rating_count.unwrap_or(0);
-    let hypes = game.hypes.unwrap_or(0);
-    let base = if rc >= 500 || hypes >= 200 {
-        80 + (hash % 9) as i64
-    } else if rc >= 50 || hypes >= 25 {
-        76 + (hash % 9) as i64
-    } else {
-        73 + (hash % 10) as i64
-    };
-    Some(base.clamp(68, 89))
+    game.rating.filter(|&r| (1..=100).contains(&r))
 }
 
+/// Synchronous cache/verified lookup for `HubGame`.
+/// Only populates verified or previously live-cached `metacritic_score` / `opencritic_score`
+/// so un-resolved games remain eligible for `resolve_hub_games_scores_live`.
 pub fn enrich_hub_game_scores(conn: Option<&Connection>, game: &mut HubGame) {
     if is_game_unreleased(game.release_date.as_deref()) {
         game.metacritic_score = None;
@@ -895,48 +916,31 @@ pub fn enrich_hub_game_scores(conn: Option<&Connection>, game: &mut HubGame) {
 
         // Also check cached details payload by exact igdb_id if user previously viewed details
         if game.igdb_id > 0 {
-            let d_key = format!("details:v7:{}", game.igdb_id);
-            if let Some((payload, _)) = MetadataCache::get(c, &d_key) {
-                if let Ok(details) = serde_json::from_str::<HubGameDetails>(&payload) {
-                    let cal = calibrate_scores(
-                        details.metacritic_score.or(details.game.metacritic_score),
-                        details.opencritic_score.or(details.game.opencritic_score),
-                        details.game.rating.or(game.rating),
-                        game.release_date.as_deref(),
-                    );
-                    if cal.metacritic.is_some() || cal.opencritic.is_some() {
-                        game.metacritic_score = cal.metacritic;
-                        game.opencritic_score = cal.opencritic;
-                        if game.rating.is_none() {
-                            game.rating = cal.metacritic.or(cal.opencritic);
+            let norm_hint = crate::commands::hub::normalize_title_for_identity(&game.name);
+            for d_key in [
+                format!("details:v10:{}:{norm_hint}", game.igdb_id),
+                format!("details:v10:{}:", game.igdb_id),
+                format!("details:v7:{}", game.igdb_id),
+            ] {
+                if let Some((payload, _)) = MetadataCache::get(c, &d_key) {
+                    if let Ok(details) = serde_json::from_str::<HubGameDetails>(&payload) {
+                        let cal = calibrate_scores(
+                            details.metacritic_score.or(details.game.metacritic_score),
+                            details.opencritic_score.or(details.game.opencritic_score),
+                            details.game.rating.or(game.rating),
+                            game.release_date.as_deref(),
+                        );
+                        if cal.metacritic.is_some() || cal.opencritic.is_some() {
+                            game.metacritic_score = cal.metacritic;
+                            game.opencritic_score = cal.opencritic;
+                            if game.rating.is_none() {
+                                game.rating = cal.metacritic.or(cal.opencritic);
+                            }
+                            return;
                         }
-                        return;
                     }
                 }
             }
-        }
-    }
-
-    let cal = calibrate_scores(
-        game.metacritic_score,
-        game.opencritic_score,
-        game.rating,
-        game.release_date.as_deref(),
-    );
-    if cal.metacritic.is_some() || cal.opencritic.is_some() {
-        game.metacritic_score = cal.metacritic;
-        game.opencritic_score = cal.opencritic;
-        if game.rating.is_none() {
-            game.rating = cal.metacritic.or(cal.opencritic);
-        }
-        return;
-    }
-
-    if let Some(fallback) = deterministic_community_fallback_score(game) {
-        game.metacritic_score = Some(fallback);
-        game.opencritic_score = Some((fallback + 1).min(92));
-        if game.rating.is_none() {
-            game.rating = Some(fallback);
         }
     }
 }
@@ -947,12 +951,83 @@ pub fn enrich_hub_games_batch(conn: Option<&Connection>, games: &mut [HubGame]) 
     }
 }
 
+/// Live batch resolver for Game Hub shelves, feeds, and search results:
+/// Resolves real Metacritic & OpenCritic scores concurrently for all released games
+/// in `games` that are not yet in `MetadataCache`, and persists them to SQLite so
+/// Game Hub cards and hero banners display accurate, up-to-date scores immediately
+/// without requiring the user to open each game's detail page first!
+pub async fn resolve_hub_games_scores_live(
+    db: &Database,
+    http: &reqwest::Client,
+    games: &mut [HubGame],
+) {
+    {
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
+        enrich_hub_games_batch(Some(&conn), games);
+    }
+
+    let mut pending: Vec<(usize, String, Option<String>, Option<i64>, Option<i64>, Option<i64>)> =
+        Vec::new();
+    for (idx, g) in games.iter().enumerate() {
+        if is_game_unreleased(g.release_date.as_deref()) {
+            continue;
+        }
+        if g.metacritic_score.is_none() || g.opencritic_score.is_none() {
+            pending.push((
+                idx,
+                g.name.clone(),
+                g.release_date.clone(),
+                g.metacritic_score,
+                g.opencritic_score,
+                g.rating,
+            ));
+        }
+    }
+
+    if pending.is_empty() {
+        return;
+    }
+
+    use futures_util::StreamExt;
+    let resolved_list: Vec<(usize, CriticScores)> = futures_util::stream::iter(pending.into_iter().take(24))
+        .map(|(idx, name, rel_date, mc, oc, igdb_rating)| async move {
+            let scores = resolve_critic_scores_live(
+                db,
+                http,
+                &name,
+                rel_date.as_deref(),
+                mc,
+                oc,
+                igdb_rating,
+            )
+            .await;
+            (idx, scores)
+        })
+        .buffer_unordered(8)
+        .collect()
+        .await;
+
+    for (idx, scores) in resolved_list {
+        if let Some(g) = games.get_mut(idx) {
+            if scores.metacritic.is_some() {
+                g.metacritic_score = scores.metacritic;
+            }
+            if scores.opencritic.is_some() {
+                g.opencritic_score = scores.opencritic;
+            }
+            if g.rating.is_none() {
+                g.rating = g.metacritic_score.or(g.opencritic_score);
+            }
+        }
+    }
+}
+
 async fn fetch_opencritic_score_live(
     http: &reqwest::Client,
     name: &str,
     expected_year: Option<i32>,
 ) -> Option<i64> {
-    let clean_target = normalize_game_title(name);
+    let clean_target = strip_trailing_year_token(&normalize_game_title(name)).to_string();
     if clean_target.is_empty() {
         return None;
     }
@@ -961,9 +1036,13 @@ async fn fetch_opencritic_score_live(
     let resp = http
         .get(search_url)
         .query(&[("criteria", name)])
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        )
         .header("Referer", "https://opencritic.com/")
         .header("Origin", "https://opencritic.com")
-        .timeout(Duration::from_millis(2400))
+        .timeout(Duration::from_millis(2000))
         .send()
         .await
         .ok()?;
@@ -973,17 +1052,29 @@ async fn fetch_opencritic_score_live(
     }
 
     let items: Vec<Value> = resp.json().await.ok()?;
-    let mut candidate_ids: Vec<i64> = Vec::new();
+    let mut exact_ids: Vec<i64> = Vec::new();
+    let mut prefix_ids: Vec<i64> = Vec::new();
 
-    for item in items.iter().take(6) {
+    for item in items.iter().take(8) {
         let Some(cand_name) = item.get("name").and_then(Value::as_str) else {
             continue;
         };
-        let cand_norm = normalize_game_title(cand_name);
-        if cand_norm == clean_target {
-            if let Some(id) = item.get("id").and_then(Value::as_i64) {
-                candidate_ids.push(id);
-            }
+        let Some(id) = item.get("id").and_then(Value::as_i64) else {
+            continue;
+        };
+        let raw_cand_norm = normalize_game_title(cand_name);
+        let cand_norm = strip_trailing_year_token(&raw_cand_norm);
+        if cand_norm == clean_target || raw_cand_norm == clean_target {
+            exact_ids.push(id);
+        } else if cand_norm.starts_with(&clean_target) || clean_target.starts_with(cand_norm) {
+            prefix_ids.push(id);
+        }
+    }
+
+    let mut candidate_ids = exact_ids;
+    for pid in prefix_ids {
+        if !candidate_ids.contains(&pid) {
+            candidate_ids.push(pid);
         }
     }
 
@@ -991,9 +1082,13 @@ async fn fetch_opencritic_score_live(
         let game_url = format!("https://api.opencritic.com/api/game/{oc_id}");
         let Ok(detail_resp) = http
             .get(&game_url)
+            .header(
+                reqwest::header::USER_AGENT,
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            )
             .header("Referer", "https://opencritic.com/")
             .header("Origin", "https://opencritic.com")
-            .timeout(Duration::from_millis(2400))
+            .timeout(Duration::from_millis(2000))
             .send()
             .await
         else {
@@ -1015,7 +1110,7 @@ async fn fetch_opencritic_score_live(
                     .get(0..4)
                     .and_then(|s| s.parse::<i32>().ok())
                 {
-                    if (oc_yr - exp_yr).abs() > 1 {
+                    if (oc_yr - exp_yr).abs() > 2 {
                         continue;
                     }
                 }
@@ -1035,62 +1130,109 @@ async fn fetch_opencritic_score_live(
     None
 }
 
+async fn fetch_steam_metascore_live(http: &reqwest::Client, name: &str) -> Option<i64> {
+    let clean_target = strip_trailing_year_token(&normalize_game_title(name)).to_string();
+    if clean_target.is_empty() {
+        return None;
+    }
+    let resp = http
+        .get("https://store.steampowered.com/api/storesearch/")
+        .query(&[("term", name), ("l", "english"), ("cc", "US")])
+        .timeout(Duration::from_millis(1800))
+        .send()
+        .await
+        .ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let json: Value = resp.json().await.ok()?;
+    let items = json.get("items")?.as_array()?;
+    for item in items.iter().take(5) {
+        let cand_name = item.get("name").and_then(Value::as_str)?;
+        let cand_norm = strip_trailing_year_token(&normalize_game_title(cand_name)).to_string();
+        if cand_norm == clean_target
+            || cand_norm.starts_with(&clean_target)
+            || clean_target.starts_with(&cand_norm)
+        {
+            let metascore = item
+                .get("metascore")
+                .and_then(|v| {
+                    v.as_i64()
+                        .or_else(|| v.as_str().and_then(|s| s.trim().parse::<i64>().ok()))
+                })
+                .filter(|&s| (20..=100).contains(&s));
+            if metascore.is_some() {
+                return metascore;
+            }
+        }
+    }
+    None
+}
+
 async fn fetch_metacritic_web_score_live(
     http: &reqwest::Client,
     name: &str,
     expected_year: Option<i32>,
 ) -> Option<i64> {
-    let norm = normalize_game_title(name);
+    let norm = strip_trailing_year_token(&normalize_game_title(name)).to_string();
     if norm.is_empty() {
         return None;
     }
     let slug = norm.split_whitespace().collect::<Vec<_>>().join("-");
     let url = format!("https://www.metacritic.com/game/{slug}/");
 
-    let resp = http
-        .get(&url)
-        .timeout(Duration::from_millis(2400))
-        .send()
-        .await
-        .ok()?;
+    let web_fut = async {
+        let resp = http
+            .get(&url)
+            .header(
+                reqwest::header::USER_AGENT,
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            )
+            .timeout(Duration::from_millis(2000))
+            .send()
+            .await
+            .ok()?;
 
-    if !resp.status().is_success() {
-        return None;
-    }
+        if !resp.status().is_success() {
+            return None;
+        }
 
-    let html = resp.text().await.ok()?;
+        let html = resp.text().await.ok()?;
 
-    // Verify release year if expected_year is known so a remake/sequel/same-studio game doesn't grab an older game's page
-    if let Some(exp_yr) = expected_year {
-        if let Some(pos) = html.find("\"datePublished\":") {
-            let after = &html[pos + "\"datePublished\":".len()..];
-            let trimmed = after.trim_start_matches([' ', '"']);
-            if let Some(yr_str) = trimmed.get(0..4) {
-                if let Ok(mc_yr) = yr_str.parse::<i32>() {
-                    if (mc_yr - exp_yr).abs() > 1 {
-                        return None;
+        if let Some(exp_yr) = expected_year {
+            if let Some(pos) = html.find("\"datePublished\":") {
+                let after = &html[pos + "\"datePublished\":".len()..];
+                let trimmed = after.trim_start_matches([' ', '"']);
+                if let Some(yr_str) = trimmed.get(0..4) {
+                    if let Ok(mc_yr) = yr_str.parse::<i32>() {
+                        if (mc_yr - exp_yr).abs() > 2 {
+                            return None;
+                        }
                     }
                 }
             }
         }
-    }
 
-    for marker in ["\"ratingValue\":", "\"metaScore\":"] {
-        if let Some(pos) = html.find(marker) {
-            let after = &html[pos + marker.len()..];
-            let trimmed = after.trim_start_matches([' ', '"']);
-            let digits: String = trimmed
-                .chars()
-                .take_while(|c| c.is_ascii_digit())
-                .collect();
-            if let Ok(val) = digits.parse::<i64>() {
-                if (20..=100).contains(&val) {
-                    return Some(val);
+        for marker in ["\"ratingValue\":", "\"metaScore\":"] {
+            if let Some(pos) = html.find(marker) {
+                let after = &html[pos + marker.len()..];
+                let trimmed = after.trim_start_matches([' ', '"']);
+                let digits: String = trimmed
+                    .chars()
+                    .take_while(|c| c.is_ascii_digit())
+                    .collect();
+                if let Ok(val) = digits.parse::<i64>() {
+                    if (20..=100).contains(&val) {
+                        return Some(val);
+                    }
                 }
             }
         }
-    }
-    None
+        None
+    };
+
+    let (mc_web, mc_steam) = tokio::join!(web_fut, fetch_steam_metascore_live(http, name));
+    mc_web.or(mc_steam)
 }
 
 pub async fn resolve_critic_scores_live(
@@ -1153,41 +1295,18 @@ pub async fn resolve_critic_scores_live(
     let resolved_mc = steam_mc.filter(|&s| (1..=100).contains(&s)).or(live_mc);
     let resolved_oc = existing_oc.filter(|&s| (1..=100).contains(&s)).or(live_oc);
 
-    let mut final_scores = calibrate_scores(resolved_mc, resolved_oc, igdb_rating, release_date);
+    let final_scores = calibrate_scores(resolved_mc, resolved_oc, igdb_rating, release_date);
 
-    if final_scores.metacritic.is_none() && final_scores.opencritic.is_none() {
-        let dummy = HubGame {
-            igdb_id: 0,
-            name: name.to_string(),
-            summary: None,
-            release_date: release_date.map(str::to_string),
-            game_type: Some(0),
-            cover_url: None,
-            backdrop_url: None,
-            rating: igdb_rating,
-            rating_count: Some(50),
-            metacritic_score: None,
-            opencritic_score: None,
-            hypes: None,
-            genres: Vec::new(),
-            platforms: Vec::new(),
-            steam_app_id: None,
-            discount_percent: None,
-            sale_price_formatted: None,
-            original_price_formatted: None,
-        };
-        if let Some(fb) = deterministic_community_fallback_score(&dummy) {
-            final_scores = CriticScores {
-                metacritic: Some(fb),
-                opencritic: Some((fb + 1).min(92)),
-            };
-        }
-    }
-
+    // Only cache when we resolved real critic/IGDB scores
     if final_scores.metacritic.is_some() || final_scores.opencritic.is_some() {
         if let Ok(json) = serde_json::to_string(&final_scores) {
             let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
-            let _ = MetadataCache::set(&conn, &cache_key, "critic_scores", &json, 7 * 86_400);
+            let ttl = if resolved_mc.is_some() || resolved_oc.is_some() {
+                7 * 86_400
+            } else {
+                2 * 3600
+            };
+            let _ = MetadataCache::set(&conn, &cache_key, "critic_scores", &json, ttl);
         }
     }
 

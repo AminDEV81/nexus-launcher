@@ -20,7 +20,7 @@ import type {
  * Auto-refreshes only once every 12 hours (or immediately when the user clicks the manual Refresh button).
  */
 export const HUB_CACHE_TTL_MS = 12 * 60 * 60 * 1000 // 12 hours in ms
-const HUB_STORAGE_PREFIX = 'nexus_hub_shelf_v2_'
+const HUB_STORAGE_PREFIX = 'nexus_hub_shelf_v6_'
 
 interface PersistedShelfPayload {
   updatedAt: number
@@ -248,7 +248,38 @@ export function useHubGameDetails(igdbId: number, expectedName?: string | null) 
 
   return useQuery({
     queryKey: ['hub', 'game', igdbId, (effectiveExpectedName ?? '').toLowerCase()],
-    queryFn: () => hubService.getHubGameDetails(igdbId, effectiveExpectedName),
+    queryFn: async () => {
+      const details = await hubService.getHubGameDetails(igdbId, effectiveExpectedName)
+      if (details && (details.metacritic_score != null || details.opencritic_score != null)) {
+        queryClient.setQueryData(
+          ['hub', 'critic-scores', details.name.trim().toLowerCase(), details.release_date ?? ''],
+          {
+            metacritic: details.metacritic_score ?? null,
+            opencritic: details.opencritic_score ?? null,
+          },
+        )
+        for (const shelfKey of ['new-releases', 'coming-soon', 'top-rated', 'recommended', 'discounted']) {
+          queryClient.setQueryData<HubGame[]>(['hub', shelfKey], (old) => {
+            if (!Array.isArray(old)) return old
+            let changed = false
+            const next = old.map((g) => {
+              if (g.igdb_id === details.igdb_id || g.name.toLowerCase() === details.name.toLowerCase()) {
+                changed = true
+                return {
+                  ...g,
+                  metacritic_score: details.metacritic_score ?? g.metacritic_score,
+                  opencritic_score: details.opencritic_score ?? g.opencritic_score,
+                }
+              }
+              return g
+            })
+            if (changed) writePersistedShelf(shelfKey, next)
+            return changed ? next : old
+          })
+        }
+      }
+      return details
+    },
     enabled: igdbId > 0,
     staleTime: HUB_CACHE_TTL_MS,
     gcTime: HUB_CACHE_TTL_MS,

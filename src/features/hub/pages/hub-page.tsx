@@ -44,6 +44,7 @@ import {
 import { HUB_FEEDS, type HubFeedId } from '../feeds'
 import { useHubSearchStore } from '../store/hub-search-store'
 import { HubFeaturedHero } from '../components/hub-featured-hero'
+import { HubScoreBadge } from '../components/hub-score-badge'
 import { HubGameCard } from '../components/hub-game-card'
 import { HubFeedSkeleton } from '../components/hub-game-skeleton'
 import { MissingKeysPanel } from '../components/missing-keys-panel'
@@ -637,6 +638,17 @@ export function HubPage() {
                       <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       <span>500K+ Live Catalog</span>
                     </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-gradient-to-r from-emerald-500/15 via-amber-500/12 to-orange-500/15 px-2.5 py-0.5 text-[10px] font-extrabold text-text shadow-2xs">
+                      <span className="flex size-3.5 items-center justify-center rounded-[4px] bg-[#ffcc33] font-serif text-[8.5px] font-black leading-none text-black">
+                        m
+                      </span>
+                      <span className="text-emerald-400">Metacritic</span>
+                      <span className="text-subtle">•</span>
+                      <span className="flex size-3.5 items-center justify-center rounded-[4px] bg-[#fc430a] font-mono text-[7px] font-black leading-none text-white">
+                        OC
+                      </span>
+                      <span className="text-orange-400">OpenCritic Live</span>
+                    </span>
                   </div>
 
                   <div className="flex items-baseline gap-2.5">
@@ -875,11 +887,12 @@ export function HubPage() {
                                 </div>
                                 <div className="mt-0.5 flex items-center gap-1.5 truncate text-[10px] text-subtle">
                                   <span className="truncate">{item.tag}</span>
-                                  {item.score != null && item.score > 0 && (
-                                    <span className="shrink-0 rounded bg-emerald-500/15 px-1 py-0.2 font-mono text-[9px] font-bold text-emerald-500 dark:text-emerald-300">
-                                      {item.score}
-                                    </span>
-                                  )}
+                                  <HubScoreBadge
+                                    variant="compact"
+                                    metacriticScore={item.score}
+                                    gameName={item.term}
+                                    className="shrink-0 scale-95 origin-left"
+                                  />
                                 </div>
                               </div>
                             </div>

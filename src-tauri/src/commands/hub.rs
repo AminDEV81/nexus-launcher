@@ -914,7 +914,7 @@ async fn fetch_shelf_feed_rotated(
     } else {
         "all".to_string()
     };
-    let cache_key = format!("shelf_rot:v5:{mode_str}:{feed}:{taste_sig}:{epoch}");
+    let cache_key = format!("shelf_rot:v7:{mode_str}:{feed}:{taste_sig}:{epoch}");
 
     {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
@@ -972,13 +972,15 @@ async fn fetch_shelf_feed_rotated(
 
     // Keep the top 4 most relevant/newest items anchored when nonce == 0 on New Releases / Coming Soon,
     // and dynamically rotate the pool when refreshed or on discovery shelves!
-    let rotated = if (feed == "new-releases" || feed == "coming-soon") && nonce == 0 {
+    let mut rotated = if (feed == "new-releases" || feed == "coming-soon") && nonce == 0 {
         let mut out = pool;
         out.truncate(limit);
         out
     } else {
         rotate_games_deterministic(pool, epoch, limit)
     };
+
+    crate::services::scores::resolve_hub_games_scores_live(db, http, &mut rotated).await;
 
     if !rotated.is_empty() {
         if let Ok(json) = serde_json::to_string(&rotated) {
@@ -2016,8 +2018,16 @@ fn make_steam_curated_hub_game(
         )),
         rating: Some(score),
         rating_count: Some(rating_count),
-        metacritic_score: Some(score),
-        opencritic_score: Some(score),
+        metacritic_score: Some(
+            crate::services::scores::lookup_verified_scores(name, Some(release_date))
+                .map(|(mc, _)| mc)
+                .unwrap_or(score),
+        ),
+        opencritic_score: Some(
+            crate::services::scores::lookup_verified_scores(name, Some(release_date))
+                .map(|(_, oc)| oc)
+                .unwrap_or(score),
+        ),
         hypes: Some(rating_count / 3),
         genres: genres.iter().map(|s| (*s).to_string()).collect(),
         platforms: platforms.iter().map(|s| (*s).to_string()).collect(),
@@ -2739,7 +2749,9 @@ pub async fn search_hub_games(
     let config = resolver.get_config(&db);
     if config.mode == ProviderMode::Public {
         let games = resolver.search_games(&db, trimmed, offset, &filters).await?;
-        return Ok(apply_hub_filters_and_sort(games, trimmed, &filters));
+        let mut sorted = apply_hub_filters_and_sort(games, trimmed, &filters);
+        crate::services::scores::resolve_hub_games_scores_live(&db, &http.0, &mut sorted).await;
+        return Ok(sorted);
     }
 
     let (client_id, client_secret) = igdb_credentials(&db)?;
@@ -3233,7 +3245,7 @@ pub async fn fetch_popular_discounted_hub_games(
     db: &Database,
     http: &reqwest::Client,
 ) -> Vec<HubGame> {
-    let cache_key = "hub:discounted_games:v3";
+    let cache_key = "hub:discounted_games:v5";
     {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((payload, is_stale)) = MetadataCache::get(&conn, cache_key) {
@@ -3490,12 +3502,36 @@ pub async fn fetch_popular_discounted_hub_games(
         score_b.cmp(&score_a)
     });
 
+    crate::services::scores::resolve_hub_games_scores_live(db, http, &mut discounted_games).await;
+
     if let Ok(json) = serde_json::to_string(&discounted_games) {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let _ = MetadataCache::set(&conn, cache_key, "discounted", &json, 1800);
     }
 
     discounted_games
+}
+
+#[tauri::command]
+pub async fn resolve_hub_game_scores(
+    db: State<'_, Database>,
+    http: State<'_, HttpClient>,
+    game_name: String,
+    release_date: Option<String>,
+    metacritic_score: Option<i64>,
+    opencritic_score: Option<i64>,
+    igdb_rating: Option<i64>,
+) -> AppResult<crate::services::scores::CriticScores> {
+    Ok(crate::services::scores::resolve_critic_scores_live(
+        &db,
+        &http.0,
+        &game_name,
+        release_date.as_deref(),
+        metacritic_score,
+        opencritic_score,
+        igdb_rating,
+    )
+    .await)
 }
 
 #[tauri::command]

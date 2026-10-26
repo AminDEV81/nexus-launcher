@@ -143,6 +143,18 @@ export function HubFeaturedHero({
                 {game.sale_price_formatted && <span>• {game.sale_price_formatted}</span>}
               </span>
             )}
+
+            {!isUnreleased && (
+              <HubScoreBadge
+                variant="compact"
+                metacriticScore={game.metacritic_score}
+                opencriticScore={game.opencritic_score}
+                igdbRating={game.rating}
+                gameName={game.name}
+                releaseDate={game.release_date}
+                className="hidden sm:inline-flex"
+              />
+            )}
           </div>
 
           {/* Quick Navigation Controls */}
@@ -416,17 +428,16 @@ export function HubFeaturedHero({
                 >
                   {item.name}
                 </p>
-                <div className="mt-0.5 flex items-center gap-2 text-[10px] text-subtle">
-                  {(item.metacritic_score ?? item.rating) != null && (
-                    <span className="inline-flex items-center gap-1 font-mono font-bold text-emerald-400">
-                      <span>MC {Math.round(item.metacritic_score ?? item.rating ?? 0)}</span>
-                      {(item.opencritic_score ?? item.metacritic_score ?? item.rating) != null && (
-                        <span className="text-orange-400">
-                          · OC {Math.round(item.opencritic_score ?? item.metacritic_score ?? item.rating ?? 0)}
-                        </span>
-                      )}
-                    </span>
-                  )}
+                <div className="mt-1 flex items-center gap-1.5 text-[10px] text-subtle">
+                  <HubScoreBadge
+                    variant="compact"
+                    metacriticScore={item.metacritic_score}
+                    opencriticScore={item.opencritic_score}
+                    igdbRating={item.rating}
+                    gameName={item.name}
+                    releaseDate={item.release_date}
+                    className="shrink-0"
+                  />
                   <span className="truncate">
                     {item.genres.length > 0 ? item.genres.join(' · ') : 'Game'}
                   </span>

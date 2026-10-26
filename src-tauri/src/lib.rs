@@ -314,6 +314,7 @@ pub fn run() {
             commands::hub::get_hub_top_rated,
             commands::hub::get_hub_recommended,
             commands::hub::get_hub_discounted_games,
+            commands::hub::resolve_hub_game_scores,
             commands::hub::resolve_nexusmods_url,
             commands::hub::refresh_hub_catalog,
             commands::hub::search_hub_games,

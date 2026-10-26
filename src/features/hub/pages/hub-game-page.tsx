@@ -25,6 +25,7 @@ import { isMissingIgdbKeys } from '../utils/is-missing-keys'
 import { useSettings } from '@/features/settings/hooks/use-settings'
 import { HubRegionalPriceModal } from '../components/hub-regional-price-modal'
 import { HubGameHero, genreColor } from '../components/hub-game-hero'
+import { HubScoreBadge } from '../components/hub-score-badge'
 import { HubMediaShowcase } from '../components/hub-media-showcase'
 import { HubGameSpecs } from '../components/hub-game-specs'
 import { HubSystemRequirements } from '../components/hub-system-requirements'
@@ -269,13 +270,26 @@ export function HubGamePage() {
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
               <Trophy className="size-5" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <span className="block text-[10px] font-bold uppercase tracking-wider text-subtle">
                 Critic Consensus
               </span>
-              <span className="truncate block text-sm font-extrabold text-text">
-                {bestScore ? `${bestScore} / 100 Rated` : 'Awaiting Reviews'}
-              </span>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                {isReleased ? (
+                  <HubScoreBadge
+                    variant="compact"
+                    metacriticScore={game.metacritic_score ?? libraryEntry?.metacritic_score}
+                    opencriticScore={game.opencritic_score ?? libraryEntry?.opencritic_score}
+                    igdbRating={game.rating}
+                    gameName={game.name}
+                    releaseDate={game.release_date}
+                  />
+                ) : (
+                  <span className="truncate block text-sm font-extrabold text-text">
+                    {bestScore ? `${bestScore} / 100 Rated` : 'Awaiting Reviews'}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

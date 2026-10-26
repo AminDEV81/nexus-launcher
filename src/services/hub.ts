@@ -46,8 +46,29 @@ export function getHubRecommended() {
   return call<HubGame[]>('get_hub_recommended')
 }
 
+export interface ResolvedCriticScoresPayload {
+  metacritic: number | null
+  opencritic: number | null
+}
+
 export function getHubDiscountedGames() {
   return call<HubGame[]>('get_hub_discounted_games')
+}
+
+export function resolveHubGameScores(params: {
+  gameName: string
+  releaseDate?: string | null
+  metacriticScore?: number | null
+  opencriticScore?: number | null
+  igdbRating?: number | null
+}) {
+  return call<ResolvedCriticScoresPayload>('resolve_hub_game_scores', {
+    gameName: params.gameName,
+    releaseDate: params.releaseDate ?? null,
+    metacriticScore: params.metacriticScore ?? null,
+    opencriticScore: params.opencriticScore ?? null,
+    igdbRating: params.igdbRating ?? null,
+  })
 }
 
 export function resolveNexusModsUrl(gameName: string) {

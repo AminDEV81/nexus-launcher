@@ -138,7 +138,7 @@ impl MetadataProviderResolver {
             ProviderMode::Custom => "custom",
         };
         let genre_suffix = genres_csv.filter(|s| !s.is_empty()).unwrap_or("all");
-        let cache_key = format!("feed:v8:{mode_str}:{feed}:{offset}:{genre_suffix}");
+        let cache_key = format!("feed:v10:{mode_str}:{feed}:{offset}:{genre_suffix}");
 
         {
             let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
@@ -189,9 +189,9 @@ impl MetadataProviderResolver {
         match result {
             Ok(mut games) => {
                 self.circuit_breaker.record_success();
+                scores::resolve_hub_games_scores_live(db, &self.http, &mut games).await;
                 {
                     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
-                    scores::enrich_hub_games_batch(Some(&conn), &mut games);
                     if let Ok(json) = serde_json::to_string(&games) {
                         let _ = feed;
                         let ttl = 12 * 3600; // 12-hour cache window
@@ -271,7 +271,7 @@ impl MetadataProviderResolver {
         }
 
         let cache_key = format!(
-            "search:v19:{mode_str}:{clean_q}:{offset}:{g_str}:{p_str}:{rel_str}:{yf_str}:{yt_str}:{rating_str}:{sort_str}:{cat_str}:{mode_filter_str}:{rel_only_str}:{on_sale_str}"
+            "search:v21:{mode_str}:{clean_q}:{offset}:{g_str}:{p_str}:{rel_str}:{yf_str}:{yt_str}:{rating_str}:{sort_str}:{cat_str}:{mode_filter_str}:{rel_only_str}:{on_sale_str}"
         );
 
         {
@@ -326,9 +326,9 @@ impl MetadataProviderResolver {
         match result {
             Ok(mut games) => {
                 self.circuit_breaker.record_success();
+                scores::resolve_hub_games_scores_live(db, &self.http, &mut games).await;
                 {
                     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
-                    scores::enrich_hub_games_batch(Some(&conn), &mut games);
                     if !games.is_empty() {
                         if let Ok(json) = serde_json::to_string(&games) {
                             let _ =
@@ -539,23 +539,8 @@ impl MetadataProviderResolver {
         match resolved_result {
             Ok(Some(mut details)) => {
                 self.circuit_breaker.record_success();
-                let mut score_details = details.clone();
-                let (_, _) = tokio::join!(
-                    crate::commands::hub::enrich_hub_game_details_live(&self.http, &mut details),
-                    scores::enrich_hub_details_scores(db, &self.http, &mut score_details)
-                );
-                details.metacritic_score =
-                    score_details.metacritic_score.or(details.metacritic_score);
-                details.opencritic_score =
-                    score_details.opencritic_score.or(details.opencritic_score);
-                details.game.metacritic_score = score_details
-                    .game
-                    .metacritic_score
-                    .or(details.game.metacritic_score);
-                details.game.opencritic_score = score_details
-                    .game
-                    .opencritic_score
-                    .or(details.game.opencritic_score);
+                crate::commands::hub::enrich_hub_game_details_live(&self.http, &mut details).await;
+                scores::enrich_hub_details_scores(db, &self.http, &mut details).await;
                 if let Ok(json) = serde_json::to_string(&details) {
                     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
                     let _ = MetadataCache::set(&conn, &cache_key, "details", &json, 12 * 3600);
