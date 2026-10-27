@@ -232,16 +232,154 @@ pub fn soundtrack_get_downloads(
     db::get_downloads(&conn)
 }
 
-/// Dynamically grants Tauri `asset://` protocol read access to a validated soundtrack directory
-/// at runtime so custom user-selected soundtrack folders work without global `**/*.mp3` wildcards.
-pub fn allow_soundtrack_directory_in_scopes(app: &AppHandle, dir: &std::path::Path) {
+const ALLOWED_AUDIO_EXTS: &[&str] = &["mp3", "flac", "ogg", "m4a", "wav", "opus", "aac", "webm"];
+
+/// Strictly validates that a candidate soundtrack directory is not a hidden dot-folder (e.g. `.ssh`, `.gnupg`, `.aws`),
+/// not inside `AppData` (`Roaming`, `Local`, `LocalLow`), not a browser/credential store, and not a top-level user/system root.
+pub fn is_safe_soundtrack_directory(dir: &std::path::Path) -> bool {
+    let raw_str = dir.to_string_lossy();
+    if !crate::commands::download::is_safe_download_save_path(&raw_str) {
+        return false;
+    }
+
+    // Resolve symlinks/junctions if the directory or an ancestor exists on disk
+    let resolved = if dir.exists() {
+        std::fs::canonicalize(dir).unwrap_or_else(|_| dir.to_path_buf())
+    } else {
+        dir.to_path_buf()
+    };
+    let resolved_str = resolved.to_string_lossy();
+    let clean_str = resolved_str
+        .strip_prefix("\\\\?\\UNC\\")
+        .map(|s| format!("\\\\{s}"))
+        .or_else(|| resolved_str.strip_prefix("\\\\?\\").map(str::to_string))
+        .unwrap_or_else(|| resolved_str.to_string());
+    let clean_path = std::path::Path::new(&clean_str);
+
+    // Block any path component starting with '.' (e.g. .ssh, .gnupg, .aws, .kube, .config, .git)
+    // or sensitive credential/browser/system folder names.
+    const DENIED_SEGMENTS: &[&str] = &[
+        "appdata",
+        "application data",
+        "local settings",
+        "ntuser",
+        "windows",
+        "system32",
+        "syswow64",
+        "programdata",
+        "openssh",
+        "ssh",
+        "gnupg",
+        "keyrings",
+        "wallets",
+        "chrome",
+        "user data",
+        "firefox",
+        "profiles",
+        "bravesoftware",
+        "microsoft",
+        "edge",
+    ];
+
+    for comp in clean_path.components() {
+        if let std::path::Component::Normal(os_seg) = comp {
+            let seg = os_seg.to_string_lossy().trim().to_ascii_lowercase();
+            if seg.starts_with('.') || DENIED_SEGMENTS.contains(&seg.as_str()) {
+                return false;
+            }
+        }
+    }
+
+    let norm = clean_str
+        .replace('/', "\\")
+        .trim_end_matches('\\')
+        .to_lowercase();
+
+    // Block top-level user directories (Documents, Desktop, Downloads, Saved Games, OneDrive) and their parents
+    let mut forbidden_exact_or_parent: Vec<String> = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        let h = home
+            .to_string_lossy()
+            .replace('/', "\\")
+            .trim_end_matches('\\')
+            .to_lowercase();
+        forbidden_exact_or_parent.push(h.clone());
+        forbidden_exact_or_parent.push(format!("{h}\\appdata"));
+        forbidden_exact_or_parent.push(format!("{h}\\documents"));
+        forbidden_exact_or_parent.push(format!("{h}\\desktop"));
+        forbidden_exact_or_parent.push(format!("{h}\\downloads"));
+        forbidden_exact_or_parent.push(format!("{h}\\saved games"));
+        forbidden_exact_or_parent.push(format!("{h}\\onedrive"));
+    }
+    for d in [
+        dirs::document_dir(),
+        dirs::desktop_dir(),
+        dirs::download_dir(),
+        dirs::config_dir(),
+        dirs::data_local_dir(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        forbidden_exact_or_parent.push(
+            d.to_string_lossy()
+                .replace('/', "\\")
+                .trim_end_matches('\\')
+                .to_lowercase(),
+        );
+    }
+
+    let norm_with_sep = format!("{norm}\\");
+    if forbidden_exact_or_parent
+        .iter()
+        .any(|f| f == &norm || f.starts_with(&norm_with_sep))
+    {
+        return false;
+    }
+
+    true
+}
+
+/// Grants Tauri `asset://` protocol read access to a single verified audio file (never non-audio files!).
+pub fn allow_soundtrack_audio_file_in_scope(app: &AppHandle, file_path: &std::path::Path) {
     use tauri::Manager;
-    let dir_str = dir.to_string_lossy();
-    if !crate::commands::download::is_safe_download_save_path(&dir_str) {
+    if !file_path.is_file() {
         return;
     }
-    let _ = std::fs::create_dir_all(dir);
-    let _ = app.asset_protocol_scope().allow_directory(dir, true);
+    let is_audio = file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|ext| ALLOWED_AUDIO_EXTS.contains(&ext.to_ascii_lowercase().as_str()))
+        .unwrap_or(false);
+    if !is_audio {
+        return;
+    }
+    if let Some(parent) = file_path.parent() {
+        if !is_safe_soundtrack_directory(parent) {
+            return;
+        }
+    } else {
+        return;
+    }
+    let _ = app.asset_protocol_scope().allow_file(file_path);
+}
+
+/// Scans an existing, validated soundtrack directory and grants `asset://` access ONLY to individual
+/// audio files inside it (zero `create_dir_all` side-effect and zero non-audio file exposure).
+pub fn allow_soundtrack_directory_in_scopes(app: &AppHandle, dir: &std::path::Path) {
+    if !dir.is_dir() || !is_safe_soundtrack_directory(dir) {
+        return;
+    }
+    for entry in walkdir::WalkDir::new(dir)
+        .max_depth(4)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(Result::ok)
+    {
+        if entry.file_type().is_file() {
+            allow_soundtrack_audio_file_in_scope(app, entry.path());
+        }
+    }
 }
 
 #[tauri::command]
@@ -260,7 +398,7 @@ pub fn soundtrack_get_download_directory(
 
     if let Some(dir) = custom {
         let trimmed = dir.trim();
-        if !trimmed.is_empty() {
+        if !trimmed.is_empty() && is_safe_soundtrack_directory(std::path::Path::new(trimmed)) {
             allow_soundtrack_directory_in_scopes(&app, std::path::Path::new(trimmed));
             return Ok(trimmed.to_string());
         }
@@ -278,12 +416,12 @@ pub fn soundtrack_set_download_directory(
     db: State<'_, Database>,
 ) -> AppResult<()> {
     let trimmed = path.trim();
-    if trimmed.is_empty() || !crate::commands::download::is_safe_download_save_path(trimmed) {
+    let dir_path = std::path::PathBuf::from(trimmed);
+    if trimmed.is_empty() || !is_safe_soundtrack_directory(&dir_path) {
         return Err(AppError::Invalid(
-            "Invalid or protected system directory cannot be used as a soundtrack folder.".into(),
+            "Selected directory is a protected system, credential, or top-level user folder. Please choose a dedicated music/soundtrack subfolder.".into(),
         ));
     }
-    let dir_path = std::path::PathBuf::from(trimmed);
     allow_soundtrack_directory_in_scopes(&app, &dir_path);
 
     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
@@ -303,8 +441,8 @@ pub async fn soundtrack_scan_library(
     let scan_paths: Vec<PathBuf> = match paths {
         Some(p) if !p.is_empty() => p
             .into_iter()
-            .filter(|s| crate::commands::download::is_safe_download_save_path(s))
             .map(PathBuf::from)
+            .filter(|p| p.is_dir() && is_safe_soundtrack_directory(p))
             .collect(),
         _ => {
             let mut defaults = Vec::new();
@@ -330,10 +468,15 @@ pub async fn soundtrack_scan_library(
 
 #[tauri::command]
 pub fn soundtrack_get_local_files(
+    app: AppHandle,
     db: State<'_, Database>,
 ) -> AppResult<Vec<SoundtrackLocalFile>> {
     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
-    db::get_local_files(&conn)
+    let files = db::get_local_files(&conn)?;
+    for f in &files {
+        allow_soundtrack_audio_file_in_scope(&app, std::path::Path::new(&f.file_path));
+    }
+    Ok(files)
 }
 
 #[tauri::command]

@@ -238,6 +238,56 @@ pub fn export_backup(
 ///   and shell/scripting binaries (`cmd.exe`, `powershell.exe`, `pwsh.exe`, `python.exe`, `node.exe`, etc.).
 /// - Requires `executable_path` to reside inside a valid game-specific `install_path` directory on disk,
 ///   falling back to `find_best_exe(install_path, game_name)` if the `.exe` moved or needs re-detection.
+/// Validates `launch_arguments` during backup import so benign gameplay flags (`-windowed`, `-dx11`,
+/// `-novid`, `-fullscreen`, `+fps_max 144`) are preserved when the original game executable is verified,
+/// while stripping any arguments containing shell metacharacters, paths, URLs, or interpreter/eval flags.
+fn sanitize_safe_launch_arguments(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() || trimmed.len() > 200 {
+        return None;
+    }
+    // Only allow simple ASCII alphanumeric flag tokens, spaces, '-', '+', '=', '.', '_', ':'
+    if !trimmed.chars().all(|c| {
+        c.is_ascii_alphanumeric() || matches!(c, ' ' | '-' | '+' | '=' | '.' | '_')
+    }) {
+        return None;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    const FORBIDDEN_ARG_PATTERNS: &[&str] = &[
+        "..",
+        "http",
+        "ftp",
+        "file",
+        "/c",
+        "/k",
+        "-enc",
+        "-command",
+        "-file",
+        "--eval",
+        "-e ",
+        ".ps1",
+        ".bat",
+        ".cmd",
+        ".vbs",
+        ".js",
+        ".py",
+        ".rb",
+        ".pl",
+        ".php",
+        ".lua",
+        ".dll",
+        ".exe",
+        ".msi",
+        ".hta",
+        ".sh",
+        ".jar",
+    ];
+    if FORBIDDEN_ARG_PATTERNS.iter().any(|pat| lower.contains(pat)) {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
 fn validate_or_redetect_backup_game_exe(
     exe_str: &str,
     install_str: &str,
@@ -253,6 +303,7 @@ fn validate_or_redetect_backup_game_exe(
         "rundll32",
         "regsvr32",
         "certutil",
+        "certreq",
         "bitsadmin",
         "msiexec",
         "python",
@@ -261,10 +312,56 @@ fn validate_or_redetect_backup_game_exe(
         "node",
         "deno",
         "bun",
+        "java",
+        "javaw",
+        "javaws",
+        "dotnet",
+        "perl",
+        "php",
+        "ruby",
+        "lua",
+        "tclsh",
+        "wish",
+        "wmic",
+        "schtasks",
+        "at",
+        "sc",
+        "net",
+        "net1",
+        "netsh",
+        "reg",
+        "regini",
+        "regasm",
+        "regsvcs",
+        "msbuild",
+        "installutil",
+        "csc",
+        "vbc",
+        "jsc",
+        "ieexec",
+        "cmstp",
+        "forfiles",
+        "pcalua",
+        "syncappvpublishingserver",
+        "odbcconf",
+        "control",
+        "mmc",
+        "hh",
+        "makecab",
+        "expand",
+        "extrac32",
+        "findstr",
+        "curl",
+        "wget",
+        "tar",
+        "ssh",
+        "scp",
+        "sftp",
+        "ftp",
+        "tftp",
         "bash",
         "sh",
         "wsl",
-        " explorer",
         "explorer",
         "conhost",
         "taskmgr",
@@ -472,11 +569,15 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
                         "backup contains a game row without an id or name.".into(),
                     ));
                 }
-                // Strip arbitrary shell hooks AND launch_arguments from backup files to prevent RCE on Play
-                // (e.g. pointing executable_path to an interpreter with malicious CLI flags).
+                // Strip arbitrary shell hooks from backup files to prevent RCE on Play
                 game.insert("pre_launch_command".to_string(), Value::Null);
                 game.insert("post_launch_command".to_string(), Value::Null);
-                game.insert("launch_arguments".to_string(), Value::Null);
+
+                let raw_launch_args = game
+                    .get("launch_arguments")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
 
                 let game_name = game
                     .get("name")
@@ -499,9 +600,21 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
                 let resolved_exe = validate_or_redetect_backup_game_exe(&exe_str, &inst_str, &game_name);
                 match resolved_exe {
                     Some(valid_exe) => {
+                        // Preserve sanitized launch_arguments ONLY if the exact original game executable was verified
+                        let same_exe = !exe_str.is_empty() && valid_exe.eq_ignore_ascii_case(&exe_str);
+                        let safe_args = if same_exe {
+                            sanitize_safe_launch_arguments(&raw_launch_args)
+                        } else {
+                            None
+                        };
+                        game.insert(
+                            "launch_arguments".to_string(),
+                            safe_args.map(Value::String).unwrap_or(Value::Null),
+                        );
                         game.insert("executable_path".to_string(), Value::String(valid_exe));
                     }
                     None => {
+                        game.insert("launch_arguments".to_string(), Value::Null);
                         game.insert("executable_path".to_string(), Value::Null);
                         if game.get("source").and_then(Value::as_str) != Some("steam") {
                             game.insert("is_installed".to_string(), Value::Number(0.into()));

@@ -233,6 +233,7 @@ pub fn run() {
             // Download tasks die with the process — orphaned mid-flight
             // rows become resumable paused entries (see download.rs).
             commands::download::recover_orphaned_downloads(app.handle());
+            commands::soundtrack::downloader::cleanup_stale_staging_files(app.handle());
 
             // Ensure the main window is visible, unminimized, and brought to front
             if let Some(window) = app.get_webview_window("main") {

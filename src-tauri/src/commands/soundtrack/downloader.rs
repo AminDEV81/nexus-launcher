@@ -150,10 +150,18 @@ pub async fn start_download(
     let Some(host) = parsed_url.host_str() else {
         return Err(AppError::Invalid("Soundtrack URL is missing a host.".into()));
     };
-    if crate::commands::profiles::is_blocked_host_or_ip(host) {
-        return Err(AppError::Invalid(
-            "Private or local network URLs are not permitted.".into(),
-        ));
+    match crate::commands::profiles::check_host_ssrf(host) {
+        crate::commands::profiles::HostSsrfStatus::Allowed => {}
+        crate::commands::profiles::HostSsrfStatus::BlockedPrivateOrLocal => {
+            return Err(AppError::Invalid(
+                "Private or local network URLs are not permitted.".into(),
+            ));
+        }
+        crate::commands::profiles::HostSsrfStatus::DnsResolutionFailed => {
+            return Err(AppError::Other(format!(
+                "Could not resolve soundtrack host '{host}'. Please check your internet connection."
+            )));
+        }
     }
 
     let path = PathBuf::from(&req.target_path);
@@ -354,11 +362,10 @@ pub async fn start_download(
         };
 
         let response_validator = extract_response_validator(resp.headers());
-        let validator_still_matches = match (&expected_validator, &response_validator) {
-            (Some(exp), Some(actual)) => exp == actual,
-            (Some(_), None) => true,
-            _ => false,
-        };
+        let validator_still_matches = matches!(
+            (&expected_validator, &response_validator),
+            (Some(exp), Some(actual)) if exp == actual
+        );
 
         let verified_range_total = if resp.status() == reqwest::StatusCode::PARTIAL_CONTENT
             && existing_bytes > 0
@@ -580,7 +587,7 @@ async fn fail_download(
     error: &str,
     remove_partial: bool,
 ) {
-    if remove_partial {
+    if remove_partial || preserved_bytes <= 0 {
         remove_staging_files(part_path, meta_path);
     }
     let recorded_bytes = if remove_partial { 0 } else { preserved_bytes.max(0) };
@@ -619,6 +626,7 @@ async fn complete_download(
     local_path: &str,
     total_bytes: i64,
 ) {
+    super::allow_soundtrack_audio_file_in_scope(app, Path::new(local_path));
     if let Some(db) = app.try_state::<Database>() {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let _ = conn.execute(
@@ -663,5 +671,34 @@ pub fn cancel_download(app: &AppHandle, state: &SoundtrackDownloadState, downloa
         let (part_path, meta_path) = get_soundtrack_staging_paths(app, download_id);
         remove_staging_files(&part_path, &meta_path);
         false
+    }
+}
+
+/// Removes orphaned or expired (>6 hours old) `.part` and `.part.json` files from `soundtrack_staging`
+/// so failed/abandoned partial downloads never accumulate in AppData.
+pub fn cleanup_stale_staging_files(app: &AppHandle) {
+    let staging_dir = crate::paths::app_data_dir(app)
+        .unwrap_or_else(|_| std::env::temp_dir().join("nexus-launcher"))
+        .join("soundtrack_staging");
+    let Ok(entries) = fs::read_dir(&staging_dir) else {
+        return;
+    };
+    let max_age = Duration::from_secs(6 * 3600);
+    for entry in entries.flatten() {
+        let p = entry.path();
+        let is_expired = entry
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|mtime| mtime.elapsed().ok())
+            .map(|age| age > max_age)
+            .unwrap_or(true);
+        let is_empty = entry
+            .metadata()
+            .map(|m| m.len() == 0)
+            .unwrap_or(false);
+        if is_expired || is_empty {
+            let _ = fs::remove_file(&p);
+        }
     }
 }

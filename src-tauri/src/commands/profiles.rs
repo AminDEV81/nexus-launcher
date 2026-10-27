@@ -954,9 +954,36 @@ pub(crate) fn is_blocked_host_literal(host: &str) -> bool {
     false
 }
 
-pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HostSsrfStatus {
+    Allowed,
+    BlockedPrivateOrLocal,
+    DnsResolutionFailed,
+}
+
+type DnsSafetyMap = std::collections::HashMap<String, (bool, std::time::Instant)>;
+
+fn dns_safety_cache() -> &'static std::sync::Mutex<DnsSafetyMap> {
+    static DNS_SAFETY_CACHE: std::sync::OnceLock<std::sync::Mutex<DnsSafetyMap>> =
+        std::sync::OnceLock::new();
+    DNS_SAFETY_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+#[cfg(test)]
+pub(crate) fn seed_dns_cache_for_test(host: &str, blocked: bool) {
+    if let Ok(mut guard) = dns_safety_cache().lock() {
+        guard.insert(
+            host.trim().to_ascii_lowercase(),
+            (blocked, std::time::Instant::now()),
+        );
+    }
+}
+
+/// Checks a hostname against literal private/local rules AND resolves DNS with a 15-second TTL cache
+/// and a bounded 2.5s timeout so slow DNS servers never stall redirect callbacks or return misleading SSRF messages when offline.
+pub(crate) fn check_host_ssrf(host: &str) -> HostSsrfStatus {
     if is_blocked_host_literal(host) {
-        return true;
+        return HostSsrfStatus::BlockedPrivateOrLocal;
     }
     let lower = host
         .trim()
@@ -964,34 +991,41 @@ pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
         .trim_end_matches('.')
         .to_ascii_lowercase();
 
-    // Short 15-second TTL DNS cache: only caches successful DNS resolutions (never caches DNS errors as safe)
-    // and re-resolves every 15s to defend against DNS rebinding.
     const DNS_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(15);
-    static DNS_SAFETY_CACHE: std::sync::OnceLock<
-        std::sync::Mutex<std::collections::HashMap<String, (bool, std::time::Instant)>>,
-    > = std::sync::OnceLock::new();
-    let cache = DNS_SAFETY_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    let cache = dns_safety_cache();
     let now = std::time::Instant::now();
     if let Ok(guard) = cache.lock() {
         if let Some(&(blocked, resolved_at)) = guard.get(&lower) {
             if now.duration_since(resolved_at) < DNS_CACHE_TTL {
-                return blocked;
+                return if blocked {
+                    HostSsrfStatus::BlockedPrivateOrLocal
+                } else {
+                    HostSsrfStatus::Allowed
+                };
             }
         }
     }
 
-    // Resolve hostname via system DNS: fail-closed (block) if DNS fails or returns any private/local IP!
-    use std::net::ToSocketAddrs;
-    let Ok(addrs) = (lower.as_str(), 80u16).to_socket_addrs() else {
-        // Fail-closed on DNS resolution failure; do NOT cache transient DNS failures
-        return true;
-    };
-    let resolved_ips: Vec<std::net::IpAddr> = addrs.map(|s| s.ip()).collect();
-    if resolved_ips.is_empty() {
-        return true;
-    }
-    let blocked = resolved_ips.into_iter().any(is_blocked_ip);
+    // Resolve hostname on a bounded timeout channel so slow DNS never hangs redirect callbacks
+    let host_for_dns = lower.clone();
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        use std::net::ToSocketAddrs;
+        let res = (host_for_dns.as_str(), 80u16)
+            .to_socket_addrs()
+            .map(|iter| iter.map(|s| s.ip()).collect::<Vec<_>>());
+        let _ = tx.send(res);
+    });
 
+    let Ok(Ok(resolved_ips)) = rx.recv_timeout(std::time::Duration::from_millis(2500)) else {
+        // Fail-closed on DNS failure/timeout, with a distinct status so callers report a network/DNS message
+        return HostSsrfStatus::DnsResolutionFailed;
+    };
+    if resolved_ips.is_empty() {
+        return HostSsrfStatus::DnsResolutionFailed;
+    }
+
+    let blocked = resolved_ips.into_iter().any(is_blocked_ip);
     if let Ok(mut guard) = cache.lock() {
         if guard.len() > 256 {
             guard.retain(|_, (_, ts)| now.duration_since(*ts) < DNS_CACHE_TTL);
@@ -1001,7 +1035,16 @@ pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
         }
         guard.insert(lower, (blocked, now));
     }
-    blocked
+
+    if blocked {
+        HostSsrfStatus::BlockedPrivateOrLocal
+    } else {
+        HostSsrfStatus::Allowed
+    }
+}
+
+pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
+    !matches!(check_host_ssrf(host), HostSsrfStatus::Allowed)
 }
 
 pub(crate) fn safe_ssrf_redirect_policy() -> reqwest::redirect::Policy {
@@ -1016,11 +1059,15 @@ pub(crate) fn safe_ssrf_redirect_policy() -> reqwest::redirect::Policy {
         let Some(host) = url.host_str() else {
             return attempt.error("redirect URL missing host");
         };
-        // Enforce full literal + DNS IP resolution check on every redirect hop
-        if is_blocked_host_or_ip(host) {
-            return attempt.error("redirect to private or local network address blocked");
+        match check_host_ssrf(host) {
+            HostSsrfStatus::Allowed => attempt.follow(),
+            HostSsrfStatus::BlockedPrivateOrLocal => {
+                attempt.error("redirect to private or local network address blocked")
+            }
+            HostSsrfStatus::DnsResolutionFailed => {
+                attempt.error("redirect target hostname could not be resolved (DNS/network error)")
+            }
         }
-        attempt.follow()
     })
 }
 
@@ -1033,10 +1080,15 @@ fn validate_avatar_url(raw_url: &str) -> Result<reqwest::Url, String> {
     let host = parsed
         .host_str()
         .ok_or_else(|| "Avatar URL is missing a host.".to_string())?;
-    if is_blocked_host_or_ip(host) {
-        return Err("Private or local network URLs are not permitted.".into());
+    match check_host_ssrf(host) {
+        HostSsrfStatus::Allowed => Ok(parsed),
+        HostSsrfStatus::BlockedPrivateOrLocal => {
+            Err("Private or local network URLs are not permitted.".into())
+        }
+        HostSsrfStatus::DnsResolutionFailed => {
+            Err(format!("Could not resolve host '{host}'. Please check your internet connection."))
+        }
     }
-    Ok(parsed)
 }
 
 fn sanitize_avatar_mime(raw: &str) -> &'static str {
@@ -1273,7 +1325,8 @@ mod tests {
 
     #[test]
     fn test_validate_avatar_url_blocks_ssrf_and_allows_public_https() {
-        assert!(validate_avatar_url("https://1.1.1.1/igdb/image/upload/t_thumb/abc.jpg").is_ok());
+        seed_dns_cache_for_test("images.igdb.com", false);
+        assert!(validate_avatar_url("https://images.igdb.com/igdb/image/upload/t_thumb/abc.jpg").is_ok());
         assert!(validate_avatar_url("http://127.0.0.1:8080/secret").is_err());
         assert!(validate_avatar_url("http://localhost:3000/avatar.png").is_err());
         assert!(validate_avatar_url("http://169.254.169.254/latest/meta-data").is_err());

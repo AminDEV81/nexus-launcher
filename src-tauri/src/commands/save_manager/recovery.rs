@@ -1,6 +1,6 @@
 use crate::commands::save_manager::error::SaveResult;
 use crate::commands::save_manager::fs_ops::{
-    calculate_tree_hash, expand_save_path, get_nexus_profiles_root, remove_path_all_with_retry,
+    calculate_tree_hash, expand_save_path, remove_path_all_with_retry,
 };
 use crate::commands::save_manager::journal::JournalManager;
 use crate::commands::save_manager::transaction::TransactionCoordinator;

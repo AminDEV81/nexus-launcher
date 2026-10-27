@@ -7,6 +7,19 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 ENVIRONMENT = "production"
 API_VERSION = "v1"
+RATE_LIMIT_PER_MINUTE = "60"
+SEARCH_RATE_LIMIT_PER_MINUTE = "30"
+
+# Cloudflare Workers distributed Rate Limiting bindings (enforced across PoPs/isolates)
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }
+
+[[ratelimits]]
+name = "SEARCH_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 30, period = 60 }
 
 # Secrets required via `wrangler secret put <NAME>`:
 # - IGDB_CLIENT_ID

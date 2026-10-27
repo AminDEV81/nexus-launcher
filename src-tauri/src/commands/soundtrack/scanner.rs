@@ -131,6 +131,7 @@ pub fn scan_directories(
                 scanned_at: chrono::Utc::now().to_rfc3339(),
             };
 
+            super::allow_soundtrack_audio_file_in_scope(&app, path);
             found_files.push(local_file);
         }
     }

@@ -277,12 +277,15 @@ pub(crate) fn validate_download_url(url: &str) -> AppResult<()> {
     let host = parsed
         .host_str()
         .ok_or_else(|| AppError::Invalid("download URL is missing a host".into()))?;
-    if crate::commands::profiles::is_blocked_host_or_ip(host) {
-        return Err(AppError::Invalid(
+    match crate::commands::profiles::check_host_ssrf(host) {
+        crate::commands::profiles::HostSsrfStatus::Allowed => Ok(()),
+        crate::commands::profiles::HostSsrfStatus::BlockedPrivateOrLocal => Err(AppError::Invalid(
             "private or local network download URLs are not permitted".into(),
-        ));
+        )),
+        crate::commands::profiles::HostSsrfStatus::DnsResolutionFailed => Err(AppError::Other(
+            format!("could not resolve download host '{host}' (check your internet connection)"),
+        )),
     }
-    Ok(())
 }
 
 /// Ensures `file_path` is a regular file path located directly inside `save_path`

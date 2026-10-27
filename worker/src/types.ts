@@ -12,6 +12,7 @@ export interface Env {
   SEARCH_RATE_LIMIT_PER_MINUTE?: string
   NEXUS_CACHE?: KVNamespace
   RATE_LIMITER?: RateLimiterBinding
+  SEARCH_RATE_LIMITER?: RateLimiterBinding
 }
 
 export interface ApiResponse<T> {
