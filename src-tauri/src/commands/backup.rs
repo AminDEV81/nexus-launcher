@@ -311,13 +311,31 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
                         "backup contains a game row without an id or name.".into(),
                     ));
                 }
-                // Strip arbitrary shell hooks and executable paths from backup files to prevent RCE on Play
+                // Strip arbitrary shell hooks from backup files to prevent RCE on Play
                 game.insert("pre_launch_command".to_string(), Value::Null);
                 game.insert("post_launch_command".to_string(), Value::Null);
-                if game.get("executable_path").is_some_and(|v| !v.is_null()) {
-                    game.insert("executable_path".to_string(), Value::Null);
-                    if game.get("source").and_then(Value::as_str) != Some("steam") {
-                        game.insert("is_installed".to_string(), Value::Number(0.into()));
+                if let Some(exe_str) = game.get("executable_path").and_then(Value::as_str) {
+                    let inst_str = game.get("install_path").and_then(Value::as_str).unwrap_or("");
+                    let exe_path = std::path::Path::new(exe_str.trim());
+                    let is_valid_local_exe = exe_path.is_absolute()
+                        && !exe_path.components().any(|c| matches!(c, std::path::Component::ParentDir))
+                        && exe_path
+                            .extension()
+                            .and_then(|e| e.to_str())
+                            .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
+                        && exe_path.is_file()
+                        && crate::commands::download::is_safe_download_save_path(
+                            if !inst_str.trim().is_empty() {
+                                inst_str
+                            } else {
+                                exe_path.parent().and_then(|p| p.to_str()).unwrap_or("")
+                            },
+                        );
+                    if !is_valid_local_exe {
+                        game.insert("executable_path".to_string(), Value::Null);
+                        if game.get("source").and_then(Value::as_str) != Some("steam") {
+                            game.insert("is_installed".to_string(), Value::Number(0.into()));
+                        }
                     }
                 }
             }
@@ -345,6 +363,11 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
                     }
                 }
                 let sp = dl.get("save_path").and_then(Value::as_str).unwrap_or("");
+                if !sp.is_empty() && !crate::commands::download::is_safe_download_save_path(sp) {
+                    return Err(AppError::Invalid(format!(
+                        "backup contains an unsafe download save_path '{sp}'"
+                    )));
+                }
                 let fp = dl.get("file_path").and_then(Value::as_str).unwrap_or("");
                 if !fp.is_empty() && !crate::commands::download::is_safe_download_file_path(fp, sp) {
                     dl.insert("file_path".to_string(), Value::Null);

@@ -50,7 +50,8 @@ impl Database {
             "DELETE FROM save_operation_locations WHERE location_id NOT IN (SELECT id FROM game_save_locations) OR operation_id NOT IN (SELECT id FROM save_operations);
              DELETE FROM collection_games WHERE game_id NOT IN (SELECT id FROM games) OR collection_id NOT IN (SELECT id FROM collections);
              DELETE FROM game_tags WHERE game_id NOT IN (SELECT id FROM games) OR tag_id NOT IN (SELECT id FROM tags);
-             DELETE FROM artwork_cache WHERE game_id NOT IN (SELECT id FROM games);",
+             DELETE FROM artwork_cache WHERE game_id NOT IN (SELECT id FROM games);
+             DELETE FROM playtime_sessions WHERE COALESCE(duration_seconds, 0) <= 0;",
         );
 
         if let Ok(mut fk_stmt) = connection.prepare("PRAGMA foreign_key_check") {

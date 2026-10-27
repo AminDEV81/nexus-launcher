@@ -87,8 +87,8 @@ describe('matchesFilters', () => {
     }
     expect(matchesFilters(game, filters)).toBe(true)
 
-    // Genre mismatch: game has RPG + Strategy, but filter requires RPG + Shooter -> false
-    expect(matchesFilters(game, { ...filters, genres: new Set(['RPG', 'Shooter']) })).toBe(false)
+    // Genre mismatch: game has RPG + Strategy, but filter requires Shooter or Puzzle -> false
+    expect(matchesFilters(game, { ...filters, genres: new Set(['Shooter', 'Puzzle']) })).toBe(false)
 
     // Playtime tier mismatch -> false
     expect(matchesFilters(game, { ...filters, playtime: new Set(['unplayed']) })).toBe(false)

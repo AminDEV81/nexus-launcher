@@ -347,9 +347,12 @@ export class AudiusProvider extends BaseSoundtrackProvider {
 
       const matched = items.find((item) => {
         const lower = item.title.toLowerCase()
-        if (trackWords.length === 0 || gameWords.length === 0) return false
+        if (trackWords.length === 0) return false
         const allTrackWordsMatch = trackWords.every((w) => lower.includes(w))
-        const someGameWordsMatch = gameWords.some((gw) => lower.includes(gw))
+        const someGameWordsMatch =
+          gameWords.length === 0 ||
+          gameWords.some((gw) => lower.includes(gw)) ||
+          trackWords.length >= 2
         return allTrackWordsMatch && someGameWordsMatch
       })
 

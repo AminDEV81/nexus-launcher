@@ -115,14 +115,20 @@ export async function fetchFeed(
     case 'top_rated':
       query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date < ${now} & first_release_date > ${threeYearsAgo} & total_rating_count > 75; sort total_rating_count desc; limit 24; offset ${safeOffset};`
       break
-    case 'recommended':
-      if (genresParam && genresParam.trim()) {
-        const cleanGenres = genresParam.replace(/[^0-9,]/g, '')
-        query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & genres = (${cleanGenres}) & first_release_date < ${now} & total_rating_count > 30; sort total_rating_count desc; limit 24; offset ${safeOffset};`
+    case 'recommended': {
+      const validGenres = genresParam
+        ? genresParam
+            .split(',')
+            .map((s) => Number.parseInt(s.trim(), 10))
+            .filter((n) => Number.isInteger(n) && n > 0)
+        : []
+      if (validGenres.length > 0) {
+        query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & genres = (${validGenres.join(',')}) & first_release_date < ${now} & total_rating_count > 30; sort total_rating_count desc; limit 24; offset ${safeOffset};`
       } else {
         query = `${FIELDS_LIST}; where game_type = ${STANDALONE_TYPES} & cover != null & first_release_date < ${now} & total_rating_count > 60; sort total_rating_count desc; limit 24; offset ${safeOffset};`
       }
       break
+    }
     default:
       throw new Error(`INVALID_FEED: Unknown feed ${feed}`)
   }

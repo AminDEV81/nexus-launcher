@@ -837,7 +837,7 @@ async fn track_session(
         let elapsed = (active_elapsed_ms / 1000) as i64;
         if elapsed - checkpointed_seconds >= 30 {
             let delta = elapsed - checkpointed_seconds;
-            if checkpoint_session(&app, &session_id, &game_id, Utc::now(), elapsed, delta) {
+            if checkpoint_session(&app, &session_id, &game_id, &session_profile_id, started_at, Utc::now(), elapsed, delta) {
                 checkpointed_seconds = elapsed;
             }
         }
@@ -1050,44 +1050,47 @@ fn finish_without_session(app: &AppHandle, game_id: &str) {
 
 fn init_session_row(
     app: &AppHandle,
-    session_id: &str,
+    _session_id: &str,
     game_id: &str,
-    profile_id: &str,
+    _profile_id: &str,
     started_at: DateTime<Utc>,
 ) {
+    // Only update `last_played_at` on launch; do not insert a 0-second row into `playtime_sessions`
+    // before the first checkpoint/exit so a crash in the first 30s never leaves a 0s orphan row.
     let db = app.state::<Database>();
     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     let started_iso = started_at.to_rfc3339();
-    let _ = conn.execute(
-        "INSERT OR IGNORE INTO playtime_sessions (id, game_id, profile_id, started_at, ended_at, duration_seconds)
-         VALUES (?1, ?2, ?3, ?4, ?5, 0)",
-        params![session_id, game_id, profile_id, &started_iso, &started_iso],
-    );
     let _ = conn.execute(
         "UPDATE games SET last_played_at = ?1 WHERE id = ?2",
         params![&started_iso, game_id],
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn checkpoint_session(
     app: &AppHandle,
     session_id: &str,
     game_id: &str,
+    profile_id: &str,
+    started_at: DateTime<Utc>,
     now: DateTime<Utc>,
     total_session_seconds: i64,
     delta_seconds: i64,
 ) -> bool {
-    if delta_seconds <= 0 {
+    if delta_seconds <= 0 || total_session_seconds <= 0 {
         return true;
     }
     let db = app.state::<Database>();
     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
+    let started_iso = started_at.to_rfc3339();
     let now_iso = now.to_rfc3339();
     let res = (|| -> rusqlite::Result<()> {
         let tx = conn.unchecked_transaction()?;
         tx.execute(
-            "UPDATE playtime_sessions SET ended_at = ?1, duration_seconds = ?2 WHERE id = ?3",
-            params![&now_iso, total_session_seconds, session_id],
+            "INSERT INTO playtime_sessions (id, game_id, profile_id, started_at, ended_at, duration_seconds)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(id) DO UPDATE SET ended_at = excluded.ended_at, duration_seconds = excluded.duration_seconds",
+            params![session_id, game_id, profile_id, &started_iso, &now_iso, total_session_seconds],
         )?;
         tx.execute(
             "UPDATE games SET total_playtime_seconds = total_playtime_seconds + ?1, last_played_at = ?2 WHERE id = ?3",
@@ -1109,6 +1112,9 @@ fn record_session(
     duration_seconds: i64,
     remaining_delta: i64,
 ) {
+    if duration_seconds <= 0 {
+        return;
+    }
     let db = app.state::<Database>();
     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
@@ -1301,7 +1307,7 @@ async fn track_external_session(
         let elapsed = (active_elapsed_ms / 1000) as i64;
         if elapsed - checkpointed_seconds >= 30 {
             let delta = elapsed - checkpointed_seconds;
-            if checkpoint_session(&app, &session_id, &game_id, Utc::now(), elapsed, delta) {
+            if checkpoint_session(&app, &session_id, &game_id, &session_profile_id, started_at, Utc::now(), elapsed, delta) {
                 checkpointed_seconds = elapsed;
             }
         }

@@ -347,7 +347,13 @@ export abstract class BaseSoundtrackProvider implements SoundtrackProvider {
     } catch {
       const res = await this.fetchWithTimeout(url, { headers }, timeoutMs)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return await res.text()
+      if (typeof res.text === 'function') {
+        return await res.text()
+      }
+      if (typeof res.json === 'function') {
+        return JSON.stringify(await res.json())
+      }
+      throw new Error('Invalid response body')
     }
   }
 

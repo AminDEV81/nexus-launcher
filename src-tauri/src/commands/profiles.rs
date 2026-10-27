@@ -920,7 +920,9 @@ pub(crate) fn is_blocked_ip(ip: std::net::IpAddr) -> bool {
     }
 }
 
-pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
+/// Fast, non-blocking check for literal IPs, localhost/local-network domains,
+/// and numeric/hex/octal IPv4 encodings (zero DNS I/O, safe inside sync callbacks and redirect policies).
+pub(crate) fn is_blocked_host_literal(host: &str) -> bool {
     let lower = host
         .trim()
         .trim_matches(['[', ']'])
@@ -934,6 +936,11 @@ pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
         || lower.ends_with(".lan")
         || lower.ends_with(".home")
         || lower.ends_with(".arpa")
+        || lower.ends_with(".nip.io")
+        || lower.ends_with(".sslip.io")
+        || lower.ends_with(".xip.io")
+        || lower.ends_with(".localtest.me")
+        || lower.ends_with(".lvh.me")
     {
         return true;
     }
@@ -944,16 +951,47 @@ pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
     if lower.chars().all(|c| c.is_ascii_digit() || c == '.' || c == 'x' || c == 'X') {
         return true;
     }
+    false
+}
+
+pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
+    if is_blocked_host_literal(host) {
+        return true;
+    }
+    let lower = host
+        .trim()
+        .trim_matches(['[', ']'])
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+
+    // Cache DNS resolution results so repeated checks never stall on OS resolver timeouts
+    static DNS_SAFETY_CACHE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, bool>>> =
+        std::sync::OnceLock::new();
+    let cache = DNS_SAFETY_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    if let Ok(guard) = cache.lock() {
+        if let Some(&blocked) = guard.get(&lower) {
+            return blocked;
+        }
+    }
+
     // Resolve hostname via system DNS and block if any resolved IP is private/local
     use std::net::ToSocketAddrs;
+    let mut blocked = false;
     if let Ok(addrs) = (lower.as_str(), 80u16).to_socket_addrs() {
         for sock in addrs {
             if is_blocked_ip(sock.ip()) {
-                return true;
+                blocked = true;
+                break;
             }
         }
     }
-    false
+    if let Ok(mut guard) = cache.lock() {
+        if guard.len() > 512 {
+            guard.clear();
+        }
+        guard.insert(lower, blocked);
+    }
+    blocked
 }
 
 pub(crate) fn safe_ssrf_redirect_policy() -> reqwest::redirect::Policy {
@@ -968,7 +1006,8 @@ pub(crate) fn safe_ssrf_redirect_policy() -> reqwest::redirect::Policy {
         let Some(host) = url.host_str() else {
             return attempt.error("redirect URL missing host");
         };
-        if is_blocked_host_or_ip(host) {
+        // Use non-blocking literal + cached DNS check inside reqwest's synchronous redirect callback
+        if is_blocked_host_literal(host) {
             return attempt.error("redirect to private or local network address blocked");
         }
         attempt.follow()

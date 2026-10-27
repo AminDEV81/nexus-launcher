@@ -451,8 +451,52 @@ fn normalize_for_guard(p: &Path) -> String {
         .to_lowercase()
 }
 
+/// Resolves symlinks/junctions on any existing ancestor of `path` and strips the Windows `\\?\` verbatim prefix.
+fn resolve_real_path_preserving_tail(path: &Path) -> PathBuf {
+    let mut cur = path;
+    let mut tail: Vec<std::ffi::OsString> = Vec::new();
+    while !cur.exists() {
+        if let Some(name) = cur.file_name() {
+            tail.push(name.to_os_string());
+        } else {
+            break;
+        }
+        if let Some(parent) = cur.parent() {
+            if parent == cur {
+                break;
+            }
+            cur = parent;
+        } else {
+            break;
+        }
+    }
+
+    let mut base = if cur.exists() {
+        std::fs::canonicalize(cur).unwrap_or_else(|_| cur.to_path_buf())
+    } else {
+        path.to_path_buf()
+    };
+
+    // Strip Windows extended-length `\\?\` prefix if canonicalize added it
+    let base_str = base.to_string_lossy().to_string();
+    if let Some(stripped) = base_str.strip_prefix("\\\\?\\UNC\\") {
+        base = PathBuf::from(format!("\\\\{stripped}"));
+    } else if let Some(stripped) = base_str.strip_prefix("\\\\?\\") {
+        base = PathBuf::from(stripped);
+    }
+
+    if cur.exists() {
+        for comp in tail.into_iter().rev() {
+            base.push(comp);
+        }
+    }
+    base
+}
+
 /// Validates that a candidate save location path is not a drive root, user home root,
-/// system directory, or top-level user shell folder (Documents, AppData, Saved Games root, Desktop, Downloads).
+/// system directory, top-level user shell folder (Documents, Documents\My Games, AppData,
+/// AppData\Local, AppData\Roaming, AppData\LocalLow, Saved Games root, Desktop, Downloads),
+/// or an ancestor/parent of any protected directory. Also resolves symlinks/junctions on existing ancestors.
 pub fn validate_safe_save_location_path(raw: &str) -> Result<PathBuf, String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
@@ -468,7 +512,9 @@ pub fn validate_safe_save_location_path(raw: &str) -> Result<PathBuf, String> {
         }
     }
 
-    let normal_count = expanded
+    let resolved = resolve_real_path_preserving_tail(&expanded);
+
+    let normal_count = resolved
         .components()
         .filter(|c| matches!(c, std::path::Component::Normal(_)))
         .count();
@@ -479,21 +525,29 @@ pub fn validate_safe_save_location_path(raw: &str) -> Result<PathBuf, String> {
         );
     }
 
-    let norm = normalize_for_guard(&expanded);
+    let norm = normalize_for_guard(&resolved);
     let profiles_root_norm = normalize_for_guard(&get_nexus_profiles_root());
-    if norm == profiles_root_norm || norm.starts_with(&format!("{profiles_root_norm}\\")) {
-        return Err("Nexus internal profile storage cannot be configured as an OS save path.".into());
+    if norm == profiles_root_norm
+        || norm.starts_with(&format!("{profiles_root_norm}\\"))
+        || profiles_root_norm.starts_with(&format!("{norm}\\"))
+    {
+        return Err("Nexus internal profile storage (or its parent directory) cannot be configured as an OS save path.".into());
     }
 
-    let mut protected_exact: Vec<String> = vec![
-        "c:".into(),
-        "c:\\users".into(),
-        "c:\\Users\\public".to_lowercase(),
-        "c:\\users\\public\\documents".into(),
-        "c:\\programdata".into(),
-        "c:\\windows".into(),
-        "c:\\program files".into(),
-        "c:\\program files (x86)".into(),
+    let sys_drive = std::env::var("SystemDrive")
+        .unwrap_or_else(|_| "C:".to_string())
+        .trim_end_matches('\\')
+        .to_lowercase();
+
+    let mut protected_dirs: Vec<String> = vec![
+        sys_drive.clone(),
+        format!("{sys_drive}\\users"),
+        format!("{sys_drive}\\users\\public"),
+        format!("{sys_drive}\\users\\public\\documents"),
+        format!("{sys_drive}\\programdata"),
+        format!("{sys_drive}\\windows"),
+        format!("{sys_drive}\\program files"),
+        format!("{sys_drive}\\program files (x86)"),
         "/".into(),
         "/home".into(),
         "/users".into(),
@@ -503,15 +557,34 @@ pub fn validate_safe_save_location_path(raw: &str) -> Result<PathBuf, String> {
         "/var".into(),
         "/bin".into(),
         "/sbin".into(),
+        "/lib".into(),
     ];
 
+    for env_key in ["WINDIR", "SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData", "PUBLIC", "APPDATA", "LOCALAPPDATA", "USERPROFILE"] {
+        if let Ok(val) = std::env::var(env_key) {
+            let p = PathBuf::from(val.trim());
+            if p.is_absolute() {
+                protected_dirs.push(normalize_for_guard(&p));
+            }
+        }
+    }
+
     if let Some(home) = dirs::home_dir() {
-        protected_exact.push(normalize_for_guard(&home));
-        protected_exact.push(normalize_for_guard(&home.join("Saved Games")));
-        protected_exact.push(normalize_for_guard(&home.join("OneDrive")));
+        protected_dirs.push(normalize_for_guard(&home));
+        protected_dirs.push(normalize_for_guard(&home.join("AppData")));
+        protected_dirs.push(normalize_for_guard(&home.join("AppData").join("Local")));
+        protected_dirs.push(normalize_for_guard(&home.join("AppData").join("Roaming")));
+        protected_dirs.push(normalize_for_guard(&home.join("AppData").join("LocalLow")));
+        protected_dirs.push(normalize_for_guard(&home.join("Saved Games")));
+        protected_dirs.push(normalize_for_guard(&home.join("OneDrive")));
+        protected_dirs.push(normalize_for_guard(&home.join("Documents")));
+        protected_dirs.push(normalize_for_guard(&home.join("Documents").join("My Games")));
+    }
+    if let Some(doc_dir) = dirs::document_dir() {
+        protected_dirs.push(normalize_for_guard(&doc_dir));
+        protected_dirs.push(normalize_for_guard(&doc_dir.join("My Games")));
     }
     for dir_opt in [
-        dirs::document_dir(),
         dirs::config_dir(),
         dirs::data_local_dir(),
         dirs::desktop_dir(),
@@ -523,23 +596,44 @@ pub fn validate_safe_save_location_path(raw: &str) -> Result<PathBuf, String> {
     .into_iter()
     .flatten()
     {
-        protected_exact.push(normalize_for_guard(&dir_opt));
+        protected_dirs.push(normalize_for_guard(&dir_opt));
     }
 
-    if protected_exact.iter().any(|p| p == &norm) {
+    // Reject if `norm` IS a protected directory OR is a parent/ancestor of ANY protected directory!
+    let norm_with_sep = format!("{norm}\\");
+    if protected_dirs
+        .iter()
+        .any(|p| p == &norm || p.starts_with(&norm_with_sep))
+    {
         return Err(format!(
-            "Refusing to use top-level system or user directory '{}' as a save folder; please select a game-specific subfolder.",
-            expanded.display()
+            "Refusing to use top-level or parent user/system directory '{}' as a save folder; please select a game-specific subfolder.",
+            resolved.display()
         ));
     }
 
-    for sys_prefix in ["c:\\windows\\", "c:\\program files\\system32\\", "/etc/", "/usr/", "/bin/", "/sbin/"] {
+    // Reject any path inside OS system binary directories on any drive
+    let mut sys_prefixes = vec![
+        format!("{sys_drive}\\windows\\"),
+        format!("{sys_drive}\\program files\\windowsapps\\"),
+        "/etc/".to_string(),
+        "/usr/".to_string(),
+        "/bin/".to_string(),
+        "/sbin/".to_string(),
+        "/lib/".to_string(),
+    ];
+    if let Ok(windir) = std::env::var("WINDIR") {
+        let wn = normalize_for_guard(Path::new(&windir));
+        if !wn.is_empty() {
+            sys_prefixes.push(format!("{wn}\\"));
+        }
+    }
+    for sys_prefix in &sys_prefixes {
         if norm.starts_with(sys_prefix) {
             return Err("System operating directories cannot be used as game save paths.".into());
         }
     }
 
-    Ok(expanded)
+    Ok(resolved)
 }
 
 pub fn safe_replace_dir(

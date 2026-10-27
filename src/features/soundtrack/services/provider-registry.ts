@@ -102,6 +102,10 @@ export class SoundtrackProviderRegistry {
     }
   }
 
+  public getMetadataProviders(): SoundtrackProvider[] {
+    return this.getProvidersForCapability('metadata')
+  }
+
   public getProvidersForCapability(capability: keyof ProviderCapabilities): SoundtrackProvider[] {
     return this.getEnabledProviders()
       .filter((p) => p.capabilities[capability])

@@ -287,17 +287,94 @@ pub(crate) fn validate_download_url(url: &str) -> AppResult<()> {
 
 /// Ensures `file_path` is a regular file path located directly inside `save_path`
 /// (with no `..` traversal segments and never pointing to a root or protected OS directory).
+/// Validates that a download `save_path` is an absolute, non-root, non-system directory
+/// (never a drive root `C:\`, `C:\Windows`, `System32`, `Program Files`, or user profile root).
+pub(crate) fn is_safe_download_save_path(save_path: &str) -> bool {
+    let sp_trimmed = save_path.trim();
+    if sp_trimmed.is_empty() {
+        return false;
+    }
+    let sp = std::path::Path::new(sp_trimmed);
+    if !sp.is_absolute()
+        || sp
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir | std::path::Component::CurDir))
+    {
+        return false;
+    }
+    let normal_count = sp
+        .components()
+        .filter(|c| matches!(c, std::path::Component::Normal(_)))
+        .count();
+    if normal_count < 1 {
+        return false;
+    }
+    let norm_sp = sp_trimmed
+        .replace('/', "\\")
+        .trim_end_matches('\\')
+        .to_lowercase();
+    if norm_sp.len() < 4 {
+        return false;
+    }
+    let blocked_exact = [
+        "c:",
+        "c:\\users",
+        "c:\\windows",
+        "c:\\program files",
+        "c:\\program files (x86)",
+        "c:\\programdata",
+        "/",
+        "/etc",
+        "/usr",
+        "/bin",
+        "/sbin",
+        "/var",
+        "/root",
+        "/home",
+    ];
+    if blocked_exact.contains(&norm_sp.as_str()) {
+        return false;
+    }
+    for sys_prefix in [
+        "c:\\windows\\",
+        "c:\\program files\\",
+        "c:\\program files (x86)\\",
+        "/etc/",
+        "/usr/",
+        "/bin/",
+        "/sbin/",
+    ] {
+        if norm_sp.starts_with(sys_prefix) {
+            return false;
+        }
+    }
+    if let Some(home) = dirs::home_dir() {
+        let home_norm = home
+            .to_string_lossy()
+            .replace('/', "\\")
+            .trim_end_matches('\\')
+            .to_lowercase();
+        let appdata_norm = format!("{home_norm}\\appdata");
+        if norm_sp == home_norm || norm_sp == appdata_norm {
+            return false;
+        }
+    }
+    true
+}
+
+/// Ensures `file_path` is a regular file path located directly inside a validated `save_path`
+/// (with no `..` traversal segments and never pointing to a root or protected OS directory).
 pub(crate) fn is_safe_download_file_path(file_path: &str, save_path: &str) -> bool {
+    if !is_safe_download_save_path(save_path) {
+        return false;
+    }
     let fp_trimmed = file_path.trim();
     let sp_trimmed = save_path.trim();
     if fp_trimmed.is_empty() || sp_trimmed.is_empty() {
         return false;
     }
     let fp = std::path::Path::new(fp_trimmed);
-    let sp = std::path::Path::new(sp_trimmed);
-    if fp.components().any(|c| matches!(c, std::path::Component::ParentDir))
-        || sp.components().any(|c| matches!(c, std::path::Component::ParentDir))
-    {
+    if fp.components().any(|c| matches!(c, std::path::Component::ParentDir | std::path::Component::CurDir)) {
         return false;
     }
     if fp.file_name().is_none() {
@@ -1367,11 +1444,13 @@ fn extract_zip(
             let remaining_budget = MAX_ZIP_TOTAL_BYTES.saturating_sub(cumulative_written);
             let max_this_file = entry.size().min(MAX_ZIP_ENTRY_BYTES).min(remaining_budget);
             let mut bounded_reader = entry.take(max_this_file + 1);
-            let mut out = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&entry_path)
-                .or_else(|_| std::fs::File::create(&entry_path))
+            if std::fs::symlink_metadata(&entry_path)
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false)
+            {
+                return Err(format!("refusing to overwrite symlink at {entry_path:?}"));
+            }
+            let mut out = std::fs::File::create(&entry_path)
                 .map_err(|e| format!("cannot write {entry_path:?}: {e}"))?;
             let written = std::io::copy(&mut bounded_reader, &mut out)
                 .map_err(|e| format!("cannot extract {entry_path:?}: {e}"))?;
@@ -1754,20 +1833,33 @@ fn start_next_global_queued_download(app: &AppHandle) -> bool {
     }
 
     let db = app.state::<Database>();
-    let Ok(conn) = db.connection.lock() else { return false; };
-
-    let next: Option<(String, String, String, String, Option<String>, Option<String>)> = conn.query_row(
-        "SELECT id, url, COALESCE(file_path, ''), save_path, game_id, chunk_state FROM downloads WHERE status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
-        [],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
-    ).ok();
+    let next: Option<(String, String, String, String, Option<String>, Option<String>)> = {
+        let Ok(conn) = db.connection.lock() else { return false; };
+        conn.query_row(
+            "SELECT id, url, COALESCE(file_path, ''), save_path, game_id, chunk_state FROM downloads WHERE status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
+        ).ok()
+    };
 
     if let Some((next_id, url, stored_path, save_path, gid, saved_chunk_state)) = next {
+        // Validate URL and save_path OUTSIDE the DB Mutex so DNS resolution never blocks SQLite!
         if let Err(err) = validate_download_url(&url) {
-            let _ = conn.execute(
-                "UPDATE downloads SET status = 'failed', error_message = ?1, updated_at = datetime('now') WHERE id = ?2",
-                rusqlite::params![err.to_string(), next_id],
-            );
+            if let Ok(conn) = db.connection.lock() {
+                let _ = conn.execute(
+                    "UPDATE downloads SET status = 'failed', error_message = ?1, updated_at = datetime('now') WHERE id = ?2",
+                    rusqlite::params![err.to_string(), next_id],
+                );
+            }
+            return false;
+        }
+        if !is_safe_download_save_path(&save_path) {
+            if let Ok(conn) = db.connection.lock() {
+                let _ = conn.execute(
+                    "UPDATE downloads SET status = 'failed', error_message = 'Unsafe download save_path blocked', updated_at = datetime('now') WHERE id = ?1",
+                    rusqlite::params![next_id],
+                );
+            }
             return false;
         }
         let file_path = if stored_path.is_empty() || !is_safe_download_file_path(&stored_path, &save_path) {
@@ -1775,10 +1867,13 @@ fn start_next_global_queued_download(app: &AppHandle) -> bool {
         } else {
             stored_path
         };
-        let changed = conn.execute(
-            "UPDATE downloads SET status = 'downloading', file_path = ?1, error_message = NULL, updated_at = datetime('now') WHERE id = ?2 AND status = 'queued'",
-            rusqlite::params![file_path, next_id],
-        ).unwrap_or(0);
+        let changed = {
+            let Ok(conn) = db.connection.lock() else { return false; };
+            conn.execute(
+                "UPDATE downloads SET status = 'downloading', file_path = ?1, error_message = NULL, updated_at = datetime('now') WHERE id = ?2 AND status = 'queued'",
+                rusqlite::params![file_path, next_id],
+            ).unwrap_or(0)
+        };
         if changed == 0 {
             return false;
         }
@@ -1791,28 +1886,41 @@ fn start_next_global_queued_download(app: &AppHandle) -> bool {
 
 fn start_next_sequential_part(app: &AppHandle, game_id: &Option<String>, save_path: &str) -> bool {
     let db = app.state::<Database>();
-    let Ok(conn) = db.connection.lock() else { return false; };
-
-    let next: Option<(String, String, String, String, Option<String>, Option<String>)> = if let Some(gid) = game_id {
-        conn.query_row(
-            "SELECT id, url, COALESCE(file_path, ''), save_path, game_id, chunk_state FROM downloads WHERE game_id = ?1 AND status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
-            [gid],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
-        ).ok()
-    } else {
-        conn.query_row(
-            "SELECT id, url, COALESCE(file_path, ''), save_path, game_id, chunk_state FROM downloads WHERE save_path = ?1 AND status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
-            [save_path],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
-        ).ok()
+    let next: Option<(String, String, String, String, Option<String>, Option<String>)> = {
+        let Ok(conn) = db.connection.lock() else { return false; };
+        if let Some(gid) = game_id {
+            conn.query_row(
+                "SELECT id, url, COALESCE(file_path, ''), save_path, game_id, chunk_state FROM downloads WHERE game_id = ?1 AND status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
+                [gid],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
+            ).ok()
+        } else {
+            conn.query_row(
+                "SELECT id, url, COALESCE(file_path, ''), save_path, game_id, chunk_state FROM downloads WHERE save_path = ?1 AND status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
+                [save_path],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
+            ).ok()
+        }
     };
 
     if let Some((next_id, url, stored_path, save_path, gid, saved_chunk_state)) = next {
+        // Validate URL and save_path OUTSIDE the DB Mutex so DNS resolution never blocks SQLite!
         if let Err(err) = validate_download_url(&url) {
-            let _ = conn.execute(
-                "UPDATE downloads SET status = 'failed', error_message = ?1, updated_at = datetime('now') WHERE id = ?2",
-                rusqlite::params![err.to_string(), next_id],
-            );
+            if let Ok(conn) = db.connection.lock() {
+                let _ = conn.execute(
+                    "UPDATE downloads SET status = 'failed', error_message = ?1, updated_at = datetime('now') WHERE id = ?2",
+                    rusqlite::params![err.to_string(), next_id],
+                );
+            }
+            return false;
+        }
+        if !is_safe_download_save_path(&save_path) {
+            if let Ok(conn) = db.connection.lock() {
+                let _ = conn.execute(
+                    "UPDATE downloads SET status = 'failed', error_message = 'Unsafe download save_path blocked', updated_at = datetime('now') WHERE id = ?1",
+                    rusqlite::params![next_id],
+                );
+            }
             return false;
         }
         let file_path = if stored_path.is_empty() || !is_safe_download_file_path(&stored_path, &save_path) {
@@ -1820,10 +1928,13 @@ fn start_next_sequential_part(app: &AppHandle, game_id: &Option<String>, save_pa
         } else {
             stored_path
         };
-        let changed = conn.execute(
-            "UPDATE downloads SET status = 'downloading', file_path = ?1, error_message = NULL, updated_at = datetime('now') WHERE id = ?2 AND status = 'queued'",
-            rusqlite::params![file_path, next_id],
-        ).unwrap_or(0);
+        let changed = {
+            let Ok(conn) = db.connection.lock() else { return false; };
+            conn.execute(
+                "UPDATE downloads SET status = 'downloading', file_path = ?1, error_message = NULL, updated_at = datetime('now') WHERE id = ?2 AND status = 'queued'",
+                rusqlite::params![file_path, next_id],
+            ).unwrap_or(0)
+        };
         if changed == 0 {
             return false;
         }

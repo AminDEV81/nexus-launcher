@@ -69,6 +69,24 @@ fn is_within_soundtrack_root(target: &Path, allowed_root: &Path) -> bool {
     norm_target.starts_with(&norm_root) && norm_target[norm_root.len()..].starts_with('\\')
 }
 
+/// Parses `Content-Range: bytes start-end/total` and checks whether `start == expected_start`.
+fn content_range_matches_offset(headers: &reqwest::header::HeaderMap, expected_start: u64) -> Option<u64> {
+    let raw = headers.get(reqwest::header::CONTENT_RANGE)?.to_str().ok()?.trim();
+    let rest = raw.strip_prefix("bytes")?.trim();
+    let (range_part, total_part) = rest.split_once('/')?;
+    let (start_str, end_str) = range_part.trim().split_once('-')?;
+    let start: u64 = start_str.trim().parse().ok()?;
+    let end: u64 = end_str.trim().parse().ok()?;
+    if start != expected_start || end < start {
+        return None;
+    }
+    if let Ok(total) = total_part.trim().parse::<u64>() {
+        Some(total)
+    } else {
+        Some(end + 1)
+    }
+}
+
 pub async fn start_download(
     app: AppHandle,
     db: tauri::State<'_, Database>,
@@ -158,7 +176,12 @@ pub async fn start_download(
         let _ = fs::create_dir_all(parent);
     }
 
-    // Upsert row in soundtrack_downloads
+    let part_path = format!("{}.part", req.target_path);
+    let existing_part_bytes = fs::metadata(&part_path)
+        .map(|m| if m.is_file() { m.len() as i64 } else { 0 })
+        .unwrap_or(0);
+
+    // Upsert row in soundtrack_downloads preserving any existing partial bytes
     {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
@@ -166,9 +189,10 @@ pub async fn start_download(
                 id, track_id, album_id, game_id, url, save_path,
                 total_bytes, downloaded_bytes, status, speed_bps,
                 created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, 0, 'downloading', 0, datetime('now'), datetime('now'))
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, 'downloading', 0, datetime('now'), datetime('now'))
             ON CONFLICT(id) DO UPDATE SET
                 status = 'downloading',
+                downloaded_bytes = ?7,
                 error_message = NULL,
                 updated_at = datetime('now')",
             params![
@@ -177,7 +201,8 @@ pub async fn start_download(
                 req.album_id,
                 req.game_id,
                 req.url,
-                req.target_path
+                req.target_path,
+                existing_part_bytes
             ],
         )?;
     }
@@ -187,6 +212,7 @@ pub async fn start_download(
     let track_id_clone = req.track_id.clone();
     let album_id_clone = req.album_id.clone();
     let target_path_clone = req.target_path.clone();
+    let part_path_clone = part_path;
     let url_clone = req.url.clone();
 
     tokio::spawn(async move {
@@ -196,8 +222,9 @@ pub async fn start_download(
             .build()
             .unwrap_or_default();
 
-        // Check if a partial file exists on disk so we can resume with HTTP Range
-        let existing_bytes = fs::metadata(&target_path_clone)
+        // Check if a `.part` partial file exists on disk so we can resume with HTTP Range
+        // without touching any already-completed file at `target_path_clone`!
+        let existing_bytes = fs::metadata(&part_path_clone)
             .map(|m| if m.is_file() { m.len() } else { 0 })
             .unwrap_or(0);
 
@@ -212,35 +239,89 @@ pub async fn start_download(
         let resp_result = request_builder.send().await;
         let resp = match resp_result {
             Ok(r) if r.status().is_success() => r,
+            Ok(r) if r.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE && existing_bytes > 0 => {
+                // 416 Range Not Satisfiable: the `.part` file is already complete or stale.
+                // Retry once from byte 0 without Range header; if that fails, preserve any existing completed file.
+                let _ = fs::remove_file(&part_path_clone);
+                match client.get(&url_clone).send().await {
+                    Ok(r2) if r2.status().is_success() => r2,
+                    Ok(r2) => {
+                        let err_msg = format!("HTTP {}", r2.status());
+                        fail_download(&app_clone, &download_id_clone, &part_path_clone, 0, &err_msg, false).await;
+                        return;
+                    }
+                    Err(e) => {
+                        let err_msg = e.to_string();
+                        fail_download(&app_clone, &download_id_clone, &part_path_clone, 0, &err_msg, false).await;
+                        return;
+                    }
+                }
+            }
             Ok(r) => {
                 let err_msg = format!("HTTP {}", r.status());
-                fail_download(&app_clone, &download_id_clone, &target_path_clone, &err_msg).await;
+                fail_download(
+                    &app_clone,
+                    &download_id_clone,
+                    &part_path_clone,
+                    existing_bytes as i64,
+                    &err_msg,
+                    false,
+                )
+                .await;
                 return;
             }
             Err(e) => {
                 let err_msg = e.to_string();
-                fail_download(&app_clone, &download_id_clone, &target_path_clone, &err_msg).await;
+                fail_download(
+                    &app_clone,
+                    &download_id_clone,
+                    &part_path_clone,
+                    existing_bytes as i64,
+                    &err_msg,
+                    false,
+                )
+                .await;
                 return;
             }
         };
 
-        let is_partial_content = resp.status().as_u16() == 206 && existing_bytes > 0;
-        let (mut file, mut downloaded_bytes, total_bytes) = if is_partial_content {
-            let content_len = resp.content_length().unwrap_or(0) as i64;
-            let total = (existing_bytes as i64) + content_len;
-            match OpenOptions::new().create(true).append(true).open(&target_path_clone) {
-                Ok(f) => (f, existing_bytes as i64, total),
+        let verified_range_total = if resp.status() == reqwest::StatusCode::PARTIAL_CONTENT && existing_bytes > 0 {
+            content_range_matches_offset(resp.headers(), existing_bytes)
+        } else {
+            None
+        };
+
+        let (mut file, mut downloaded_bytes, total_bytes) = if let Some(total_from_range) = verified_range_total {
+            match OpenOptions::new().create(true).append(true).open(&part_path_clone) {
+                Ok(f) => (f, existing_bytes as i64, total_from_range as i64),
                 Err(e) => {
-                    fail_download(&app_clone, &download_id_clone, &target_path_clone, &format!("File open failed: {e}")).await;
+                    fail_download(
+                        &app_clone,
+                        &download_id_clone,
+                        &part_path_clone,
+                        existing_bytes as i64,
+                        &format!("File open failed: {e}"),
+                        false,
+                    )
+                    .await;
                     return;
                 }
             }
         } else {
+            // Server returned 200 OK or a mismatched Content-Range: truncate `.part` and write from 0
             let total = resp.content_length().unwrap_or(0) as i64;
-            match File::create(&target_path_clone) {
+            match File::create(&part_path_clone) {
                 Ok(f) => (f, 0i64, total),
                 Err(e) => {
-                    fail_download(&app_clone, &download_id_clone, &target_path_clone, &format!("File create failed: {e}")).await;
+                    fail_download(
+                        &app_clone,
+                        &download_id_clone,
+                        &part_path_clone,
+                        0,
+                        &format!("File create failed: {e}"),
+                        false,
+                    )
+                    .await;
                     return;
                 }
             }
@@ -257,7 +338,7 @@ pub async fn start_download(
                     drop(file);
                     let should_delete = task_ref.delete_partial.load(Ordering::SeqCst);
                     let final_status = if should_delete {
-                        let _ = fs::remove_file(&target_path_clone);
+                        let _ = fs::remove_file(&part_path_clone);
                         "cancelled"
                     } else {
                         "paused"
@@ -300,12 +381,26 @@ pub async fn start_download(
                         Some(Ok(chunk)) => {
                             if downloaded_bytes + (chunk.len() as i64) > 250 * 1024 * 1024 {
                                 drop(file);
-                                fail_download(&app_clone, &download_id_clone, &target_path_clone, "Soundtrack file exceeds 250 MB safety limit").await;
+                                fail_download(
+                                    &app_clone,
+                                    &download_id_clone,
+                                    &part_path_clone,
+                                    0,
+                                    "Soundtrack file exceeds 250 MB safety limit",
+                                    true,
+                                ).await;
                                 return;
                             }
                             if let Err(e) = file.write_all(&chunk) {
                                 drop(file);
-                                fail_download(&app_clone, &download_id_clone, &target_path_clone, &format!("Write failed: {e}")).await;
+                                fail_download(
+                                    &app_clone,
+                                    &download_id_clone,
+                                    &part_path_clone,
+                                    downloaded_bytes,
+                                    &format!("Write failed: {e}"),
+                                    false,
+                                ).await;
                                 return;
                             }
                             let len = chunk.len() as i64;
@@ -335,12 +430,35 @@ pub async fn start_download(
                         }
                         Some(Err(e)) => {
                             drop(file);
-                            fail_download(&app_clone, &download_id_clone, &target_path_clone, &format!("Stream error: {e}")).await;
+                            fail_download(
+                                &app_clone,
+                                &download_id_clone,
+                                &part_path_clone,
+                                downloaded_bytes,
+                                &format!("Stream error: {e}"),
+                                false,
+                            ).await;
                             return;
                         }
                         None => {
-                            // Download completed!
+                            // Download completed: flush `.part` and atomically move to `target_path_clone`
                             let _ = file.flush();
+                            drop(file);
+                            if let Err(e) = fs::rename(&part_path_clone, &target_path_clone) {
+                                if fs::copy(&part_path_clone, &target_path_clone).is_ok() {
+                                    let _ = fs::remove_file(&part_path_clone);
+                                } else {
+                                    fail_download(
+                                        &app_clone,
+                                        &download_id_clone,
+                                        &part_path_clone,
+                                        downloaded_bytes,
+                                        &format!("Failed to finalize soundtrack file: {e}"),
+                                        false,
+                                    ).await;
+                                    return;
+                                }
+                            }
                             complete_download(
                                 &app_clone,
                                 &download_id_clone,
@@ -359,15 +477,25 @@ pub async fn start_download(
     Ok(())
 }
 
-async fn fail_download(app: &AppHandle, download_id: &str, target_path: &str, error: &str) {
-    let _ = fs::remove_file(target_path);
+async fn fail_download(
+    app: &AppHandle,
+    download_id: &str,
+    part_path: &str,
+    preserved_bytes: i64,
+    error: &str,
+    remove_partial: bool,
+) {
+    if remove_partial {
+        let _ = fs::remove_file(part_path);
+    }
+    let recorded_bytes = if remove_partial { 0 } else { preserved_bytes.max(0) };
     if let Some(db) = app.try_state::<Database>() {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         let _ = conn.execute(
             "UPDATE soundtrack_downloads
-             SET status = 'failed', error_message = ?1, downloaded_bytes = 0, speed_bps = 0, updated_at = datetime('now')
-             WHERE id = ?2",
-            params![error, download_id],
+             SET status = 'failed', error_message = ?1, downloaded_bytes = ?2, speed_bps = 0, updated_at = datetime('now')
+             WHERE id = ?3",
+            params![error, recorded_bytes, download_id],
         );
     }
     if let Some(state) = app.try_state::<SoundtrackDownloadState>() {
@@ -380,7 +508,7 @@ async fn fail_download(app: &AppHandle, download_id: &str, target_path: &str, er
             id: download_id.to_string(),
             track_id: None,
             album_id: None,
-            downloaded_bytes: 0,
+            downloaded_bytes: recorded_bytes,
             total_bytes: 0,
             speed_bps: 0,
             status: "failed".into(),

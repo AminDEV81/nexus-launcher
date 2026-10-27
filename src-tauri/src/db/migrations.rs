@@ -63,8 +63,16 @@ pub fn run(conn: &mut Connection, db_path: Option<&std::path::Path>) -> AppResul
 
     if already_applied > 0 && already_applied < latest_known {
         if let Some(path) = db_path {
+            // Checkpoint WAL frames into the main DB file first and use VACUUM INTO
+            // (with fs::copy fallback) so the backup is 100% self-contained and WAL-consistent.
+            let _ = conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);");
             let backup_path = path.with_extension(format!("db.pre_migration_v{already_applied}.bak"));
-            if let Err(err) = std::fs::copy(path, &backup_path) {
+            let _ = std::fs::remove_file(&backup_path);
+            let backup_str = backup_path.to_string_lossy().to_string();
+            let vacuum_res = conn.execute("VACUUM INTO ?1", [backup_str.as_str()]);
+            if vacuum_res.is_ok() {
+                log::info!("Created WAL-consistent pre-migration DB backup via VACUUM INTO at {:?}", backup_path);
+            } else if let Err(err) = std::fs::copy(path, &backup_path) {
                 log::warn!("Could not create pre-migration DB backup at {:?}: {}", backup_path, err);
             } else {
                 log::info!("Created pre-migration DB backup at {:?}", backup_path);
