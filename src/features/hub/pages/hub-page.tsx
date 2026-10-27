@@ -2776,7 +2776,10 @@ function HubRow({
   const [shuffleSeed, setShuffleSeed] = useState(0)
   const { title } = HUB_FEEDS[feed]
   let subtitle: string = HUB_FEEDS[feed].subtitle
-  const baseGames = query.data && query.data.length > 0 ? query.data : (fallbackData ?? [])
+  const baseGames = useMemo(
+    () => (query.data && query.data.length > 0 ? query.data : (fallbackData ?? [])),
+    [query.data, fallbackData],
+  )
   const games = useMemo(() => {
     if (shuffleSeed === 0 || baseGames.length <= 2) return baseGames
     const copy = [...baseGames]

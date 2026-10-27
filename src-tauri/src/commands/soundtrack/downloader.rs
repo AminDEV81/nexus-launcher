@@ -288,6 +288,7 @@ pub async fn start_download(
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(300))
             .redirect(crate::commands::profiles::safe_ssrf_redirect_policy())
+            .dns_resolver(crate::commands::profiles::safe_dns_resolver())
             .build()
             .unwrap_or_default();
 
@@ -683,7 +684,9 @@ pub fn cleanup_stale_staging_files(app: &AppHandle) {
     let Ok(entries) = fs::read_dir(&staging_dir) else {
         return;
     };
-    let max_age = Duration::from_secs(6 * 3600);
+    // Keep partials for a week so a paused download can still resume after days away;
+    // anything older is an orphan (never retried / row removed).
+    let max_age = Duration::from_secs(7 * 24 * 3600);
     for entry in entries.flatten() {
         let p = entry.path();
         let is_expired = entry

@@ -63,7 +63,7 @@ pub fn axis_scale_with_deadzone(value: u8, flip: bool, deadzone: u8) -> i16 {
 
     let temp = adjusted * (1.0 / 255.0);
     let temp = if flip {
-        (temp - 0.5f32) * -1.0f32 + 0.5f32
+        -(temp - 0.5f32) + 0.5f32
     } else {
         temp
     };
@@ -81,6 +81,7 @@ pub fn trigger_scale_with_deadzone(value: u8, deadzone: u8) -> u8 {
 
 /// Converts a `DualSenseRawInput` frame into an `Xbox360EmulatedState` and `XusbReport`
 /// using the exact button and axis mapping from `DS4Windows/DS4Control/Xbox360OutDevice.cs`.
+#[allow(clippy::too_many_arguments)]
 pub fn convert_dualsense_to_xbox360(
     ds: &DualSenseRawInput,
     cfg: &DualSenseProfileConfig,
@@ -276,10 +277,6 @@ impl Default for VigemXbox360Client {
 }
 
 impl VigemXbox360Client {
-    pub fn new() -> Self {
-        Self::new_for_slot(0)
-    }
-
     pub fn new_for_slot(slot_index: u8) -> Self {
         Self {
             #[cfg(target_os = "windows")]

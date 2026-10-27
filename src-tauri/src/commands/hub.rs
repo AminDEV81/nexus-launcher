@@ -1428,21 +1428,6 @@ fn release_clause(filter: Option<&str>, now: i64) -> AppResult<Option<String>> {
     Ok(Some(clause))
 }
 
-fn sort_clause(sort: Option<&str>) -> AppResult<Option<&'static str>> {
-    let Some(sort) = sort.map(str::trim).filter(|value| !value.is_empty()) else {
-        return Ok(None);
-    };
-    match sort {
-        "popularity" => Ok(Some("total_rating_count desc")),
-        "rating" => Ok(Some("aggregated_rating desc")),
-        "hypes" => Ok(Some("hypes desc")),
-        "newest" => Ok(Some("first_release_date desc")),
-        "oldest" => Ok(Some("first_release_date asc")),
-        "name" => Ok(Some("name asc")),
-        _ => Err(AppError::Invalid(format!("unknown sort '{sort}'"))),
-    }
-}
-
 /// Build an IGDB APIcalypse query body for `search_hub_games` and `DirectIgdbProvider::search_games`.
 pub fn build_igdb_filter_query(
     raw_query: &str,
@@ -1992,6 +1977,7 @@ pub fn game_matches_category(game: &HubGame, category: Option<&str>) -> bool {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_steam_curated_hub_game(
     igdb_id: i64,
     steam_app_id: u32,
@@ -2596,7 +2582,7 @@ pub fn apply_hub_filters_and_sort(
             });
         }
         "name" => {
-            filtered.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+            filtered.sort_by_key(|a| a.name.to_lowercase());
         }
         "popularity" => {
             filtered.sort_by(|a, b| {
@@ -4310,32 +4296,30 @@ async fn check_youtube_age_restricted_and_piped_stream(
     }
 
     // Check ANDROID_VR and IOS for playabilityStatus and direct combined MP4/WebM streams (audio + video)
-    for resp_res in [innertube_vr_resp, innertube_ios_resp] {
-        if let Ok(resp) = resp_res {
-            if let Ok(json) = resp.json::<Value>().await {
-                let status = json
-                    .pointer("/playabilityStatus/status")
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
-                let reason = json
-                    .pointer("/playabilityStatus/reason")
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
-                if status == "LOGIN_REQUIRED"
-                    || status == "AGE_VERIFICATION_REQUIRED"
-                    || status == "UNPLAYABLE"
-                    || reason.to_lowercase().contains("age")
-                    || reason.to_lowercase().contains("sign in")
-                {
-                    is_restricted = true;
-                }
-                if let Some(formats) = json.pointer("/streamingData/formats").and_then(Value::as_array) {
-                    for fmt in formats.iter().rev() {
-                        let url = fmt.get("url").and_then(Value::as_str).unwrap_or("");
-                        let mime = fmt.get("mimeType").and_then(Value::as_str).unwrap_or("");
-                        if !url.is_empty() && (mime.contains("video/mp4") || mime.contains("video/webm")) {
-                            return (is_restricted, Some(url.to_string()));
-                        }
+    for resp in [innertube_vr_resp, innertube_ios_resp].into_iter().flatten() {
+        if let Ok(json) = resp.json::<Value>().await {
+            let status = json
+                .pointer("/playabilityStatus/status")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let reason = json
+                .pointer("/playabilityStatus/reason")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            if status == "LOGIN_REQUIRED"
+                || status == "AGE_VERIFICATION_REQUIRED"
+                || status == "UNPLAYABLE"
+                || reason.to_lowercase().contains("age")
+                || reason.to_lowercase().contains("sign in")
+            {
+                is_restricted = true;
+            }
+            if let Some(formats) = json.pointer("/streamingData/formats").and_then(Value::as_array) {
+                for fmt in formats.iter().rev() {
+                    let url = fmt.get("url").and_then(Value::as_str).unwrap_or("");
+                    let mime = fmt.get("mimeType").and_then(Value::as_str).unwrap_or("");
+                    if !url.is_empty() && (mime.contains("video/mp4") || mime.contains("video/webm")) {
+                        return (is_restricted, Some(url.to_string()));
                     }
                 }
             }
@@ -4466,24 +4450,22 @@ async fn verify_and_extract_mirror_candidate(
     let mut is_ok = false;
     let mut direct_mp4 = None;
 
-    for resp_res in [vr_res, ios_res] {
-        if let Ok(resp) = resp_res {
-            if let Ok(json) = resp.json::<Value>().await {
-                let status = json
-                    .pointer("/playabilityStatus/status")
-                    .and_then(Value::as_str)
-                    .unwrap_or("");
-                if status == "OK" {
-                    is_ok = true;
-                    if direct_mp4.is_none() {
-                        if let Some(formats) = json.pointer("/streamingData/formats").and_then(Value::as_array) {
-                            for fmt in formats.iter().rev() {
-                                let url = fmt.get("url").and_then(Value::as_str).unwrap_or("");
-                                let mime = fmt.get("mimeType").and_then(Value::as_str).unwrap_or("");
-                                if !url.is_empty() && (mime.contains("video/mp4") || mime.contains("video/webm")) {
-                                    direct_mp4 = Some(url.to_string());
-                                    break;
-                                }
+    for resp in [vr_res, ios_res].into_iter().flatten() {
+        if let Ok(json) = resp.json::<Value>().await {
+            let status = json
+                .pointer("/playabilityStatus/status")
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            if status == "OK" {
+                is_ok = true;
+                if direct_mp4.is_none() {
+                    if let Some(formats) = json.pointer("/streamingData/formats").and_then(Value::as_array) {
+                        for fmt in formats.iter().rev() {
+                            let url = fmt.get("url").and_then(Value::as_str).unwrap_or("");
+                            let mime = fmt.get("mimeType").and_then(Value::as_str).unwrap_or("");
+                            if !url.is_empty() && (mime.contains("video/mp4") || mime.contains("video/webm")) {
+                                direct_mp4 = Some(url.to_string());
+                                break;
                             }
                         }
                     }
@@ -4955,7 +4937,7 @@ pub async fn unmount_embedded_trailer(app: AppHandle) -> AppResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{release_clause, sort_clause};
+    use super::release_clause;
 
     const NOW: i64 = 1_750_000_000;
 
@@ -4970,17 +4952,5 @@ mod tests {
         assert!(recent.ends_with(&format!(" & first_release_date < {NOW}")));
         assert_eq!(release_clause(None, NOW).unwrap(), None);
         assert_eq!(release_clause(Some("  "), NOW).unwrap(), None);
-    }
-
-    #[test]
-    fn sort_clause_is_a_whitelist() {
-        assert_eq!(
-            sort_clause(Some("rating")).unwrap().unwrap(),
-            "aggregated_rating desc"
-        );
-        assert_eq!(sort_clause(Some("name")).unwrap().unwrap(), "name asc");
-        assert_eq!(sort_clause(None).unwrap(), None);
-        assert_eq!(sort_clause(Some("")).unwrap(), None);
-        assert!(sort_clause(Some("name; DROP TABLE games")).is_err());
     }
 }

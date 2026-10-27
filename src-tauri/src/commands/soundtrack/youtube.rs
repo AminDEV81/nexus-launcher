@@ -79,41 +79,39 @@ pub async fn extract_youtube_direct_audio_url(
             .send()
     );
 
-    for resp_res in [vr_resp, ios_resp] {
-        if let Ok(resp) = resp_res {
-            if let Ok(json) = resp.json::<Value>().await {
-                // 1. Prefer adaptiveFormats audio/mp4 (AAC .m4a) or audio/webm (Opus)
-                if let Some(adaptive) = json
-                    .pointer("/streamingData/adaptiveFormats")
-                    .and_then(Value::as_array)
-                {
-                    // First pass: look for audio/mp4 with direct URL
-                    for fmt in adaptive {
-                        let mime = fmt.get("mimeType").and_then(Value::as_str).unwrap_or("");
-                        let url = fmt.get("url").and_then(Value::as_str).unwrap_or("");
-                        if !url.is_empty() && mime.starts_with("audio/mp4") {
-                            return Some(url.to_string());
-                        }
-                    }
-                    // Second pass: look for any audio/* with direct URL
-                    for fmt in adaptive {
-                        let mime = fmt.get("mimeType").and_then(Value::as_str).unwrap_or("");
-                        let url = fmt.get("url").and_then(Value::as_str).unwrap_or("");
-                        if !url.is_empty() && mime.starts_with("audio/") {
-                            return Some(url.to_string());
-                        }
+    for resp in [vr_resp, ios_resp].into_iter().flatten() {
+        if let Ok(json) = resp.json::<Value>().await {
+            // 1. Prefer adaptiveFormats audio/mp4 (AAC .m4a) or audio/webm (Opus)
+            if let Some(adaptive) = json
+                .pointer("/streamingData/adaptiveFormats")
+                .and_then(Value::as_array)
+            {
+                // First pass: look for audio/mp4 with direct URL
+                for fmt in adaptive {
+                    let mime = fmt.get("mimeType").and_then(Value::as_str).unwrap_or("");
+                    let url = fmt.get("url").and_then(Value::as_str).unwrap_or("");
+                    if !url.is_empty() && mime.starts_with("audio/mp4") {
+                        return Some(url.to_string());
                     }
                 }
-                // 2. Fallback to combined formats (video/mp4 with audio) which <audio> also plays natively
-                if let Some(formats) = json
-                    .pointer("/streamingData/formats")
-                    .and_then(Value::as_array)
-                {
-                    for fmt in formats {
-                        let url = fmt.get("url").and_then(Value::as_str).unwrap_or("");
-                        if !url.is_empty() {
-                            return Some(url.to_string());
-                        }
+                // Second pass: look for any audio/* with direct URL
+                for fmt in adaptive {
+                    let mime = fmt.get("mimeType").and_then(Value::as_str).unwrap_or("");
+                    let url = fmt.get("url").and_then(Value::as_str).unwrap_or("");
+                    if !url.is_empty() && mime.starts_with("audio/") {
+                        return Some(url.to_string());
+                    }
+                }
+            }
+            // 2. Fallback to combined formats (video/mp4 with audio) which <audio> also plays natively
+            if let Some(formats) = json
+                .pointer("/streamingData/formats")
+                .and_then(Value::as_array)
+            {
+                for fmt in formats {
+                    let url = fmt.get("url").and_then(Value::as_str).unwrap_or("");
+                    if !url.is_empty() {
+                        return Some(url.to_string());
                     }
                 }
             }

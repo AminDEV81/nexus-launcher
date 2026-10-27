@@ -83,7 +83,7 @@ pub fn clean_scanned_game_title(raw: &str) -> String {
     let space_count = s.chars().filter(|&c| c == ' ').count();
     let dot_count = s.chars().filter(|&c| c == '.').count();
     if space_count == 0 && dot_count >= 2 {
-        s = s.replace('.', " ").replace('_', " ");
+        s = s.replace(['.', '_'], " ");
     } else {
         s = s.replace('_', " ");
     }
@@ -276,7 +276,7 @@ fn scan_inno_and_repack_uninstall_registry(seen_paths: &mut HashSet<String>) -> 
         r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
     ];
 
-    let non_game_Filter = [
+    let non_game_filter = [
         "microsoft",
         "windows",
         "nvidia",
@@ -321,7 +321,7 @@ fn scan_inno_and_repack_uninstall_registry(seen_paths: &mut HashSet<String>) -> 
                     continue;
                 }
                 let disp_low = display_name.to_lowercase();
-                if non_game_Filter.iter().any(|&w| disp_low.contains(w)) {
+                if non_game_filter.iter().any(|&w| disp_low.contains(w)) {
                     continue;
                 }
 

@@ -130,6 +130,7 @@ fn download_client() -> reqwest::Client {
     reqwest::Client::builder()
         .user_agent(concat!("NexusLauncher/", env!("CARGO_PKG_VERSION")))
         .redirect(crate::commands::profiles::safe_ssrf_redirect_policy())
+        .dns_resolver(crate::commands::profiles::safe_dns_resolver())
         .tcp_nodelay(true)
         .tcp_keepalive(Some(Duration::from_secs(15)))
         .pool_max_idle_per_host(32)
@@ -286,6 +287,30 @@ pub(crate) fn validate_download_url(url: &str) -> AppResult<()> {
             format!("could not resolve download host '{host}' (check your internet connection)"),
         )),
     }
+}
+
+/// Offline variant of [`validate_download_url`]: scheme + literal-host checks
+/// only, no DNS. Used when importing a backup, where a dead domain or an
+/// offline machine must not reject the whole restore. The full DNS-based
+/// check (and the connect-time resolver filter) still runs when a download
+/// actually starts or resumes.
+pub(crate) fn validate_download_url_offline(url: &str) -> AppResult<()> {
+    let parsed = reqwest::Url::parse(url.trim())
+        .map_err(|e| AppError::Invalid(format!("invalid download URL: {e}")))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
+        return Err(AppError::Invalid(
+            "only http(s) download links are supported".into(),
+        ));
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| AppError::Invalid("download URL is missing a host".into()))?;
+    if crate::commands::profiles::is_blocked_host_literal(host) {
+        return Err(AppError::Invalid(
+            "private or local network download URLs are not permitted".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Ensures `file_path` is a regular file path located directly inside `save_path`
@@ -1829,6 +1854,9 @@ fn cleanup_bundle_archives(app: &AppHandle, game_id: &Option<String>, save_path:
     }
 }
 
+/// `(id, url, file_path, save_path, game_id, chunk_state)` of a queued download row.
+type QueuedDownloadRow = (String, String, String, String, Option<String>, Option<String>);
+
 fn start_next_global_queued_download(app: &AppHandle) -> bool {
     let state = app.state::<DownloadState>();
     if !state.active.lock().unwrap_or_else(|e| e.into_inner()).is_empty() {
@@ -1836,7 +1864,7 @@ fn start_next_global_queued_download(app: &AppHandle) -> bool {
     }
 
     let db = app.state::<Database>();
-    let next: Option<(String, String, String, String, Option<String>, Option<String>)> = {
+    let next: Option<QueuedDownloadRow> = {
         let Ok(conn) = db.connection.lock() else { return false; };
         conn.query_row(
             "SELECT id, url, COALESCE(file_path, ''), save_path, game_id, chunk_state FROM downloads WHERE status = 'queued' ORDER BY rowid ASC, created_at ASC LIMIT 1",
@@ -1889,7 +1917,7 @@ fn start_next_global_queued_download(app: &AppHandle) -> bool {
 
 fn start_next_sequential_part(app: &AppHandle, game_id: &Option<String>, save_path: &str) -> bool {
     let db = app.state::<Database>();
-    let next: Option<(String, String, String, String, Option<String>, Option<String>)> = {
+    let next: Option<QueuedDownloadRow> = {
         let Ok(conn) = db.connection.lock() else { return false; };
         if let Some(gid) = game_id {
             conn.query_row(
@@ -2947,7 +2975,8 @@ mod tests {
 
     #[test]
     fn test_sanitize_file_name_strips_traversal_and_reserved_names() {
-        assert_eq!(sanitize_file_name("../../etc/passwd"), "--..-..-etc-passwd");
+        // Separators become '-', then the leading dots are trimmed: no traversal survives.
+        assert_eq!(sanitize_file_name("../../etc/passwd"), "-..-etc-passwd");
         assert_eq!(sanitize_file_name("CON.txt"), "_CON.txt");
         assert_eq!(sanitize_file_name("NUL"), "_NUL");
         assert_eq!(sanitize_file_name("   ...   "), "download");
@@ -2955,7 +2984,20 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_download_url_offline_needs_no_dns() {
+        // A well-formed public-looking host passes without any network lookup...
+        assert!(validate_download_url_offline("https://dead-domain-example.invalid/a.zip").is_ok());
+        // ...while literal private targets and non-http schemes are still rejected.
+        assert!(validate_download_url_offline("http://127.0.0.1/a.zip").is_err());
+        assert!(validate_download_url_offline("http://localhost/a.zip").is_err());
+        assert!(validate_download_url_offline("ftp://example.com/a.zip").is_err());
+    }
+
+    #[test]
     fn test_validate_download_url_blocks_private_and_non_http() {
+        // Pre-seed the DNS safety cache so the "public host" case is deterministic
+        // and doesn't depend on real DNS / network access.
+        crate::commands::profiles::seed_dns_cache_for_test("cdn.example.com", false);
         assert!(validate_download_url("https://cdn.example.com/archive.zip").is_ok());
         assert!(validate_download_url("http://127.0.0.1:9000/file.zip").is_err());
         assert!(validate_download_url("http://localhost/file.zip").is_err());

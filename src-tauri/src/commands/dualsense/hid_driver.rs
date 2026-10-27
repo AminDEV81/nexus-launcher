@@ -70,9 +70,9 @@ pub fn parse_dualsense_input_report(
 
     let dpad_state = b8 & 0x0F;
     out.dpad_up = matches!(dpad_state, 0 | 1 | 7);
-    out.dpad_right = matches!(dpad_state, 1 | 2 | 3);
-    out.dpad_down = matches!(dpad_state, 3 | 4 | 5);
-    out.dpad_left = matches!(dpad_state, 5 | 6 | 7);
+    out.dpad_right = matches!(dpad_state, 1..=3);
+    out.dpad_down = matches!(dpad_state, 3..=5);
+    out.dpad_left = matches!(dpad_state, 5..=7);
 
     // Byte 9: L1, R1, L2Btn, R2Btn, Create(Share), Options, L3, R3
     let b9 = buf[offset + 9];

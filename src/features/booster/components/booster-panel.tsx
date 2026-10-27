@@ -174,10 +174,10 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
   const cpuGhz = cpuFreqMhz > 0 ? `${(cpuFreqMhz / 1000).toFixed(2)} GHz` : 'Turbo'
 
   const apps = useMemo(() => boostableApps ?? [], [boostableApps])
-  const targetApps = useMemo(
-    () => apps.filter((a) => !isExcluded(a.name)),
-    [apps, excludedNames],
-  )
+  const targetApps = useMemo(() => {
+    const excludedLower = new Set(excludedNames.map((n) => n.toLowerCase()))
+    return apps.filter((a) => !excludedLower.has(a.name.toLowerCase()))
+  }, [apps, excludedNames])
   const protectedAppsCount = apps.length - targetApps.length
   const reclaimableRamBytes = useMemo(
     () => targetApps.reduce((acc, a) => acc + (a.memory_bytes || 0), 0),

@@ -304,13 +304,15 @@ fn launch_directly(target: &LaunchTarget) -> AppResult<LaunchedProcess> {
         .to_ascii_lowercase();
 
     let mut command = if cfg!(windows) && (ext == "bat" || ext == "cmd") {
-        if executable_path.contains(['"', '!', '\r', '\n', '\0']) || !path_obj.is_file() {
+        if executable_path.contains(['"', '!', '%', '^', '\r', '\n', '\0']) || !path_obj.is_file() {
             return Err(AppError::Invalid(
                 "Invalid or unsafe batch script path.".into(),
             ));
         }
         // Pass batch path via environment variable with delayed expansion (`!NEXUS_BATCH_TARGET!`)
-        // so `cmd.exe` never parses `&`, `|`, `^`, `<`, `>`, or `%` in the path as shell metacharacters.
+        // so `cmd.exe` never parses `&`, `|`, `<`, or `>` in the path as shell metacharacters. `call` re-parses
+        // its argument once more, so `%` and `^` (rejected above) are the only characters that could still
+        // be reinterpreted.
         let mut cmd = StdCommand::new("cmd.exe");
         cmd.env("NEXUS_BATCH_TARGET", executable_path);
         cmd.args(["/d", "/v:on", "/c", "call \"!NEXUS_BATCH_TARGET!\""]);

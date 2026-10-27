@@ -469,7 +469,7 @@ pub fn shutdown_system(action: Option<String>) -> AppResult<()> {
             }
             _ => unreachable!(),
         }
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -492,7 +492,7 @@ pub fn cancel_shutdown() -> AppResult<()> {
         if !status.success() {
             return Err(AppError::Other("No pending shutdown to cancel.".into()));
         }
-        return Ok(());
+        Ok(())
     }
 
     #[cfg(not(target_os = "windows"))]

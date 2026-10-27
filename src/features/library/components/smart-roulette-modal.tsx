@@ -78,7 +78,7 @@ const MOOD_PRESETS: Array<{
 
 export function SmartRouletteModal({ open, onClose, games: propGames }: SmartRouletteModalProps) {
   const { data: queryGames } = useGames()
-  const games = propGames ?? queryGames ?? []
+  const games = useMemo(() => propGames ?? queryGames ?? [], [propGames, queryGames])
   const [mood, setMood] = useState<MoodFilterId>('all')
   const [onlyInstalled, setOnlyInstalled] = useState(true)
   const [isSpinning, setIsSpinning] = useState(false)

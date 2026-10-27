@@ -329,7 +329,7 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
                 for dev in found {
                     let already_open = (0..MAX_CONTROLLER_SLOTS).any(|idx| {
                         active_handles[idx] != -1
-                            && active_devs[idx].as_ref().map_or(false, |d| {
+                            && active_devs[idx].as_ref().is_some_and(|d| {
                                 d.device_path.eq_ignore_ascii_case(&dev.device_path)
                                     || d.serial_mac.eq_ignore_ascii_case(&dev.serial_mac)
                             })

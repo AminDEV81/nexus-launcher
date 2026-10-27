@@ -409,10 +409,6 @@ pub fn remove_path_all_with_retry(path: &Path) -> SaveResult<()> {
     })
 }
 
-/// Atomically replaces or moves `staging_path` to `target_path`.
-/// If `target_path` exists and `backup_path` is given:
-///   1. Moves/copies `target_path` to `backup_path` and flushes.
-///   2. Moves/copies `staging_path` to `target_path` and flushes.
 /// Validates that a single identifier segment (`profile_id`, `game_id`, `location_id`, `op_id`, `snapshot_id`)
 /// cannot escape its parent directory or override a base path in `Path::join`.
 pub fn is_valid_id_segment(raw: &str) -> bool {
@@ -636,6 +632,10 @@ pub fn validate_safe_save_location_path(raw: &str) -> Result<PathBuf, String> {
     Ok(resolved)
 }
 
+/// Atomically replaces or moves `staging_path` to `target_path`.
+/// If `target_path` exists and `backup_path` is given:
+///   1. Moves/copies `target_path` to `backup_path` and flushes.
+///   2. Moves/copies `staging_path` to `target_path` and flushes.
 pub fn safe_replace_dir(
     staging_path: &Path,
     target_path: &Path,

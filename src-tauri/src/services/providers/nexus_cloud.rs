@@ -310,12 +310,10 @@ impl MetadataProvider for NexusCloudProvider {
                 }
             );
 
-            for feed_res in [f_rec, f_top, f_new, f_soon, f_g1, f_g2] {
-                if let Ok(list) = feed_res {
-                    for g in list {
-                        if seen.insert(g.igdb_id) {
-                            combined.push(g);
-                        }
+            for list in [f_rec, f_top, f_new, f_soon, f_g1, f_g2].into_iter().flatten() {
+                for g in list {
+                    if seen.insert(g.igdb_id) {
+                        combined.push(g);
                     }
                 }
             }

@@ -227,17 +227,6 @@ pub fn export_backup(
     Ok(total_rows)
 }
 
-/// Parses + validates the file WITHOUT touching the database, returning
-/// the per-table rows on success. Everything after this point can
-/// assume well-shaped data.
-/// One table's rows from a backup file, in import order.
-/// Validates a game's `executable_path` and `install_path` during backup import:
-/// - Allows legitimate game folders under `C:\Program Files (x86)\Steam\steamapps\common\<Game>`,
-///   `C:\Program Files\Epic Games\<Game>`, `C:\GOG Games\<Game>`, `D:\Games\<Game>`, etc.
-/// - Blocks OS system directories (`C:\Windows`, `System32`, `SysWOW64`), user `AppData` interpreters,
-///   and shell/scripting binaries (`cmd.exe`, `powershell.exe`, `pwsh.exe`, `python.exe`, `node.exe`, etc.).
-/// - Requires `executable_path` to reside inside a valid game-specific `install_path` directory on disk,
-///   falling back to `find_best_exe(install_path, game_name)` if the `.exe` moved or needs re-detection.
 /// Validates `launch_arguments` during backup import so benign gameplay flags (`-windowed`, `-dx11`,
 /// `-novid`, `-fullscreen`, `+fps_max 144`) are preserved when the original game executable is verified,
 /// while stripping any arguments containing shell metacharacters, paths, URLs, or interpreter/eval flags.
@@ -288,6 +277,13 @@ fn sanitize_safe_launch_arguments(raw: &str) -> Option<String> {
     Some(trimmed.to_string())
 }
 
+/// Validates a game's `executable_path` and `install_path` during backup import:
+/// - Allows legitimate game folders under `C:\Program Files (x86)\Steam\steamapps\common\<Game>`,
+///   `C:\Program Files\Epic Games\<Game>`, `C:\GOG Games\<Game>`, `D:\Games\<Game>`, etc.
+/// - Blocks OS system directories (`C:\Windows`, `System32`, `SysWOW64`), user `AppData` interpreters,
+///   and shell/scripting binaries (`cmd.exe`, `powershell.exe`, `pwsh.exe`, `python.exe`, `node.exe`, etc.).
+/// - Requires `executable_path` to reside inside a valid game-specific `install_path` directory on disk,
+///   falling back to `find_best_exe(install_path, game_name)` if the `.exe` moved or needs re-detection.
 fn validate_or_redetect_backup_game_exe(
     exe_str: &str,
     install_str: &str,
@@ -311,7 +307,6 @@ fn validate_or_redetect_backup_game_exe(
         "python3",
         "node",
         "deno",
-        "bun",
         "java",
         "javaw",
         "javaws",
@@ -321,10 +316,8 @@ fn validate_or_redetect_backup_game_exe(
         "ruby",
         "lua",
         "tclsh",
-        "wish",
         "wmic",
         "schtasks",
-        "at",
         "sc",
         "net",
         "net1",
@@ -344,16 +337,12 @@ fn validate_or_redetect_backup_game_exe(
         "pcalua",
         "syncappvpublishingserver",
         "odbcconf",
-        "control",
         "mmc",
-        "hh",
         "makecab",
-        "expand",
         "extrac32",
         "findstr",
         "curl",
         "wget",
-        "tar",
         "ssh",
         "scp",
         "sftp",
@@ -486,11 +475,22 @@ fn validate_or_redetect_backup_game_exe(
     }
 
     // Fallback: if `install_path` is a valid existing game folder on disk, auto-detect the game `.exe` inside it
-    crate::commands::download::find_best_exe(&install_dir, game_name)
+    crate::commands::download::find_best_exe(&install_dir, game_name).filter(|found| {
+        let stem = std::path::Path::new(found)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        !stem.is_empty() && !BLOCKED_INTERPRETERS.contains(&stem.as_str())
+    })
 }
 
+/// One table's rows from a backup file, in import order.
 type BackupTable = (&'static str, Vec<Map<String, Value>>);
 
+/// Parses + validates the file WITHOUT touching the database, returning
+/// the per-table rows on success. Everything after this point can
+/// assume well-shaped data.
 fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
     let raw = std::fs::read_to_string(path)
         .map_err(|err| AppError::Invalid(format!("could not read that file: {err}")))?;
@@ -614,9 +614,20 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
                         game.insert("executable_path".to_string(), Value::String(valid_exe));
                     }
                     None => {
-                        game.insert("launch_arguments".to_string(), Value::Null);
+                        let is_steam = game.get("source").and_then(Value::as_str) == Some("steam");
+                        // Steam titles launch through the Steam client (no local exe to verify),
+                        // so only the character-sanitized launch options are kept for them.
+                        let kept_args = if is_steam {
+                            sanitize_safe_launch_arguments(&raw_launch_args)
+                        } else {
+                            None
+                        };
+                        game.insert(
+                            "launch_arguments".to_string(),
+                            kept_args.map(Value::String).unwrap_or(Value::Null),
+                        );
                         game.insert("executable_path".to_string(), Value::Null);
-                        if game.get("source").and_then(Value::as_str) != Some("steam") {
+                        if !is_steam {
                             game.insert("is_installed".to_string(), Value::Number(0.into()));
                         }
                     }
@@ -639,7 +650,7 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
         if *table == "downloads" {
             for dl in rows.iter_mut() {
                 if let Some(url) = dl.get("url").and_then(Value::as_str) {
-                    if let Err(err) = crate::commands::download::validate_download_url(url) {
+                    if let Err(err) = crate::commands::download::validate_download_url_offline(url) {
                         return Err(AppError::Invalid(format!(
                             "backup contains an unsafe download URL '{url}': {err}"
                         )));

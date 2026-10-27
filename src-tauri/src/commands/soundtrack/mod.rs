@@ -263,22 +263,15 @@ pub fn is_safe_soundtrack_directory(dir: &std::path::Path) -> bool {
         "application data",
         "local settings",
         "ntuser",
-        "windows",
         "system32",
         "syswow64",
         "programdata",
         "openssh",
-        "ssh",
         "gnupg",
         "keyrings",
         "wallets",
-        "chrome",
         "user data",
-        "firefox",
-        "profiles",
         "bravesoftware",
-        "microsoft",
-        "edge",
     ];
 
     for comp in clean_path.components() {
@@ -340,46 +333,114 @@ pub fn is_safe_soundtrack_directory(dir: &std::path::Path) -> bool {
     true
 }
 
+/// Verdicts for `is_safe_soundtrack_directory` are cached briefly: per-file grants in
+/// big libraries would otherwise canonicalize the same parent directory thousands of times.
+fn is_safe_soundtrack_directory_cached(dir: &std::path::Path) -> bool {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{Duration, Instant};
+    static CACHE: OnceLock<Mutex<HashMap<std::path::PathBuf, (bool, Instant)>>> = OnceLock::new();
+    const TTL: Duration = Duration::from_secs(60);
+    const MAX_ENTRIES: usize = 4096;
+
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some((verdict, at)) = cache
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(dir)
+        .copied()
+    {
+        if at.elapsed() < TTL {
+            return verdict;
+        }
+    }
+    let verdict = is_safe_soundtrack_directory(dir);
+    let mut guard = cache.lock().unwrap_or_else(|e| e.into_inner());
+    if guard.len() >= MAX_ENTRIES {
+        guard.clear();
+    }
+    guard.insert(dir.to_path_buf(), (verdict, Instant::now()));
+    verdict
+}
+
+fn has_allowed_audio_ext(path: &std::path::Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|ext| ALLOWED_AUDIO_EXTS.contains(&ext.to_ascii_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
 /// Grants Tauri `asset://` protocol read access to a single verified audio file (never non-audio files!).
 pub fn allow_soundtrack_audio_file_in_scope(app: &AppHandle, file_path: &std::path::Path) {
     use tauri::Manager;
-    if !file_path.is_file() {
+    if !file_path.is_file() || !has_allowed_audio_ext(file_path) {
         return;
     }
-    let is_audio = file_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|ext| ALLOWED_AUDIO_EXTS.contains(&ext.to_ascii_lowercase().as_str()))
-        .unwrap_or(false);
-    if !is_audio {
-        return;
-    }
-    if let Some(parent) = file_path.parent() {
-        if !is_safe_soundtrack_directory(parent) {
-            return;
-        }
-    } else {
-        return;
+    match file_path.parent() {
+        Some(parent) if is_safe_soundtrack_directory_cached(parent) => {}
+        _ => return,
     }
     let _ = app.asset_protocol_scope().allow_file(file_path);
 }
 
 /// Scans an existing, validated soundtrack directory and grants `asset://` access ONLY to individual
 /// audio files inside it (zero `create_dir_all` side-effect and zero non-audio file exposure).
+///
+/// The walk runs on a background thread and is throttled per directory, so callers on the
+/// startup / command path never block on large libraries. Sub-directories whose real path
+/// escapes the root (junctions, symlinks) are not descended into.
 pub fn allow_soundtrack_directory_in_scopes(app: &AppHandle, dir: &std::path::Path) {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    use std::time::{Duration, Instant};
+    use tauri::Manager;
+    static LAST_WALK: OnceLock<Mutex<HashMap<std::path::PathBuf, Instant>>> = OnceLock::new();
+    const THROTTLE: Duration = Duration::from_secs(120);
+
     if !dir.is_dir() || !is_safe_soundtrack_directory(dir) {
         return;
     }
-    for entry in walkdir::WalkDir::new(dir)
-        .max_depth(4)
-        .follow_links(false)
-        .into_iter()
-        .filter_map(Result::ok)
+    let Ok(root_real) = std::fs::canonicalize(dir) else {
+        return;
+    };
     {
-        if entry.file_type().is_file() {
-            allow_soundtrack_audio_file_in_scope(app, entry.path());
+        let mut map = LAST_WALK
+            .get_or_init(|| Mutex::new(HashMap::new()))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if map
+            .get(&root_real)
+            .is_some_and(|at| at.elapsed() < THROTTLE)
+        {
+            return;
         }
+        map.insert(root_real.clone(), Instant::now());
     }
+
+    let app = app.clone();
+    let root_walk = dir.to_path_buf();
+    std::thread::spawn(move || {
+        let scope = app.asset_protocol_scope();
+        for entry in walkdir::WalkDir::new(&root_walk)
+            .max_depth(4)
+            .follow_links(false)
+            .into_iter()
+            .filter_entry(|e| {
+                if e.file_type().is_dir() {
+                    std::fs::canonicalize(e.path())
+                        .map(|real| real.starts_with(&root_real))
+                        .unwrap_or(false)
+                } else {
+                    true
+                }
+            })
+            .filter_map(Result::ok)
+        {
+            if entry.file_type().is_file() && has_allowed_audio_ext(entry.path()) {
+                let _ = scope.allow_file(entry.path());
+            }
+        }
+    });
 }
 
 #[tauri::command]

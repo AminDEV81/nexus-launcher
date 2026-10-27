@@ -1047,6 +1047,33 @@ pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
     !matches!(check_host_ssrf(host), HostSsrfStatus::Allowed)
 }
 
+/// reqwest DNS resolver that drops private/loopback/link-local answers at
+/// *connect time*. Pre-flight `check_host_ssrf` resolves separately from the
+/// actual connection, so a rebinding DNS server could answer "public" for the
+/// check and "private" for the connect. Filtering here closes that gap.
+pub(crate) struct SsrfSafeResolver;
+
+impl reqwest::dns::Resolve for SsrfSafeResolver {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            let resolved = tokio::net::lookup_host((host.as_str(), 0u16))
+                .await
+                .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) })?;
+            let addrs: Vec<std::net::SocketAddr> =
+                resolved.filter(|a| !is_blocked_ip(a.ip())).collect();
+            if addrs.is_empty() {
+                return Err("host resolves only to private or local network addresses".into());
+            }
+            Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs)
+        })
+    }
+}
+
+pub(crate) fn safe_dns_resolver() -> std::sync::Arc<SsrfSafeResolver> {
+    std::sync::Arc::new(SsrfSafeResolver)
+}
+
 pub(crate) fn safe_ssrf_redirect_policy() -> reqwest::redirect::Policy {
     reqwest::redirect::Policy::custom(|attempt| {
         if attempt.previous().len() >= 10 {

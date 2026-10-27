@@ -966,8 +966,8 @@ pub async fn resolve_hub_games_scores_live(
         enrich_hub_games_batch(Some(&conn), games);
     }
 
-    let mut pending: Vec<(usize, String, Option<String>, Option<i64>, Option<i64>, Option<i64>)> =
-        Vec::new();
+    type PendingScoreLookup = (usize, String, Option<String>, Option<i64>, Option<i64>, Option<i64>);
+    let mut pending: Vec<PendingScoreLookup> = Vec::new();
     for (idx, g) in games.iter().enumerate() {
         if is_game_unreleased(g.release_date.as_deref()) {
             continue;

@@ -274,7 +274,7 @@ export class KHInsiderProvider extends BaseSoundtrackProvider {
         searchRegion = html.substring(pageContentIdx)
       }
 
-      const regex = /href="(\/game-soundtracks\/album\/([^"\/]+))"[^>]*>([^<]+)<\/a>/gi
+      const regex = /href="(\/game-soundtracks\/album\/([^"/]+))"[^>]*>([^<]+)<\/a>/gi
       let match: RegExpExecArray | null
 
       while ((match = regex.exec(searchRegion)) !== null) {

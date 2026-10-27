@@ -7,7 +7,9 @@
 
 use super::models::{DualSenseProfileConfig, DualSenseRawInput};
 
+#[allow(dead_code)] // Documents the DualSense touchpad resolution.
 pub const TOUCHPAD_WIDTH: u16 = 1920;
+#[allow(dead_code)]
 pub const TOUCHPAD_HEIGHT: u16 = 1080;
 pub const TOUCHPAD_MID_X: u16 = 960;
 

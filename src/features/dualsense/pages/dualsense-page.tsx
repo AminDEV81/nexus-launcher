@@ -362,7 +362,9 @@ export function DualSensePage() {
       ? connectedSlots.every((s) => s.xbox.emulationActive)
       : slots.some((s) => s.xbox.emulationActive)
 
-  // Sync hex input when slot or config changes
+  // Sync hex input when slot or the lightbar colour changes (deps intentionally exclude the whole
+  // `cfg` object so unrelated config updates don't overwrite what the user is typing).
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (cfg) {
       setHexDraft(rgbToHex(cfg.lightbarR, cfg.lightbarG, cfg.lightbarB))
@@ -591,7 +593,7 @@ export function DualSensePage() {
 
     const nextState = allSlots
       ? !allConnectedEmulating
-      : !Boolean(slots[slotToUse]?.xbox?.emulationActive ?? snapshot?.xbox?.emulationActive)
+      : !(slots[slotToUse]?.xbox?.emulationActive ?? snapshot?.xbox?.emulationActive)
 
     try {
       const updated = await invoke<DualSenseTelemetrySnapshot>('dualsense_set_xbox_emulation', {

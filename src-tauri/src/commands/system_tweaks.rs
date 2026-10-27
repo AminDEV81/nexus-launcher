@@ -187,6 +187,9 @@ mod imp {
 
         // Direct Registry edit when elevated
         let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        // Registry writes that were previously fire-and-forget; a failure now turns the
+        // result into an error instead of reporting a tweak that was never applied.
+        let mut reg_write_failures = 0u32;
         if let Ok(interfaces) = hklm.open_subkey_with_flags(
             r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces",
             KEY_WRITE | KEY_READ,
@@ -197,7 +200,9 @@ mod imp {
                     let _ = subkey.delete_value("TcpAckFrequency");
                     let _ = subkey.delete_value("TcpDelAckTicks");
                     if enable {
-                        let _ = subkey.set_value("TCPNoDelay", &1u32);
+                        if subkey.set_value("TCPNoDelay", &1u32).is_err() {
+                            reg_write_failures += 1;
+                        }
                     } else {
                         let _ = subkey.delete_value("TCPNoDelay");
                     }
@@ -212,7 +217,12 @@ mod imp {
         ) {
             let _ = mmcss.delete_value("AlwaysOn");
             let _ = mmcss.delete_value("NoLazyMode");
-            let _ = mmcss.set_value("NetworkThrottlingIndex", &0xffffffffu32);
+            if mmcss
+                .set_value("NetworkThrottlingIndex", &0xffffffffu32)
+                .is_err()
+            {
+                reg_write_failures += 1;
+            }
         }
 
         // Run netsh optimization and verify command exit statuses
@@ -220,7 +230,7 @@ mod imp {
         let s2 = Command::new("netsh").args(["int", "tcp", "set", "heuristics", "default"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
         let s3 = Command::new("netsh").args(["int", "tcp", "set", "global", "rss=enabled"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
         let s4 = Command::new("ipconfig").args(["/flushdns"]).creation_flags(CREATE_NO_WINDOW).status().map(|s| s.success()).unwrap_or(false);
-        let net_ok = s1 && s2 && s3 && s4;
+        let net_ok = s1 && s2 && s3 && s4 && reg_write_failures == 0;
 
         TweakActionResult {
             success: net_ok,
@@ -341,8 +351,12 @@ mod imp {
                         dev_key, instance_key
                     );
                     if let Ok((msi_key, _)) = hklm.create_subkey(&msi_path) {
-                        let _ = msi_key.set_value("MSISupported", &(if enable { 1u32 } else { 0u32 }));
-                        count += 1;
+                        if msi_key
+                            .set_value("MSISupported", &(if enable { 1u32 } else { 0u32 }))
+                            .is_ok()
+                        {
+                            count += 1;
+                        }
                     }
 
                     let affinity_path = format!(

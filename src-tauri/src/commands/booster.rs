@@ -293,7 +293,7 @@ pub async fn scan_boostable_apps() -> Vec<BoostableApp> {
         }
 
         let mut list: Vec<BoostableApp> = grouped.into_values().collect();
-        list.sort_by(|a, b| b.memory_bytes.cmp(&a.memory_bytes));
+        list.sort_by_key(|b| std::cmp::Reverse(b.memory_bytes));
         list
     })
     .await

@@ -12,6 +12,7 @@ pub const IOCTL_GET_WHITELIST: u32 = 0x8001_6000;
 pub const IOCTL_SET_WHITELIST: u32 = 0x8001_6004;
 pub const IOCTL_GET_BLACKLIST: u32 = 0x8001_6008;
 pub const IOCTL_SET_BLACKLIST: u32 = 0x8001_600C;
+#[allow(dead_code)] // Part of the HidHide IOCTL set; kept for completeness.
 pub const IOCTL_GET_ACTIVE: u32 = 0x8001_6010;
 pub const IOCTL_SET_ACTIVE: u32 = 0x8001_6014;
 
