@@ -218,9 +218,10 @@ pub async fn soundtrack_download(
 #[tauri::command]
 pub fn soundtrack_cancel_download(
     download_id: String,
+    app: AppHandle,
     state: State<'_, SoundtrackDownloadState>,
 ) -> AppResult<bool> {
-    Ok(downloader::cancel_download(&state, &download_id))
+    Ok(downloader::cancel_download(&app, &state, &download_id))
 }
 
 #[tauri::command]
@@ -231,8 +232,21 @@ pub fn soundtrack_get_downloads(
     db::get_downloads(&conn)
 }
 
+/// Dynamically grants Tauri `asset://` protocol read access to a validated soundtrack directory
+/// at runtime so custom user-selected soundtrack folders work without global `**/*.mp3` wildcards.
+pub fn allow_soundtrack_directory_in_scopes(app: &AppHandle, dir: &std::path::Path) {
+    use tauri::Manager;
+    let dir_str = dir.to_string_lossy();
+    if !crate::commands::download::is_safe_download_save_path(&dir_str) {
+        return;
+    }
+    let _ = std::fs::create_dir_all(dir);
+    let _ = app.asset_protocol_scope().allow_directory(dir, true);
+}
+
 #[tauri::command]
 pub fn soundtrack_get_download_directory(
+    app: AppHandle,
     db: State<'_, Database>,
 ) -> AppResult<String> {
     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
@@ -245,24 +259,38 @@ pub fn soundtrack_get_download_directory(
         .ok();
 
     if let Some(dir) = custom {
-        if !dir.is_empty() {
-            return Ok(dir);
+        let trimmed = dir.trim();
+        if !trimmed.is_empty() {
+            allow_soundtrack_directory_in_scopes(&app, std::path::Path::new(trimmed));
+            return Ok(trimmed.to_string());
         }
     }
 
-    Ok(downloader::get_default_soundtrack_dir().to_string_lossy().to_string())
+    let default_dir = downloader::get_default_soundtrack_dir();
+    allow_soundtrack_directory_in_scopes(&app, &default_dir);
+    Ok(default_dir.to_string_lossy().to_string())
 }
 
 #[tauri::command]
 pub fn soundtrack_set_download_directory(
     path: String,
+    app: AppHandle,
     db: State<'_, Database>,
 ) -> AppResult<()> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() || !crate::commands::download::is_safe_download_save_path(trimmed) {
+        return Err(AppError::Invalid(
+            "Invalid or protected system directory cannot be used as a soundtrack folder.".into(),
+        ));
+    }
+    let dir_path = std::path::PathBuf::from(trimmed);
+    allow_soundtrack_directory_in_scopes(&app, &dir_path);
+
     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     conn.execute(
         "INSERT INTO settings (key, value) VALUES ('soundtrack_download_dir', ?1)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-        params![path],
+        params![trimmed],
     )?;
     Ok(())
 }
@@ -272,8 +300,12 @@ pub async fn soundtrack_scan_library(
     paths: Option<Vec<String>>,
     app: AppHandle,
 ) -> AppResult<Vec<SoundtrackLocalFile>> {
-    let scan_paths = match paths {
-        Some(p) if !p.is_empty() => p.into_iter().map(PathBuf::from).collect(),
+    let scan_paths: Vec<PathBuf> = match paths {
+        Some(p) if !p.is_empty() => p
+            .into_iter()
+            .filter(|s| crate::commands::download::is_safe_download_save_path(s))
+            .map(PathBuf::from)
+            .collect(),
         _ => {
             let mut defaults = Vec::new();
             defaults.push(downloader::get_default_soundtrack_dir());
@@ -283,6 +315,9 @@ pub async fn soundtrack_scan_library(
             defaults
         }
     };
+    for sp in &scan_paths {
+        allow_soundtrack_directory_in_scopes(&app, sp);
+    }
 
     tokio::task::spawn_blocking(move || {
         use tauri::Manager;

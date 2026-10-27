@@ -158,7 +158,24 @@ pub fn run() {
                 if let Err(err) = commands::save_manager::recovery::CrashRecoveryEngine::recover_interrupted_operations(&conn) {
                     log::error!("Failed to recover interrupted save operations: {}", err);
                 }
+                if let Ok(custom_st_dir) = conn.query_row(
+                    "SELECT value FROM settings WHERE key = 'soundtrack_download_dir'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                ) {
+                    let trimmed = custom_st_dir.trim();
+                    if !trimmed.is_empty() {
+                        commands::soundtrack::allow_soundtrack_directory_in_scopes(
+                            app.handle(),
+                            std::path::Path::new(trimmed),
+                        );
+                    }
+                }
             }
+            commands::soundtrack::allow_soundtrack_directory_in_scopes(
+                app.handle(),
+                &commands::soundtrack::downloader::get_default_soundtrack_dir(),
+            );
             app.manage(database);
 
             // Run save location auto-configuration in the background after startup

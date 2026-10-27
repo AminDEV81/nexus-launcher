@@ -40,15 +40,7 @@
           "$HOME/Music/**",
           "$APPDATA/soundtracks/**",
           "$LOCALAPPDATA/soundtracks/**",
-          "$EXE/Soundtracks/**",
-          "**/*.mp3",
-          "**/*.flac",
-          "**/*.ogg",
-          "**/*.m4a",
-          "**/*.wav",
-          "**/*.opus",
-          "**/*.aac",
-          "**/*.webm"
+          "$EXE/Soundtracks/**"
         ]
       }
     }

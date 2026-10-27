@@ -2,6 +2,7 @@ use crate::db::Database;
 use crate::error::{AppError, AppResult};
 use futures_util::StreamExt;
 use rusqlite::params;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -24,6 +25,13 @@ pub struct ActiveDownloadTask {
 #[derive(Default)]
 pub struct SoundtrackDownloadState {
     pub active: Mutex<HashMap<String, Arc<ActiveDownloadTask>>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PartialDownloadMeta {
+    url: String,
+    target_path: String,
+    validator: Option<String>,
 }
 
 /// Sanitize filename/folder name to be safe on Windows/POSIX and prevent path traversal
@@ -50,6 +58,44 @@ pub fn get_default_soundtrack_dir() -> PathBuf {
     } else {
         PathBuf::from("Soundtracks")
     }
+}
+
+/// Returns a dedicated staging directory inside AppData (outside the user's Music library)
+/// so in-progress or interrupted `.part` files never clutter the user's Music folder.
+fn get_soundtrack_staging_paths(app: &AppHandle, download_id: &str) -> (PathBuf, PathBuf) {
+    let base_dir = crate::paths::app_data_dir(app)
+        .unwrap_or_else(|_| std::env::temp_dir().join("nexus-launcher"))
+        .join("soundtrack_staging");
+    let _ = fs::create_dir_all(&base_dir);
+    let safe_id = crate::commands::save_manager::fs_ops::sanitize_safe_id_segment(download_id);
+    let part_path = base_dir.join(format!("{safe_id}.part"));
+    let meta_path = base_dir.join(format!("{safe_id}.part.json"));
+    (part_path, meta_path)
+}
+
+fn read_part_meta(meta_path: &Path) -> Option<PartialDownloadMeta> {
+    let raw = fs::read_to_string(meta_path).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
+fn write_part_meta(meta_path: &Path, meta: &PartialDownloadMeta) {
+    if let Ok(json) = serde_json::to_string(meta) {
+        let _ = fs::write(meta_path, json);
+    }
+}
+
+fn remove_staging_files(part_path: &Path, meta_path: &Path) {
+    let _ = fs::remove_file(part_path);
+    let _ = fs::remove_file(meta_path);
+}
+
+fn extract_response_validator(headers: &reqwest::header::HeaderMap) -> Option<String> {
+    headers
+        .get(reqwest::header::ETAG)
+        .or_else(|| headers.get(reqwest::header::LAST_MODIFIED))
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
 }
 
 fn is_within_soundtrack_root(target: &Path, allowed_root: &Path) -> bool {
@@ -156,6 +202,7 @@ pub async fn start_download(
             "Target soundtrack path must reside inside the configured soundtrack download directory.".into(),
         ));
     }
+    super::allow_soundtrack_directory_in_scopes(&app, &configured_root);
 
     // Atomically check and register active download task
     let cancel = CancellationToken::new();
@@ -176,12 +223,24 @@ pub async fn start_download(
         let _ = fs::create_dir_all(parent);
     }
 
-    let part_path = format!("{}.part", req.target_path);
+    let (part_path, meta_path) = get_soundtrack_staging_paths(&app, &req.download_id);
+
+    // Validate existing `.part` file against stored URL + ETag/Last-Modified validator;
+    // if URL/target_path changed or no validator was stored, discard `.part` and start fresh from 0.
+    let stored_meta = read_part_meta(&meta_path).filter(|m| {
+        m.url == trimmed_url
+            && m.target_path == req.target_path
+            && m.validator.as_deref().is_some_and(|v| !v.is_empty())
+    });
+    if stored_meta.is_none() {
+        remove_staging_files(&part_path, &meta_path);
+    }
+
     let existing_part_bytes = fs::metadata(&part_path)
         .map(|m| if m.is_file() { m.len() as i64 } else { 0 })
         .unwrap_or(0);
 
-    // Upsert row in soundtrack_downloads preserving any existing partial bytes
+    // Upsert row in soundtrack_downloads preserving any verified partial bytes
     {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
@@ -191,6 +250,8 @@ pub async fn start_download(
                 created_at, updated_at
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, 'downloading', 0, datetime('now'), datetime('now'))
             ON CONFLICT(id) DO UPDATE SET
+                url = excluded.url,
+                save_path = excluded.save_path,
                 status = 'downloading',
                 downloaded_bytes = ?7,
                 error_message = NULL,
@@ -200,7 +261,7 @@ pub async fn start_download(
                 req.track_id,
                 req.album_id,
                 req.game_id,
-                req.url,
+                trimmed_url,
                 req.target_path,
                 existing_part_bytes
             ],
@@ -212,8 +273,8 @@ pub async fn start_download(
     let track_id_clone = req.track_id.clone();
     let album_id_clone = req.album_id.clone();
     let target_path_clone = req.target_path.clone();
-    let part_path_clone = part_path;
-    let url_clone = req.url.clone();
+    let url_clone = trimmed_url.to_string();
+    let expected_validator = stored_meta.and_then(|m| m.validator);
 
     tokio::spawn(async move {
         let client = reqwest::Client::builder()
@@ -222,50 +283,56 @@ pub async fn start_download(
             .build()
             .unwrap_or_default();
 
-        // Check if a `.part` partial file exists on disk so we can resume with HTTP Range
-        // without touching any already-completed file at `target_path_clone`!
-        let existing_bytes = fs::metadata(&part_path_clone)
-            .map(|m| if m.is_file() { m.len() } else { 0 })
-            .unwrap_or(0);
+        let existing_bytes = if expected_validator.is_some() {
+            fs::metadata(&part_path)
+                .map(|m| if m.is_file() { m.len() } else { 0 })
+                .unwrap_or(0)
+        } else {
+            0
+        };
 
         let mut request_builder = client.get(&url_clone);
         if existing_bytes > 0 {
-            request_builder = request_builder.header(
-                reqwest::header::RANGE,
-                format!("bytes={existing_bytes}-"),
-            );
+            if let Some(ref val) = expected_validator {
+                request_builder = request_builder
+                    .header(reqwest::header::RANGE, format!("bytes={existing_bytes}-"))
+                    .header(reqwest::header::IF_RANGE, val.as_str());
+            }
         }
 
         let resp_result = request_builder.send().await;
         let resp = match resp_result {
             Ok(r) if r.status().is_success() => r,
             Ok(r) if r.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE && existing_bytes > 0 => {
-                // 416 Range Not Satisfiable: the `.part` file is already complete or stale.
-                // Retry once from byte 0 without Range header; if that fails, preserve any existing completed file.
-                let _ = fs::remove_file(&part_path_clone);
+                // 416 Range Not Satisfiable: discard stale `.part` and retry once from byte 0
+                remove_staging_files(&part_path, &meta_path);
                 match client.get(&url_clone).send().await {
                     Ok(r2) if r2.status().is_success() => r2,
                     Ok(r2) => {
                         let err_msg = format!("HTTP {}", r2.status());
-                        fail_download(&app_clone, &download_id_clone, &part_path_clone, 0, &err_msg, false).await;
+                        fail_download(&app_clone, &download_id_clone, &part_path, &meta_path, 0, &err_msg, true).await;
                         return;
                     }
                     Err(e) => {
                         let err_msg = e.to_string();
-                        fail_download(&app_clone, &download_id_clone, &part_path_clone, 0, &err_msg, false).await;
+                        fail_download(&app_clone, &download_id_clone, &part_path, &meta_path, 0, &err_msg, true).await;
                         return;
                     }
                 }
             }
             Ok(r) => {
-                let err_msg = format!("HTTP {}", r.status());
+                let status = r.status();
+                let err_msg = format!("HTTP {status}");
+                // Clean up staging `.part` on permanent 4xx errors (400/401/403/404/410)
+                let is_permanent = status.is_client_error() && status != reqwest::StatusCode::TOO_MANY_REQUESTS;
                 fail_download(
                     &app_clone,
                     &download_id_clone,
-                    &part_path_clone,
-                    existing_bytes as i64,
+                    &part_path,
+                    &meta_path,
+                    if is_permanent { 0 } else { existing_bytes as i64 },
                     &err_msg,
-                    false,
+                    is_permanent,
                 )
                 .await;
                 return;
@@ -275,7 +342,8 @@ pub async fn start_download(
                 fail_download(
                     &app_clone,
                     &download_id_clone,
-                    &part_path_clone,
+                    &part_path,
+                    &meta_path,
                     existing_bytes as i64,
                     &err_msg,
                     false,
@@ -285,20 +353,31 @@ pub async fn start_download(
             }
         };
 
-        let verified_range_total = if resp.status() == reqwest::StatusCode::PARTIAL_CONTENT && existing_bytes > 0 {
+        let response_validator = extract_response_validator(resp.headers());
+        let validator_still_matches = match (&expected_validator, &response_validator) {
+            (Some(exp), Some(actual)) => exp == actual,
+            (Some(_), None) => true,
+            _ => false,
+        };
+
+        let verified_range_total = if resp.status() == reqwest::StatusCode::PARTIAL_CONTENT
+            && existing_bytes > 0
+            && validator_still_matches
+        {
             content_range_matches_offset(resp.headers(), existing_bytes)
         } else {
             None
         };
 
         let (mut file, mut downloaded_bytes, total_bytes) = if let Some(total_from_range) = verified_range_total {
-            match OpenOptions::new().create(true).append(true).open(&part_path_clone) {
+            match OpenOptions::new().create(true).append(true).open(&part_path) {
                 Ok(f) => (f, existing_bytes as i64, total_from_range as i64),
                 Err(e) => {
                     fail_download(
                         &app_clone,
                         &download_id_clone,
-                        &part_path_clone,
+                        &part_path,
+                        &meta_path,
                         existing_bytes as i64,
                         &format!("File open failed: {e}"),
                         false,
@@ -308,18 +387,27 @@ pub async fn start_download(
                 }
             }
         } else {
-            // Server returned 200 OK or a mismatched Content-Range: truncate `.part` and write from 0
+            // Server returned 200 OK or validator/Content-Range changed: truncate `.part` and write fresh from 0
             let total = resp.content_length().unwrap_or(0) as i64;
-            match File::create(&part_path_clone) {
+            write_part_meta(
+                &meta_path,
+                &PartialDownloadMeta {
+                    url: url_clone.clone(),
+                    target_path: target_path_clone.clone(),
+                    validator: response_validator,
+                },
+            );
+            match File::create(&part_path) {
                 Ok(f) => (f, 0i64, total),
                 Err(e) => {
                     fail_download(
                         &app_clone,
                         &download_id_clone,
-                        &part_path_clone,
+                        &part_path,
+                        &meta_path,
                         0,
                         &format!("File create failed: {e}"),
-                        false,
+                        true,
                     )
                     .await;
                     return;
@@ -338,7 +426,7 @@ pub async fn start_download(
                     drop(file);
                     let should_delete = task_ref.delete_partial.load(Ordering::SeqCst);
                     let final_status = if should_delete {
-                        let _ = fs::remove_file(&part_path_clone);
+                        remove_staging_files(&part_path, &meta_path);
                         "cancelled"
                     } else {
                         "paused"
@@ -384,7 +472,8 @@ pub async fn start_download(
                                 fail_download(
                                     &app_clone,
                                     &download_id_clone,
-                                    &part_path_clone,
+                                    &part_path,
+                                    &meta_path,
                                     0,
                                     "Soundtrack file exceeds 250 MB safety limit",
                                     true,
@@ -396,7 +485,8 @@ pub async fn start_download(
                                 fail_download(
                                     &app_clone,
                                     &download_id_clone,
-                                    &part_path_clone,
+                                    &part_path,
+                                    &meta_path,
                                     downloaded_bytes,
                                     &format!("Write failed: {e}"),
                                     false,
@@ -433,7 +523,8 @@ pub async fn start_download(
                             fail_download(
                                 &app_clone,
                                 &download_id_clone,
-                                &part_path_clone,
+                                &part_path,
+                                &meta_path,
                                 downloaded_bytes,
                                 &format!("Stream error: {e}"),
                                 false,
@@ -441,23 +532,26 @@ pub async fn start_download(
                             return;
                         }
                         None => {
-                            // Download completed: flush `.part` and atomically move to `target_path_clone`
+                            // Download completed: flush `.part` in staging and move to `target_path_clone`
                             let _ = file.flush();
                             drop(file);
-                            if let Err(e) = fs::rename(&part_path_clone, &target_path_clone) {
-                                if fs::copy(&part_path_clone, &target_path_clone).is_ok() {
-                                    let _ = fs::remove_file(&part_path_clone);
+                            if let Err(e) = fs::rename(&part_path, &target_path_clone) {
+                                if fs::copy(&part_path, &target_path_clone).is_ok() {
+                                    remove_staging_files(&part_path, &meta_path);
                                 } else {
                                     fail_download(
                                         &app_clone,
                                         &download_id_clone,
-                                        &part_path_clone,
+                                        &part_path,
+                                        &meta_path,
                                         downloaded_bytes,
                                         &format!("Failed to finalize soundtrack file: {e}"),
                                         false,
                                     ).await;
                                     return;
                                 }
+                            } else {
+                                let _ = fs::remove_file(&meta_path);
                             }
                             complete_download(
                                 &app_clone,
@@ -480,13 +574,14 @@ pub async fn start_download(
 async fn fail_download(
     app: &AppHandle,
     download_id: &str,
-    part_path: &str,
+    part_path: &Path,
+    meta_path: &Path,
     preserved_bytes: i64,
     error: &str,
     remove_partial: bool,
 ) {
     if remove_partial {
-        let _ = fs::remove_file(part_path);
+        remove_staging_files(part_path, meta_path);
     }
     let recorded_bytes = if remove_partial { 0 } else { preserved_bytes.max(0) };
     if let Some(db) = app.try_state::<Database>() {
@@ -557,13 +652,16 @@ async fn complete_download(
     );
 }
 
-pub fn cancel_download(state: &SoundtrackDownloadState, download_id: &str) -> bool {
+pub fn cancel_download(app: &AppHandle, state: &SoundtrackDownloadState, download_id: &str) -> bool {
     let mut active = state.active.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(task) = active.remove(download_id) {
         task.delete_partial.store(true, Ordering::SeqCst);
         task.cancel.cancel();
         true
     } else {
+        // Also clean up any paused/failed `.part` staging files when cancelling an inactive download
+        let (part_path, meta_path) = get_soundtrack_staging_paths(app, download_id);
+        remove_staging_files(&part_path, &meta_path);
         false
     }
 }

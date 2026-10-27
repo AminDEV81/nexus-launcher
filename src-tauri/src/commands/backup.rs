@@ -231,6 +231,167 @@ pub fn export_backup(
 /// the per-table rows on success. Everything after this point can
 /// assume well-shaped data.
 /// One table's rows from a backup file, in import order.
+/// Validates a game's `executable_path` and `install_path` during backup import:
+/// - Allows legitimate game folders under `C:\Program Files (x86)\Steam\steamapps\common\<Game>`,
+///   `C:\Program Files\Epic Games\<Game>`, `C:\GOG Games\<Game>`, `D:\Games\<Game>`, etc.
+/// - Blocks OS system directories (`C:\Windows`, `System32`, `SysWOW64`), user `AppData` interpreters,
+///   and shell/scripting binaries (`cmd.exe`, `powershell.exe`, `pwsh.exe`, `python.exe`, `node.exe`, etc.).
+/// - Requires `executable_path` to reside inside a valid game-specific `install_path` directory on disk,
+///   falling back to `find_best_exe(install_path, game_name)` if the `.exe` moved or needs re-detection.
+fn validate_or_redetect_backup_game_exe(
+    exe_str: &str,
+    install_str: &str,
+    game_name: &str,
+) -> Option<String> {
+    const BLOCKED_INTERPRETERS: &[&str] = &[
+        "cmd",
+        "powershell",
+        "pwsh",
+        "wscript",
+        "cscript",
+        "mshta",
+        "rundll32",
+        "regsvr32",
+        "certutil",
+        "bitsadmin",
+        "msiexec",
+        "python",
+        "pythonw",
+        "python3",
+        "node",
+        "deno",
+        "bun",
+        "bash",
+        "sh",
+        "wsl",
+        " explorer",
+        "explorer",
+        "conhost",
+        "taskmgr",
+        "regedit",
+    ];
+
+    let is_safe_game_install_dir = |dir_raw: &str| -> Option<std::path::PathBuf> {
+        let trimmed = dir_raw.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let p = std::path::Path::new(trimmed);
+        if !p.is_absolute()
+            || p.components().any(|c| {
+                matches!(
+                    c,
+                    std::path::Component::ParentDir | std::path::Component::CurDir
+                )
+            })
+            || !p.is_dir()
+        {
+            return None;
+        }
+        let normal_count = p
+            .components()
+            .filter(|c| matches!(c, std::path::Component::Normal(_)))
+            .count();
+        // Require at least 2 normal components (e.g. `D:\Games\Hades` or `C:\Program Files\Epic Games\Fortnite`),
+        // so bare `C:\`, `C:\Program Files`, `C:\Program Files (x86)`, or `C:\Users` are never accepted.
+        if normal_count < 2 {
+            return None;
+        }
+        let norm = trimmed
+            .replace('/', "\\")
+            .trim_end_matches('\\')
+            .to_lowercase();
+        for forbidden_prefix in [
+            "c:\\windows",
+            "c:\\programdata",
+            "/etc",
+            "/usr",
+            "/bin",
+            "/sbin",
+            "/lib",
+        ] {
+            if norm == forbidden_prefix || norm.starts_with(&format!("{forbidden_prefix}\\")) {
+                return None;
+            }
+        }
+        if let Some(home) = dirs::home_dir() {
+            let home_norm = home
+                .to_string_lossy()
+                .replace('/', "\\")
+                .trim_end_matches('\\')
+                .to_lowercase();
+            let appdata_norm = format!("{home_norm}\\appdata");
+            if norm == home_norm
+                || norm == appdata_norm
+                || norm.starts_with(&format!("{appdata_norm}\\"))
+            {
+                return None;
+            }
+        }
+        // Reject top-level Program Files / Steam roots unless pointing to a specific game subfolder
+        if matches!(
+            norm.as_str(),
+            "c:\\program files"
+                | "c:\\program files (x86)"
+                | "c:\\program files (x86)\\steam"
+                | "c:\\program files (x86)\\steam\\steamapps"
+                | "c:\\program files (x86)\\steam\\steamapps\\common"
+                | "c:\\program files\\epic games"
+        ) {
+            return None;
+        }
+        Some(p.to_path_buf())
+    };
+
+    let install_dir = is_safe_game_install_dir(install_str).or_else(|| {
+        let ep = std::path::Path::new(exe_str.trim());
+        ep.parent()
+            .and_then(|parent| parent.to_str())
+            .and_then(is_safe_game_install_dir)
+    })?;
+
+    if !exe_str.is_empty() {
+        let exe_path = std::path::Path::new(exe_str);
+        if exe_path.is_absolute()
+            && !exe_path.components().any(|c| {
+                matches!(
+                    c,
+                    std::path::Component::ParentDir | std::path::Component::CurDir
+                )
+            })
+            && exe_path
+                .extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
+            && exe_path.is_file()
+        {
+            let stem = exe_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .trim()
+                .to_ascii_lowercase();
+            if !stem.is_empty() && !BLOCKED_INTERPRETERS.contains(&stem.as_str()) {
+                let norm_exe = exe_str
+                    .replace('/', "\\")
+                    .trim_end_matches('\\')
+                    .to_lowercase();
+                let norm_inst = install_dir
+                    .to_string_lossy()
+                    .replace('/', "\\")
+                    .trim_end_matches('\\')
+                    .to_lowercase();
+                if norm_exe.starts_with(&format!("{norm_inst}\\")) {
+                    return Some(exe_str.to_string());
+                }
+            }
+        }
+    }
+
+    // Fallback: if `install_path` is a valid existing game folder on disk, auto-detect the game `.exe` inside it
+    crate::commands::download::find_best_exe(&install_dir, game_name)
+}
+
 type BackupTable = (&'static str, Vec<Map<String, Value>>);
 
 fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
@@ -311,27 +472,36 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
                         "backup contains a game row without an id or name.".into(),
                     ));
                 }
-                // Strip arbitrary shell hooks from backup files to prevent RCE on Play
+                // Strip arbitrary shell hooks AND launch_arguments from backup files to prevent RCE on Play
+                // (e.g. pointing executable_path to an interpreter with malicious CLI flags).
                 game.insert("pre_launch_command".to_string(), Value::Null);
                 game.insert("post_launch_command".to_string(), Value::Null);
-                if let Some(exe_str) = game.get("executable_path").and_then(Value::as_str) {
-                    let inst_str = game.get("install_path").and_then(Value::as_str).unwrap_or("");
-                    let exe_path = std::path::Path::new(exe_str.trim());
-                    let is_valid_local_exe = exe_path.is_absolute()
-                        && !exe_path.components().any(|c| matches!(c, std::path::Component::ParentDir))
-                        && exe_path
-                            .extension()
-                            .and_then(|e| e.to_str())
-                            .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
-                        && exe_path.is_file()
-                        && crate::commands::download::is_safe_download_save_path(
-                            if !inst_str.trim().is_empty() {
-                                inst_str
-                            } else {
-                                exe_path.parent().and_then(|p| p.to_str()).unwrap_or("")
-                            },
-                        );
-                    if !is_valid_local_exe {
+                game.insert("launch_arguments".to_string(), Value::Null);
+
+                let game_name = game
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string();
+                let inst_str = game
+                    .get("install_path")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+                let exe_str = game
+                    .get("executable_path")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+
+                let resolved_exe = validate_or_redetect_backup_game_exe(&exe_str, &inst_str, &game_name);
+                match resolved_exe {
+                    Some(valid_exe) => {
+                        game.insert("executable_path".to_string(), Value::String(valid_exe));
+                    }
+                    None => {
                         game.insert("executable_path".to_string(), Value::Null);
                         if game.get("source").and_then(Value::as_str) != Some("steam") {
                             game.insert("is_installed".to_string(), Value::Number(0.into()));

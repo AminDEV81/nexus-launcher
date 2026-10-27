@@ -199,6 +199,7 @@ export async function searchGames(
   } = opts
   if (!env) throw new Error('ENV_MISSING')
   const cleanQ = queryText.replace(/["\\]/g, '').trim()
+  const safeOffset = Math.max(0, Math.min(1000, Number.isFinite(offset) ? Math.floor(offset) : 0))
   const now = Math.floor(Date.now() / 1000)
 
   const hasFilters = Boolean(
@@ -314,14 +315,14 @@ export async function searchGames(
       sortOrder = 'hypes desc'
     }
 
-    const query = `${FIELDS_LIST}; where ${conditions.join(' & ')}; sort ${sortOrder}; limit 36; offset ${offset};`
+    const query = `${FIELDS_LIST}; where ${conditions.join(' & ')}; sort ${sortOrder}; limit 36; offset ${safeOffset};`
     const raw = await queryIgdb('games', query, env)
     return raw.map(normalizeGame)
   }
 
   if (cleanQ.length >= 2) {
     const wc = buildNameWildcardClause(cleanQ)
-    const searchQuery = `search "${cleanQ}"; ${FIELDS_LIST}; where game_type = ${SEARCH_TYPES} & cover != null; limit 30; offset ${offset};`
+    const searchQuery = `search "${cleanQ}"; ${FIELDS_LIST}; where game_type = ${SEARCH_TYPES} & cover != null; limit 30; offset ${safeOffset};`
     if (wc) {
       const wildcardQuery = `${FIELDS_LIST}; where game_type = ${SEARCH_TYPES} & cover != null & ${wc}; sort total_rating_count desc; limit 24; offset ${safeOffset};`
       const [wildRaw, searchRaw] = await Promise.all([

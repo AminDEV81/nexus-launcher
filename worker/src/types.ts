@@ -1,10 +1,17 @@
+export interface RateLimiterBinding {
+  limit(options: { key: string }): Promise<{ success: boolean }>
+}
+
 export interface Env {
   IGDB_CLIENT_ID?: string
   IGDB_CLIENT_SECRET?: string
   STEAMGRIDDB_API_KEY?: string
   ENVIRONMENT?: string
   API_VERSION?: string
+  RATE_LIMIT_PER_MINUTE?: string
+  SEARCH_RATE_LIMIT_PER_MINUTE?: string
   NEXUS_CACHE?: KVNamespace
+  RATE_LIMITER?: RateLimiterBinding
 }
 
 export interface ApiResponse<T> {

@@ -1590,7 +1590,7 @@ fn single_root_dir(save_path: &str) -> Option<String> {
 /// Picks the most likely game executable from an extracted folder:
 /// skips uninstallers/redistributes/anti-cheat helpers, prefers shallow
 /// paths, big binaries, and stems that echo the game's name.
-fn find_best_exe(dir: &std::path::Path, game_name: &str) -> Option<String> {
+pub(crate) fn find_best_exe(dir: &std::path::Path, game_name: &str) -> Option<String> {
     const EXCLUDE: [&str; 13] = [
         "unins", "redist", "setup", "dxsetup", "vcredist", "dotnet", "directx", "crash",
         "unitycrash", "eac", "easyanticheat", "update", "patcher",

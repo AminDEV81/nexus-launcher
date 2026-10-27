@@ -36,12 +36,12 @@ export async function handleRequest(
   }
 
   // 2. Rate Limiting Check
-  const clientIp = request.headers.get('cf-connecting-ip') || '127.0.0.1'
-  const rateLimit = await checkRateLimit(clientIp, env)
+  const isSearchAction = pathname === '/api/v1/games/search'
+  const rateLimit = await checkRateLimit(request, env, isSearchAction, ctx)
   if (!rateLimit.allowed) {
     return createErrorResponse(
       'RATE_LIMITED',
-      `Too many requests. Please retry in ${Math.ceil(rateLimit.resetInMs / 1000)}s`,
+      `Too many requests. Please retry in ${Math.max(1, Math.ceil(rateLimit.resetInMs / 1000))}s`,
       429,
     )
   }

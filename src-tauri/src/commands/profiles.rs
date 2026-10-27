@@ -964,32 +964,42 @@ pub(crate) fn is_blocked_host_or_ip(host: &str) -> bool {
         .trim_end_matches('.')
         .to_ascii_lowercase();
 
-    // Cache DNS resolution results so repeated checks never stall on OS resolver timeouts
-    static DNS_SAFETY_CACHE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, bool>>> =
-        std::sync::OnceLock::new();
+    // Short 15-second TTL DNS cache: only caches successful DNS resolutions (never caches DNS errors as safe)
+    // and re-resolves every 15s to defend against DNS rebinding.
+    const DNS_CACHE_TTL: std::time::Duration = std::time::Duration::from_secs(15);
+    static DNS_SAFETY_CACHE: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<String, (bool, std::time::Instant)>>,
+    > = std::sync::OnceLock::new();
     let cache = DNS_SAFETY_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    let now = std::time::Instant::now();
     if let Ok(guard) = cache.lock() {
-        if let Some(&blocked) = guard.get(&lower) {
-            return blocked;
-        }
-    }
-
-    // Resolve hostname via system DNS and block if any resolved IP is private/local
-    use std::net::ToSocketAddrs;
-    let mut blocked = false;
-    if let Ok(addrs) = (lower.as_str(), 80u16).to_socket_addrs() {
-        for sock in addrs {
-            if is_blocked_ip(sock.ip()) {
-                blocked = true;
-                break;
+        if let Some(&(blocked, resolved_at)) = guard.get(&lower) {
+            if now.duration_since(resolved_at) < DNS_CACHE_TTL {
+                return blocked;
             }
         }
     }
+
+    // Resolve hostname via system DNS: fail-closed (block) if DNS fails or returns any private/local IP!
+    use std::net::ToSocketAddrs;
+    let Ok(addrs) = (lower.as_str(), 80u16).to_socket_addrs() else {
+        // Fail-closed on DNS resolution failure; do NOT cache transient DNS failures
+        return true;
+    };
+    let resolved_ips: Vec<std::net::IpAddr> = addrs.map(|s| s.ip()).collect();
+    if resolved_ips.is_empty() {
+        return true;
+    }
+    let blocked = resolved_ips.into_iter().any(is_blocked_ip);
+
     if let Ok(mut guard) = cache.lock() {
-        if guard.len() > 512 {
-            guard.clear();
+        if guard.len() > 256 {
+            guard.retain(|_, (_, ts)| now.duration_since(*ts) < DNS_CACHE_TTL);
+            if guard.len() > 256 {
+                guard.clear();
+            }
         }
-        guard.insert(lower, blocked);
+        guard.insert(lower, (blocked, now));
     }
     blocked
 }
@@ -1006,8 +1016,8 @@ pub(crate) fn safe_ssrf_redirect_policy() -> reqwest::redirect::Policy {
         let Some(host) = url.host_str() else {
             return attempt.error("redirect URL missing host");
         };
-        // Use non-blocking literal + cached DNS check inside reqwest's synchronous redirect callback
-        if is_blocked_host_literal(host) {
+        // Enforce full literal + DNS IP resolution check on every redirect hop
+        if is_blocked_host_or_ip(host) {
             return attempt.error("redirect to private or local network address blocked");
         }
         attempt.follow()
@@ -1263,7 +1273,7 @@ mod tests {
 
     #[test]
     fn test_validate_avatar_url_blocks_ssrf_and_allows_public_https() {
-        assert!(validate_avatar_url("https://images.igdb.com/igdb/image/upload/t_thumb/abc.jpg").is_ok());
+        assert!(validate_avatar_url("https://1.1.1.1/igdb/image/upload/t_thumb/abc.jpg").is_ok());
         assert!(validate_avatar_url("http://127.0.0.1:8080/secret").is_err());
         assert!(validate_avatar_url("http://localhost:3000/avatar.png").is_err());
         assert!(validate_avatar_url("http://169.254.169.254/latest/meta-data").is_err());
