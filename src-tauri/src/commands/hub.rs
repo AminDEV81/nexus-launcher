@@ -4735,13 +4735,40 @@ fn validate_youtube_video_id(raw: &str) -> AppResult<&str> {
     Ok(trimmed)
 }
 
+/// Rejects NaN/infinite geometry coming from the webview and clamps it to sane bounds so a bad
+/// layout measurement can never create a zero-sized or screen-sized child webview.
+fn sanitize_embedded_bounds(x: f64, y: f64, width: f64, height: f64) -> AppResult<(f64, f64, f64, f64)> {
+    if ![x, y, width, height].iter().all(|v| v.is_finite()) {
+        return Err(AppError::Invalid("invalid embedded player bounds".into()));
+    }
+    Ok((
+        x.clamp(-10_000.0, 10_000.0),
+        y.clamp(-10_000.0, 10_000.0),
+        width.clamp(200.0, 8_000.0),
+        height.clamp(120.0, 8_000.0),
+    ))
+}
+
+/// Destroys a webview by label and waits briefly so a new one can reuse the label. `close()` is
+/// asynchronous, and building a window with the same label right after it can fail with
+/// "a webview with the label ... already exists".
+async fn destroy_webview_and_wait(app: &AppHandle, label: &str) {
+    if let Some(existing) = app.get_webview_window(label) {
+        let _ = existing.destroy();
+        for _ in 0..10 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(30)).await;
+            if app.get_webview_window(label).is_none() {
+                break;
+            }
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn open_trailer_window(app: AppHandle, video_id: String, title: String) -> AppResult<()> {
     let valid_id = validate_youtube_video_id(&video_id)?;
 
-    if let Some(window) = app.get_webview_window("trailer_player") {
-        let _ = window.close();
-    }
+    destroy_webview_and_wait(&app, "trailer_player").await;
 
     let watch_url = format!("https://www.youtube.com/watch?v={valid_id}&autoplay=1")
         .parse()
@@ -4787,9 +4814,8 @@ pub async fn mount_embedded_trailer(
     width: f64,
     height: f64,
 ) -> AppResult<()> {
-    if let Some(child) = app.get_webview_window("trailer_child") {
-        let _ = child.close();
-    }
+    let (x, y, width, height) = sanitize_embedded_bounds(x, y, width, height)?;
+    destroy_webview_and_wait(&app, "trailer_child").await;
 
     let main_window = app
         .get_webview_window("main")
@@ -4843,9 +4869,8 @@ pub async fn mount_embedded_google_auth(
     width: f64,
     height: f64,
 ) -> AppResult<()> {
-    if let Some(child) = app.get_webview_window("trailer_child") {
-        let _ = child.close();
-    }
+    let (x, y, width, height) = sanitize_embedded_bounds(x, y, width, height)?;
+    destroy_webview_and_wait(&app, "trailer_child").await;
 
     let main_window = app
         .get_webview_window("main")

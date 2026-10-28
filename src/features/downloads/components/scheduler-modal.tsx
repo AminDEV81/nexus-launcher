@@ -39,7 +39,12 @@ export function SchedulerModal({ open, onClose }: SchedulerModalProps) {
       setAction((settings.download_scheduler_action as 'shutdown' | 'sleep') || 'shutdown')
       try {
         if (settings.download_scheduler_days) {
-          setSelectedDays(JSON.parse(settings.download_scheduler_days))
+          const parsed: unknown = JSON.parse(settings.download_scheduler_days)
+          setSelectedDays(
+            Array.isArray(parsed)
+              ? parsed.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6)
+              : [0, 1, 2, 3, 4, 5, 6],
+          )
         }
       } catch {
         setSelectedDays([0, 1, 2, 3, 4, 5, 6])

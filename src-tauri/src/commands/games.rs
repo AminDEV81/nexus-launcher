@@ -362,7 +362,7 @@ pub fn restore_game_from_memory(
 }
 
 /// Permanently purges a game, all its saves, sessions, artwork, and database records.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn permanently_delete_game(
     app: AppHandle,
     db: State<'_, Database>,

@@ -527,7 +527,7 @@ pub async fn soundtrack_scan_library(
     .map_err(|e| AppError::Other(e.to_string()))?
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn soundtrack_get_local_files(
     app: AppHandle,
     db: State<'_, Database>,

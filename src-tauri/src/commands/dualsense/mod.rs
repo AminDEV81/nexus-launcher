@@ -876,7 +876,7 @@ pub fn dualsense_trigger_rumble_test(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn dualsense_install_driver(
     driver_type: String,
     state: tauri::State<'_, DualSenseEngineState>,

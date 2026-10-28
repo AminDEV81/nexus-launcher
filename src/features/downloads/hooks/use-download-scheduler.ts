@@ -20,6 +20,25 @@ export function isTimeInWindow(startTime: string, endTime: string, now: Date): b
   return nowMinutes >= startMinutes || nowMinutes < endMinutes
 }
 
+/**
+ * Whether `now` falls on a scheduled day. An overnight window (e.g. 23:00–07:00) belongs to the
+ * day it STARTED on, so after midnight the previous weekday decides whether it is active.
+ */
+export function isScheduleDayActive(
+  selectedDays: number[],
+  startTime: string,
+  endTime: string,
+  now: Date,
+): boolean {
+  const [sH = 0, sM = 0] = startTime.split(':').map(Number)
+  const [eH = 0, eM = 0] = endTime.split(':').map(Number)
+  const nowMinutes = now.getHours() * 60 + now.getMinutes()
+  const crossesMidnight = sH * 60 + sM > eH * 60 + eM
+  const day = now.getDay()
+  const windowDay = crossesMidnight && nowMinutes < eH * 60 + eM ? (day + 6) % 7 : day
+  return selectedDays.includes(windowDay)
+}
+
 export function useDownloadScheduler() {
   const { data: settings } = useSettings()
   const { data: downloads = [] } = useDownloads()
@@ -49,7 +68,10 @@ export function useDownloadScheduler() {
     let selectedDays: number[] = [0, 1, 2, 3, 4, 5, 6]
     try {
       if (settings.download_scheduler_days) {
-        selectedDays = JSON.parse(settings.download_scheduler_days)
+        const parsed: unknown = JSON.parse(settings.download_scheduler_days)
+        if (Array.isArray(parsed)) {
+          selectedDays = parsed.filter((d): d is number => Number.isInteger(d) && d >= 0 && d <= 6)
+        }
       }
     } catch {
       selectedDays = [0, 1, 2, 3, 4, 5, 6]
@@ -61,9 +83,8 @@ export function useDownloadScheduler() {
     const checkSchedule = () => {
       const currentDownloads = downloadsRef.current
       const now = new Date()
-      const dayOfWeek = now.getDay()
 
-      const isDayActive = selectedDays.includes(dayOfWeek)
+      const isDayActive = isScheduleDayActive(selectedDays, startTime, endTime, now)
       const isWindowActive = isDayActive && isTimeInWindow(startTime, endTime, now)
       const transitionedToActive = wasWindowActive.current !== true && isWindowActive
       wasWindowActive.current = isWindowActive

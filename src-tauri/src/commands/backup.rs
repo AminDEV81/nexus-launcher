@@ -173,7 +173,7 @@ fn json_to_sql(value: &Value) -> AppResult<rusqlite::types::Value> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn export_backup(
     db: State<'_, Database>,
     file_path: String,
@@ -673,7 +673,7 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
     Ok(tables)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn import_backup(
     app: AppHandle,
     db: State<'_, Database>,

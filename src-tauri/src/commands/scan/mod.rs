@@ -44,7 +44,7 @@ fn normalize_path_key(raw: &str) -> String {
 
 /// Runs every official store scanner PLUS the Cracked / Repack / Standalone scanner
 /// and returns the combined, de-duplicated list for the user to review.
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scan_all_stores(db: State<'_, Database>) -> AppResult<ScanResult> {
     let scans: [(&str, Vec<ScannedGame>); 9] = [
         ("steam", steam::scan_steam()),
@@ -114,7 +114,7 @@ pub fn scan_all_stores(db: State<'_, Database>) -> AppResult<ScanResult> {
     Ok(ScanResult { games, summaries })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn import_scanned_games(
     app: AppHandle,
     db: State<'_, Database>,
