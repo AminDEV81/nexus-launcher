@@ -13,6 +13,7 @@ import {
   Timer,
   Zap,
   Loader2,
+  Tv,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { LogoMark } from '@/components/brand/logo-mark'
@@ -289,6 +290,15 @@ export function TitleBar() {
               <span>Update v{update.version}</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => navigate('/console')}
+            title="Enter Console Mode (Big Picture) — Ctrl+Alt+Enter"
+            className="hidden sm:flex items-center gap-1.5 rounded-full border border-cyan-500/40 bg-cyan-500/12 px-2.5 py-0.5 text-[10px] font-extrabold text-cyan-400 hover:bg-cyan-500/25 transition-all cursor-pointer"
+          >
+            <Tv className="size-3" />
+            <span>Console</span>
+          </button>
           <ProfileBadgeButton />
         </div>
         <TitleBarButton label="Minimize" onClick={() => void appWindow.minimize()}>

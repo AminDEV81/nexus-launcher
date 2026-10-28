@@ -108,8 +108,12 @@ pub fn run() {
         // Second launch of the installed exe must not spawn a second
         // window: focus the existing one instead. Must be the FIRST
         // plugin so later plugins don't initialize twice.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             restore_and_focus_main_window(app);
+            if args.iter().any(|a| a.trim() == "--console") {
+                use tauri::Emitter;
+                let _ = app.emit("console://enter", ());
+            }
         }))
         .plugin(
             tauri_plugin_window_state::Builder::default()
@@ -220,6 +224,7 @@ pub fn run() {
             app.manage(commands::soundtrack::SoundtrackDownloadState::default());
             app.manage(commands::overlay::OverlayState::new());
             app.manage(commands::dualsense::DualSenseEngineState::new());
+            app.manage(commands::console::ConsoleModeState::new());
             // The hotkey manager lives in managed state so saving the
             // overlay config can re-register a changed hotkey at runtime.
             app.manage(commands::overlay::GlobalHotkeyManager::new());
@@ -469,6 +474,18 @@ pub fn run() {
             commands::dualsense::dualsense_scan_devices,
             commands::dualsense::dualsense_trigger_rumble_test,
             commands::dualsense::dualsense_install_driver,
+            commands::console::console_mode_enter,
+            commands::console::console_mode_exit,
+            commands::console::console_list_monitors,
+            commands::console::console_get_system_status,
+            commands::console::console_get_master_volume,
+            commands::console::console_set_master_volume,
+            commands::console::console_resume_game,
+            commands::console::console_toggle_quick_menu,
+            commands::console::console_guide_listener_start,
+            commands::console::console_guide_listener_stop,
+            commands::console::console_power_action,
+            commands::console::console_extract_dominant_color,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

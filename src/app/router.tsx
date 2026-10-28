@@ -15,6 +15,7 @@ import { LibrarySkeleton } from '@/features/library/components/library-skeleton'
 import { LazyStatsPage } from './lazy-stats-page'
 import { LazyDownloadsPage } from './lazy-downloads-page'
 import { LazySoundtrackPage } from './lazy-soundtrack-page'
+import { LazyConsolePage } from './lazy-console-page'
 import { OverlaySettingsPage } from '@/features/overlay/pages/overlay-settings-page'
 import { OverlayWindowPage } from '@/features/overlay/pages/overlay-window-page'
 import { BoosterPanel } from '@/features/booster/components/booster-panel'
@@ -154,6 +155,14 @@ export const router = createHashRouter([
         element: <OverlaySettingsPage />,
       },
     ],
+  },
+  {
+    path: '/console',
+    element: (
+      <Suspense fallback={<LibrarySkeleton />}>
+        <LazyConsolePage />
+      </Suspense>
+    ),
   },
   {
     path: '/overlay-window',

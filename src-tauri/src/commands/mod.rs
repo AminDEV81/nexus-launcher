@@ -2,6 +2,7 @@ pub mod backup;
 pub mod booster;
 pub mod cleanup;
 pub mod collections;
+pub mod console;
 pub mod download;
 pub mod dualsense;
 pub mod games;

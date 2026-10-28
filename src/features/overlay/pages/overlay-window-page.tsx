@@ -7,6 +7,7 @@ import { NotificationStack } from '../components/notification-stack'
 import { ThemeRenderer } from '../themes/theme-renderer'
 import { THEME_REGISTRY } from '../themes/theme-registry'
 import { isOverlayVisible } from '../services/overlay'
+import { QuickMenuOverlay } from '../components/quick-menu-overlay'
 import type { OverlayConfig, OverlayNotification, OverlayPosition } from '../types/overlay'
 
 const POSITION_CLASSES: Record<OverlayPosition, string> = {
@@ -27,6 +28,7 @@ export const OverlayWindowPage: React.FC = () => {
   const pushToast = useNotificationStore((s) => s.push)
   const clearToasts = useNotificationStore((s) => s.clear)
   const [visible, setVisible] = useState(false)
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false)
 
   const notif = config.notifications
 
@@ -67,6 +69,15 @@ export const OverlayWindowPage: React.FC = () => {
           useOverlayStore.setState({ config: normalizeConfig(e.payload) })
         }),
         listen<OverlayNotification>('overlay://notification', (e) => pushNotification(e.payload)),
+        listen<boolean>('overlay://quick-menu', (e) => {
+          const open = Boolean(e.payload)
+          setQuickMenuOpen(open)
+          if (open) setVisible(true)
+        }),
+        listen<string>('console://guide', () => {
+          setQuickMenuOpen((prev) => !prev)
+          setVisible(true)
+        }),
       ])
       if (!active) {
         subs.forEach((un) => un())
@@ -126,7 +137,7 @@ export const OverlayWindowPage: React.FC = () => {
     />
   )
 
-  if (!visible) return null
+  if (!visible && !quickMenuOpen) return null
 
   return (
     <>
@@ -155,6 +166,11 @@ export const OverlayWindowPage: React.FC = () => {
           {stack}
         </div>
       )}
+      <QuickMenuOverlay
+        open={quickMenuOpen}
+        onClose={() => setQuickMenuOpen(false)}
+        onToggleHudMetrics={() => setVisible((v) => !v)}
+      />
     </>
   )
 }

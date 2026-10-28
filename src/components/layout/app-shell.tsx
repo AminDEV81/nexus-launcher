@@ -1,4 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { listen } from '@tauri-apps/api/event'
+import { consoleToggleQuickMenu } from '@/services/console'
+import { useConsoleStore } from '@/features/console/store/console-store'
 import { AnimatePresence, motion } from 'framer-motion'
 import { TitleBar } from './title-bar'
 import { ResizeHandles } from './resize-handles'
@@ -63,6 +67,8 @@ export function AppShell() {
   useSoundtrackDownloads()
   useSoundtrackGlobalShortcuts()
 
+  const navigate = useNavigate()
+  const location = useLocation()
   const [showSplash, setShowSplash] = useState(true)
   const speed = useAnimationSpeed()
   const fillsScreen = useWindowFillsScreen()
@@ -85,6 +91,54 @@ export function AppShell() {
   const [onboardingDismissed, setOnboardingDismissed] = useState(false)
   const showOnboarding =
     !showSplash && !onboardingDismissed && settings !== undefined && settings.onboarded !== '1'
+
+  // Console Mode global keyboard shortcut (Ctrl+Alt+Enter), single-instance CLI --console event,
+  // Guide button listener event, and boot-into-console setting.
+  useEffect(() => {
+    if (settings) {
+      useConsoleStore.getState().hydrateFromSettings(settings)
+      if (
+        (settings.console_start_in_console === '1' ||
+          settings.console_start_in_console === 'true') &&
+        location.pathname !== '/console'
+      ) {
+        useConsoleStore.getState().setLastDesktopRoute(location.pathname)
+        navigate('/console')
+      }
+    }
+  }, [settings, location.pathname, navigate])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.altKey && e.key === 'Enter') {
+        e.preventDefault()
+        useConsoleStore.getState().setLastDesktopRoute(location.pathname)
+        navigate('/console')
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+
+    let disposed = false
+    const unlisteners: Array<() => void> = []
+    void Promise.all([
+      listen('console://enter', () => {
+        useConsoleStore.getState().setLastDesktopRoute(location.pathname)
+        navigate('/console')
+      }),
+      listen('console://guide', () => {
+        void consoleToggleQuickMenu().catch(() => {})
+      }),
+    ]).then((subs) => {
+      if (disposed) subs.forEach((u) => u())
+      else unlisteners.push(...subs)
+    })
+
+    return () => {
+      disposed = true
+      window.removeEventListener('keydown', onKeyDown)
+      unlisteners.forEach((u) => u())
+    }
+  }, [location.pathname, navigate])
 
   useEffect(() => {
     void queryClient.prefetchQuery({ queryKey: gamesKey, queryFn: () => listGames() })

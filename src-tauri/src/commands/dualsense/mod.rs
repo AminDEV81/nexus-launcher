@@ -153,6 +153,12 @@ impl DualSenseEngineState {
         state
     }
 
+    pub fn snapshot(&self) -> DualSenseTelemetrySnapshot {
+        self.ensure_worker_started();
+        let guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        guard.build_snapshot()
+    }
+
     pub fn ensure_worker_started(&self) {
         if self
             .worker_started

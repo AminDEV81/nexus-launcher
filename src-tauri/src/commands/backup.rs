@@ -668,6 +668,22 @@ fn load_and_validate(path: &str) -> AppResult<Vec<BackupTable>> {
                 }
             }
         }
+        if *table == "settings" {
+            for row in rows.iter_mut() {
+                if let (Some(k), Some(v)) = (
+                    row.get("key").and_then(Value::as_str).map(str::to_string),
+                    row.get("value").and_then(Value::as_str).map(str::to_string),
+                ) {
+                    if k.starts_with("console_") {
+                        if let Some(clean_val) =
+                            crate::commands::console::validate_console_setting_value(&k, &v)
+                        {
+                            row.insert("value".to_string(), Value::String(clean_val));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     Ok(tables)
