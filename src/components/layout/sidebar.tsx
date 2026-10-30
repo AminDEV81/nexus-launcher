@@ -13,7 +13,8 @@ import {
   SkipForward,
   Sparkles,
   Sun,
-  MonitorPlay,
+  Gamepad2,
+  ChevronRight,
 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { LogoMark } from '@/components/brand/logo-mark'
@@ -278,30 +279,74 @@ function SectionLabel({ children }: { children: string }) {
   )
 }
 
-/** Prominent entry point for the fullscreen, controller-first Console Mode (Big Picture). */
+/** Prominent hero entry point for the fullscreen, controller-first Console Mode (Big Picture). */
 function ConsoleModeButton({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
+  const speed = useAnimationSpeed()
+
+  if (collapsed) {
+    return (
+      <motion.button
+        type="button"
+        title="Console Mode (TV & Gamepad)"
+        aria-label="Open Console Mode"
+        onClick={onClick}
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.94 }}
+        transition={{ duration: 0.18 * speed }}
+        className="group relative mx-auto flex size-11 shrink-0 items-center justify-center rounded-xl border border-accent/40 bg-gradient-to-br from-accent/20 via-surface-raised to-surface text-accent shadow-xs transition-colors hover:border-accent hover:bg-accent/30 hover:text-white cursor-pointer"
+      >
+        <Gamepad2
+          className="size-5 transition-transform duration-200 group-hover:scale-110"
+          strokeWidth={2.2}
+        />
+        <span className="absolute top-1 right-1 size-2 rounded-full bg-accent shadow-[0_0_8px_var(--nx-accent)] ring-1 ring-surface" />
+      </motion.button>
+    )
+  }
+
   return (
     <motion.button
       type="button"
-      title="Console Mode"
+      title="Console Mode (TV & Gamepad)"
       aria-label="Open Console Mode"
       onClick={onClick}
-      whileHover={{ x: collapsed ? 0 : 2 }}
-      whileTap={{ scale: 0.97 }}
-      className={cn(
-        'group relative flex items-center gap-3 overflow-hidden rounded-xl border border-accent/30 bg-gradient-to-r from-accent/18 via-accent/8 to-transparent px-3 py-2.5 text-sm font-semibold text-text transition-colors hover:border-accent/55 hover:from-accent/28',
-        collapsed && 'justify-center px-0',
-      )}
+      whileHover={{ y: -1, scale: 1.01 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ duration: 0.18 * speed }}
+      className="group relative flex h-14 min-h-[56px] w-full shrink-0 items-center gap-2.5 overflow-hidden rounded-xl border border-accent/30 bg-gradient-to-r from-accent/15 via-surface-raised to-surface px-3 py-2 text-left shadow-xs transition-all duration-200 hover:border-accent/70 hover:shadow-[0_4px_20px_-4px_var(--nx-accent)]/20 cursor-pointer"
     >
-      <MonitorPlay className="size-[18px] shrink-0 text-accent" strokeWidth={2} />
-      {!collapsed && (
-        <>
-          <span className="truncate">Console Mode</span>
-          <span className="ml-auto rounded-md bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-accent">
-            TV
-          </span>
-        </>
-      )}
+      {/* Top subtle highlight */}
+      <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+
+      {/* Ambient soft glow on hover */}
+      <span className="pointer-events-none absolute -right-6 -top-6 size-16 rounded-full bg-accent/20 blur-xl opacity-30 transition-opacity duration-200 group-hover:opacity-80" />
+
+      {/* Glowing Gamepad Icon box */}
+      <div className="relative flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-white shadow-[0_0_12px_var(--nx-accent)]/40 ring-1 ring-white/20 transition-transform duration-200 group-hover:scale-105">
+        <Gamepad2
+          className="size-5 drop-shadow-xs transition-transform duration-200 group-hover:rotate-[-6deg]"
+          strokeWidth={2.2}
+        />
+      </div>
+
+      {/* Main title & description */}
+      <div className="min-w-0 flex-1 flex flex-col justify-center">
+        <span className="truncate text-[13px] font-bold tracking-tight text-text transition-colors group-hover:text-accent leading-tight">
+          Console Mode
+        </span>
+        <div className="mt-1 flex items-center gap-1.5 text-[10px] font-medium text-subtle transition-colors group-hover:text-muted leading-none">
+          <span className="size-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+          <span className="truncate">TV & Gamepad</span>
+        </div>
+      </div>
+
+      {/* Badge + Arrow */}
+      <div className="flex shrink-0 items-center gap-1.5">
+        <span className="rounded-md border border-accent/35 bg-accent/15 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-accent leading-none">
+          TV
+        </span>
+        <ChevronRight className="size-3.5 text-subtle transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-accent" />
+      </div>
     </motion.button>
   )
 }
