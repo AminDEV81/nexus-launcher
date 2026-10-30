@@ -13,6 +13,7 @@ import {
   SkipForward,
   Sparkles,
   Sun,
+  MonitorPlay,
 } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { LogoMark } from '@/components/brand/logo-mark'
@@ -102,6 +103,15 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-5">
+        <ConsoleModeButton
+          collapsed={collapsed}
+          onClick={() => {
+            playButtonClick()
+            navigate('/console')
+          }}
+        />
+
+        <div className="my-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
         {!collapsed && <SectionLabel>Discover</SectionLabel>}
         {DISCOVER_NAV_ITEMS.map((item) => (
           <SidebarNavItem key={item.path} item={item} collapsed={collapsed} />
@@ -265,6 +275,34 @@ function SectionLabel({ children }: { children: string }) {
     <div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-subtle">
       {children}
     </div>
+  )
+}
+
+/** Prominent entry point for the fullscreen, controller-first Console Mode (Big Picture). */
+function ConsoleModeButton({ collapsed, onClick }: { collapsed: boolean; onClick: () => void }) {
+  return (
+    <motion.button
+      type="button"
+      title="Console Mode"
+      aria-label="Open Console Mode"
+      onClick={onClick}
+      whileHover={{ x: collapsed ? 0 : 2 }}
+      whileTap={{ scale: 0.97 }}
+      className={cn(
+        'group relative flex items-center gap-3 overflow-hidden rounded-xl border border-accent/30 bg-gradient-to-r from-accent/18 via-accent/8 to-transparent px-3 py-2.5 text-sm font-semibold text-text transition-colors hover:border-accent/55 hover:from-accent/28',
+        collapsed && 'justify-center px-0',
+      )}
+    >
+      <MonitorPlay className="size-[18px] shrink-0 text-accent" strokeWidth={2} />
+      {!collapsed && (
+        <>
+          <span className="truncate">Console Mode</span>
+          <span className="ml-auto rounded-md bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-accent">
+            TV
+          </span>
+        </>
+      )}
+    </motion.button>
   )
 }
 

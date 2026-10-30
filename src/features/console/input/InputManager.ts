@@ -85,8 +85,7 @@ export class StepRepeatTimer {
     if (heldMs < REPEAT_INITIAL_DELAY_MS) {
       return null
     }
-    const interval =
-      heldMs >= REPEAT_TURBO_AFTER_MS ? REPEAT_TURBO_INTERVAL_MS : REPEAT_INTERVAL_MS
+    const interval = heldMs >= REPEAT_TURBO_AFTER_MS ? REPEAT_TURBO_INTERVAL_MS : REPEAT_INTERVAL_MS
     if (nowMs - this.lastFiredAtMs >= interval) {
       this.lastFiredAtMs = nowMs
       return dir
@@ -101,32 +100,44 @@ export class StepRepeatTimer {
   }
 }
 
+/** True for Sony pads (DualSense / DualShock). Never matches "Xbox Wireless Controller". */
+export function isSonyGamepadId(rawId: string): boolean {
+  const low = rawId.toLowerCase()
+  if (low.includes('xbox') || low.includes('045e') || low.includes('xinput')) return false
+  return (
+    low.includes('054c') ||
+    low.includes('dualsense') ||
+    low.includes('dualshock') ||
+    low.includes('playstation') ||
+    low.includes('ps5') ||
+    low.includes('ps4') ||
+    low.includes('0ce6') ||
+    low.includes('09cc') ||
+    low.includes('05c4') ||
+    low.includes('wireless controller')
+  )
+}
+
+export function isNintendoGamepadId(rawId: string): boolean {
+  const low = rawId.toLowerCase()
+  return (
+    low.includes('057e') ||
+    low.includes('nintendo') ||
+    low.includes('switch') ||
+    low.includes('pro controller') ||
+    low.includes('joy-con')
+  )
+}
+
 export function detectGlyphFamilyFromId(
   rawId: string,
   dualSenseConnectedCount = 0,
   override: ConsoleGlyphOverride = 'auto',
 ): ConsoleGlyphFamily {
   if (override !== 'auto') return override
+  if (isSonyGamepadId(rawId)) return 'playstation'
+  if (isNintendoGamepadId(rawId)) return 'switch'
   const low = rawId.toLowerCase()
-  if (
-    low.includes('054c') ||
-    low.includes('dualsense') ||
-    low.includes('dualshock') ||
-    low.includes('playstation') ||
-    low.includes('ps5') ||
-    low.includes('ps4')
-  ) {
-    return 'playstation'
-  }
-  if (
-    low.includes('057e') ||
-    low.includes('nintendo') ||
-    low.includes('switch') ||
-    low.includes('pro controller') ||
-    low.includes('joy-con')
-  ) {
-    return 'switch'
-  }
   if (dualSenseConnectedCount > 0 && (low.includes('xinput') || low.includes('xbox'))) {
     // When ViGEm Xbox 360 emulation is active for a physical DualSense, keep PlayStation glyphs!
     return 'playstation'
@@ -144,9 +155,8 @@ export function dedupeLogicalGamepads(
   dualSenseConnectedCount: number,
   override: ConsoleGlyphOverride = 'auto',
 ): LogicalGamepadDescriptor[] {
-  const connected = rawPads.filter(
-    (p): p is { index: number; id: string; connected: boolean } =>
-      Boolean(p && p.connected),
+  const connected = rawPads.filter((p): p is { index: number; id: string; connected: boolean } =>
+    Boolean(p && p.connected),
   )
 
   const xinputPads = connected.filter((p) => {
@@ -158,15 +168,8 @@ export function dedupeLogicalGamepads(
     xinputPads.length > 0 ? Math.min(dualSenseEmulatingCount, xinputPads.length) : 0
 
   return connected.map((pad) => {
-    const low = pad.id.toLowerCase()
-    const isSonyPhysical =
-      low.includes('054c') ||
-      low.includes('dualsense') ||
-      low.includes('dualshock') ||
-      low.includes('wireless controller')
-
     let isShadowedDuplicate = false
-    if (isSonyPhysical && remainingShadowsToMark > 0) {
+    if (isSonyGamepadId(pad.id) && remainingShadowsToMark > 0) {
       isShadowedDuplicate = true
       remainingShadowsToMark -= 1
     }
@@ -178,6 +181,95 @@ export function dedupeLogicalGamepads(
       isShadowedDuplicate,
     }
   })
+}
+
+/** One controller frame in the standard-mapping layout, whatever its source. */
+export interface PadFrame {
+  key: string
+  glyphFamily: ConsoleGlyphFamily
+  lx: number
+  ly: number
+  /** Standard Gamepad layout: 0..3 face, 4/5 bumpers, 6/7 triggers, 8 select, 9 start, 12..15 d-pad, 16 guide. */
+  buttons: boolean[]
+}
+
+/** Frame reported by the Rust DualSense engine (`console_get_native_pad_input`). */
+export interface NativePadSlotFrame {
+  slotIndex: number
+  cross: boolean
+  circle: boolean
+  square: boolean
+  triangle: boolean
+  l1: boolean
+  r1: boolean
+  l2: boolean
+  r2: boolean
+  create: boolean
+  options: boolean
+  ps: boolean
+  dpadUp: boolean
+  dpadDown: boolean
+  dpadLeft: boolean
+  dpadRight: boolean
+  lx: number
+  ly: number
+}
+
+/** Converts a native DualSense slot into the same standard layout the Gamepad API uses. */
+export function nativeSlotToPadFrame(slot: NativePadSlotFrame): PadFrame {
+  const buttons = new Array<boolean>(17).fill(false)
+  buttons[0] = slot.cross
+  buttons[1] = slot.circle
+  buttons[2] = slot.square
+  buttons[3] = slot.triangle
+  buttons[4] = slot.l1
+  buttons[5] = slot.r1
+  buttons[6] = slot.l2
+  buttons[7] = slot.r2
+  buttons[8] = slot.create
+  buttons[9] = slot.options
+  buttons[12] = slot.dpadUp
+  buttons[13] = slot.dpadDown
+  buttons[14] = slot.dpadLeft
+  buttons[15] = slot.dpadRight
+  buttons[16] = slot.ps
+  return {
+    key: `native:${slot.slotIndex}`,
+    glyphFamily: 'playstation',
+    lx: slot.lx,
+    ly: slot.ly,
+    buttons,
+  }
+}
+
+/**
+ * Decides whether the Rust DualSense engine must supply input. The browser is preferred whenever it
+ * can see a usable pad (lower latency); the native path covers pads that Chromium cannot enumerate
+ * (cloaked by HidHide, emulation off) or that it exposes with a non-standard button layout.
+ */
+export function shouldUseNativePads(
+  usableBrowserPadCount: number,
+  dualSenseConnectedCount: number,
+): boolean {
+  return usableBrowserPadCount === 0 && dualSenseConnectedCount > 0
+}
+
+/** A browser pad is only trusted when it uses the standard layout, or is not a Sony pad. */
+export function isUsableBrowserPad(id: string, mapping: string): boolean {
+  return mapping === 'standard' || !isSonyGamepadId(id)
+}
+
+export function describeGlyphFamily(family: ConsoleGlyphFamily): string {
+  switch (family) {
+    case 'playstation':
+      return 'PlayStation controller'
+    case 'xbox':
+      return 'Xbox controller'
+    case 'switch':
+      return 'Switch controller'
+    default:
+      return 'Controller'
+  }
 }
 
 export function isWithinSwallowWindow(lastFocusRegainedAtMs: number, nowMs: number): boolean {

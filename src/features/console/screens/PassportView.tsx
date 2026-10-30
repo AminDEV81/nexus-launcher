@@ -1,98 +1,76 @@
 import React, { useEffect, useState } from 'react'
-import { Award, Clock, Gamepad2, HardDrive, Trophy } from 'lucide-react'
 import { getStatsSummary, getPlaytimeByGenre } from '@/services/stats'
 import type { StatsSummary, GenrePlaytime } from '@/types/models'
 import { formatPlaytime } from '@/features/library/utils/format'
+
+const Stat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div>
+    <p className="text-[0.95rem] text-white/45">{label}</p>
+    <p className="mt-1 text-[3.4rem] font-semibold leading-none tracking-tight text-white">
+      {value}
+    </p>
+  </div>
+)
 
 export const PassportView: React.FC = () => {
   const [summary, setSummary] = useState<StatsSummary | null>(null)
   const [genres, setGenres] = useState<GenrePlaytime[]>([])
 
   useEffect(() => {
-    getStatsSummary().then(setSummary).catch(() => {})
-    getPlaytimeByGenre().then(setGenres).catch(() => {})
+    getStatsSummary()
+      .then(setSummary)
+      .catch(() => {})
+    getPlaytimeByGenre()
+      .then((list) => setGenres(Array.isArray(list) ? list : []))
+      .catch(() => {})
   }, [])
 
+  const topGenres = genres.slice(0, 6)
+  const maxSeconds = Math.max(1, ...topGenres.map((g) => g.total_playtime_seconds))
+
   return (
-    <div className="space-y-6 pb-16">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="p-6 rounded-3xl bg-white/5 border border-white/10 flex items-center gap-4">
-          <div className="p-4 rounded-2xl bg-cyan-500/20 text-cyan-300">
-            <Clock className="w-8 h-8" />
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Total Playtime
-            </p>
-            <p className="text-3xl font-black text-white mt-1">
-              {formatPlaytime(summary?.total_playtime_seconds ?? 0)}
-            </p>
-          </div>
-        </div>
+    <div className="flex flex-col gap-12 pb-16">
+      <h1 className="px-6 pt-2 text-[2.6rem] font-semibold tracking-tight text-white">Passport</h1>
 
-        <div className="p-6 rounded-3xl bg-white/5 border border-white/10 flex items-center gap-4">
-          <div className="p-4 rounded-2xl bg-violet-500/20 text-violet-300">
-            <Gamepad2 className="w-8 h-8" />
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Total Library Titles
-            </p>
-            <p className="text-3xl font-black text-white mt-1">{summary?.total_games ?? 0}</p>
-          </div>
-        </div>
-
-        <div className="p-6 rounded-3xl bg-white/5 border border-white/10 flex items-center gap-4">
-          <div className="p-4 rounded-2xl bg-emerald-500/20 text-emerald-300">
-            <HardDrive className="w-8 h-8" />
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Installed Ready
-            </p>
-            <p className="text-3xl font-black text-white mt-1">{summary?.installed_games ?? 0}</p>
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-x-20 gap-y-8 px-6">
+        <Stat label="Time played" value={formatPlaytime(summary?.total_playtime_seconds ?? 0)} />
+        <Stat label="Games" value={String(summary?.total_games ?? 0)} />
+        <Stat label="Installed" value={String(summary?.installed_games ?? 0)} />
       </div>
 
       {summary?.most_played_game && (
-        <div className="p-6 rounded-3xl bg-gradient-to-r from-amber-500/15 via-slate-900/80 to-slate-950 border border-amber-400/30 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Trophy className="w-10 h-10 text-amber-400" />
-            <div>
-              <span className="text-xs font-extrabold uppercase tracking-widest text-amber-300">
-                Most Played Crown
-              </span>
-              <h2 className="text-2xl font-black text-white mt-0.5">
-                {summary.most_played_game.name}
-              </h2>
-            </div>
-          </div>
-          <span className="text-xl font-black text-amber-300">
+        <div className="px-6">
+          <p className="text-[0.95rem] text-white/45">Most played</p>
+          <p className="mt-1 text-[2rem] font-semibold text-white">
+            {summary.most_played_game.name}
+          </p>
+          <p className="text-[1.05rem] text-white/50">
             {formatPlaytime(summary.most_played_game.total_playtime_seconds)}
-          </span>
+          </p>
         </div>
       )}
 
-      <div className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-4">
-        <h2 className="text-xl font-extrabold text-white flex items-center gap-2">
-          <Award className="w-5 h-5 text-cyan-400" />
-          Top Genres by Playtime
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {genres.slice(0, 8).map((g) => (
-            <div
-              key={g.genre}
-              className="p-4 rounded-2xl bg-slate-900/70 border border-white/10 flex items-center justify-between"
-            >
-              <span className="font-bold text-white">{g.genre}</span>
-              <span className="text-sm font-extrabold text-cyan-300">
-                {formatPlaytime(g.total_playtime_seconds)}
-              </span>
+      {topGenres.length > 0 && (
+        <div className="flex max-w-[44rem] flex-col gap-5 px-6">
+          <p className="text-[0.95rem] text-white/45">Top genres</p>
+          {topGenres.map((g) => (
+            <div key={g.genre} className="flex flex-col gap-2">
+              <div className="flex items-baseline justify-between text-[1.05rem]">
+                <span className="font-medium text-white">{g.genre}</span>
+                <span className="text-white/50">{formatPlaytime(g.total_playtime_seconds)}</span>
+              </div>
+              <div className="h-[0.3rem] overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-white/80"
+                  style={{
+                    width: `${Math.max(4, (g.total_playtime_seconds / maxSeconds) * 100)}%`,
+                  }}
+                />
+              </div>
             </div>
           ))}
         </div>
-      </div>
+      )}
     </div>
   )
 }

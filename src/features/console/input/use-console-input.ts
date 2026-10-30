@@ -4,10 +4,16 @@ import { toast } from 'sonner'
 import {
   applyStickDeadzoneAndLock,
   dedupeLogicalGamepads,
+  describeGlyphFamily,
+  isUsableBrowserPad,
   isWithinSwallowWindow,
   mapFaceButtonAction,
+  nativeSlotToPadFrame,
+  shouldUseNativePads,
   StepRepeatTimer,
   type ConsoleAction,
+  type NativePadSlotFrame,
+  type PadFrame,
 } from './InputManager'
 import { consoleNavController } from '../nav/FocusScope'
 import { useConsoleStore } from '../store/console-store'
@@ -34,6 +40,8 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
   const repeatTimerRef = useRef<StepRepeatTimer>(new StepRepeatTimer())
   const prevStickDirRef = useRef<NavDirection | null>(null)
   const prevButtonsRef = useRef<Record<string, boolean[]>>({})
+  const nativeFramesRef = useRef<PadFrame[]>([])
+  const needNativeRef = useRef(false)
   const prevPadCountRef = useRef<number>(0)
   const dualSenseCountsRef = useRef<{ connected: number; emulating: number }>({
     connected: 0,
@@ -119,9 +127,7 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
       const target = e.target as HTMLElement | null
       const isTextInput =
         target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.isContentEditable)
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
 
       useConsoleStore.getState().setDetectedDevice('keyboard')
       markActivity()
@@ -206,10 +212,16 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
       }
     }
 
+    // Any first interaction (key, pointer or controller) unlocks WebAudio so UI sounds always work.
+    const unlockAudio = () => consoleSoundEngine.unlock()
+
     window.addEventListener('focus', onWindowFocus)
     window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', unlockAudio, { passive: true })
+    window.addEventListener('pointerdown', unlockAudio, { passive: true })
+    window.addEventListener('gamepadconnected', unlockAudio)
 
-    // Poll DualSense emulation count every 3s for accurate deduplication
+    // Poll DualSense counts every 3s for accurate deduplication and glyph detection.
     const syncDualSense = () => {
       invoke<{ connectedCount?: number; emulatingCount?: number }>('dualsense_get_state')
         .then((snap) => {
@@ -223,6 +235,24 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
     syncDualSense()
     const dsInterval = window.setInterval(syncDualSense, 3000)
 
+    // Native DualSense input (Rust engine). Only polled while the browser cannot see a usable pad.
+    let nativeInFlight = false
+    const pollNative = () => {
+      if (!needNativeRef.current || nativeInFlight) return
+      nativeInFlight = true
+      invoke<NativePadSlotFrame[]>('console_get_native_pad_input')
+        .then((slots) => {
+          nativeFramesRef.current = (slots ?? []).map(nativeSlotToPadFrame)
+        })
+        .catch(() => {
+          nativeFramesRef.current = []
+        })
+        .finally(() => {
+          nativeInFlight = false
+        })
+    }
+    const nativeInterval = window.setInterval(pollNative, 16)
+
     // Idle screensaver check every 5s
     const idleInterval = window.setInterval(() => {
       const st = useConsoleStore.getState()
@@ -233,7 +263,7 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
       }
     }, 5000)
 
-    // 60Hz Gamepad RAF polling loop
+    // 60Hz polling loop over every controller source (browser Gamepad API + native DualSense).
     let rafId = 0
     const pollGamepads = () => {
       const now = performance.now()
@@ -243,54 +273,82 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
           : []
 
       const st = useConsoleStore.getState()
+      const counts = dualSenseCountsRef.current
       const descriptors = dedupeLogicalGamepads(
         rawPads.map((p) => (p ? { index: p.index, id: p.id, connected: p.connected } : null)),
-        dualSenseCountsRef.current.emulating,
-        dualSenseCountsRef.current.connected,
+        counts.emulating,
+        counts.connected,
         st.glyphOverride,
       )
 
-      const activePads = descriptors.filter((d) => !d.isShadowedDuplicate)
-      if (activePads.length !== prevPadCountRef.current) {
-        if (activePads.length > prevPadCountRef.current && activePads[0]) {
-          st.setDetectedDevice(activePads[0].glyphFamily, activePads.length)
+      const frames: PadFrame[] = []
+      for (const desc of descriptors) {
+        if (desc.isShadowedDuplicate) continue
+        const pad = rawPads[desc.index]
+        if (!pad || !isUsableBrowserPad(pad.id, pad.mapping)) continue
+        frames.push({
+          key: `web:${desc.index}`,
+          glyphFamily: desc.glyphFamily,
+          lx: pad.axes[0] ?? 0,
+          ly: pad.axes[1] ?? 0,
+          buttons: pad.buttons.map((b) => Boolean(b?.pressed)),
+        })
+      }
+
+      needNativeRef.current = shouldUseNativePads(frames.length, counts.connected)
+      if (needNativeRef.current) {
+        for (const native of nativeFramesRef.current) {
+          frames.push(
+            st.glyphOverride === 'auto' ? native : { ...native, glyphFamily: st.glyphOverride },
+          )
+        }
+      } else if (nativeFramesRef.current.length > 0) {
+        nativeFramesRef.current = []
+      }
+
+      if (frames.length !== prevPadCountRef.current) {
+        if (frames.length > prevPadCountRef.current && frames[0]) {
+          st.setDetectedDevice(frames[0].glyphFamily, frames.length)
           st.setControllerDisconnectedModal(false)
+          consoleSoundEngine.unlock()
           consoleSoundEngine.play('toast')
-          toast.success(`Controller connected (${activePads[0].glyphFamily.toUpperCase()})`)
-        } else if (activePads.length === 0 && prevPadCountRef.current > 0) {
+          toast.success(`${describeGlyphFamily(frames[0].glyphFamily)} connected`, {
+            id: 'console-pad-connected',
+            duration: 2200,
+          })
+        } else if (frames.length === 0 && prevPadCountRef.current > 0) {
           st.setDetectedDevice(st.detectedGlyphFamily, 0)
           st.setControllerDisconnectedModal(true)
         }
-        prevPadCountRef.current = activePads.length
+        prevPadCountRef.current = frames.length
       }
 
       if (!isWithinSwallowWindow(lastFocusRegainedAtRef.current, now)) {
         let combinedDir: NavDirection | null = null
 
-        for (const desc of activePads) {
-          const pad = rawPads[desc.index]
-          if (!pad) continue
-
-          const lx = pad.axes[0] ?? 0
-          const ly = pad.axes[1] ?? 0
-          const stickDir = applyStickDeadzoneAndLock(lx, ly, prevStickDirRef.current)
+        for (const frame of frames) {
+          const stickDir = applyStickDeadzoneAndLock(frame.lx, frame.ly, prevStickDirRef.current)
           if (stickDir) combinedDir = stickDir
 
           // D-Pad buttons 12=Up, 13=Down, 14=Left, 15=Right
-          if (pad.buttons[12]?.pressed) combinedDir = 'up'
-          else if (pad.buttons[13]?.pressed) combinedDir = 'down'
-          else if (pad.buttons[14]?.pressed) combinedDir = 'left'
-          else if (pad.buttons[15]?.pressed) combinedDir = 'right'
+          if (frame.buttons[12]) combinedDir = 'up'
+          else if (frame.buttons[13]) combinedDir = 'down'
+          else if (frame.buttons[14]) combinedDir = 'left'
+          else if (frame.buttons[15]) combinedDir = 'right'
 
-          const prevBtns = prevButtonsRef.current[desc.index] || []
-          const curBtns = pad.buttons.map((b) => Boolean(b?.pressed))
-          prevButtonsRef.current[desc.index] = curBtns
+          const prevBtns = prevButtonsRef.current[frame.key] || []
+          const curBtns = frame.buttons
+          prevButtonsRef.current[frame.key] = curBtns
 
           const justPressed = (idx: number) => Boolean(curBtns[idx] && !prevBtns[idx])
+          if (curBtns.some((pressed, i) => pressed && !prevBtns[i])) {
+            // A controller press is real user activity: wake audio and the idle timer.
+            consoleSoundEngine.unlock()
+            st.setDetectedDevice(frame.glyphFamily, frames.length)
+          }
 
           for (let bIdx = 0; bIdx <= 3; bIdx++) {
             if (justPressed(bIdx)) {
-              st.setDetectedDevice(desc.glyphFamily, activePads.length)
               const faceAction = mapFaceButtonAction(bIdx, st.confirmSwap)
               if (faceAction) dispatchAction(faceAction)
             }
@@ -308,9 +366,7 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
         prevStickDirRef.current = combinedDir
         const stepDir = repeatTimerRef.current.update(combinedDir, now)
         if (stepDir) {
-          if (activePads[0]) {
-            st.setDetectedDevice(activePads[0].glyphFamily, activePads.length)
-          }
+          if (frames[0]) st.setDetectedDevice(frames[0].glyphFamily, frames.length)
           dispatchAction(stepDir)
         }
       }
@@ -323,7 +379,11 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
     return () => {
       window.removeEventListener('focus', onWindowFocus)
       window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', unlockAudio)
+      window.removeEventListener('pointerdown', unlockAudio)
+      window.removeEventListener('gamepadconnected', unlockAudio)
       window.clearInterval(dsInterval)
+      window.clearInterval(nativeInterval)
       window.clearInterval(idleInterval)
       window.cancelAnimationFrame(rafId)
     }

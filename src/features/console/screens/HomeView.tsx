@@ -120,7 +120,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
   }
 
   return (
-    <div className="space-y-6 pb-16">
+    <div className="space-y-1 pb-20">
       <ConsoleHero
         game={featuredGame}
         isRunning={featuredGame ? runningGameIds.has(featuredGame.id) : false}

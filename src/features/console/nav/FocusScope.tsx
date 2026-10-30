@@ -1,12 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useId, useRef } from 'react'
 import { consoleSoundEngine } from '../audio/ui-sounds'
+import { followFocus } from './smooth-scroll'
 import { useConsoleStore } from '../store/console-store'
-import {
-  selectNextCandidate,
-  type FocusNode,
-  type NavDirection,
-  type ScopeConfig,
-} from './spatial'
+import { selectNextCandidate, type FocusNode, type NavDirection, type ScopeConfig } from './spatial'
 
 interface RegisteredItem {
   id: string
@@ -79,9 +75,9 @@ class NavigationController {
     useConsoleStore.getState().rememberFocus(item.scopeId, id)
 
     const el = item.getElement()
-    if (el && typeof el.scrollIntoView === 'function') {
+    if (el) {
       try {
-        el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
+        followFocus(el)
       } catch {
         // Ignore in headless tests
       }
@@ -136,13 +132,7 @@ class NavigationController {
       scopeRecord[k] = v
     }
 
-    const nextId = selectNextCandidate(
-      this.focusedId,
-      nodes,
-      dir,
-      scopeRecord,
-      this.scopeMemory,
-    )
+    const nextId = selectNextCandidate(this.focusedId, nodes, dir, scopeRecord, this.scopeMemory)
     if (nextId && nextId !== this.focusedId) {
       return this.setFocus(nextId, true)
     }
@@ -187,6 +177,12 @@ class NavigationController {
 }
 
 export const consoleNavController = new NavigationController()
+
+// Dev-only handle so UI states can be inspected / scripted from the browser console and screenshots.
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  ;(window as unknown as { __consoleNav?: NavigationController }).__consoleNav =
+    consoleNavController
+}
 
 const ScopeContext = createContext<string>('root')
 
@@ -277,36 +273,50 @@ export function useFocusable<T extends HTMLElement = HTMLElement>(
     })
   }, [itemId])
 
+  // Always read the *latest* options through a ref. Registering once per (id, scope) is essential:
+  // callers pass fresh inline arrows every render, and re-registering on each change used to drop
+  // the focused item (focus fell back to the first registered element, the top tab) whenever a
+  // focus callback updated state.
+  const latest = useRef(options)
+  latest.current = options
+
   useEffect(() => {
     return consoleNavController.registerItem({
       id: itemId,
       scopeId,
       getElement: () => ref.current,
-      disabled: options.disabled,
-      nextUp: options.nextUp,
-      nextDown: options.nextDown,
-      nextLeft: options.nextLeft,
-      nextRight: options.nextRight,
-      onConfirm: options.onConfirm,
-      onOptions: options.onOptions,
-      onSecondary: options.onSecondary,
-      onTertiary: options.onTertiary,
-      onFocus: options.onFocus,
+      get disabled() {
+        return latest.current.disabled
+      },
+      get nextUp() {
+        return latest.current.nextUp
+      },
+      get nextDown() {
+        return latest.current.nextDown
+      },
+      get nextLeft() {
+        return latest.current.nextLeft
+      },
+      get nextRight() {
+        return latest.current.nextRight
+      },
+      get onConfirm() {
+        return latest.current.onConfirm
+      },
+      get onOptions() {
+        return latest.current.onOptions
+      },
+      get onSecondary() {
+        return latest.current.onSecondary
+      },
+      get onTertiary() {
+        return latest.current.onTertiary
+      },
+      get onFocus() {
+        return latest.current.onFocus
+      },
     })
-  }, [
-    itemId,
-    scopeId,
-    options.disabled,
-    options.nextUp,
-    options.nextDown,
-    options.nextLeft,
-    options.nextRight,
-    options.onConfirm,
-    options.onOptions,
-    options.onSecondary,
-    options.onTertiary,
-    options.onFocus,
-  ])
+  }, [itemId, scopeId])
 
   const focusSelf = useCallback(() => {
     consoleNavController.setFocus(itemId, true)

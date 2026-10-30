@@ -761,6 +761,88 @@ pub fn console_guide_listener_stop(state: State<'_, ConsoleModeState>) -> AppRes
     Ok(false)
 }
 
+/// Compact per-controller input frame read straight from the DualSense engine.
+///
+/// The browser Gamepad API cannot see a pad that the DualSense engine has cloaked with HidHide,
+/// and it sees nothing at all when Xbox emulation is off. Console Mode therefore also polls this
+/// frame, so a PS5 controller always drives the UI whether or not Chromium can enumerate it.
+#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct NativePadSlot {
+    pub slot_index: u8,
+    pub name: String,
+    pub vendor_id: u16,
+    pub product_id: u16,
+    pub emulating: bool,
+    pub cross: bool,
+    pub circle: bool,
+    pub square: bool,
+    pub triangle: bool,
+    pub l1: bool,
+    pub r1: bool,
+    pub l2: bool,
+    pub r2: bool,
+    pub create: bool,
+    pub options: bool,
+    pub ps: bool,
+    pub dpad_up: bool,
+    pub dpad_down: bool,
+    pub dpad_left: bool,
+    pub dpad_right: bool,
+    /// Left stick, normalised to -1.0..=1.0 (Y grows downward, like the Gamepad API).
+    pub lx: f32,
+    pub ly: f32,
+}
+
+/// Maps a raw 0..=255 stick byte (centre ~128) to -1.0..=1.0 with a tiny centre snap.
+pub fn normalize_stick_axis(raw: u8) -> f32 {
+    let v = (f32::from(raw) - 128.0) / 127.0;
+    if v.abs() < 0.02 {
+        0.0
+    } else {
+        v.clamp(-1.0, 1.0)
+    }
+}
+
+#[tauri::command]
+pub async fn console_get_native_pad_input(
+    ds_state: State<'_, DualSenseEngineState>,
+) -> AppResult<Vec<NativePadSlot>> {
+    let snap = ds_state.snapshot();
+    Ok(snap
+        .slots
+        .iter()
+        .filter(|slot| slot.dualsense.connected)
+        .map(|slot| {
+            let ds = &slot.dualsense;
+            NativePadSlot {
+                slot_index: slot.slot_index,
+                name: ds.device_name.clone(),
+                vendor_id: ds.vendor_id,
+                product_id: ds.product_id,
+                emulating: slot.xbox.emulation_active,
+                cross: ds.cross,
+                circle: ds.circle,
+                square: ds.square,
+                triangle: ds.triangle,
+                l1: ds.l1,
+                r1: ds.r1,
+                l2: ds.l2_button || ds.l2 > 200,
+                r2: ds.r2_button || ds.r2 > 200,
+                create: ds.create,
+                options: ds.options,
+                ps: ds.ps,
+                dpad_up: ds.dpad_up,
+                dpad_down: ds.dpad_down,
+                dpad_left: ds.dpad_left,
+                dpad_right: ds.dpad_right,
+                lx: normalize_stick_axis(ds.lx),
+                ly: normalize_stick_axis(ds.ly),
+            }
+        })
+        .collect())
+}
+
 #[tauri::command]
 pub async fn console_power_action(action: String) -> AppResult<()> {
     let validated = validate_power_action(&action)?;
@@ -894,7 +976,7 @@ pub async fn console_extract_dominant_color(
             let min_c = r.min(g).min(b) as u64;
             let sat = max_c.saturating_sub(min_c);
             let luma = (r as u64 + g as u64 + b as u64) / 3;
-            if luma < 20 || luma > 240 {
+            if !(20..=240).contains(&luma) {
                 continue;
             }
             let w = (sat + 10).max(1);
@@ -980,6 +1062,15 @@ mod tests {
             validate_console_setting_value("console_theme", "<script>"),
             Some("cyberpunk".to_string())
         );
+    }
+
+    #[test]
+    fn test_normalize_stick_axis() {
+        assert_eq!(normalize_stick_axis(128), 0.0);
+        assert_eq!(normalize_stick_axis(129), 0.0); // inside the centre snap
+        assert!((normalize_stick_axis(255) - 1.0).abs() < 0.01);
+        assert!((normalize_stick_axis(0) + 1.0).abs() < 0.01);
+        assert!(normalize_stick_axis(200) > 0.5);
     }
 
     #[test]

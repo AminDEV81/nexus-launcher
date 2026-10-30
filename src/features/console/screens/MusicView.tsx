@@ -1,5 +1,5 @@
 import React from 'react'
-import { Music, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat } from 'lucide-react'
+import { Play, Pause, SkipBack, SkipForward, Shuffle, Repeat } from 'lucide-react'
 import { useSoundtrackStore } from '@/features/soundtrack/store/soundtrack-store'
 import { FocusScope, useFocusable } from '../nav/FocusScope'
 
@@ -55,22 +55,17 @@ export const MusicView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-16">
-      <div className="p-8 rounded-3xl bg-gradient-to-br from-violet-950/60 via-slate-900/90 to-slate-950 border border-white/15 flex flex-col md:flex-row items-center justify-between gap-8">
-        <div className="flex items-center gap-6">
-          <div className="w-28 h-28 rounded-3xl bg-violet-500/20 border border-violet-400/30 flex items-center justify-center text-violet-300 shadow-2xl">
-            <Music className="w-12 h-12" />
-          </div>
-          <div>
-            <span className="text-xs font-extrabold uppercase tracking-widest text-violet-300">
-              Soundtrack Center
-            </span>
-            <h1 className="text-3xl font-black text-white mt-1">
-              {currentTrack ? currentTrack.title : 'No Track Playing'}
-            </h1>
-            <p className="text-base text-slate-400 mt-1">
-              {currentTrack?.artist || currentAlbum?.title || 'Select a game soundtrack to start listening'}
-            </p>
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-10 px-6 pt-2">
+        <div className="min-w-0 max-w-[44rem]">
+          <p className="text-[0.95rem] font-medium tracking-wide text-white/45">
+            {currentAlbum?.title || 'Music'}
+          </p>
+          <h1 className="mt-1 line-clamp-2 text-[3.2rem] font-semibold leading-[1.02] tracking-tight text-white">
+            {currentTrack ? currentTrack.title : 'Nothing playing'}
+          </h1>
+          <p className="mt-2 text-[1.15rem] text-white/55">
+            {currentTrack?.artist || 'Pick a game soundtrack to start listening'}
+          </p>
         </div>
 
         <FocusScope
@@ -81,12 +76,12 @@ export const MusicView: React.FC = () => {
           <button
             type="button"
             {...shuffleFocus.focusProps}
-            className={`p-3.5 rounded-2xl border transition-all ${
+            className={`flex size-[3.2rem] items-center justify-center rounded-full outline-none transition-all ${
               shuffleFocus.isFocused
-                ? 'bg-cyan-400 text-slate-950 border-cyan-300 scale-105'
+                ? 'bg-white text-black scale-110'
                 : shuffle
-                  ? 'bg-violet-500/30 text-violet-200 border-violet-400/50'
-                  : 'bg-white/5 text-slate-300 border-white/10'
+                  ? 'bg-white/22 text-white'
+                  : 'bg-white/10 text-white/80'
             }`}
           >
             <Shuffle className="w-5 h-5" />
@@ -95,10 +90,8 @@ export const MusicView: React.FC = () => {
           <button
             type="button"
             {...prevFocus.focusProps}
-            className={`p-4 rounded-2xl border transition-all ${
-              prevFocus.isFocused
-                ? 'bg-cyan-400 text-slate-950 border-cyan-300 scale-105'
-                : 'bg-white/10 text-white border-white/15'
+            className={`flex size-[3.6rem] items-center justify-center rounded-full outline-none transition-all ${
+              prevFocus.isFocused ? 'bg-white text-black scale-110' : 'bg-white/10 text-white'
             }`}
           >
             <SkipBack className="w-5 h-5" />
@@ -107,10 +100,10 @@ export const MusicView: React.FC = () => {
           <button
             type="button"
             {...playFocus.focusProps}
-            className={`p-5 rounded-2xl font-extrabold transition-all ${
+            className={`flex size-[4.4rem] items-center justify-center rounded-full outline-none transition-all ${
               playFocus.isFocused
-                ? 'bg-cyan-400 text-slate-950 scale-110 ring-4 ring-cyan-300/50 shadow-xl'
-                : 'bg-cyan-500 text-slate-950'
+                ? 'bg-white text-black scale-110 shadow-[0_18px_50px_-8px_var(--console-ambient,#7dd3fc)]'
+                : 'bg-white text-black'
             }`}
           >
             {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 fill-current" />}
@@ -119,10 +112,8 @@ export const MusicView: React.FC = () => {
           <button
             type="button"
             {...nextFocus.focusProps}
-            className={`p-4 rounded-2xl border transition-all ${
-              nextFocus.isFocused
-                ? 'bg-cyan-400 text-slate-950 border-cyan-300 scale-105'
-                : 'bg-white/10 text-white border-white/15'
+            className={`flex size-[3.6rem] items-center justify-center rounded-full outline-none transition-all ${
+              nextFocus.isFocused ? 'bg-white text-black scale-110' : 'bg-white/10 text-white'
             }`}
           >
             <SkipForward className="w-5 h-5" />
@@ -131,12 +122,12 @@ export const MusicView: React.FC = () => {
           <button
             type="button"
             {...repeatFocus.focusProps}
-            className={`p-3.5 rounded-2xl border transition-all ${
+            className={`flex size-[3.2rem] items-center justify-center rounded-full outline-none transition-all ${
               repeatFocus.isFocused
-                ? 'bg-cyan-400 text-slate-950 border-cyan-300 scale-105'
+                ? 'bg-white text-black scale-110'
                 : repeatMode !== 'off'
-                  ? 'bg-violet-500/30 text-violet-200 border-violet-400/50'
-                  : 'bg-white/5 text-slate-300 border-white/10'
+                  ? 'bg-white/22 text-white'
+                  : 'bg-white/10 text-white/80'
             }`}
           >
             <Repeat className="w-5 h-5" />
@@ -149,9 +140,9 @@ export const MusicView: React.FC = () => {
         <FocusScope
           id="console_music_queue"
           orientation="vertical"
-          className="p-6 rounded-3xl bg-white/5 border border-white/10 space-y-2.5"
+          className="p-6 rounded-3xl bg-white/[0.06] border border-transparent space-y-2.5"
         >
-          <h2 className="text-lg font-extrabold text-white mb-3">Current Queue ({queue.length})</h2>
+          <h2 className="text-lg font-semibold text-white mb-3">Current Queue ({queue.length})</h2>
           {queue.slice(0, 20).map((track, idx) => (
             <QueueTrackRow
               key={track.id}
@@ -188,10 +179,10 @@ const QueueTrackRow: React.FC<{
       {...focusProps}
       className={`w-full p-3.5 rounded-2xl border flex items-center justify-between text-left transition-all ${
         isFocused
-          ? 'bg-cyan-400 text-slate-950 border-cyan-300 scale-[1.01]'
+          ? 'bg-white text-black border-transparent scale-[1.01]'
           : active
-            ? 'bg-violet-500/20 text-violet-200 border-violet-400/40'
-            : 'bg-slate-900/60 text-slate-200 border-white/10'
+            ? 'bg-violet-500/20 text-white/70 border-violet-400/40'
+            : 'bg-slate-900/60 text-slate-200 border-transparent'
       }`}
     >
       <span className="font-bold text-sm truncate">{title}</span>

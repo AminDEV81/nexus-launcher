@@ -485,6 +485,7 @@ pub fn run() {
             commands::console::console_guide_listener_start,
             commands::console::console_guide_listener_stop,
             commands::console::console_power_action,
+            commands::console::console_get_native_pad_input,
             commands::console::console_extract_dominant_color,
         ])
         .run(tauri::generate_context!())

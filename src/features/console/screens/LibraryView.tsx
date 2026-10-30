@@ -32,12 +32,12 @@ const FilterChip: React.FC<{
     <button
       type="button"
       {...focusProps}
-      className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${
+      className={`rounded-full px-5 py-2 text-[1rem] font-medium outline-none transition-all ${
         isFocused
-          ? 'bg-cyan-400 text-slate-950 border-cyan-300 scale-105 shadow-lg'
+          ? 'bg-white text-black border-transparent scale-105 shadow-lg'
           : active
-            ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/50'
-            : 'bg-white/5 text-slate-300 border-white/10'
+            ? 'bg-white/16 text-white border-transparent'
+            : 'bg-white/8 text-white/70 border-transparent'
       }`}
     >
       {label}
@@ -95,8 +95,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     const bySearch = q
       ? byFilter.filter(
           (g) =>
-            g.name.toLowerCase().includes(q) ||
-            g.genres.some((gn) => gn.toLowerCase().includes(q)),
+            g.name.toLowerCase().includes(q) || g.genres.some((gn) => gn.toLowerCase().includes(q)),
         )
       : byFilter
 
@@ -120,7 +119,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       <FocusScope
         id="console_library_filters"
         orientation="horizontal"
-        className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white/5 border border-white/10"
+        className="flex flex-wrap items-center justify-between gap-4 px-2 pb-1"
       >
         <div className="flex flex-wrap items-center gap-2.5">
           <FilterChip
@@ -159,34 +158,34 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           <button
             type="button"
             {...searchBtnFocus.focusProps}
-            className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 border transition-all ${
+            className={`flex items-center gap-2 rounded-full px-5 py-2 text-[1rem] font-medium outline-none transition-all ${
               searchBtnFocus.isFocused
-                ? 'bg-cyan-400 text-slate-950 border-cyan-300 scale-105'
-                : 'bg-slate-900/90 text-slate-200 border-white/15'
+                ? 'bg-white text-black border-transparent scale-105'
+                : 'bg-white/8 text-white/80 border-transparent'
             }`}
           >
-            <Search className="w-4 h-4 text-cyan-400" />
+            <Search className="w-4 h-4 text-white/70" />
             <span>{searchQuery ? `"${searchQuery}"` : `${t.actions.search}...`}</span>
           </button>
 
           <button
             type="button"
             {...sortBtnFocus.focusProps}
-            className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 border transition-all ${
+            className={`flex items-center gap-2 rounded-full px-5 py-2 text-[1rem] font-medium outline-none transition-all ${
               sortBtnFocus.isFocused
-                ? 'bg-cyan-400 text-slate-950 border-cyan-300 scale-105'
-                : 'bg-slate-900/90 text-slate-200 border-white/15'
+                ? 'bg-white text-black border-transparent scale-105'
+                : 'bg-white/8 text-white/80 border-transparent'
             }`}
           >
-            <ArrowUpDown className="w-4 h-4 text-violet-400" />
-            <span className="uppercase text-xs">Sort: {sort}</span>
+            <ArrowUpDown className="w-4 h-4 text-white/70" />
+            <span>Sort: {sort}</span>
           </button>
         </div>
       </FocusScope>
 
       {/* Grid */}
       {filteredGames.length === 0 ? (
-        <div className="p-16 text-center rounded-3xl border border-white/10 bg-white/5">
+        <div className="p-16 text-center rounded-3xl border border-transparent bg-white/[0.06]">
           <SlidersHorizontal className="w-10 h-10 text-slate-400 mx-auto mb-3" />
           <p className="text-lg font-bold text-white">No games match the current filter</p>
         </div>

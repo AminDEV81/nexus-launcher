@@ -33,24 +33,17 @@ export const ConsoleRow: React.FC<ConsoleRowProps> = React.memo(
     const scopeId = `row_${rowId}`
 
     return (
-      <section className="flex flex-col gap-2.5 py-2">
-        <div className="flex items-baseline justify-between px-2">
-          <div className="flex items-baseline gap-3">
-            <h2 className="text-2xl font-extrabold text-white tracking-tight">{title}</h2>
-            {subtitle && (
-              <span className="text-sm font-semibold text-cyan-300">{subtitle}</span>
-            )}
-          </div>
-          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
-            {items.length} {items.length === 1 ? 'Item' : 'Items'}
-          </span>
-        </div>
+      <section className="flex flex-col gap-1 py-1">
+        <h2 className="px-2 text-[1.1rem] font-medium tracking-wide text-white/65">
+          {title}
+          {subtitle && <span className="ml-3 text-[0.95rem] text-white/35">{subtitle}</span>}
+        </h2>
 
         <FocusScope
           id={scopeId}
           orientation="horizontal"
           memory
-          className="flex items-center gap-5 overflow-x-auto no-scrollbar px-2 py-4"
+          className="flex items-start gap-6 overflow-x-auto no-scrollbar px-2 pb-[4.25rem] pt-5"
         >
           {items.map((item) => {
             const pct =

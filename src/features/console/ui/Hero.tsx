@@ -1,9 +1,10 @@
 import React from 'react'
-import { Play, Info, Sparkles, Clock, Disc3, Heart } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { useAnimationSpeed } from '@/hooks/use-animation-speed'
+import { Play, Info, Heart } from 'lucide-react'
 import type { Game } from '@/types/models'
 import { formatPlaytime } from '@/features/library/utils/format'
 import { FocusScope, useFocusable } from '../nav/FocusScope'
-import { Glyph } from './Glyph'
 import { resolveConsoleMediaUrl } from './Tile'
 
 export interface ConsoleHeroProps {
@@ -17,6 +18,12 @@ export interface ConsoleHeroProps {
   onToggleFavorite?: (game: Game) => void
 }
 
+const SPRING = { type: 'spring', stiffness: 460, damping: 30, mass: 0.7 } as const
+
+/**
+ * Minimal hero: no card, no border. The full-bleed artwork lives in `ConsoleBackdrop`; this is just
+ * a caption, a large title and the primary actions, left-aligned over the dissolved artwork.
+ */
 export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
   game,
   isRunning = false,
@@ -27,6 +34,7 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
   onOpenHub,
   onToggleFavorite,
 }) => {
+  const speed = useAnimationSpeed()
   const playFocus = useFocusable<HTMLButtonElement>({
     id: 'hero_primary_play',
     scopeId: 'console_hero_scope',
@@ -34,7 +42,6 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
       if (game) onPlayOrResume(game)
     },
   })
-
   const detailsFocus = useFocusable<HTMLButtonElement>({
     id: 'hero_secondary_details',
     scopeId: 'console_hero_scope',
@@ -42,7 +49,6 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
       if (game) onOpenHub(game)
     },
   })
-
   const favFocus = useFocusable<HTMLButtonElement>({
     id: 'hero_tertiary_fav',
     scopeId: 'console_hero_scope',
@@ -53,129 +59,107 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
 
   if (!game) {
     return (
-      <div className="relative w-full h-[300px] rounded-3xl overflow-hidden border border-white/10 bg-slate-900/60 flex items-center justify-center p-10">
-        <div className="text-center max-w-md">
-          <Disc3 className="w-12 h-12 text-cyan-400 mx-auto mb-3 animate-spin" />
-          <h2 className="text-2xl font-extrabold text-white">Your Console Library Awaits</h2>
-          <p className="text-sm text-slate-400 mt-2">
-            Scan your PC drives or browse the Store tab to populate your Big Picture dashboard.
-          </p>
-        </div>
+      <div className="flex h-[18.5rem] flex-col justify-end pb-6">
+        <h1 className="text-[3.2rem] font-semibold leading-none tracking-tight text-white">
+          Your library is empty
+        </h1>
+        <p className="mt-3 text-lg text-white/50">Add games from the desktop to get started.</p>
       </div>
     )
   }
 
-  const backdrop = resolveConsoleMediaUrl(
-    game.banner_path ?? game.background_path ?? game.cover_path,
-  )
   const logoSrc = resolveConsoleMediaUrl(game.logo_path)
-  const score = game.opencritic_score ?? game.metacritic_score
+  const meta = [game.genres.slice(0, 2).join(' · '), formatPlaytime(game.total_playtime_seconds)]
+    .filter(Boolean)
+    .join('   ·   ')
 
   return (
-    <div className="relative w-full h-[350px] rounded-3xl overflow-hidden border border-white/15 shadow-2xl select-none">
-      {backdrop ? (
-        <img
-          src={backdrop}
-          alt={game.name}
-          className="absolute inset-0 w-full h-full object-cover object-center scale-105 filter brightness-90 transition-all duration-700"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-cyan-950 via-slate-900 to-black" />
-      )}
-
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/75 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-black/30" />
-
-      <div className="relative z-10 h-full flex flex-col justify-end p-8 md:p-10 max-w-3xl gap-3.5">
-        <div className="flex flex-wrap items-center gap-2.5">
-          {isRunning && (
-            <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              Running Now
-            </span>
-          )}
-          {game.genres[0] && (
-            <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-bold text-slate-200">
-              {game.genres[0]}
-            </span>
-          )}
-          {score && score > 0 ? (
-            <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" />
-              Critic {score}
-            </span>
-          ) : null}
-          <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5 text-cyan-400" />
-            {formatPlaytime(game.total_playtime_seconds)}
-          </span>
-        </div>
-
-        {logoSrc ? (
-          <img
-            src={logoSrc}
-            alt={game.name}
-            className="max-h-16 max-w-sm object-contain object-left drop-shadow-xl"
-          />
-        ) : (
-          <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-none drop-shadow-lg line-clamp-1">
-            {game.name}
-          </h1>
-        )}
-
-        {game.description && (
-          <p className="text-sm md:text-base text-slate-300/90 line-clamp-2 max-w-2xl leading-relaxed">
-            {game.description.replace(/<[^>]+>/g, '')}
-          </p>
-        )}
-
-        <FocusScope
-          id="console_hero_scope"
-          orientation="horizontal"
-          className="flex items-center gap-4 pt-2"
+    <div className="flex h-[18.5rem] max-w-[46rem] select-none flex-col justify-end pb-4">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={`info_${game.id}`}
+          className="flex flex-col gap-4"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.34 * speed, ease: [0.22, 1, 0.36, 1] }}
         >
-          <button
-            type="button"
-            {...playFocus.focusProps}
-            className={`px-7 py-3.5 rounded-2xl font-extrabold text-base flex items-center gap-3 transition-all ${
-              playFocus.isFocused
-                ? 'bg-cyan-400 text-slate-950 scale-105 ring-4 ring-cyan-300/60 shadow-[0_0_35px_rgba(0,229,255,0.65)]'
-                : 'bg-cyan-500/90 text-slate-950 hover:bg-cyan-400'
-            }`}
-          >
-            <Play className="w-5 h-5 fill-current" />
-            <span>{isRunning ? resumeLabel : playLabel}</span>
-            <Glyph button="confirm" size="sm" />
-          </button>
+          <div className="flex items-center gap-3 text-[0.95rem] font-medium tracking-wide text-white/55">
+            {isRunning && (
+              <span className="flex items-center gap-2 text-emerald-300">
+                <span className="size-2 animate-pulse rounded-full bg-emerald-400" />
+                Playing now
+              </span>
+            )}
+            <span>{meta}</span>
+          </div>
 
-          <button
-            type="button"
-            {...detailsFocus.focusProps}
-            className={`px-6 py-3.5 rounded-2xl font-bold text-base flex items-center gap-2.5 transition-all border ${
-              detailsFocus.isFocused
-                ? 'bg-white/20 text-white border-cyan-400 scale-105 ring-4 ring-cyan-400/40'
-                : 'bg-white/10 text-slate-200 border-white/15 hover:bg-white/15'
-            }`}
-          >
-            <Info className="w-5 h-5 text-cyan-300" />
-            <span>{detailsLabel}</span>
-          </button>
-
-          {onToggleFavorite && (
-            <button
-              type="button"
-              {...favFocus.focusProps}
-              className={`p-3.5 rounded-2xl border transition-all ${
-                favFocus.isFocused
-                  ? 'bg-amber-400/25 border-amber-300 text-amber-300 scale-105 ring-4 ring-amber-400/30'
-                  : 'bg-white/10 border-white/15 text-slate-300'
-              }`}
-            >
-              <Heart className={`w-5 h-5 ${game.is_favorite ? 'fill-amber-400 text-amber-400' : ''}`} />
-            </button>
+          {logoSrc ? (
+            <img
+              src={logoSrc}
+              alt={game.name}
+              className="max-h-[5.5rem] max-w-[28rem] object-contain object-left drop-shadow-2xl"
+            />
+          ) : (
+            <h1 className="line-clamp-2 text-[4.1rem] font-semibold leading-[0.98] tracking-[-0.025em] text-white [text-shadow:0_4px_40px_rgba(0,0,0,0.45)]">
+              {game.name}
+            </h1>
           )}
-        </FocusScope>
-      </div>
+        </motion.div>
+      </AnimatePresence>
+
+      <FocusScope
+        id="console_hero_scope"
+        orientation="horizontal"
+        className="mt-7 flex items-center gap-4"
+      >
+        <motion.button
+          type="button"
+          {...playFocus.focusProps}
+          animate={{ scale: playFocus.isFocused ? 1.07 : 1 }}
+          transition={speed === 0 ? { duration: 0 } : SPRING}
+          className={`flex items-center gap-3 rounded-full px-9 py-4 text-[1.15rem] font-semibold outline-none transition-[background-color,box-shadow] duration-200 ${
+            playFocus.isFocused
+              ? 'bg-white text-black shadow-[0_0_0_4px_rgba(255,255,255,0.28),0_18px_50px_-8px_var(--console-ambient,#7dd3fc)]'
+              : 'bg-white/92 text-black/90'
+          }`}
+        >
+          <Play className="size-[1.15rem] fill-current" />
+          <span>{isRunning ? resumeLabel : playLabel}</span>
+        </motion.button>
+
+        <motion.button
+          type="button"
+          {...detailsFocus.focusProps}
+          aria-label={detailsLabel}
+          title={detailsLabel}
+          animate={{ scale: detailsFocus.isFocused ? 1.1 : 1 }}
+          transition={speed === 0 ? { duration: 0 } : SPRING}
+          className={`flex size-[3.7rem] items-center justify-center rounded-full outline-none transition-colors duration-200 ${
+            detailsFocus.isFocused
+              ? 'bg-white text-black'
+              : 'bg-white/12 text-white backdrop-blur-sm'
+          }`}
+        >
+          <Info className="size-[1.35rem]" />
+        </motion.button>
+
+        {onToggleFavorite && (
+          <motion.button
+            type="button"
+            {...favFocus.focusProps}
+            aria-label="Favorite"
+            title="Favorite"
+            animate={{ scale: favFocus.isFocused ? 1.1 : 1 }}
+            transition={speed === 0 ? { duration: 0 } : SPRING}
+            className={`flex size-[3.7rem] items-center justify-center rounded-full outline-none transition-colors duration-200 ${
+              favFocus.isFocused ? 'bg-white text-black' : 'bg-white/12 text-white backdrop-blur-sm'
+            }`}
+          >
+            <Heart className={`size-[1.35rem] ${game.is_favorite ? 'fill-current' : ''}`} />
+          </motion.button>
+        )}
+      </FocusScope>
     </div>
   )
 }

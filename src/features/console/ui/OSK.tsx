@@ -39,7 +39,7 @@ const KeyButton: React.FC<{
       type="button"
       {...focusProps}
       className={`flex h-14 items-center justify-center rounded-xl border text-lg font-bold transition-transform duration-150 ${
-        wide ? 'px-6 min-w-[120px]' : 'w-14'
+        wide ? 'px-6 min-w-[7.5rem]' : 'w-14'
       } ${
         isFocused
           ? 'scale-110 border-cyan-300 bg-cyan-500/30 text-white shadow-[0_0_20px_rgba(0,229,255,0.45)]'
@@ -124,9 +124,7 @@ export const ConsoleOSK: React.FC = () => {
               id="osk_layout"
               label={layout === 'en' ? '🌐 فارسی' : layout === 'fa' ? '🌐 #!=' : '🌐 EN'}
               wide
-              onPress={() =>
-                setLayout((l) => (l === 'en' ? 'fa' : l === 'fa' ? 'sym' : 'en'))
-              }
+              onPress={() => setLayout((l) => (l === 'en' ? 'fa' : l === 'fa' ? 'sym' : 'en'))}
             />
             <KeyButton
               id="osk_shift"
@@ -146,25 +144,9 @@ export const ConsoleOSK: React.FC = () => {
               wide
               onPress={() => setValue((v) => v.slice(0, -1))}
             />
-            <KeyButton
-              id="osk_clear"
-              label="Clear"
-              wide
-              onPress={() => setValue('')}
-            />
-            <KeyButton
-              id="osk_done"
-              label="✓ Done"
-              wide
-              accent
-              onPress={handleSubmit}
-            />
-            <KeyButton
-              id="osk_cancel"
-              label="✕ Cancel"
-              wide
-              onPress={closeOsk}
-            />
+            <KeyButton id="osk_clear" label="Clear" wide onPress={() => setValue('')} />
+            <KeyButton id="osk_done" label="✓ Done" wide accent onPress={handleSubmit} />
+            <KeyButton id="osk_cancel" label="✕ Cancel" wide onPress={closeOsk} />
           </div>
         </div>
 
