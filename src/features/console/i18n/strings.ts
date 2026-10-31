@@ -7,6 +7,7 @@ export interface ConsoleDictionary {
     store: string
     downloads: string
     music: string
+    dualsense: string
     passport: string
     booster: string
     settings: string
@@ -81,6 +82,7 @@ export const CONSOLE_STRINGS: Record<ConsoleLanguage, ConsoleDictionary> = {
       store: 'Store',
       downloads: 'Downloads',
       music: 'Music',
+      dualsense: 'DualSense',
       passport: 'Passport',
       booster: 'Booster',
       settings: 'Settings',
@@ -153,6 +155,7 @@ export const CONSOLE_STRINGS: Record<ConsoleLanguage, ConsoleDictionary> = {
       store: 'فروشگاه',
       downloads: 'دانلودها',
       music: 'موسیقی',
+      dualsense: 'دوال‌سنس',
       passport: 'پاسپورت',
       booster: 'بوستر',
       settings: 'تنظیمات',

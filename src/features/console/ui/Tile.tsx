@@ -1,10 +1,14 @@
 import React from 'react'
 import { motion } from 'framer-motion'
+import { Sparkles, Star } from 'lucide-react'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import type { Game, HubGame } from '@/types/models'
-import { formatPlaytime } from '@/features/library/utils/format'
+import { formatPlaytime, formatElapsed } from '@/features/library/utils/format'
+import { useLaunchStore } from '@/store/launch-store'
 import { useFocusable } from '../nav/FocusScope'
+import { useConsoleStore } from '../store/console-store'
+import { CONSOLE_THEMES } from '../theme/tokens'
 
 export interface ConsoleTileProps {
   id: string
@@ -37,12 +41,31 @@ export function resolveConsoleMediaUrl(url: string | null | undefined): string |
   }
 }
 
+/**
+ * Upgrades IGDB & Steam artwork URLs to maximum 1080p HD quality (#8) so hovering/focusing a game
+ * never displays a blurry low-resolution thumbnail in the backdrop or hero banner.
+ */
+export function resolveConsoleHighResUrl(url: string | null | undefined): string | null {
+  const resolved = resolveConsoleMediaUrl(url)
+  if (!resolved) return null
+  if (resolved.includes('images.igdb.com/igdb/image/upload/')) {
+    return resolved
+      .replace('/t_thumb/', '/t_1080p/')
+      .replace('/t_micro/', '/t_1080p/')
+      .replace('/t_cover_small/', '/t_1080p/')
+      .replace('/t_cover_big/', '/t_1080p/')
+      .replace('/t_720p/', '/t_1080p/')
+      .replace('/t_screenshot_med/', '/t_1080p/')
+      .replace('/t_screenshot_big/', '/t_1080p/')
+  }
+  if (resolved.includes('shared.akamai.steamstatic.com') || resolved.includes('steamcdn-a.akamaihd.net')) {
+    return resolved.replace('/capsule_616x353.jpg', '/library_hero.jpg')
+  }
+  return resolved
+}
+
 const SPRING = { type: 'spring', stiffness: 440, damping: 32, mass: 0.7 } as const
 
-/**
- * Minimal poster tile: artwork only. Everything secondary (title, playtime, price) appears under the
- * focused tile, so a row reads as a calm strip of covers and the focused one lifts out of it.
- */
 export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
   ({
     id,
@@ -58,6 +81,12 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
     onOptionsTile,
   }) => {
     const speed = useAnimationSpeed()
+    const themeId = useConsoleStore((s) => s.theme)
+    const elapsedSeconds = useLaunchStore((s) =>
+      isRunning && game?.id ? (s.elapsedSeconds[game.id] ?? 0) : 0,
+    )
+    const isLight = Boolean(CONSOLE_THEMES[themeId]?.isLight)
+
     const { focusProps, isFocused } = useFocusable<HTMLButtonElement>({
       id,
       scopeId,
@@ -71,7 +100,7 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
         ? 'w-[18.5rem] h-[10.5rem]'
         : variant === 'square'
           ? 'w-[11.5rem] h-[11.5rem]'
-          : 'w-[12rem] h-[17.5rem]'
+          : 'w-[12.2rem] h-[17.6rem]'
 
     const title = game?.name ?? hubGame?.name ?? 'Untitled'
     const rawCover =
@@ -82,13 +111,20 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
           hubGame?.backdrop_url ??
           hubGame?.cover_url)
         : (game?.cover_path ?? hubGame?.cover_url)
-    const imageSrc = resolveConsoleMediaUrl(rawCover)
+    const imageSrc = resolveConsoleHighResUrl(rawCover)
+
+    const score =
+      game?.opencritic_score ??
+      game?.metacritic_score ??
+      hubGame?.opencritic_score ??
+      hubGame?.metacritic_score ??
+      (hubGame?.rating ? Math.round(hubGame.rating) : null)
 
     const caption = game
       ? game.total_playtime_seconds > 0
         ? formatPlaytime(game.total_playtime_seconds)
-        : 'Not played yet'
-      : hubGame?.sale_price_formatted || hubGame?.release_date || ''
+        : 'Ready to play'
+      : hubGame?.sale_price_formatted || hubGame?.release_date || 'Store'
     const tag = badge ?? (hubGame?.discount_percent ? `-${hubGame.discount_percent}%` : undefined)
     const downloading = typeof progress === 'number' && progress >= 0
 
@@ -100,22 +136,30 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
           e.preventDefault()
           onOptionsTile?.()
         }}
-        className={`group relative shrink-0 text-left select-none outline-none ${dims}`}
+        className={`group relative shrink-0 text-left select-none outline-none cursor-pointer ${dims}`}
       >
-        {/* Light pool under the focused cover (opacity only, so it stays on the compositor) */}
+        {/* Light pool under the focused cover */}
         <motion.div
           aria-hidden
-          className="pointer-events-none absolute inset-x-4 -bottom-3 h-10 rounded-full blur-2xl"
-          style={{ background: 'var(--console-ambient, #7dd3fc)' }}
+          className="pointer-events-none absolute inset-x-3 -bottom-3 h-10 rounded-full blur-2xl"
+          style={{ background: 'var(--console-ambient, #00e5ff)' }}
           initial={false}
-          animate={{ opacity: isFocused ? 0.75 : 0, scale: isFocused ? 1 : 0.8 }}
-          transition={{ duration: 0.32 * speed }}
+          animate={{ opacity: isFocused ? 0.85 : 0, scale: isFocused ? 1.05 : 0.8 }}
+          transition={{ duration: 0.28 * speed }}
         />
 
         <motion.div
-          className="absolute inset-0 overflow-hidden rounded-[1.1rem] bg-[#10121a] shadow-[0_10px_30px_-10px_rgba(0,0,0,0.8)]"
+          className={`absolute inset-0 overflow-hidden rounded-[1.15rem] transition-shadow ${
+            isLight ? 'bg-slate-200 shadow-lg' : 'bg-[#141b2d] shadow-[0_12px_34px_-8px_rgba(0,0,0,0.75)]'
+          } ${
+            isFocused
+              ? 'ring-[3px] ring-cyan-400 shadow-[0_18px_45px_rgba(0,229,255,0.38)]'
+              : isLight
+                ? 'ring-1 ring-slate-300'
+                : 'ring-1 ring-white/15'
+          }`}
           initial={false}
-          animate={{ scale: isFocused ? 1.085 : 1, y: isFocused ? -7 : 0 }}
+          animate={{ scale: isFocused ? 1.08 : 1, y: isFocused ? -7 : 0 }}
           transition={speed === 0 ? { duration: 0 } : SPRING}
           style={{ zIndex: isFocused ? 20 : 1 }}
         >
@@ -128,63 +172,83 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_20%,#1c2233,#0b0d14)] p-5">
-              <span className="line-clamp-3 text-center text-lg font-semibold text-white/80">
+            <div className="flex h-full w-full items-end bg-gradient-to-br from-slate-700 via-slate-800 to-slate-950 p-4">
+              <span className="line-clamp-3 text-[1.05rem] font-bold leading-snug text-white">
                 {title}
               </span>
             </div>
           )}
 
-          {/* Dims unfocused covers; the focused one is shown at full brightness */}
-          <motion.div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 bg-black"
-            initial={false}
-            animate={{ opacity: isFocused ? 0 : 0.38 }}
-            transition={{ duration: 0.25 * speed }}
-          />
-          <div className="pointer-events-none absolute inset-0 rounded-[1.1rem] ring-1 ring-inset ring-white/10" />
-          <motion.div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 rounded-[1.1rem] ring-2 ring-inset ring-white/90"
-            initial={false}
-            animate={{ opacity: isFocused ? 1 : 0 }}
-            transition={{ duration: 0.18 * speed }}
-          />
+          {/* Subtle bottom gradient for contrast */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
 
-          {isRunning ? (
-            <span className="absolute left-3 top-3 flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[0.7rem] font-medium text-white backdrop-blur-sm">
-              <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />
-              Playing
-            </span>
-          ) : tag ? (
-            <span className="absolute left-3 top-3 rounded-full bg-white px-2.5 py-1 text-[0.7rem] font-semibold text-black">
-              {tag}
-            </span>
-          ) : null}
+          {/* Top-left & Top-right status pills */}
+          <div className="pointer-events-none absolute inset-x-2.5 top-2.5 flex items-center justify-between gap-1">
+            {isRunning ? (
+              <span className="flex items-center gap-1.5 rounded-full bg-emerald-400 px-2.5 py-0.5 text-[0.68rem] font-extrabold uppercase tracking-wider text-slate-950 shadow tabular-nums">
+                <span className="size-1.5 rounded-full bg-slate-950 animate-ping" />
+                Playing · {formatElapsed(elapsedSeconds)}
+              </span>
+            ) : tag ? (
+              <span className="rounded-full bg-cyan-400 px-2.5 py-0.5 text-[0.7rem] font-extrabold text-slate-950 shadow">
+                {tag}
+              </span>
+            ) : game?.is_favorite ? (
+              <span className="rounded-full bg-amber-400/95 p-1.5 text-slate-950 shadow">
+                <Star className="size-3 fill-current" />
+              </span>
+            ) : (
+              <span />
+            )}
+
+            {score && score > 0 ? (
+              <span className="flex items-center gap-1 rounded-lg border border-white/20 bg-black/75 px-2 py-0.5 text-[0.7rem] font-extrabold text-emerald-300 backdrop-blur-md">
+                <Sparkles className="size-2.5" />
+                {score}
+              </span>
+            ) : null}
+          </div>
 
           {downloading && (
-            <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/15">
+            <div className="absolute inset-x-3 bottom-3 h-1.5 overflow-hidden rounded-full bg-black/60">
               <div
-                className="h-full bg-white transition-[width] duration-300"
+                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 transition-[width] duration-300"
                 style={{ width: `${Math.min(100, Math.max(0, progress ?? 0))}%` }}
               />
             </div>
           )}
         </motion.div>
 
-        {/* Caption under the focused tile */}
+        {/* Caption under the tile */}
         <motion.div
-          aria-hidden={!isFocused}
-          className="pointer-events-none absolute inset-x-0 top-full mt-4 flex flex-col gap-0.5 px-1"
+          className="pointer-events-none absolute inset-x-0 -bottom-[3.6rem] flex flex-col gap-0.5 px-1"
           initial={false}
-          animate={{ opacity: isFocused ? 1 : 0, y: isFocused ? 0 : -6 }}
-          transition={{ duration: 0.22 * speed }}
+          animate={{
+            opacity: isFocused ? 1 : 0.65,
+            y: isFocused ? 0 : -3,
+          }}
+          transition={{ duration: 0.18 * speed }}
         >
-          <span className="truncate text-[1.02rem] font-semibold leading-tight text-white">
+          <div
+            className={`truncate text-[0.98rem] font-bold tracking-tight ${
+              isLight ? 'text-slate-900' : 'text-white'
+            }`}
+          >
             {title}
-          </span>
-          {caption && <span className="truncate text-[0.82rem] text-white/50">{caption}</span>}
+          </div>
+          <div
+            className={`truncate text-[0.78rem] font-medium ${
+              isFocused
+                ? isLight
+                  ? 'text-indigo-600'
+                  : 'text-cyan-300'
+                : isLight
+                  ? 'text-slate-500'
+                  : 'text-slate-400'
+            }`}
+          >
+            {caption}
+          </div>
         </motion.div>
       </button>
     )

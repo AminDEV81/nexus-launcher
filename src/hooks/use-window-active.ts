@@ -85,3 +85,15 @@ function getSnapshot() {
 export function useWindowActive() {
   return useSyncExternalStore(subscribe, getSnapshot, () => true)
 }
+
+/**
+ * Synchronous getter for non-React engines (like Console Audio & Gamepad Input loops).
+ * Ensures the native Tauri `onFocusChanged` listener is active so Windows WebView2 never
+ * reports false-positive focus while a fullscreen/borderless game is in the foreground.
+ */
+export function isNativeWindowActive(): boolean {
+  if (typeof window !== 'undefined' && !listening) {
+    startListening()
+  }
+  return active
+}

@@ -250,8 +250,11 @@ export function nativeSlotToPadFrame(slot: NativePadSlotFrame): PadFrame {
 export function shouldUseNativePads(
   usableBrowserPadCount: number,
   dualSenseConnectedCount: number,
+  dualSenseEmulatingCount = 0,
 ): boolean {
-  return usableBrowserPadCount === 0 && dualSenseConnectedCount > 0
+  if (dualSenseConnectedCount <= 0) return false
+  if (usableBrowserPadCount === 0) return true
+  return dualSenseEmulatingCount === 0
 }
 
 /** A browser pad is only trusted when it uses the standard layout, or is not a Sony pad. */

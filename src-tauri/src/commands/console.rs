@@ -162,7 +162,7 @@ pub fn validate_console_setting_value(key: &str, value: &str) -> Option<String> 
             .ok()
             .map(|n| n.clamp(1, 120).to_string()),
         "console_theme" => {
-            if matches!(v, "cyberpunk" | "oled" | "light") {
+            if matches!(v, "cyberpunk" | "ps5" | "emerald" | "crimson" | "synthwave" | "oled" | "light") {
                 Some(v.to_string())
             } else {
                 Some("cyberpunk".to_string())
@@ -419,7 +419,7 @@ pub fn console_get_system_status(
             controllers.push(ControllerBatteryStatus {
                 slot_index: slot.slot_index,
                 name: slot.dualsense.device_name.clone(),
-                glyph_family: "playstation".to_string(),
+                glyph_family: if slot.xbox.emulation_active { "xbox".to_string() } else { "playstation".to_string() },
                 connected: true,
                 battery_percent: slot.dualsense.battery_percent,
                 charging: slot.dualsense.battery_charging,

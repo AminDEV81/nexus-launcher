@@ -1,10 +1,12 @@
 import { create } from 'zustand'
 import { setSetting } from '@/services/settings'
-import type {
-  ConsoleGlyphFamily,
-  ConsoleGlyphOverride,
-  ConsoleLanguage,
-  ConsoleThemeId,
+import type { HubGame } from '@/types/models'
+import {
+  CONSOLE_THEMES,
+  type ConsoleGlyphFamily,
+  type ConsoleGlyphOverride,
+  type ConsoleLanguage,
+  type ConsoleThemeId,
 } from '../theme/tokens'
 
 export type ConsoleTabId =
@@ -13,6 +15,7 @@ export type ConsoleTabId =
   | 'store'
   | 'downloads'
   | 'music'
+  | 'dualsense'
   | 'passport'
   | 'booster'
   | 'settings'
@@ -63,9 +66,8 @@ export function parseConsoleSettingsFromMap(
     const v = g(k, def ? '1' : '0')
     return v === '1' || v === 'true'
   }
-  const themeRaw = g('console_theme', 'cyberpunk')
-  const theme: ConsoleThemeId =
-    themeRaw === 'oled' || themeRaw === 'light' ? themeRaw : 'cyberpunk'
+  const themeRaw = g('console_theme', 'cyberpunk') as ConsoleThemeId
+  const theme: ConsoleThemeId = CONSOLE_THEMES[themeRaw] ? themeRaw : 'cyberpunk'
 
   const glyphRaw = g('console_glyph_override', 'auto')
   const glyphOverride: ConsoleGlyphOverride =
@@ -79,9 +81,6 @@ export function parseConsoleSettingsFromMap(
   const comboRaw = g('console_guide_combo', 'both')
   const guideCombo =
     comboRaw === 'guide_only' || comboRaw === 'back_start' ? comboRaw : 'both'
-
-  const langRaw = g('console_language', 'en')
-  const language: ConsoleLanguage = langRaw === 'fa' ? 'fa' : 'en'
 
   return {
     consoleEnabled: b('console_enabled', true),
@@ -102,7 +101,7 @@ export function parseConsoleSettingsFromMap(
     guideCombo,
     reduceMotion: b('console_reduce_motion', false),
     minimalHome: b('console_minimal_home', false),
-    language,
+    language: 'en',
   }
 }
 
@@ -113,14 +112,25 @@ interface OskRequest {
   onSubmit?: (value: string) => void
 }
 
+export interface ConsoleSoundtrackTarget {
+  id: string
+  name: string
+  coverUrl?: string | null
+  steamAppId?: string | null
+  igdbId?: number | null
+}
+
 interface ConsoleStoreState extends ConsoleSettingsState {
   activeTab: ConsoleTabId
   selectedGameId: string | null
+  selectedStoreHubGame: HubGame | null
+  selectedSoundtrackGame: ConsoleSoundtrackTarget | null
   focusedGameId: string | null
   ambientColor: string
   detectedGlyphFamily: ConsoleGlyphFamily
   activeControllerCount: number
   controllerDisconnectedModal: boolean
+  controllerTestMode: boolean
   profileGateCompleted: boolean
   screensaverActive: boolean
   quickSettingsOpen: boolean
@@ -136,10 +146,14 @@ interface ConsoleStoreState extends ConsoleSettingsState {
   ) => Promise<void>
   setActiveTab: (tab: ConsoleTabId) => void
   setSelectedGameId: (gameId: string | null) => void
+  setSelectedStoreHubGame: (hubGame: HubGame | null) => void
+  setSelectedSoundtrackGame: (target: ConsoleSoundtrackTarget | null) => void
+  openGameSoundtrackInConsole: (target: ConsoleSoundtrackTarget) => void
   setFocusedGameId: (gameId: string | null, accentColor?: string) => void
   setAmbientColor: (hex: string) => void
   setDetectedDevice: (family: ConsoleGlyphFamily, count?: number) => void
   setControllerDisconnectedModal: (open: boolean) => void
+  setControllerTestMode: (active: boolean) => void
   setProfileGateCompleted: (done: boolean) => void
   setScreensaverActive: (active: boolean) => void
   setQuickSettingsOpen: (open: boolean) => void
@@ -178,11 +192,14 @@ export const useConsoleStore = create<ConsoleStoreState>((set, get) => ({
   ...parseConsoleSettingsFromMap(undefined),
   activeTab: 'home',
   selectedGameId: null,
+  selectedStoreHubGame: null,
+  selectedSoundtrackGame: null,
   focusedGameId: null,
   ambientColor: '#00e5ff',
   detectedGlyphFamily: 'playstation',
   activeControllerCount: 0,
   controllerDisconnectedModal: false,
+  controllerTestMode: false,
   profileGateCompleted: false,
   screensaverActive: false,
   quickSettingsOpen: false,
@@ -216,8 +233,31 @@ export const useConsoleStore = create<ConsoleStoreState>((set, get) => ({
     }
   },
 
-  setActiveTab: (tab) => set({ activeTab: tab, selectedGameId: null }),
-  setSelectedGameId: (gameId) => set({ selectedGameId: gameId }),
+  setActiveTab: (tab) =>
+    set({
+      activeTab: tab,
+      selectedGameId: null,
+      selectedStoreHubGame: null,
+      controllerTestMode: false,
+    }),
+  setSelectedGameId: (gameId) =>
+    set({
+      selectedGameId: gameId,
+      selectedStoreHubGame: null,
+    }),
+  setSelectedStoreHubGame: (hubGame) =>
+    set({
+      selectedStoreHubGame: hubGame,
+      selectedGameId: null,
+    }),
+  setSelectedSoundtrackGame: (target) => set({ selectedSoundtrackGame: target }),
+  openGameSoundtrackInConsole: (target) =>
+    set({
+      selectedSoundtrackGame: target,
+      selectedGameId: null,
+      selectedStoreHubGame: null,
+      activeTab: 'music',
+    }),
   setFocusedGameId: (gameId, accentColor) =>
     set((s) => ({
       focusedGameId: gameId,
@@ -230,6 +270,7 @@ export const useConsoleStore = create<ConsoleStoreState>((set, get) => ({
       activeControllerCount: count !== undefined ? count : s.activeControllerCount,
     })),
   setControllerDisconnectedModal: (open) => set({ controllerDisconnectedModal: open }),
+  setControllerTestMode: (active) => set({ controllerTestMode: active }),
   setProfileGateCompleted: (done) => set({ profileGateCompleted: done }),
   setScreensaverActive: (active) => set({ screensaverActive: active }),
   setQuickSettingsOpen: (open) => set({ quickSettingsOpen: open }),

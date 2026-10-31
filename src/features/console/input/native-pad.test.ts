@@ -23,11 +23,12 @@ describe('controller family detection', () => {
     expect(isSonyGamepadId(XINPUT_ID)).toBe(false)
   })
 
-  it('maps ids to the right glyph family', () => {
-    expect(detectGlyphFamilyFromId(DS_ID)).toBe('playstation')
+  it('maps ids to the right glyph family and switches to Xbox glyphs when ViGEm Xbox mode is active', () => {
+    expect(detectGlyphFamilyFromId(DS_ID, 0)).toBe('playstation')
+    expect(detectGlyphFamilyFromId(DS_ID, 1)).toBe('xbox') // ViGEm Xbox mode enabled on DualSense
     expect(detectGlyphFamilyFromId(XBOX_BT_ID)).toBe('xbox')
     expect(detectGlyphFamilyFromId(SWITCH_ID)).toBe('switch')
-    expect(detectGlyphFamilyFromId(XINPUT_ID, 1)).toBe('playstation') // emulated DualSense
+    expect(detectGlyphFamilyFromId(XINPUT_ID, 1)).toBe('xbox') // ViGEm virtual Xbox 360 controller
     expect(detectGlyphFamilyFromId(XINPUT_ID, 0)).toBe('xbox')
     expect(detectGlyphFamilyFromId(DS_ID, 0, 'xbox')).toBe('xbox') // manual override wins
   })
@@ -50,6 +51,7 @@ describe('dedupeLogicalGamepads', () => {
     )
     expect(out.find((p) => p.index === 0)?.isShadowedDuplicate).toBe(true)
     expect(out.find((p) => p.index === 1)?.isShadowedDuplicate).toBe(false)
+    expect(out.find((p) => p.index === 1)?.glyphFamily).toBe('xbox')
   })
 
   it('keeps a genuine Xbox Wireless pad even while a DualSense is emulating', () => {
@@ -101,10 +103,11 @@ describe('native DualSense input source', () => {
     expect(frame.lx).toBe(0.5)
   })
 
-  it('only falls back to the native engine when the browser sees no usable pad', () => {
-    expect(shouldUseNativePads(0, 1)).toBe(true)
-    expect(shouldUseNativePads(1, 1)).toBe(false)
-    expect(shouldUseNativePads(0, 0)).toBe(false)
+  it('uses native DualSense HID whenever ViGEm is disabled or no usable browser pad exists', () => {
+    expect(shouldUseNativePads(0, 1, 0)).toBe(true)
+    expect(shouldUseNativePads(1, 1, 0)).toBe(true) // ViGEm disabled -> native DualSense stays active
+    expect(shouldUseNativePads(1, 1, 1)).toBe(false) // ViGEm enabled -> XInput browser pad used
+    expect(shouldUseNativePads(0, 0, 0)).toBe(false)
   })
 
   it('distrusts Sony pads that Chromium exposes without the standard mapping', () => {

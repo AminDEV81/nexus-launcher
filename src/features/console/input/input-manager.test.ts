@@ -30,7 +30,7 @@ describe('Console InputManager & DualSense/ViGEm Deduplication', () => {
     expect(timer.update('down', 2300)).toBe('down')
   })
 
-  it('deduplicates physical Sony DualSense when ViGEm virtual Xbox 360 emulation is active', () => {
+  it('deduplicates physical Sony DualSense and switches to Xbox glyphs when ViGEm Xbox 360 emulation is active', () => {
     const rawPads = [
       { index: 0, id: 'DualSense Wireless Controller (Vendor: 054c Product: 0ce6)', connected: true },
       { index: 1, id: 'Xbox 360 Controller (XInput STANDARD GAMEPAD)', connected: true },
@@ -39,12 +39,13 @@ describe('Console InputManager & DualSense/ViGEm Deduplication', () => {
     expect(logical).toHaveLength(2)
     expect(logical[0].isShadowedDuplicate).toBe(true)
     expect(logical[1].isShadowedDuplicate).toBe(false)
-    // Preserves PlayStation glyph family even when driven via virtual XInput pad!
-    expect(logical[1].glyphFamily).toBe('playstation')
+    // Switches to Xbox glyph family when ViGEm Xbox mode is enabled!
+    expect(logical[1].glyphFamily).toBe('xbox')
   })
 
   it('detects PlayStation, Xbox, and Switch glyph families and honors Confirm/Back swap', () => {
-    expect(detectGlyphFamilyFromId('Wireless Controller (054c:0ce6)', 1, 'auto')).toBe('playstation')
+    expect(detectGlyphFamilyFromId('Wireless Controller (054c:0ce6)', 0, 'auto')).toBe('playstation')
+    expect(detectGlyphFamilyFromId('Wireless Controller (054c:0ce6)', 1, 'auto')).toBe('xbox')
     expect(detectGlyphFamilyFromId('Nintendo Switch Pro Controller (057e:2009)', 0, 'auto')).toBe('switch')
     expect(detectGlyphFamilyFromId('Xbox Wireless Controller', 0, 'auto')).toBe('xbox')
 

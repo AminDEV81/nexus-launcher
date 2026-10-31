@@ -1,3 +1,5 @@
+import { isNativeWindowActive } from '@/hooks/use-window-active'
+import { useLaunchStore } from '@/store/launch-store'
 import { useEffect, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
@@ -61,6 +63,11 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
 
     const dispatchAction = (action: ConsoleAction) => {
       markActivity()
+      // Requirement #6: When Controller Test Mode is active in the DualSense tab,
+      // lock out all menu navigation so pressing buttons only lights up the live controller visualizer!
+      if (useConsoleStore.getState().controllerTestMode) {
+        return
+      }
       const customHandled = handlersRef.current.onAction?.(action)
       if (customHandled) return
 
@@ -131,6 +138,15 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
 
       useConsoleStore.getState().setDetectedDevice('keyboard')
       markActivity()
+
+      if (useConsoleStore.getState().controllerTestMode) {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          useConsoleStore.getState().setControllerTestMode(false)
+          consoleSoundEngine.play('back')
+        }
+        return
+      }
 
       if (isTextInput) {
         if (e.key === 'Escape') {
@@ -215,30 +231,64 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
     // Any first interaction (key, pointer or controller) unlocks WebAudio so UI sounds always work.
     const unlockAudio = () => consoleSoundEngine.unlock()
 
+    const onMouseNavButton = (e: MouseEvent) => {
+      if (e.button === 3 || e.button === 4) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (e.type === 'mouseup' && e.button === 3) {
+          dispatchAction('back')
+        }
+      }
+    }
+
     window.addEventListener('focus', onWindowFocus)
     window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('mousedown', onMouseNavButton, true)
+    window.addEventListener('mouseup', onMouseNavButton, true)
+    window.addEventListener('auxclick', onMouseNavButton, true)
     window.addEventListener('keydown', unlockAudio, { passive: true })
     window.addEventListener('pointerdown', unlockAudio, { passive: true })
     window.addEventListener('gamepadconnected', unlockAudio)
 
-    // Poll DualSense counts every 3s for accurate deduplication and glyph detection.
+    // Poll DualSense counts every 1.2s (and immediately on mode change) for accurate deduplication and glyph switching (#7).
     const syncDualSense = () => {
       invoke<{ connectedCount?: number; emulatingCount?: number }>('dualsense_get_state')
         .then((snap) => {
-          dualSenseCountsRef.current = {
-            connected: snap?.connectedCount ?? 0,
-            emulating: snap?.emulatingCount ?? 0,
+          const connected = snap?.connectedCount ?? 0
+          const emulating = snap?.emulatingCount ?? 0
+          const prevEmulating = dualSenseCountsRef.current.emulating
+          dualSenseCountsRef.current = { connected, emulating }
+          if (connected > 0 && emulating !== prevEmulating) {
+            useConsoleStore
+              .getState()
+              .setDetectedDevice(emulating > 0 ? 'xbox' : 'playstation', Math.max(1, connected))
           }
         })
         .catch(() => {})
     }
     syncDualSense()
-    const dsInterval = window.setInterval(syncDualSense, 3000)
+    window.addEventListener('nexus:dualsense-mode-changed', syncDualSense)
+    const dsInterval = window.setInterval(syncDualSense, 1200)
 
     // Native DualSense input (Rust engine). Only polled while the browser cannot see a usable pad.
     let nativeInFlight = false
+    const isBackgroundedOrGaming = () => {
+      if (typeof document !== 'undefined') {
+        if (document.hidden) return true
+        if (!isNativeWindowActive()) return true
+        if (typeof document.hasFocus === 'function' && !document.hasFocus()) return true
+      }
+      const isOverlayWin =
+        typeof document !== 'undefined' &&
+        document.documentElement.getAttribute('data-overlay-window') === 'true'
+      if (!isOverlayWin && (useLaunchStore.getState().runningGameIds?.size ?? 0) > 0) {
+        return true
+      }
+      return false
+    }
+
     const pollNative = () => {
-      if (!needNativeRef.current || nativeInFlight) return
+      if (!needNativeRef.current || nativeInFlight || isBackgroundedOrGaming()) return
       nativeInFlight = true
       invoke<NativePadSlotFrame[]>('console_get_native_pad_input')
         .then((slots) => {
@@ -266,6 +316,13 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
     // 60Hz polling loop over every controller source (browser Gamepad API + native DualSense).
     let rafId = 0
     const pollGamepads = () => {
+      if (isBackgroundedOrGaming()) {
+        prevStickDirRef.current = null
+        repeatTimerRef.current.reset()
+        prevButtonsRef.current = {}
+        rafId = window.requestAnimationFrame(pollGamepads)
+        return
+      }
       const now = performance.now()
       const rawPads =
         typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function'
@@ -295,15 +352,31 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
         })
       }
 
-      needNativeRef.current = shouldUseNativePads(frames.length, counts.connected)
+      needNativeRef.current = shouldUseNativePads(
+        frames.length,
+        counts.connected,
+        counts.emulating,
+      )
       if (needNativeRef.current) {
         for (const native of nativeFramesRef.current) {
-          frames.push(
-            st.glyphOverride === 'auto' ? native : { ...native, glyphFamily: st.glyphOverride },
-          )
+          const targetGlyph =
+            st.glyphOverride !== 'auto'
+              ? st.glyphOverride
+              : counts.emulating > 0
+                ? 'xbox'
+                : 'playstation'
+          frames.push({ ...native, glyphFamily: targetGlyph })
         }
       } else if (nativeFramesRef.current.length > 0) {
         nativeFramesRef.current = []
+      }
+
+      // Requirement #7A: When ViGEm Xbox 360 emulation is active (counts.emulating > 0) and glyphOverride is 'auto',
+      // display Xbox glyphs ('xbox') so the UI matches the active virtual Xbox 360 controller!
+      if (st.glyphOverride === 'auto' && counts.connected > 0) {
+        for (const f of frames) {
+          f.glyphFamily = counts.emulating > 0 ? 'xbox' : f.glyphFamily
+        }
       }
 
       if (frames.length !== prevPadCountRef.current) {
@@ -379,9 +452,13 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
     return () => {
       window.removeEventListener('focus', onWindowFocus)
       window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('mousedown', onMouseNavButton, true)
+      window.removeEventListener('mouseup', onMouseNavButton, true)
+      window.removeEventListener('auxclick', onMouseNavButton, true)
       window.removeEventListener('keydown', unlockAudio)
       window.removeEventListener('pointerdown', unlockAudio)
       window.removeEventListener('gamepadconnected', unlockAudio)
+      window.removeEventListener('nexus:dualsense-mode-changed', syncDualSense)
       window.clearInterval(dsInterval)
       window.clearInterval(nativeInterval)
       window.clearInterval(idleInterval)

@@ -23,6 +23,7 @@ import { useGamingMode } from '@/features/downloads/hooks/use-gaming-mode'
 import { ScanResultsModal } from '@/features/library/components/scan-results-modal'
 import { GameDetailsPanel } from '@/features/library/components/game-details-panel'
 import { ProfileSelectScreen } from '@/features/profiles/components/profile-select-screen'
+import { ModeSelectModal } from '@/components/modals/mode-select-modal'
 import { ProfileManagerModal } from '@/features/profiles/components/profile-manager-modal'
 import { SaveHistoryModal } from '@/features/library/components/save-history-modal'
 import { LaunchBoostModal } from '@/features/booster/components/launch-boost-modal'
@@ -116,7 +117,14 @@ export function AppShell() {
         navigate('/console')
       }
     }
+    const blockBrowserMouseBack = (e: MouseEvent) => {
+      if (e.button === 3 || e.button === 4) {
+        e.preventDefault()
+      }
+    }
     window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('mouseup', blockBrowserMouseBack, true)
+    window.addEventListener('auxclick', blockBrowserMouseBack, true)
 
     let disposed = false
     const unlisteners: Array<() => void> = []
@@ -136,6 +144,8 @@ export function AppShell() {
     return () => {
       disposed = true
       window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('mouseup', blockBrowserMouseBack, true)
+      window.removeEventListener('auxclick', blockBrowserMouseBack, true)
       unlisteners.forEach((u) => u())
     }
   }, [location.pathname, navigate])
@@ -229,6 +239,7 @@ export function AppShell() {
       <ProfileManagerModal />
       <SaveHistoryModal />
       <ProfileSelectScreen />
+      <ModeSelectModal />
       <LaunchBoostModal />
       <ExpandedPlayer />
       <UpdateModal />

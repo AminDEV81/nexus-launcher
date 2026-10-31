@@ -1,8 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useId, useRef } from 'react'
 import { consoleSoundEngine } from '../audio/ui-sounds'
-import { followFocus } from './smooth-scroll'
+import { animateScrollTo, followFocus } from './smooth-scroll'
 import { useConsoleStore } from '../store/console-store'
 import { selectNextCandidate, type FocusNode, type NavDirection, type ScopeConfig } from './spatial'
+
+const HEADER_SCOPES = new Set(['console_top_tabs', 'console_top_actions'])
 
 interface RegisteredItem {
   id: string
@@ -23,21 +25,67 @@ interface RegisteredItem {
 class NavigationController {
   private items = new Map<string, RegisteredItem>()
   private scopes = new Map<string, ScopeConfig>()
+  private trapStack: string[] = []
   private scopeMemory: Record<string, string> = {}
   private focusedId: string | null = null
   private listeners = new Set<(focusedId: string | null) => void>()
-  private orderCounter = 0
+
+  private isScopeInsideTrap(scopeId: string, trapScopeId: string): boolean {
+    let cur: string | undefined = scopeId
+    const visited = new Set<string>()
+    while (cur && !visited.has(cur)) {
+      if (cur === trapScopeId) return true
+      visited.add(cur)
+      cur = this.scopes.get(cur)?.parentScopeId
+    }
+    return false
+  }
+
+  private getActiveTrapScopeId(): string | null {
+    for (let i = this.trapStack.length - 1; i >= 0; i--) {
+      const id = this.trapStack[i]
+      if (this.scopes.get(id)?.trapFocus) return id
+    }
+    return null
+  }
 
   public registerScope(config: ScopeConfig): () => void {
     this.scopes.set(config.id, config)
+    if (config.trapFocus) {
+      this.trapStack = this.trapStack.filter((id) => id !== config.id)
+      this.trapStack.push(config.id)
+      // Immediately move focus into the newly opened trapFocus scope (#2)
+      this.ensureFocusInsideActiveTrap()
+    }
     return () => {
       this.scopes.delete(config.id)
+      this.trapStack = this.trapStack.filter((id) => id !== config.id)
     }
+  }
+
+  private ensureFocusInsideActiveTrap(): boolean {
+    const activeTrap = this.getActiveTrapScopeId()
+    if (!activeTrap) return false
+    if (this.focusedId) {
+      const curItem = this.items.get(this.focusedId)
+      if (curItem && !curItem.disabled && this.isScopeInsideTrap(curItem.scopeId, activeTrap)) {
+        return true
+      }
+    }
+    for (const item of this.items.values()) {
+      if (!item.disabled && this.isScopeInsideTrap(item.scopeId, activeTrap)) {
+        return this.setFocus(item.id, false)
+      }
+    }
+    return false
   }
 
   public registerItem(item: RegisteredItem): () => void {
     this.items.set(item.id, item)
-    if (!this.focusedId && !item.disabled) {
+    const activeTrap = this.getActiveTrapScopeId()
+    if (activeTrap && this.isScopeInsideTrap(item.scopeId, activeTrap)) {
+      this.ensureFocusInsideActiveTrap()
+    } else if (!this.focusedId && !item.disabled && !activeTrap) {
       this.setFocus(item.id, false)
     }
     return () => {
@@ -66,7 +114,7 @@ class NavigationController {
     }
   }
 
-  public setFocus(id: string, playSound = true): boolean {
+  public setFocus(id: string, playSound = true, fromPointer = false): boolean {
     const item = this.items.get(id)
     if (!item || item.disabled) return false
     const changed = this.focusedId !== id
@@ -75,7 +123,7 @@ class NavigationController {
     useConsoleStore.getState().rememberFocus(item.scopeId, id)
 
     const el = item.getElement()
-    if (el) {
+    if (el && !fromPointer) {
       try {
         followFocus(el)
       } catch {
@@ -91,9 +139,20 @@ class NavigationController {
   }
 
   public move(dir: NavDirection): boolean {
+    const activeTrap = this.getActiveTrapScopeId()
+    if (activeTrap) {
+      const curItem = this.focusedId ? this.items.get(this.focusedId) : undefined
+      if (!curItem || !this.isScopeInsideTrap(curItem.scopeId, activeTrap)) {
+        return this.ensureFocusInsideActiveTrap()
+      }
+    }
+
     const nodes: FocusNode[] = []
     let idx = 0
     for (const item of this.items.values()) {
+      if (activeTrap && !this.isScopeInsideTrap(item.scopeId, activeTrap)) {
+        continue
+      }
       const el = item.getElement()
       if (!el) continue
       const rect = el.getBoundingClientRect()
@@ -103,18 +162,25 @@ class NavigationController {
         rect.height <= 0 ||
         style?.display === 'none' ||
         style?.visibility === 'hidden'
+
+      // Requirement #3: Use scroll-compensated document Y coordinates for elements inside <main>
+      // so scrolled-off-screen upper rows remain above lower rows instead of jumping to <header>!
+      const mainEl = el.closest('main')
+      const scrollY = mainEl ? mainEl.scrollTop : 0
+      const effectiveTop = mainEl ? rect.top + scrollY : rect.top
+
       nodes.push({
         id: item.id,
         scopeId: item.scopeId,
         rect: {
           left: rect.left,
-          top: rect.top,
+          top: effectiveTop,
           width: rect.width,
           height: rect.height,
         },
         disabled: item.disabled,
         hidden,
-        domOrder: ++idx + this.orderCounter * 0,
+        domOrder: ++idx,
         nextUp: item.nextUp,
         nextDown: item.nextDown,
         nextLeft: item.nextLeft,
@@ -123,13 +189,36 @@ class NavigationController {
     }
 
     if (nodes.length === 0) return false
-    if (!this.focusedId || !this.items.has(this.focusedId)) {
+    if (!this.focusedId || !nodes.some((n) => n.id === this.focusedId)) {
       return this.setFocus(nodes[0].id, true)
     }
 
     const scopeRecord: Record<string, ScopeConfig> = {}
     for (const [k, v] of this.scopes.entries()) {
       scopeRecord[k] = v
+    }
+
+    const currentNode = nodes.find((n) => n.id === this.focusedId)
+
+    // Requirement #3: If moving 'up' from inside <main> (not in HEADER_SCOPES),
+    // always prefer upper items inside <main> before ever jumping into HEADER_SCOPES!
+    if (dir === 'up' && currentNode && !HEADER_SCOPES.has(currentNode.scopeId) && !activeTrap) {
+      const mainOnlyNodes = nodes.filter((n) => !HEADER_SCOPES.has(n.scopeId))
+      const nextInMain = selectNextCandidate(
+        this.focusedId,
+        mainOnlyNodes,
+        dir,
+        scopeRecord,
+        this.scopeMemory,
+      )
+      if (nextInMain && nextInMain !== this.focusedId) {
+        return this.setFocus(nextInMain, true)
+      }
+      // Already at the very top of <main>: scroll <main> to 0 and move into header
+      const mainContainer = document.querySelector('main')
+      if (mainContainer instanceof HTMLElement && mainContainer.scrollTop > 4) {
+        animateScrollTo(mainContainer, 'y', 0)
+      }
     }
 
     const nextId = selectNextCandidate(this.focusedId, nodes, dir, scopeRecord, this.scopeMemory)
@@ -140,6 +229,8 @@ class NavigationController {
   }
 
   public triggerConfirm(): boolean {
+    const activeTrap = this.getActiveTrapScopeId()
+    if (activeTrap) this.ensureFocusInsideActiveTrap()
     if (!this.focusedId) return false
     const item = this.items.get(this.focusedId)
     if (!item || item.disabled || !item.onConfirm) return false
@@ -178,7 +269,6 @@ class NavigationController {
 
 export const consoleNavController = new NavigationController()
 
-// Dev-only handle so UI states can be inspected / scripted from the browser console and screenshots.
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as { __consoleNav?: NavigationController }).__consoleNav =
     consoleNavController
@@ -273,10 +363,6 @@ export function useFocusable<T extends HTMLElement = HTMLElement>(
     })
   }, [itemId])
 
-  // Always read the *latest* options through a ref. Registering once per (id, scope) is essential:
-  // callers pass fresh inline arrows every render, and re-registering on each change used to drop
-  // the focused item (focus fell back to the first registered element, the top tab) whenever a
-  // focus callback updated state.
   const latest = useRef(options)
   latest.current = options
 
@@ -332,9 +418,10 @@ export function useFocusable<T extends HTMLElement = HTMLElement>(
       'data-focus-id': itemId,
       'data-focused': isFocused ? 'true' : 'false',
       tabIndex: options.disabled ? -1 : 0,
-      onMouseMove: () => {
+      onMouseEnter: () => {
         if (!isFocused && !options.disabled) {
-          consoleNavController.setFocus(itemId, false)
+          consoleSoundEngine.unlock()
+          consoleNavController.setFocus(itemId, true, true)
         }
       },
       onClick: () => {

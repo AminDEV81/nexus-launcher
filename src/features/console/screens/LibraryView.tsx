@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Search, SlidersHorizontal, ArrowUpDown } from 'lucide-react'
 import type { Game } from '@/types/models'
 import { useConsoleStore } from '../store/console-store'
+import { CONSOLE_THEMES } from '../theme/tokens'
 import { CONSOLE_STRINGS } from '../i18n/strings'
 import { FocusScope, useFocusable } from '../nav/FocusScope'
 import { ConsoleTile } from '../ui/Tile'
@@ -21,8 +22,9 @@ const FilterChip: React.FC<{
   id: string
   label: string
   active: boolean
+  isLight: boolean
   onSelect: () => void
-}> = ({ id, label, active, onSelect }) => {
+}> = ({ id, label, active, isLight, onSelect }) => {
   const { focusProps, isFocused } = useFocusable<HTMLButtonElement>({
     id,
     scopeId: 'console_library_filters',
@@ -32,12 +34,16 @@ const FilterChip: React.FC<{
     <button
       type="button"
       {...focusProps}
-      className={`rounded-full px-5 py-2 text-[1rem] font-medium outline-none transition-all ${
+      className={`rounded-2xl border px-4 py-2 text-xs font-extrabold uppercase tracking-wider outline-none transition-all cursor-pointer ${
         isFocused
-          ? 'bg-white text-black border-transparent scale-105 shadow-lg'
+          ? 'scale-105 border-cyan-300 bg-cyan-400 text-slate-950 shadow-lg'
           : active
-            ? 'bg-white/16 text-white border-transparent'
-            : 'bg-white/8 text-white/70 border-transparent'
+            ? isLight
+              ? 'border-indigo-600 bg-indigo-600 text-white'
+              : 'border-cyan-400/50 bg-cyan-500/20 text-cyan-300'
+            : isLight
+              ? 'border-slate-300 bg-white/85 text-slate-700 hover:bg-white'
+              : 'border-white/12 bg-white/[0.06] text-slate-300 hover:bg-white/10'
       }`}
     >
       {label}
@@ -52,9 +58,10 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onFocusGame,
   onToggleFavorite,
 }) => {
-  const lang = useConsoleStore((s) => s.language)
+  const themeId = useConsoleStore((s) => s.theme)
+  const isLight = Boolean(CONSOLE_THEMES[themeId]?.isLight)
   const openOsk = useConsoleStore((s) => s.openOsk)
-  const t = CONSOLE_STRINGS[lang]
+  const t = CONSOLE_STRINGS.en
 
   const [filter, setFilter] = useState<LibraryFilterPill>('all')
   const [sort, setSort] = useState<LibrarySortMode>('recent')
@@ -64,7 +71,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
     id: 'lib_search_osk_btn',
     scopeId: 'console_library_filters',
     onConfirm: () => {
-      openOsk('Search Library (English / فارسی)', searchQuery, (val) => {
+      openOsk('Search Library Games & Genres', searchQuery, (val) => {
         setSearchQuery(val)
       })
     },
@@ -114,42 +121,49 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   }, [games, filter, sort, searchQuery])
 
   return (
-    <div className="space-y-6 pb-16">
+    <div className="space-y-6 pb-20">
       {/* Filter & Search Bar */}
       <FocusScope
         id="console_library_filters"
         orientation="horizontal"
-        className="flex flex-wrap items-center justify-between gap-4 px-2 pb-1"
+        className={`flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 ${
+          isLight ? 'border-slate-300 bg-white/85 shadow-xs' : 'border-white/12 bg-white/[0.04]'
+        }`}
       >
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <FilterChip
             id="lib_filter_all"
             label={`All (${games.filter((g) => !g.is_hidden && !g.is_memory && !g.is_wishlist).length})`}
             active={filter === 'all'}
+            isLight={isLight}
             onSelect={() => setFilter('all')}
           />
           <FilterChip
             id="lib_filter_installed"
             label="Installed"
             active={filter === 'installed'}
+            isLight={isLight}
             onSelect={() => setFilter('installed')}
           />
           <FilterChip
             id="lib_filter_fav"
             label={t.home.favorites}
             active={filter === 'favorites'}
+            isLight={isLight}
             onSelect={() => setFilter('favorites')}
           />
           <FilterChip
             id="lib_filter_recent"
             label={t.home.recentlyPlayed}
             active={filter === 'recent'}
+            isLight={isLight}
             onSelect={() => setFilter('recent')}
           />
           <FilterChip
             id="lib_filter_unplayed"
             label="Unplayed"
             active={filter === 'unplayed'}
+            isLight={isLight}
             onSelect={() => setFilter('unplayed')}
           />
         </div>
@@ -158,26 +172,30 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
           <button
             type="button"
             {...searchBtnFocus.focusProps}
-            className={`flex items-center gap-2 rounded-full px-5 py-2 text-[1rem] font-medium outline-none transition-all ${
+            className={`flex items-center gap-2 rounded-2xl border px-4 py-2 text-xs font-extrabold uppercase tracking-wider outline-none transition-all cursor-pointer ${
               searchBtnFocus.isFocused
-                ? 'bg-white text-black border-transparent scale-105'
-                : 'bg-white/8 text-white/80 border-transparent'
+                ? 'scale-105 border-cyan-300 bg-cyan-400 text-slate-950 shadow-lg'
+                : isLight
+                  ? 'border-slate-300 bg-slate-100 text-slate-800'
+                  : 'border-cyan-400/40 bg-cyan-500/15 text-cyan-200'
             }`}
           >
-            <Search className="w-4 h-4 text-white/70" />
+            <Search className="size-4" />
             <span>{searchQuery ? `"${searchQuery}"` : `${t.actions.search}...`}</span>
           </button>
 
           <button
             type="button"
             {...sortBtnFocus.focusProps}
-            className={`flex items-center gap-2 rounded-full px-5 py-2 text-[1rem] font-medium outline-none transition-all ${
+            className={`flex items-center gap-2 rounded-2xl border px-4 py-2 text-xs font-extrabold uppercase tracking-wider outline-none transition-all cursor-pointer ${
               sortBtnFocus.isFocused
-                ? 'bg-white text-black border-transparent scale-105'
-                : 'bg-white/8 text-white/80 border-transparent'
+                ? 'scale-105 border-cyan-300 bg-cyan-400 text-slate-950 shadow-lg'
+                : isLight
+                  ? 'border-slate-300 bg-slate-100 text-slate-800'
+                  : 'border-white/15 bg-white/10 text-slate-200'
             }`}
           >
-            <ArrowUpDown className="w-4 h-4 text-white/70" />
+            <ArrowUpDown className="size-4" />
             <span>Sort: {sort}</span>
           </button>
         </div>
@@ -185,15 +203,21 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
 
       {/* Grid */}
       {filteredGames.length === 0 ? (
-        <div className="p-16 text-center rounded-3xl border border-transparent bg-white/[0.06]">
-          <SlidersHorizontal className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-          <p className="text-lg font-bold text-white">No games match the current filter</p>
+        <div
+          className={`rounded-3xl border p-16 text-center ${
+            isLight ? 'border-slate-300 bg-white/85' : 'border-white/12 bg-white/[0.04]'
+          }`}
+        >
+          <SlidersHorizontal className="mx-auto mb-3 size-10 text-slate-400" />
+          <p className={`text-lg font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+            No games match the current filter
+          </p>
         </div>
       ) : (
         <FocusScope
           id="console_library_grid"
           orientation="grid"
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6 justify-items-center py-2"
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-6 gap-y-16 justify-items-center py-4 pb-12"
         >
           {filteredGames.map((game) => (
             <ConsoleTile

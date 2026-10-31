@@ -1,3 +1,5 @@
+import { isNativeWindowActive } from '@/hooks/use-window-active'
+import { useLaunchStore } from '@/store/launch-store'
 import { useConsoleStore } from '../store/console-store'
 import { useSoundtrackStore } from '@/features/soundtrack/store/soundtrack-store'
 
@@ -237,18 +239,24 @@ class ConsoleUiSoundEngine {
         break
       }
       case 'boot': {
-        this.duckSoundtrackBriefly(900)
-        this.tone(ctx, { from: 330, to: 340, duration: 0.5, type: 'sine', peak: 0.28 })
-        this.tone(ctx, { from: 495, to: 505, duration: 0.5, type: 'sine', peak: 0.24, delay: 0.1 })
-        this.tone(ctx, { from: 660, to: 680, duration: 0.6, type: 'sine', peak: 0.22, delay: 0.2 })
-        this.tone(ctx, {
-          from: 990,
-          to: 1010,
-          duration: 0.7,
-          type: 'triangle',
-          peak: 0.12,
-          delay: 0.3,
-        })
+        // New Task #4: 3.2-second multi-stage polyphonic Console Boot Anthem!
+        this.duckSoundtrackBriefly(3300)
+        // Stage 1 (0.0s - 1.2s): Deep sub-bass ignition & atmospheric whoosh sweep
+        this.whoosh(ctx, 1.35, 0.18)
+        this.tone(ctx, { from: 110, to: 165, duration: 2.9, type: 'sine', peak: 0.34, attack: 0.18 })
+        this.tone(ctx, { from: 220, to: 330, duration: 1.4, type: 'triangle', peak: 0.22, delay: 0.08, attack: 0.12 })
+        // Stage 2 (0.45s - 1.8s): Crystalline rising arpeggio fifths
+        this.tone(ctx, { from: 330, to: 332, duration: 1.1, type: 'sine', peak: 0.24, delay: 0.42, attack: 0.04 })
+        this.tone(ctx, { from: 495, to: 498, duration: 1.1, type: 'sine', peak: 0.24, delay: 0.68, attack: 0.04 })
+        this.tone(ctx, { from: 660, to: 664, duration: 1.2, type: 'triangle', peak: 0.22, delay: 0.94, attack: 0.04 })
+        this.tone(ctx, { from: 990, to: 996, duration: 1.3, type: 'sine', peak: 0.2, delay: 1.2, attack: 0.04 })
+        // Stage 3 (1.45s - 3.25s): Lush sustained Major-9th console horizon chord swell
+        this.tone(ctx, { from: 330, to: 330, duration: 1.8, type: 'sine', peak: 0.26, delay: 1.45, attack: 0.22 })
+        this.tone(ctx, { from: 415.3, to: 415.3, duration: 1.8, type: 'sine', peak: 0.2, delay: 1.48, attack: 0.22 })
+        this.tone(ctx, { from: 493.88, to: 493.88, duration: 1.8, type: 'triangle', peak: 0.22, delay: 1.52, attack: 0.22 })
+        this.tone(ctx, { from: 659.25, to: 660, duration: 1.85, type: 'sine', peak: 0.24, delay: 1.56, attack: 0.25 })
+        this.tone(ctx, { from: 739.99, to: 740, duration: 1.75, type: 'sine', peak: 0.16, delay: 1.62, attack: 0.28 })
+        this.tone(ctx, { from: 1318.5, to: 1320, duration: 1.6, type: 'sine', peak: 0.12, delay: 1.7, attack: 0.3 })
         break
       }
       case 'launch': {
@@ -271,7 +279,11 @@ class ConsoleUiSoundEngine {
         break
       }
       case 'close': {
-        this.tone(ctx, { from: 640, to: 420, duration: 0.12, type: 'triangle', peak: 0.28 })
+        // New Task #5: 1.05-second descending harmonic Console Exit chord
+        this.duckSoundtrackBriefly(1100)
+        this.tone(ctx, { from: 880, to: 440, duration: 0.45, type: 'sine', peak: 0.24, attack: 0.02 })
+        this.tone(ctx, { from: 659.25, to: 329.63, duration: 0.65, type: 'triangle', peak: 0.22, delay: 0.14, attack: 0.03 })
+        this.tone(ctx, { from: 440, to: 220, duration: 0.85, type: 'sine', peak: 0.26, delay: 0.28, attack: 0.05 })
         break
       }
     }
@@ -280,6 +292,16 @@ class ConsoleUiSoundEngine {
   public play(kind: ConsoleSoundKind, options: ConsoleSoundOptions = {}): void {
     const { soundsEnabled, soundVolume } = useConsoleStore.getState()
     if (!soundsEnabled || soundVolume <= 0) return
+
+    // Requirement #17: Never play Console Mode navigation/click sounds while a game is running
+    // or when the Nexus window is unfocused / minimized in the background!
+    if (typeof document !== 'undefined' && kind !== 'boot' && kind !== 'close') {
+      if (document.hidden) return
+      if (!isNativeWindowActive()) return
+      if (typeof document.hasFocus === 'function' && !document.hasFocus()) return
+      const runningCount = useLaunchStore.getState().runningGameIds?.size ?? 0
+      if (runningCount > 0 && kind !== 'launch') return
+    }
 
     const nowMs = typeof performance !== 'undefined' ? performance.now() : Date.now()
     const last = this.lastPlayedAt[kind] ?? 0
