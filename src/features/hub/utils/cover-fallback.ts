@@ -1,57 +1,168 @@
 /**
- * Builds an ordered list of fallback image URLs for a game cover so that if
- * Steam's `library_600x900_2x.jpg` or a CDN mirror returns 404, the `<img>`
- * automatically cascades through `library_600x900.jpg`, `header.jpg`,
- * `capsule_616x353.jpg`, and `backdropUrl` before showing the styled title poster.
+ * Builds a deduplicated, multi-CDN fallback chain for Game Hub, Store, and Console Mode cover/banner images.
+ * When Steam's `library_600x900_2x.jpg`, `library_hero.jpg`, or a CDN mirror returns 404, the `<img>`
+ * automatically cascades through `library_600x900.jpg`, signed `backdropUrl`, `header.jpg`,
+ * and `capsule_616x353.jpg` across Steam/IGDB CDN mirrors so cards never render blank.
  */
+function normalizeExternalImageUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const clean = raw.trim()
+  if (!clean) return null
+  if (clean.startsWith('//')) return `https:${clean}`
+  return clean
+}
+
+function extractSteamAppId(
+  coverUrl?: string | null,
+  backdropUrl?: string | null,
+  steamAppId?: string | number | null,
+  igdbId?: number | null,
+): string | null {
+  if (steamAppId != null && String(steamAppId).trim() !== '') {
+    const s = String(steamAppId).trim()
+    if (/^\d+$/.test(s)) return s
+  }
+  const combined = `${coverUrl ?? ''} ${backdropUrl ?? ''}`
+  const m = combined.match(/\/steam\/apps\/(\d+)\//)
+  if (m?.[1]) return m[1]
+  if (igdbId && igdbId > 1_000_000_000) {
+    return String(igdbId - 1_000_000_000)
+  }
+  return null
+}
+
 export function buildCoverFallbackChain(
   coverUrl?: string | null,
   backdropUrl?: string | null,
   steamAppId?: string | number | null,
+  igdbId?: number | null,
 ): string[] {
-  const urls: string[] = []
+  const candidates: string[] = []
   const pushUnique = (u?: string | null) => {
-    const trimmed = u?.trim()
-    if (trimmed && !urls.includes(trimmed)) {
-      urls.push(trimmed)
-    }
+    const clean = normalizeExternalImageUrl(u)
+    if (!clean) return
+    if (!candidates.includes(clean)) candidates.push(clean)
   }
 
-  pushUnique(coverUrl)
+  const normCover = normalizeExternalImageUrl(coverUrl)
+  const normBackdrop = normalizeExternalImageUrl(backdropUrl)
 
-  const matchFromCover = coverUrl?.match(/\/steam\/apps\/(\d+)\//)
-  const matchFromBackdrop = backdropUrl?.match(/\/steam\/apps\/(\d+)\//)
-  const resolvedAppId =
-    (steamAppId != null && String(steamAppId).trim() !== '' ? String(steamAppId).trim() : null) ??
-    matchFromCover?.[1] ??
-    matchFromBackdrop?.[1] ??
-    null
+  pushUnique(normCover)
 
-  if (resolvedAppId && /^\d+$/.test(resolvedAppId)) {
+  // If primary cover is an IGDB high-res variant, add standard cover_big fallback
+  if (normCover && normCover.includes('images.igdb.com/igdb/image/upload/')) {
     pushUnique(
-      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`,
+      normCover.replace(
+        /\/t_(?:1080p|cover_big_2x|720p)\//,
+        '/t_cover_big/',
+      ),
+    )
+  }
+
+  const resolvedAppId = extractSteamAppId(normCover, normBackdrop, steamAppId, igdbId)
+
+  if (resolvedAppId) {
+    if (normCover?.includes('library_600x900_2x.jpg')) {
+      pushUnique(normCover.replace('library_600x900_2x.jpg', 'library_600x900.jpg'))
+    }
+    pushUnique(
+      `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/library_600x900.jpg`,
     )
     pushUnique(
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/library_600x900.jpg`,
     )
     pushUnique(
-      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900_2x.jpg`,
+      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`,
     )
-    pushUnique(`https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/header.jpg`)
+    pushUnique(
+      `https://cdn.cloudflare.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`,
+    )
+  }
+
+  pushUnique(normBackdrop)
+
+  if (resolvedAppId) {
+    pushUnique(
+      `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/header.jpg`,
+    )
     pushUnique(
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/header.jpg`,
+    )
+    pushUnique(
+      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/header.jpg`,
+    )
+    pushUnique(
+      `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/capsule_616x353.jpg`,
     )
     pushUnique(
       `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/capsule_616x353.jpg`,
     )
   }
 
-  if (coverUrl && coverUrl.includes('images.igdb.com/igdb/image/upload/')) {
-    pushUnique(coverUrl.replace('/t_cover_big/', '/t_720p/'))
-    pushUnique(coverUrl.replace('/t_720p/', '/t_cover_big/'))
+  return candidates
+}
+
+/**
+ * Builds a deduplicated widescreen (16:9) fallback chain for Store / Wishlist banners, capsules, and hero stages.
+ * Prioritizes verified `backdropUrl` / `header.jpg` / `capsule_616x353.jpg` before falling back to portrait covers.
+ */
+export function buildBannerFallbackChain(
+  backdropUrl?: string | null,
+  coverUrl?: string | null,
+  steamAppId?: string | number | null,
+  igdbId?: number | null,
+): string[] {
+  const candidates: string[] = []
+  const pushUnique = (u?: string | null) => {
+    const clean = normalizeExternalImageUrl(u)
+    if (!clean) return
+    if (!candidates.includes(clean)) candidates.push(clean)
   }
 
-  pushUnique(backdropUrl)
+  const normBackdrop = normalizeExternalImageUrl(backdropUrl)
+  const normCover = normalizeExternalImageUrl(coverUrl)
 
-  return urls
+  pushUnique(normBackdrop)
+
+  if (normBackdrop && normBackdrop.includes('images.igdb.com/igdb/image/upload/')) {
+    pushUnique(normBackdrop.replace(/\/t_[a-z0-9_]+\//i, '/t_1080p/'))
+    pushUnique(normBackdrop.replace(/\/t_[a-z0-9_]+\//i, '/t_720p/'))
+  }
+
+  const resolvedAppId = extractSteamAppId(normCover, normBackdrop, steamAppId, igdbId)
+
+  if (resolvedAppId) {
+    if (normBackdrop?.includes('library_hero.jpg')) {
+      pushUnique(normBackdrop.replace('library_hero.jpg', 'header.jpg'))
+      pushUnique(normBackdrop.replace('library_hero.jpg', 'capsule_616x353.jpg'))
+    }
+    pushUnique(
+      `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/header.jpg`,
+    )
+    pushUnique(
+      `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/header.jpg`,
+    )
+    pushUnique(
+      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/header.jpg`,
+    )
+    pushUnique(
+      `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/capsule_616x353.jpg`,
+    )
+    pushUnique(
+      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/capsule_616x353.jpg`,
+    )
+  }
+
+  pushUnique(normCover)
+
+  if (resolvedAppId) {
+    pushUnique(
+      `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/library_600x900.jpg`,
+    )
+    pushUnique(
+      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`,
+    )
+  }
+
+  return candidates
 }

@@ -1336,6 +1336,37 @@ pub async fn enrich_hub_details_scores(
 }
 
 pub fn heal_library_game_scores(conn: &Connection, game: &mut Game) {
+    let norm_title = normalize_game_title(&game.name);
+    if matches!(
+        norm_title.as_str(),
+        "grand theft auto vi" | "grand theft auto 6" | "gta vi" | "gta 6"
+    ) {
+        let gta6_cover = "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co9rwo.jpg";
+        let gta6_banner = "https://images.igdb.com/igdb/image/upload/t_1080p/scq3y1.jpg";
+        let has_wrong_steam_id = game.steam_app_id.is_some();
+        let cover_needs_heal = game.cover_path.as_deref().map_or(true, |c| {
+            has_wrong_steam_id
+                || c.contains("12110")
+                || c.contains("1547000")
+                || c.contains("271590")
+                || (!c.starts_with("http") && game.is_wishlist)
+        });
+        if has_wrong_steam_id || cover_needs_heal || game.release_date.is_none() {
+            game.steam_app_id = None;
+            if cover_needs_heal {
+                game.cover_path = Some(gta6_cover.to_string());
+                game.banner_path = Some(gta6_banner.to_string());
+            }
+            if game.release_date.is_none() {
+                game.release_date = Some("2026-05-26".to_string());
+            }
+            let _ = conn.execute(
+                "UPDATE games SET steam_app_id = NULL, cover_path = ?1, banner_path = ?2, release_date = COALESCE(release_date, '2026-05-26') WHERE id = ?3",
+                rusqlite::params![&game.cover_path, &game.banner_path, &game.id],
+            );
+        }
+    }
+
     if is_game_unreleased(game.release_date.as_deref()) {
         if game.metacritic_score.is_some() || game.opencritic_score.is_some() {
             game.metacritic_score = None;

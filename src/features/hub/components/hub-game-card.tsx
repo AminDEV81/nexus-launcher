@@ -26,6 +26,7 @@ import { findLibraryEntry } from '../utils/in-library'
 import { buildCoverFallbackChain } from '../utils/cover-fallback'
 import { useUiStore } from '@/store/ui-store'
 import { localDateKey } from '@/features/library/utils/format'
+import { formatCompactCountdown } from '@/features/console/ui/ReleaseCountdownBanner'
 import { getGameTypeInfo } from '../utils/game-type'
 import { HubScoreBadge } from './hub-score-badge'
 import type { HubFeedId } from '../feeds'
@@ -257,9 +258,9 @@ export const HubGameCard = memo(function HubGameCard({
                 <span>Wishlist</span>
               </span>
             ) : isUnreleased ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-cyan-600/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-cyan-300/30 backdrop-blur-md">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-cyan-600/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-cyan-300/30 backdrop-blur-md tabular-nums">
                 <Clock className="size-2.5" />
-                <span>Upcoming</span>
+                <span>{formatCompactCountdown(game.release_date) || 'Upcoming'}</span>
               </span>
             ) : null}
 

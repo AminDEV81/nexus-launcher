@@ -370,6 +370,7 @@ pub fn run() {
             commands::metadata::sync_wishlist_metadata,
             commands::metadata::search_cover_options,
             commands::metadata::apply_cover,
+            commands::metadata::get_artwork_file_size,
             commands::metadata::apply_custom_cover,
             commands::metadata::search_banner_options,
             commands::metadata::search_logo_options,

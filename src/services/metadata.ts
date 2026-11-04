@@ -34,8 +34,16 @@ export function syncWishlistMetadata() {
   return call<Game[]>('sync_wishlist_metadata')
 }
 
-export function searchCoverOptions(gameId: string) {
-  return call<CoverOption[]>('search_cover_options', { gameId })
+export function searchCoverOptions(gameId: string, query?: string) {
+  const cleanQuery = query?.trim()
+  return call<CoverOption[]>('search_cover_options', {
+    gameId,
+    query: cleanQuery ? cleanQuery : null,
+  })
+}
+
+export function getArtworkFileSize(url: string) {
+  return call<number>('get_artwork_file_size', { url })
 }
 
 export function applyCover(gameId: string, url: string, isAnimated: boolean, allowLarge?: boolean) {
@@ -46,16 +54,24 @@ export function applyCustomCover(gameId: string, filePath: string) {
   return call<Game>('apply_custom_cover', { gameId, filePath })
 }
 
-export function searchLogoOptions(gameId: string) {
-  return call<CoverOption[]>('search_logo_options', { gameId })
+export function searchLogoOptions(gameId: string, query?: string) {
+  const cleanQuery = query?.trim()
+  return call<CoverOption[]>('search_logo_options', {
+    gameId,
+    query: cleanQuery ? cleanQuery : null,
+  })
 }
 
 export function applyLogo(gameId: string, url: string, allowLarge?: boolean) {
   return call<Game>('apply_logo', { gameId, url, allowLarge: allowLarge ?? false })
 }
 
-export function searchBannerOptions(gameId: string) {
-  return call<CoverOption[]>('search_banner_options', { gameId })
+export function searchBannerOptions(gameId: string, query?: string) {
+  const cleanQuery = query?.trim()
+  return call<CoverOption[]>('search_banner_options', {
+    gameId,
+    query: cleanQuery ? cleanQuery : null,
+  })
 }
 
 export function applyBanner(gameId: string, url: string, allowLarge?: boolean) {

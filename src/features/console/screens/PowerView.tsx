@@ -163,12 +163,20 @@ export const PowerView: React.FC<PowerViewProps> = ({ onExitToDesktop, onSwitchP
             id="console_power_confirm"
             trapFocus
             orientation="horizontal"
-            className="w-full max-w-lg space-y-6 rounded-3xl border border-rose-500/40 bg-slate-950 p-8 text-center shadow-2xl"
+            className={`w-full max-w-lg space-y-6 rounded-3xl border p-8 text-center shadow-2xl ${
+              isLight
+                ? 'border-rose-300 bg-white text-slate-900'
+                : 'border-rose-500/40 bg-slate-950 text-white'
+            }`}
           >
-            <AlertTriangle className="mx-auto size-12 text-rose-400" />
+            <AlertTriangle className="mx-auto size-12 text-rose-500" />
             <div>
-              <h2 className="text-2xl font-black text-white">{t.power.confirmTitle}</h2>
-              <p className="text-sm text-slate-400 mt-2">{t.power.confirmDesc}</p>
+              <h2 className={`text-2xl font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                {t.power.confirmTitle}
+              </h2>
+              <p className={`text-sm mt-2 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                {t.power.confirmDesc}
+              </p>
             </div>
             <div className="flex items-center justify-center gap-4">
               <button
@@ -177,7 +185,9 @@ export const PowerView: React.FC<PowerViewProps> = ({ onExitToDesktop, onSwitchP
                 className={`rounded-2xl px-7 py-3 text-sm font-extrabold outline-none transition-all cursor-pointer ${
                   confirmYes.isFocused
                     ? 'bg-rose-500 text-white scale-105'
-                    : 'bg-rose-500/20 text-rose-300'
+                    : isLight
+                      ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                      : 'bg-rose-500/20 text-rose-300'
                 }`}
               >
                 {t.actions.confirm} ({pendingAction.toUpperCase()})
@@ -188,7 +198,9 @@ export const PowerView: React.FC<PowerViewProps> = ({ onExitToDesktop, onSwitchP
                 className={`rounded-2xl px-7 py-3 text-sm font-bold outline-none transition-all cursor-pointer ${
                   confirmNo.isFocused
                     ? 'bg-cyan-400 text-slate-950 scale-105'
-                    : 'bg-white/10 text-white/80'
+                    : isLight
+                      ? 'bg-slate-200 text-slate-800 hover:bg-slate-300'
+                      : 'bg-white/10 text-white/80'
                 }`}
               >
                 {t.actions.cancel}

@@ -64,7 +64,6 @@ function filterDuplicateCandidates(
 export function GameSaveCard({ game }: GameSaveCardProps) {
   const activeProfile = useProfileStore((s) => s.activeProfile)
   const profiles = useProfileStore((s) => s.profiles)
-  const openHistoryModal = useSaveManagerStore((s) => s.openHistoryModal)
 
   const [details, setDetails] = useState<GameSaveDetails | null>(null)
   const [detected, setDetected] = useState<DetectedSaveLocation[]>([])
@@ -339,27 +338,12 @@ export function GameSaveCard({ game }: GameSaveCardProps) {
 
           <button
             type="button"
-            onClick={() => {
-              if (details?.is_managed) {
-                openHistoryModal(game.id)
-              } else {
-                void handleOpenFolder()
-              }
-            }}
-            title={details?.is_managed ? 'View automatic save snapshots' : 'Open save folder'}
+            onClick={() => void handleOpenFolder()}
+            title="Open active save folder on disk"
             className="col-span-2 sm:col-span-1 flex items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-text transition-all hover:border-accent/40 hover:bg-surface-raised active:scale-98 cursor-pointer"
           >
-            {details?.is_managed ? (
-              <>
-                <History className="size-3.5 shrink-0 text-accent" />
-                <span>Snapshots</span>
-              </>
-            ) : (
-              <>
-                <FolderOpen className="size-3.5 shrink-0 text-accent" />
-                <span>Open Folder</span>
-              </>
-            )}
+            <FolderOpen className="size-3.5 shrink-0 text-accent" />
+            <span>Open Folder</span>
           </button>
         </div>
       </section>

@@ -114,7 +114,7 @@ const SEQUEL_SUBTITLE_TOKENS = new Set([
   'rubicon',
 ])
 
-const STOP_WORDS = new Set(['the', 'of', 'and', 'a', 'an', 'in', 'on', 'to', 'for'])
+const STOP_WORDS = new Set(['the', 'of', 'and', 'a', 'an', 'in', 'on', 'to', 'for', 'from', 'by'])
 
 /**
  * Normalizes a game title into its canonical core search form:
@@ -154,11 +154,11 @@ export function extractCoreGameTitle(rawTitle: string): string {
     .trim()
 }
 
-function normalizeTokensForComparison(text: string): string[] {
+export function normalizeTokensForComparison(text: string): string[] {
   const core = extractCoreGameTitle(text)
     .toLowerCase()
     .replace(
-      /\b(?:original|official|video|game|soundtrack|soundtracks|score|ost|music|audio|gamerip|complete|expanded|selection|selections|ep|vol|volume|disc|cd)\b/g,
+      /\b(?:original|official|video|game|soundtrack|soundtracks|score|ost|music|audio|gamerip|complete|expanded|selection|selections|ep|vol|volume|disc|cd|songs|test|collectors|collector|special|bonus|remastered|version)\b/g,
       ' ',
     )
     .replace(
@@ -185,13 +185,7 @@ function extractYearNumber(raw?: string | null): number | null {
 }
 
 /**
- * Strictly scores how well an album title matches a target game title (0 = invalid/mismatch, 1..100 = verified match).
- * Prevents:
- * - Unrelated KHInsider sidebar links ("The Witcher 3" when searching "Cyberpunk 2077")
- * - Wrong sequels or same-studio entries ("God of War" vs "God of War Ragnarök", "Spider-Man" vs "Spider-Man 2",
- *   "Monster Hunter World" vs "Monster Hunter Wilds", "Ghost of Tsushima" vs "Ghost of Yōtei", "Elden Ring" vs "Elden Ring Nightreign")
- * - Single-word false positives ("Out of Control" when searching "Control", "Inside Out" when searching "Inside")
- * - Release-year mismatches for newly released games or same-name reboots.
+ * Scores how well an album title matches a target game title (0 = mismatch, 1..100 = verified match).
  */
 export function scoreAlbumMatchForGame(
   albumTitle: string,
@@ -206,8 +200,6 @@ export function scoreAlbumMatchForGame(
     return 0
   }
 
-  // Release-year guard: if the game is a brand-new release (e.g. 2025/2026) and the album is from
-  // a much older game (more than 2 years prior), reject it so new releases don't inherit old OSTs!
   const albYear = extractYearNumber(albumReleaseDate)
   const gmYear = extractYearNumber(gameReleaseDate)
   if (albYear !== null && gmYear !== null) {
@@ -233,32 +225,29 @@ export function scoreAlbumMatchForGame(
   const albumTokenSet = new Set(effAlbumTokens)
 
   // 1. Sequel / Spin-Off / Subtitle Disambiguation Guard
-  // Every sequel or subtitle marker present in the game title MUST be in the album title
   for (const tok of effGameTokens) {
     if (SEQUEL_SUBTITLE_TOKENS.has(tok) && !albumTokenSet.has(tok)) {
       return 0
     }
   }
-  // And any sequel or subtitle marker in the album title that is NOT in the game title is rejected!
   for (const tok of effAlbumTokens) {
     if (SEQUEL_SUBTITLE_TOKENS.has(tok) && !gameTokenSet.has(tok)) {
       return 0
     }
   }
-  // Special check for "Miles Morales" spin-off vs base "Spider-Man"
   const gameHasMiles = gameTokens.includes('miles') || gameTokens.includes('morales')
   const albumHasMiles = albumTokens.includes('miles') || albumTokens.includes('morales')
   if (gameHasMiles !== albumHasMiles) {
     return 0
   }
 
-  // 2. Single-word Game Title Strict Guard (e.g. "Control", "Hades", "Prey", "Inside", "Stray", "Doom")
+  // 2. Single-word Game Title Guard (allows descriptive subtitle words as long as sequel tokens match and first word is targetWord)
   if (effGameTokens.length === 1) {
     const targetWord = effGameTokens[0]
     if (effAlbumTokens[0] !== targetWord) {
       return 0
     }
-    if (effAlbumTokens.length > 1) {
+    if (effAlbumTokens.length > 3) {
       return 0
     }
   } else {
@@ -270,15 +259,14 @@ export function scoreAlbumMatchForGame(
     const matchedCount = effGameTokens.filter((t) => albumTokenSet.has(t)).length
     const coverage = matchedCount / effGameTokens.length
 
-    if (effGameTokens.length <= 3 && matchedCount < effGameTokens.length) {
+    if (effGameTokens.length <= 2 && matchedCount < effGameTokens.length) {
       return 0
     }
-    if (coverage < 0.8) {
+    if (coverage < 0.75) {
       return 0
     }
 
-    // Reject if the album has extra significant tokens that alter the game identity (e.g. spin-offs)
-    if (effAlbumTokens.length > effGameTokens.length + 2) {
+    if (effAlbumTokens.length > effGameTokens.length + 3) {
       return 0
     }
   }
@@ -305,6 +293,70 @@ export function scoreAlbumMatchForGame(
   if (lowerAlbum.includes('remix') || lowerAlbum.includes('arrangement')) score -= 10
 
   return Math.max(1, Math.min(100, score))
+}
+
+/**
+ * Flexible search query scorer used when the user types a game or franchise query into the Soundtrack search bar.
+ * Allows franchise searches (e.g. "Assassin's Creed", "Forza Horizon", "Resident Evil", "Tekken", "Sifu", "BioShock")
+ * to return all matching official game soundtracks in that series!
+ */
+export function scoreAlbumForUserSearchQuery(
+  albumTitle: string,
+  artistName: string,
+  userQuery: string,
+): number {
+  if (!albumTitle || !userQuery) return 0
+  const lowAlbum = albumTitle.toLowerCase()
+  if (/\b(?:podcast|interview|audiobook|ringtone|karaoke|parody|tribute|lullaby)\b/.test(lowAlbum)) {
+    return 0
+  }
+
+  const queryTokens = normalizeTokensForComparison(userQuery).filter((t) => !STOP_WORDS.has(t))
+  if (queryTokens.length === 0) return 0
+
+  const albumTokens = normalizeTokensForComparison(albumTitle)
+  const artistTokens = normalizeTokensForComparison(artistName || '')
+  const combinedSet = new Set([...albumTokens, ...artistTokens])
+  const albumSet = new Set(albumTokens)
+
+  // Every query token must appear in the album title or artist (or as a prefix for 4+ char tokens)
+  let matchedInAlbum = 0
+  for (const qt of queryTokens) {
+    const inAlbum =
+      albumSet.has(qt) ||
+      (qt.length >= 4 && albumTokens.some((at) => at.startsWith(qt) || qt.startsWith(at)))
+    const inCombined =
+      inAlbum ||
+      combinedSet.has(qt) ||
+      (qt.length >= 4 && artistTokens.some((art) => art.startsWith(qt)))
+    if (!inCombined) {
+      return 0
+    }
+    if (inAlbum) matchedInAlbum += 1
+  }
+
+  if (matchedInAlbum === 0 && queryTokens.length === 1) {
+    return 0
+  }
+
+  // For single-word queries, require the query token to be the first token of the album title OR require an explicit OST marker
+  const hasExplicitOst =
+    lowAlbum.includes('soundtrack') ||
+    lowAlbum.includes('original score') ||
+    lowAlbum.includes('game') ||
+    /\bost\b/.test(lowAlbum)
+
+  if (queryTokens.length === 1 && albumTokens[0] !== queryTokens[0] && !hasExplicitOst) {
+    return 0
+  }
+
+  let score = 60 + matchedInAlbum * 12
+  if (albumTokens[0] === queryTokens[0]) score += 15
+  if (hasExplicitOst) score += 15
+  const strictScore = scoreAlbumMatchForGame(albumTitle, userQuery)
+  if (strictScore > 0) score += 25
+
+  return Math.min(100, score)
 }
 
 export function isAlbumValidForGame(

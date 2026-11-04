@@ -76,8 +76,8 @@ pub(crate) fn prepare_unique_path(dir: &Path, file_stem: &str, extension: &str) 
 /// `http(s)` schemes are fetched (no `file:`/`ftp:`/other-protocol
 /// reads), and the response is capped — a hostile or misbehaving server
 /// must not be able to stream unbounded bytes into memory or onto disk.
-pub const LARGE_ARTWORK_THRESHOLD: u64 = 15 * 1024 * 1024;
-pub const MAX_ARTWORK_BYTES: u64 = 150 * 1024 * 1024;
+pub const LARGE_ARTWORK_THRESHOLD: u64 = 5 * 1024 * 1024;
+pub const MAX_ARTWORK_BYTES: u64 = 250 * 1024 * 1024;
 
 pub async fn download_artwork(
     client: &reqwest::Client,
@@ -223,7 +223,7 @@ pub fn copy_local_artwork(
         .unwrap_or_else(|| "png".to_string());
     if !matches!(
         raw_ext.as_str(),
-        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "ico" | "avif"
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "ico" | "avif" | "webm" | "mp4"
     ) {
         return Err(AppError::Invalid(
             "selected file must be a valid image (.png, .jpg, .webp, .gif, .bmp, .ico)".into(),
@@ -383,4 +383,75 @@ fn compute_dir_size(path: &Path) -> u64 {
         }
     }
     total
+}
+
+
+/// Lightweight probe to determine the download file size in bytes of a remote
+/// artwork URL before downloading it, using HTTP HEAD with a Range: bytes=0-0
+/// fallback so we never download the body just to check size.
+pub async fn probe_artwork_size(client: &reqwest::Client, url: &str) -> AppResult<u64> {
+    let parsed_url = reqwest::Url::parse(url)
+        .map_err(|err| AppError::Invalid(format!("invalid artwork URL: {err}")))?;
+    if !matches!(parsed_url.scheme(), "http" | "https") {
+        return Err(AppError::Invalid("artwork URLs must be http(s) links".into()));
+    }
+    let host = parsed_url
+        .host_str()
+        .ok_or_else(|| AppError::Invalid("artwork URL is missing a host".into()))?;
+    if crate::commands::profiles::is_blocked_host_or_ip(host) {
+        return Err(AppError::Invalid(
+            "private or local network artwork URLs are not permitted".into(),
+        ));
+    }
+
+    // 1. Try HTTP HEAD first
+    if let Ok(resp) = client
+        .head(url)
+        .timeout(std::time::Duration::from_millis(4000))
+        .send()
+        .await
+    {
+        if resp.status().is_success() {
+            if let Some(len) = resp
+                .headers()
+                .get(reqwest::header::CONTENT_LENGTH)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.trim().parse::<u64>().ok())
+            {
+                if len > 0 {
+                    return Ok(len);
+                }
+            }
+        }
+    }
+
+    // 2. Fallback: GET with Range: bytes=0-0 and parse Content-Range: bytes 0-0/TOTAL
+    if let Ok(resp) = client
+        .get(url)
+        .header(reqwest::header::RANGE, "bytes=0-0")
+        .timeout(std::time::Duration::from_millis(4500))
+        .send()
+        .await
+    {
+        if let Some(cr) = resp
+            .headers()
+            .get(reqwest::header::CONTENT_RANGE)
+            .and_then(|v| v.to_str().ok())
+        {
+            if let Some((_, total_str)) = cr.rsplit_once('/') {
+                if let Ok(total) = total_str.trim().parse::<u64>() {
+                    if total > 0 {
+                        return Ok(total);
+                    }
+                }
+            }
+        }
+        if let Some(len) = resp.content_length() {
+            if len > 1 {
+                return Ok(len);
+            }
+        }
+    }
+
+    Ok(0)
 }

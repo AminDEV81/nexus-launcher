@@ -5,12 +5,20 @@ use crate::commands::hub::{
     HubSearchFilters,
 };
 use crate::error::{AppError, AppResult};
+use crate::services::scores::normalize_game_title;
 use serde::Deserialize;
 use std::collections::HashSet;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub const DEFAULT_GATEWAY_URL: &str =
     "https://nexus-metadata-gateway.nexus-amin.workers.dev";
+
+fn now_unix_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
 
 #[derive(Deserialize)]
 struct GatewayEnvelope<T> {
@@ -43,23 +51,50 @@ impl NexusCloudProvider {
     }
 
     async fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> AppResult<T> {
-        let full_url = format!("{}{path}", self.base_url);
-        let res = self
-            .http
-            .get(&full_url)
-            .timeout(Duration::from_millis(3200))
-            .send()
+        self.get_json_with_options(path, false, Duration::from_millis(3200))
             .await
-            .map_err(|err| {
-                if err.is_connect() || err.is_timeout() {
-                    AppError::Other("Network disconnected or server unreachable. Please check your internet connection.".into())
-                } else {
-                    AppError::Other("Unable to connect to game catalog. Please check your internet connection.".into())
-                }
-            })?;
+    }
+
+    async fn get_json_no_cache<T: for<'de> Deserialize<'de>>(&self, path: &str) -> AppResult<T> {
+        let sep = if path.contains('?') { '&' } else { '?' };
+        // `sort` is in the Cloudflare Worker's ALLOWED_QUERY_PARAMS, so changing `sort`
+        // creates a fresh canonical cache key and 100% bypasses the 14-day Worker edge cache!
+        let bust_path = format!("{path}{sep}sort=live_{}", now_unix_ms());
+        self.get_json_with_options(&bust_path, true, Duration::from_millis(8500))
+            .await
+    }
+
+    async fn get_json_with_options<T: for<'de> Deserialize<'de>>(
+        &self,
+        path: &str,
+        no_cache: bool,
+        timeout: Duration,
+    ) -> AppResult<T> {
+        let full_url = format!("{}{path}", self.base_url);
+        let mut req = self.http.get(&full_url).timeout(timeout);
+        if no_cache {
+            req = req
+                .header("Cache-Control", "no-cache, no-store, must-revalidate")
+                .header("Pragma", "no-cache");
+        }
+        let res = req.send().await.map_err(|err| {
+            if err.is_connect() || err.is_timeout() {
+                AppError::Other(
+                    "Network disconnected or server unreachable. Please check your internet connection."
+                        .into(),
+                )
+            } else {
+                AppError::Other(
+                    "Unable to connect to game catalog. Please check your internet connection."
+                        .into(),
+                )
+            }
+        })?;
 
         if res.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
-            return Err(AppError::Other("Gateway rate limit reached. Please wait a moment.".into()));
+            return Err(AppError::Other(
+                "Gateway rate limit reached. Please wait a moment.".into(),
+            ));
         }
 
         let body_text = res
@@ -373,12 +408,87 @@ impl ArtworkProvider for NexusCloudProvider {
         steam_app_id: Option<&str>,
         name: &str,
     ) -> AppResult<Vec<UnifiedArtwork>> {
-        let encoded_name = urlencoding_light(name);
-        let mut path = format!("/api/v1/artwork/options/{kind}?name={encoded_name}");
-        if let Some(app_id) = steam_app_id {
-            path.push_str(&format!("&app_id={app_id}"));
+        let trimmed_name = name.trim();
+        let encoded_name = urlencoding_light(trimmed_name);
+        let clean_title = normalize_game_title(trimmed_name);
+        let expanded_title = expand_search_query(trimmed_name);
+
+        // 1. Path with app_id ONLY (omitting `name` forces the Worker to query `/steam/{app_id}` directly!)
+        let app_id_path = steam_app_id
+            .filter(|id| !id.trim().is_empty())
+            .map(|app_id| format!("/api/v1/artwork/options/{kind}?app_id={app_id}"));
+
+        // 2. Path with name ONLY (forces the Worker to run SteamGridDB autocomplete -> `/game/{sgdb_id}`)
+        let name_only_path = if !trimmed_name.is_empty() {
+            Some(format!("/api/v1/artwork/options/{kind}?name={encoded_name}"))
+        } else {
+            None
+        };
+
+        // 3. Path with normalized core title (strips "Deluxe Edition", "Director's Cut", "Remastered", colons, etc.)
+        let clean_name_path = if !clean_title.is_empty()
+            && !clean_title.eq_ignore_ascii_case(trimmed_name)
+        {
+            Some(format!(
+                "/api/v1/artwork/options/{kind}?name={}",
+                urlencoding_light(&clean_title)
+            ))
+        } else if !expanded_title.is_empty() && !expanded_title.eq_ignore_ascii_case(trimmed_name) {
+            Some(format!(
+                "/api/v1/artwork/options/{kind}?name={}",
+                urlencoding_light(&expanded_title)
+            ))
+        } else if let Some((base, _)) = trimmed_name.split_once(':') {
+            let b = base.trim();
+            if b.len() >= 4 {
+                Some(format!(
+                    "/api/v1/artwork/options/{kind}?name={}",
+                    urlencoding_light(b)
+                ))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let (res_by_name, res_by_app_id, res_by_clean) = tokio::join!(
+            async {
+                if let Some(ref p) = name_only_path {
+                    self.get_json_no_cache::<Vec<UnifiedArtwork>>(p).await.ok()
+                } else {
+                    None
+                }
+            },
+            async {
+                if let Some(ref p) = app_id_path {
+                    self.get_json_no_cache::<Vec<UnifiedArtwork>>(p).await.ok()
+                } else {
+                    None
+                }
+            },
+            async {
+                if let Some(ref p) = clean_name_path {
+                    self.get_json_no_cache::<Vec<UnifiedArtwork>>(p).await.ok()
+                } else {
+                    None
+                }
+            }
+        );
+
+        let mut combined = Vec::new();
+        let mut seen_urls = HashSet::new();
+
+        // Put name-resolved SteamGridDB `/game/{id}` results and `/steam/{app_id}` results together
+        for list in [res_by_name, res_by_app_id, res_by_clean].into_iter().flatten() {
+            for item in list {
+                if !item.url.is_empty() && seen_urls.insert(item.url.clone()) {
+                    combined.push(item);
+                }
+            }
         }
-        self.get_json(&path).await
+
+        Ok(combined)
     }
 }
 

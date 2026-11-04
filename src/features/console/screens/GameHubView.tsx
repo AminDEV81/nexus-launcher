@@ -1,37 +1,41 @@
 import React, { useEffect, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Play,
-  Square,
-  Heart,
-  ShieldCheck,
-  Music,
-  RotateCcw,
-  Sparkles,
-  Clock,
-  Calendar,
-  Building2,
   ArrowLeft,
-  HardDrive,
-  Maximize2,
+  Building2,
+  Calendar,
+  Clock,
+  Compass,
   Film,
-  X,
   FolderOpen,
+  HardDrive,
+  Heart,
+  Loader2,
+  Music,
+  Play,
+  Sparkles,
+  Square,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Game, HubGameDetails, SaveSnapshot } from '@/types/models'
-import { formatElapsed, formatPlaytime } from '@/features/library/utils/format'
+import type { Game, HubGame, HubGameDetails } from '@/types/models'
+import { formatElapsed, formatPlaytime, isGameUnreleased } from '@/features/library/utils/format'
 import { useLaunchStore } from '@/store/launch-store'
 import { formatBytes } from '@/features/library/utils/guess-name'
 import { getGameScreenshots } from '@/services/games'
-import { getHubGameDetails, openTrailerWindow, resolveHubGameScores } from '@/services/hub'
-import { listSaveSnapshots, restoreSaveSnapshot } from '@/services/save-manager'
+import {
+  getHubGameDetails,
+  resolveHubGameScores,
+  searchHubGames,
+} from '@/services/hub'
 import { useConsoleStore } from '../store/console-store'
 import { CONSOLE_THEMES } from '../theme/tokens'
 import { FocusScope, useFocusable } from '../nav/FocusScope'
 import { resolveConsoleHighResUrl } from '../ui/Tile'
 import { Glyph } from '../ui/Glyph'
 import { InlineGameSoundtrackSection } from '../ui/InlineGameSoundtrackSection'
+import { ReleaseCountdownBanner } from '../ui/ReleaseCountdownBanner'
+import { ConsoleTrailerShowcase } from '../ui/ConsoleTrailerShowcase'
+import { ConsoleScorecardStrip } from '../ui/ConsoleScorecardStrip'
+import { ConsoleFpsEstimatorSection } from '../ui/ConsoleFpsEstimatorSection'
 
 export interface GameHubViewProps {
   game: Game
@@ -52,13 +56,13 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
 }) => {
   const themeId = useConsoleStore((s) => s.theme)
   const isLight = Boolean(CONSOLE_THEMES[themeId]?.isLight)
+  const setSelectedStoreHubGame = useConsoleStore((s) => s.setSelectedStoreHubGame)
+  const setSelectedGameId = useConsoleStore((s) => s.setSelectedGameId)
   const elapsedSeconds = useLaunchStore((s) => s.elapsedSeconds[game.id] ?? 0)
 
-  const [snapshots, setSnapshots] = useState<SaveSnapshot[]>([])
-  const [restoringId, setRestoringId] = useState<string | null>(null)
   const [screenshots, setScreenshots] = useState<string[]>([])
   const [hubDetails, setHubDetails] = useState<HubGameDetails | null>(null)
-  const [lightboxImg, setLightboxImg] = useState<string | null>(null)
+  const [openingStore, setOpeningStore] = useState(false)
   const [scores, setScores] = useState<{ metacritic: number | null; opencritic: number | null }>({
     metacritic: game.metacritic_score,
     opencritic: game.opencritic_score,
@@ -71,24 +75,34 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
       opencritic: game.opencritic_score,
     })
 
-    // 1. Load Save Guardian snapshots
-    listSaveSnapshots(game.id)
-      .then((list) => {
-        if (!cancelled) setSnapshots(list.slice(0, 6))
-      })
-      .catch(() => {
-        if (!cancelled) setSnapshots([])
-      })
+    // Load local + IGDB screenshots & supplemental metadata (even if game.igdb_id is null, search by name!)
+    const fetchIgdbDetails = async (): Promise<HubGameDetails | null> => {
+      if (game.igdb_id) {
+        return getHubGameDetails(game.igdb_id, game.name).catch(() => null)
+      }
+      try {
+        const searchHits = await searchHubGames(game.name, 0)
+        if (searchHits && searchHits[0]?.igdb_id) {
+          return await getHubGameDetails(searchHits[0].igdb_id, game.name)
+        }
+      } catch {
+        // Ignore
+      }
+      return null
+    }
 
-    // 2. Load local + IGDB screenshots & supplemental metadata (#15)
     Promise.all([
       getGameScreenshots(game.id).catch(() => [] as string[]),
-      game.igdb_id
-        ? getHubGameDetails(game.igdb_id, game.name).catch(() => null)
-        : Promise.resolve(null),
+      fetchIgdbDetails(),
     ]).then(([localShots, igdbData]) => {
       if (cancelled) return
-      if (igdbData) setHubDetails(igdbData)
+      if (igdbData) {
+        setHubDetails(igdbData)
+        setScores((prev) => ({
+          metacritic: prev.metacritic ?? igdbData.metacritic_score ?? null,
+          opencritic: prev.opencritic ?? igdbData.opencritic_score ?? null,
+        }))
+      }
       const merged = [
         ...localShots,
         ...(igdbData?.screenshot_urls ?? []),
@@ -96,19 +110,26 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
         .map((u) => resolveConsoleHighResUrl(u))
         .filter((u): u is string => Boolean(u))
       setScreenshots(Array.from(new Set(merged)))
-    })
 
-    // 3. Resolve critic scores if not stored yet
-    if (!game.metacritic_score && !game.opencritic_score) {
-      resolveHubGameScores({
-        gameName: game.name,
-        releaseDate: game.release_date,
-      })
-        .then((sc) => {
-          if (!cancelled) setScores(sc)
+      if (!game.metacritic_score && !game.opencritic_score) {
+        resolveHubGameScores({
+          gameName: game.name,
+          releaseDate: game.release_date ?? igdbData?.release_date,
+          metacriticScore: igdbData?.metacritic_score ?? null,
+          opencriticScore: igdbData?.opencritic_score ?? null,
+          igdbRating: igdbData?.rating ?? null,
         })
-        .catch(() => {})
-    }
+          .then((sc) => {
+            if (!cancelled) {
+              setScores((prev) => ({
+                metacritic: sc.metacritic ?? prev.metacritic,
+                opencritic: sc.opencritic ?? prev.opencritic,
+              }))
+            }
+          })
+          .catch(() => {})
+      }
+    })
 
     return () => {
       cancelled = true
@@ -116,7 +137,6 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
   }, [game])
 
   const handleOpenGameOst = () => {
-    // Requirement #12: Stay right inside the Game Page and scroll smoothly to the inline OST section!
     const el = document.getElementById('game-page-inline-soundtrack')
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -124,13 +144,45 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
   }
 
   const handleWatchTrailer = () => {
-    const vid = hubDetails?.videos?.[0]?.video_id
-    if (vid) {
-      void openTrailerWindow(vid, `${game.name} — Trailer`).catch(() => {})
-    } else if (game.trailer_url || hubDetails?.trailer_url) {
-      window.open(game.trailer_url || hubDetails?.trailer_url || '', '_blank')
-    } else {
-      toast.info('No trailer video available for this game')
+    const el = document.getElementById('console-inline-trailer-section')
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+
+  const handleViewInStore = async () => {
+    if (openingStore) return
+    if (hubDetails) {
+      setSelectedGameId(null)
+      setSelectedStoreHubGame(hubDetails)
+      return
+    }
+    if (game.igdb_id) {
+      setOpeningStore(true)
+      try {
+        const d = await getHubGameDetails(game.igdb_id, game.name)
+        setSelectedGameId(null)
+        setSelectedStoreHubGame(d)
+        return
+      } catch {
+        // Fallback to search below
+      } finally {
+        setOpeningStore(false)
+      }
+    }
+    setOpeningStore(true)
+    try {
+      const results: HubGame[] = await searchHubGames(game.name, 0)
+      if (results.length > 0) {
+        setSelectedGameId(null)
+        setSelectedStoreHubGame(results[0])
+      } else {
+        toast.info(`Could not find a Store page for "${game.name}"`)
+      }
+    } catch {
+      toast.error('Could not open Store page right now')
+    } finally {
+      setOpeningStore(false)
     }
   }
 
@@ -138,6 +190,14 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
     id: 'hub_action_play',
     scopeId: 'console_game_hub',
     onConfirm: () => onPlayOrResume(game),
+  })
+
+  const viewInStoreBtn = useFocusable<HTMLButtonElement>({
+    id: 'hub_action_view_in_store',
+    scopeId: 'console_game_hub',
+    onConfirm: () => {
+      void handleViewInStore()
+    },
   })
 
   const favBtn = useFocusable<HTMLButtonElement>({
@@ -164,18 +224,7 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
     onConfirm: onBack,
   })
 
-  const handleRestoreSnapshot = async (snap: SaveSnapshot) => {
-    if (restoringId) return
-    setRestoringId(snap.id)
-    try {
-      await restoreSaveSnapshot(game.id, snap.id)
-      toast.success('Save snapshot restored safely via Save Guardian!')
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to restore snapshot')
-    } finally {
-      setRestoringId(null)
-    }
-  }
+
 
   const backdrop = resolveConsoleHighResUrl(
     game.background_path ??
@@ -184,18 +233,19 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
       hubDetails?.backdrop_url ??
       game.cover_path,
   )
-  const cover = resolveConsoleHighResUrl(game.cover_path)
+  const cover = resolveConsoleHighResUrl(game.cover_path ?? hubDetails?.cover_url)
   const logoSrc = resolveConsoleHighResUrl(game.logo_path)
   const descriptionText = game.description || hubDetails?.summary
   const developerText = game.developer || hubDetails?.developer
   const publisherText = game.publisher || hubDetails?.publisher
   const releaseText = game.release_date || hubDetails?.release_date
+  const unreleased = isGameUnreleased(releaseText)
 
   return (
-    <FocusScope id="console_game_hub" orientation="vertical" className="space-y-8 pb-20">
+    <FocusScope id="console_game_hub" orientation="vertical" className="space-y-6 pb-20">
       {/* High-Clarity 1080p Hero Showcase Card */}
       <div
-        className={`relative overflow-hidden rounded-[2rem] border shadow-2xl ${
+        className={`relative overflow-hidden rounded-[1.75rem] border shadow-2xl ${
           isLight ? 'border-slate-300 bg-white' : 'border-white/15 bg-[#0d1426]'
         }`}
       >
@@ -215,39 +265,69 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
           }}
         />
 
-        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-end gap-8 p-8 md:p-10">
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-end gap-6 p-6 md:p-8">
           {cover && (
             <img
               src={cover}
               alt={game.name}
-              className="h-64 w-44 shrink-0 rounded-2xl border-2 border-white/20 object-cover shadow-2xl"
+              className="h-52 w-36 shrink-0 rounded-2xl border-2 border-white/20 object-cover shadow-2xl"
             />
           )}
 
-          <div className="flex-1 space-y-4">
-            <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex-1 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
               {isRunning && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400 px-3 py-1 text-xs font-black uppercase text-slate-950">
                   <span className="size-2 rounded-full bg-slate-950 animate-ping" />
                   Running Now
                 </span>
               )}
-              <span className="rounded-full bg-cyan-500/20 border border-cyan-400/40 px-3 py-1 text-xs font-extrabold uppercase text-cyan-300">
-                {game.source || 'PC Library'}
+              <span
+                className={`rounded-full border px-3 py-1 text-xs font-extrabold uppercase ${
+                  isLight
+                    ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                    : 'bg-cyan-500/20 border-cyan-400/40 text-cyan-300'
+                }`}
+              >
+                {game.is_wishlist ? 'Wishlist' : game.source || 'PC Library'}
               </span>
               {scores.metacritic && scores.metacritic > 0 ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-1 text-xs font-extrabold text-emerald-300">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-extrabold ${
+                    isLight
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                      : 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+                  }`}
+                >
                   <Sparkles className="size-3.5" />
                   Metacritic {scores.metacritic}
                 </span>
               ) : null}
               {scores.opencritic && scores.opencritic > 0 ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-400/40 px-3 py-1 text-xs font-extrabold text-amber-300">
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-extrabold ${
+                    isLight
+                      ? 'bg-amber-50 border-amber-300 text-amber-800'
+                      : 'bg-amber-500/20 border-amber-400/40 text-amber-300'
+                  }`}
+                >
                   <Sparkles className="size-3.5" />
                   OpenCritic {scores.opencritic}
                 </span>
               ) : null}
-              {game.genres.map((gn) => (
+              {hubDetails?.rating && hubDetails.rating > 0 ? (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-extrabold ${
+                    isLight
+                      ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
+                      : 'bg-cyan-500/20 border-cyan-400/40 text-cyan-300'
+                  }`}
+                >
+                  <Sparkles className="size-3.5" />
+                  IGDB {Math.round(hubDetails.rating)}%
+                </span>
+              ) : null}
+              {(game.genres.length > 0 ? game.genres : (hubDetails?.genres ?? [])).map((gn) => (
                 <span
                   key={gn}
                   className={`rounded-full px-3 py-1 text-xs font-bold ${
@@ -263,11 +343,11 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
               <img
                 src={logoSrc}
                 alt={game.name}
-                className="max-h-20 max-w-md object-contain object-left drop-shadow-2xl"
+                className="max-h-16 max-w-md object-contain object-left drop-shadow-2xl"
               />
             ) : (
               <h1
-                className={`text-4xl md:text-5xl font-black tracking-tight ${
+                className={`text-3xl md:text-4xl font-black tracking-tight ${
                   isLight ? 'text-slate-900' : 'text-white'
                 }`}
               >
@@ -277,7 +357,7 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
 
             {/* Key Game Telemetry Strip */}
             <div
-              className={`flex flex-wrap items-center gap-6 text-sm font-semibold ${
+              className={`flex flex-wrap items-center gap-5 text-sm font-semibold ${
                 isLight ? 'text-slate-600' : 'text-slate-300'
               }`}
             >
@@ -314,102 +394,123 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
 
             {descriptionText && (
               <p
-                className={`max-w-3xl text-sm md:text-base leading-relaxed line-clamp-4 ${
+                className={`max-w-3xl text-sm leading-relaxed line-clamp-3 ${
                   isLight ? 'text-slate-700' : 'text-slate-200/90'
                 }`}
               >
-                {descriptionText.replace(/<[^>]+>/g, '')}
+                {descriptionText}
               </p>
             )}
 
-            {/* Primary Action Bar */}
-            <div className="flex flex-wrap items-center gap-3.5 pt-3">
-              <button
-                type="button"
-                {...playBtn.focusProps}
-                className={`flex items-center gap-3 rounded-2xl px-8 py-4 text-base font-extrabold transition-all cursor-pointer ${
-                  isRunning
-                    ? playBtn.isFocused
-                      ? 'scale-105 bg-rose-500 text-white ring-4 ring-rose-300/60 shadow-[0_0_35px_rgba(244,63,94,0.65)]'
-                      : 'bg-rose-500/90 text-white hover:bg-rose-500'
-                    : playBtn.isFocused
-                      ? 'scale-105 bg-cyan-400 text-slate-950 ring-4 ring-cyan-300/60 shadow-[0_0_35px_rgba(0,229,255,0.65)]'
-                      : 'bg-cyan-500 text-slate-950 hover:bg-cyan-400'
-                }`}
-              >
-                {isRunning ? (
-                  <>
-                    <Square className="size-4 fill-current" />
-                    <span>Stop · {formatElapsed(elapsedSeconds)}</span>
-                  </>
-                ) : (
-                  <>
-                    <Play className="size-5 fill-current" />
-                    <span>Play Now</span>
-                  </>
-                )}
-                <Glyph button="confirm" size="sm" />
-              </button>
+            {/* Primary Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              {game.is_installed && (
+                <button
+                  type="button"
+                  {...playBtn.focusProps}
+                  className={`flex items-center gap-2.5 px-7 py-3 rounded-2xl font-extrabold text-sm transition-all cursor-pointer tabular-nums ${
+                    isRunning
+                      ? playBtn.isFocused
+                        ? 'bg-rose-500 text-white scale-105 ring-4 ring-rose-300/60 shadow-[0_0_35px_rgba(244,63,94,0.65)]'
+                        : 'bg-rose-600/90 text-white hover:bg-rose-500'
+                      : playBtn.isFocused
+                        ? 'bg-cyan-400 text-slate-950 scale-105 ring-4 ring-cyan-300/60 shadow-[0_0_35px_rgba(0,229,255,0.65)]'
+                        : 'bg-cyan-500/90 text-slate-950 hover:bg-cyan-400'
+                  }`}
+                >
+                  {isRunning ? (
+                    <Square className="w-4 h-4 fill-current" />
+                  ) : (
+                    <Play className="w-4 h-4 fill-current" />
+                  )}
+                  <span>
+                    {isRunning ? `Stop · ${formatElapsed(elapsedSeconds)}` : 'Play Now'}
+                  </span>
+                  <Glyph button="confirm" size="sm" />
+                </button>
+              )}
 
               <button
                 type="button"
-                {...ostBtn.focusProps}
-                className={`flex items-center gap-2.5 rounded-2xl border px-6 py-4 text-sm font-bold transition-all cursor-pointer ${
-                  ostBtn.isFocused
-                    ? 'scale-105 border-violet-300 bg-violet-400 text-slate-950 shadow-lg'
+                {...viewInStoreBtn.focusProps}
+                disabled={openingStore}
+                className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-extrabold text-sm border transition-all cursor-pointer ${
+                  viewInStoreBtn.isFocused
+                    ? 'scale-105 border-cyan-300 bg-cyan-400 text-slate-950 shadow-xl'
                     : isLight
-                      ? 'border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200'
-                      : 'border-white/15 bg-white/10 text-white hover:bg-white/15'
+                      ? 'border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                      : 'border-cyan-400/40 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25'
                 }`}
               >
-                <Music className="size-4" />
-                <span>Soundtrack (OST)</span>
+                {openingStore ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Compass className="w-4 h-4" />
+                )}
+                <span>View in Store</span>
               </button>
 
               <button
                 type="button"
                 {...favBtn.focusProps}
-                className={`flex items-center gap-2.5 rounded-2xl border px-6 py-4 text-sm font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm border transition-all cursor-pointer ${
                   favBtn.isFocused
-                    ? 'scale-105 border-amber-300 bg-amber-400 text-slate-950 shadow-lg'
-                    : isLight
-                      ? 'border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200'
-                      : 'border-white/15 bg-white/10 text-white hover:bg-white/15'
+                    ? 'bg-amber-400 text-slate-950 border-amber-300 scale-105'
+                    : game.is_favorite
+                      ? isLight
+                        ? 'bg-amber-50 text-amber-800 border-amber-300'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                      : isLight
+                        ? 'bg-slate-100 text-slate-800 border-slate-300'
+                        : 'bg-white/10 text-white border-white/15'
                 }`}
               >
-                <Heart className={`size-4 ${game.is_favorite ? 'fill-current text-amber-400' : ''}`} />
+                <Heart className={`w-4 h-4 ${game.is_favorite ? 'fill-current' : ''}`} />
                 <span>{game.is_favorite ? 'Favorited' : 'Favorite'}</span>
               </button>
 
-              {(game.trailer_url || hubDetails?.videos?.length || hubDetails?.trailer_url) ? (
-                <button
-                  type="button"
-                  {...trailerBtn.focusProps}
-                  className={`flex items-center gap-2 rounded-2xl border px-5 py-4 text-sm font-bold transition-all cursor-pointer ${
-                    trailerBtn.isFocused
-                      ? 'scale-105 border-rose-300 bg-rose-400 text-slate-950'
-                      : isLight
-                        ? 'border-slate-300 bg-slate-100 text-slate-800'
-                        : 'border-white/15 bg-white/10 text-white'
-                  }`}
-                >
-                  <Film className="size-4" />
-                  <span>Trailer</span>
-                </button>
-              ) : null}
+              <button
+                type="button"
+                {...trailerBtn.focusProps}
+                className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm border transition-all cursor-pointer ${
+                  trailerBtn.isFocused
+                    ? 'bg-rose-400 text-slate-950 border-rose-300 scale-105'
+                    : isLight
+                      ? 'bg-slate-100 text-slate-800 border-slate-300'
+                      : 'bg-rose-500/15 text-rose-300 border-rose-400/35'
+                }`}
+              >
+                <Film className="w-4 h-4" />
+                <span>Media &amp; Trailers</span>
+              </button>
+
+              <button
+                type="button"
+                {...ostBtn.focusProps}
+                className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm border transition-all cursor-pointer ${
+                  ostBtn.isFocused
+                    ? 'bg-violet-400 text-slate-950 border-violet-300 scale-105'
+                    : isLight
+                      ? 'bg-slate-100 text-slate-800 border-slate-300'
+                      : 'bg-white/10 text-white border-white/15'
+                }`}
+              >
+                <Music className="w-4 h-4" />
+                <span>Soundtrack (OST)</span>
+              </button>
 
               <button
                 type="button"
                 {...backBtn.focusProps}
-                className={`flex items-center gap-2 rounded-2xl border px-5 py-4 text-sm font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-2 px-4 py-3 rounded-2xl font-bold text-sm border transition-all cursor-pointer ${
                   backBtn.isFocused
-                    ? 'scale-105 border-cyan-300 bg-white text-slate-950'
+                    ? 'bg-white text-slate-950 border-cyan-300 scale-105'
                     : isLight
-                      ? 'border-slate-300 bg-white text-slate-700'
-                      : 'border-white/15 bg-white/5 text-slate-300'
+                      ? 'bg-white text-slate-700 border-slate-300'
+                      : 'bg-white/5 text-slate-300 border-white/15'
                 }`}
               >
-                <ArrowLeft className="size-4" />
+                <ArrowLeft className="w-4 h-4" />
                 <span>Back</span>
               </button>
             </div>
@@ -417,187 +518,57 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
         </div>
       </div>
 
-      {/* Interactive HD Screenshot Showcase (#15) */}
-      {screenshots.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-2">
-            <h2 className={`text-xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              Screenshots & Visual Showcase ({screenshots.length})
-            </h2>
-            <span className="text-xs font-semibold text-slate-400">
-              Press Enter or Click to enlarge
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {screenshots.slice(0, 6).map((url, idx) => (
-              <HubScreenshotCard
-                key={url}
-                id={`hub_shot_${idx}`}
-                url={url}
-                onOpen={() => setLightboxImg(url)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Inline Game Soundtrack Section (#12: Shows & plays OST right inside the Game Page!) */}
-      <InlineGameSoundtrackSection
-        scopeId="console_game_hub"
-        gameId={game.id}
-        gameName={game.name}
-        coverUrl={game.cover_path}
-        steamAppId={game.steam_app_id}
-        igdbId={game.igdb_id}
+      {/* Live Release Countdown Banner for Unreleased or Wishlisted Games */}
+      <ReleaseCountdownBanner
+        releaseDate={releaseText}
+        isWishlist={game.is_wishlist}
         isLight={isLight}
       />
 
-      {/* Save Guardian Snapshots Section */}
-      <div
-        className={`rounded-3xl border p-6 space-y-4 ${
-          isLight
-            ? 'border-slate-300 bg-white/85 shadow-xs'
-            : 'border-white/12 bg-white/[0.04]'
-        }`}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck className="size-5 text-cyan-400" />
-            <h2 className={`text-xl font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>
-              Save Guardian Vault & Checkpoints
-            </h2>
-          </div>
-          <span className="text-xs font-bold text-cyan-400">
-            {snapshots.length} Isolated Save Checkpoints
-          </span>
-        </div>
+      {/* Item #2: Dedicated Critic & Community Ratings Scorecard on Console Game Page */}
+      <ConsoleScorecardStrip
+        metacriticScore={scores.metacritic}
+        opencriticScore={scores.opencritic}
+        igdbRating={hubDetails?.rating ?? null}
+        userRating={game.user_rating}
+        isUnreleased={unreleased}
+        isLight={isLight}
+      />
 
-        {snapshots.length === 0 ? (
-          <p className={`text-sm ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-            Save snapshots are captured automatically each time you exit the game.
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {snapshots.map((snap) => (
-              <SnapshotCard
-                key={snap.id}
-                snap={snap}
-                busy={restoringId === snap.id}
-                isLight={isLight}
-                onRestore={() => {
-                  void handleRestoreSnapshot(snap)
-                }}
-              />
-            ))}
-          </div>
-        )}
+      {/* Item #1: Unified Switchable Media Showcase (Trailers + Screenshots in one player like Game Hub) */}
+      <ConsoleTrailerShowcase
+        scopeId="console_game_hub"
+        gameName={game.name}
+        steamAppId={game.steam_app_id ?? hubDetails?.steam_app_id}
+        videos={hubDetails?.videos}
+        trailerUrl={game.trailer_url ?? hubDetails?.trailer_url}
+        screenshots={screenshots}
+        isLight={isLight}
+      />
+
+      {/* Live FPS & Resolution Estimator + PC System Requirements */}
+      <ConsoleFpsEstimatorSection
+        scopeId="console_game_hub"
+        gameName={game.name}
+        releaseDate={releaseText}
+        genres={game.genres.length > 0 ? game.genres : (hubDetails?.genres ?? [])}
+        systemRequirements={hubDetails?.system_requirements}
+        isLight={isLight}
+      />
+
+      {/* Inline Game Soundtrack Player & Tracklist Section */}
+      <div id="game-page-inline-soundtrack">
+        <InlineGameSoundtrackSection
+          scopeId="console_game_hub"
+          gameId={game.id}
+          gameName={game.name}
+          coverUrl={game.cover_path}
+          steamAppId={game.steam_app_id}
+          igdbId={game.igdb_id}
+          isLight={isLight}
+        />
       </div>
-
-      {/* Fullscreen Screenshot Lightbox */}
-      <AnimatePresence>
-        {lightboxImg && (
-          <motion.div
-            key="game-hub-lightbox"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setLightboxImg(null)}
-            className="fixed inset-0 z-[280] flex items-center justify-center bg-black/90 backdrop-blur-xl p-8 cursor-pointer"
-          >
-            <img
-              src={lightboxImg}
-              alt="Screenshot Fullscreen"
-              className="max-h-[88vh] max-w-[92vw] rounded-3xl border border-white/20 object-contain shadow-2xl"
-            />
-            <button
-              type="button"
-              onClick={() => setLightboxImg(null)}
-              className="absolute right-8 top-8 rounded-full bg-white/15 p-3 text-white hover:bg-white/25"
-            >
-              <X className="size-6" />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </FocusScope>
   )
 }
 
-const HubScreenshotCard: React.FC<{
-  id: string
-  url: string
-  onOpen: () => void
-}> = ({ id, url, onOpen }) => {
-  const { focusProps, isFocused } = useFocusable<HTMLButtonElement>({
-    id,
-    scopeId: 'console_game_hub',
-    onConfirm: onOpen,
-  })
-  return (
-    <button
-      type="button"
-      {...focusProps}
-      className={`group relative aspect-video w-full overflow-hidden rounded-2xl border transition-all cursor-pointer ${
-        isFocused
-          ? 'scale-[1.03] border-cyan-300 ring-4 ring-cyan-400/50 shadow-2xl z-10'
-          : 'border-white/15 opacity-90 hover:opacity-100'
-      }`}
-    >
-      <img
-        src={url}
-        alt=""
-        loading="lazy"
-        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-end p-3">
-        <span className="rounded-xl bg-black/70 p-2 text-white">
-          <Maximize2 className="size-4" />
-        </span>
-      </div>
-    </button>
-  )
-}
-
-const SnapshotCard: React.FC<{
-  snap: SaveSnapshot
-  busy: boolean
-  isLight: boolean
-  onRestore: () => void
-}> = ({ snap, busy, isLight, onRestore }) => {
-  const { focusProps, isFocused } = useFocusable<HTMLButtonElement>({
-    id: `hub_snap_${snap.id}`,
-    scopeId: 'console_game_hub',
-    onConfirm: onRestore,
-  })
-  return (
-    <button
-      type="button"
-      {...focusProps}
-      disabled={busy}
-      className={`flex items-center justify-between rounded-2xl border p-4 text-left transition-all cursor-pointer ${
-        isFocused
-          ? 'scale-[1.03] border-cyan-300 bg-cyan-400 text-slate-950 shadow-lg'
-          : isLight
-            ? 'border-slate-200 bg-slate-50 text-slate-900'
-            : 'border-white/10 bg-slate-900/70 text-white'
-      }`}
-    >
-      <div className="min-w-0 pr-3">
-        <p className="truncate text-sm font-extrabold">
-          {snap.note || `Checkpoint ${snap.id.slice(0, 6)}`}
-        </p>
-        <p className={`mt-1 text-xs ${isFocused ? 'text-slate-800' : 'text-slate-400'}`}>
-          {snap.created_at}
-        </p>
-      </div>
-      <span
-        className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-extrabold ${
-          isFocused ? 'text-slate-950' : 'text-cyan-400'
-        }`}
-      >
-        <RotateCcw className="size-4" />
-        Restore
-      </span>
-    </button>
-  )
-}

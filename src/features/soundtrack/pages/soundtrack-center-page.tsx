@@ -58,6 +58,7 @@ import {
   resolveAlbumCoverFallback,
 } from '../services/curated-soundtracks'
 import { soundtrackResolver } from '../services/soundtrack-resolver'
+import { scoreAlbumForUserSearchQuery } from '../services/providers/base-provider'
 import {
   getAllSoundtrackAlbums,
   getSoundtrackAlbum,
@@ -736,7 +737,7 @@ export function SoundtrackCenterPage() {
               if (k) seenKeys.add(k)
               return true
             })
-            return [...prev, ...fresh]
+            return [...fresh, ...prev]
           })
         }
       })
@@ -1183,6 +1184,25 @@ export function SoundtrackCenterPage() {
 
   // Filtered albums by search AND active Vibe filter chip
   const filteredAlbums = useMemo(() => {
+    const rawQ = searchQuery.trim()
+    if (rawQ) {
+      const q = rawQ.toLowerCase()
+      // Put onlineDiscovered first when searching so newly fetched online soundtracks appear at the top!
+      const orderedPool = [
+        ...onlineDiscovered,
+        ...albumsWithTracks.filter(
+          (a) => !onlineDiscovered.some((o) => o.album.id === a.album.id),
+        ),
+      ]
+      return orderedPool.filter(
+        (a) =>
+          scoreAlbumForUserSearchQuery(a.album.title, a.album.artist || '', rawQ) > 0 ||
+          a.album.title.toLowerCase().includes(q) ||
+          a.album.artist?.toLowerCase().includes(q) ||
+          a.tracks.some((t) => t.title.toLowerCase().includes(q)),
+      )
+    }
+
     let list = albumsWithTracks
     const vibeObj = VIBE_FILTERS.find((v) => v.id === activeVibe)
     if (vibeObj && vibeObj.keywords.length > 0) {
@@ -1191,17 +1211,8 @@ export function SoundtrackCenterPage() {
         return vibeObj.keywords.some((kw) => hay.includes(kw))
       })
     }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      list = list.filter(
-        (a) =>
-          a.album.title.toLowerCase().includes(q) ||
-          a.album.artist?.toLowerCase().includes(q) ||
-          a.tracks.some((t) => t.title.toLowerCase().includes(q)),
-      )
-    }
     return list
-  }, [albumsWithTracks, activeVibe, searchQuery])
+  }, [albumsWithTracks, onlineDiscovered, activeVibe, searchQuery])
 
   // Downloaded / Offline tracks
   const downloadedTracks = useMemo(() => {
@@ -2464,13 +2475,13 @@ export function SoundtrackCenterPage() {
                       ))}
                     </div>
 
-                    {/* Bottom "More" Pagination & Online Discovery Button */}
+                    {/* Bottom Deterministic "More Soundtracks" Pagination & Online Discovery Button */}
                     <div className="mt-6 flex flex-col items-center justify-center gap-2 pt-2">
                       <button
                         type="button"
                         onClick={() => void handleLoadMoreSoundtracks()}
                         disabled={isLoadingMore}
-                        className="group inline-flex items-center gap-2.5 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/15 via-surface-raised to-accent/15 px-7 py-3 text-xs font-extrabold text-text shadow-md transition-all hover:border-accent hover:bg-accent hover:text-white active:scale-95 disabled:opacity-60 cursor-pointer"
+                        className="group inline-flex min-w-[270px] items-center justify-center gap-2.5 rounded-2xl border border-accent/40 bg-gradient-to-r from-accent/15 via-surface-raised to-accent/15 px-7 py-3 text-xs font-extrabold text-text shadow-md transition-colors hover:border-accent hover:bg-accent hover:text-white disabled:pointer-events-none disabled:opacity-65 cursor-pointer"
                       >
                         {isLoadingMore ? (
                           <>

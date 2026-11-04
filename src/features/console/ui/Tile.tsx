@@ -1,14 +1,17 @@
-import React from 'react'
-import { motion } from 'framer-motion'
-import { Sparkles, Star } from 'lucide-react'
-import { useAnimationSpeed } from '@/hooks/use-animation-speed'
+import React, { useEffect, useMemo, useState } from 'react'
+import { Clock, Sparkles, Star } from 'lucide-react'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import type { Game, HubGame } from '@/types/models'
-import { formatPlaytime, formatElapsed } from '@/features/library/utils/format'
+import { formatPlaytime, formatElapsed, isGameUnreleased } from '@/features/library/utils/format'
+import {
+  buildBannerFallbackChain,
+  buildCoverFallbackChain,
+} from '@/features/hub/utils/cover-fallback'
 import { useLaunchStore } from '@/store/launch-store'
 import { useFocusable } from '../nav/FocusScope'
 import { useConsoleStore } from '../store/console-store'
 import { CONSOLE_THEMES } from '../theme/tokens'
+import { formatCompactCountdown } from './ReleaseCountdownBanner'
 
 export interface ConsoleTileProps {
   id: string
@@ -26,24 +29,29 @@ export interface ConsoleTileProps {
 
 export function resolveConsoleMediaUrl(url: string | null | undefined): string | null {
   if (!url) return null
+  const clean = url.trim()
+  if (!clean) return null
+  if (clean.startsWith('//')) {
+    return `https:${clean}`
+  }
   if (
-    url.startsWith('http://') ||
-    url.startsWith('https://') ||
-    url.startsWith('data:') ||
-    url.startsWith('asset:')
+    clean.startsWith('http://') ||
+    clean.startsWith('https://') ||
+    clean.startsWith('data:') ||
+    clean.startsWith('asset:')
   ) {
-    return url
+    return clean
   }
   try {
-    return convertFileSrc(url)
+    return convertFileSrc(clean)
   } catch {
-    return url
+    return clean
   }
 }
 
 /**
- * Upgrades IGDB & Steam artwork URLs to maximum 1080p HD quality (#8) so hovering/focusing a game
- * never displays a blurry low-resolution thumbnail in the backdrop or hero banner.
+ * Upgrades IGDB artwork URLs to 1080p HD quality for full-bleed
+ * widescreen Backdrops and Hero banners without mutating signed Steam CDN URLs.
  */
 export function resolveConsoleHighResUrl(url: string | null | undefined): string | null {
   const resolved = resolveConsoleMediaUrl(url)
@@ -58,13 +66,30 @@ export function resolveConsoleHighResUrl(url: string | null | undefined): string
       .replace('/t_screenshot_med/', '/t_1080p/')
       .replace('/t_screenshot_big/', '/t_1080p/')
   }
-  if (resolved.includes('shared.akamai.steamstatic.com') || resolved.includes('steamcdn-a.akamaihd.net')) {
-    return resolved.replace('/capsule_616x353.jpg', '/library_hero.jpg')
-  }
   return resolved
 }
 
-const SPRING = { type: 'spring', stiffness: 440, damping: 32, mass: 0.7 } as const
+/**
+ * Right-sized cover URL resolver for poster/square tiles (`11rem x 16rem`) so 100+ tiles
+ * don't decode 1080p textures into GPU VRAM, keeping Console Mode fast and lightweight.
+ */
+function resolveConsoleTileCoverUrl(
+  url: string | null | undefined,
+  variant: 'poster' | 'landscape' | 'square',
+): string | null {
+  if (variant === 'landscape') {
+    return resolveConsoleHighResUrl(url)
+  }
+  const resolved = resolveConsoleMediaUrl(url)
+  if (!resolved) return null
+  if (resolved.includes('images.igdb.com/igdb/image/upload/')) {
+    return resolved
+      .replace('/t_thumb/', '/t_cover_big/')
+      .replace('/t_micro/', '/t_cover_big/')
+      .replace('/t_cover_small/', '/t_cover_big/')
+  }
+  return resolved
+}
 
 export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
   ({
@@ -80,7 +105,6 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
     onFocusTile,
     onOptionsTile,
   }) => {
-    const speed = useAnimationSpeed()
     const themeId = useConsoleStore((s) => s.theme)
     const elapsedSeconds = useLaunchStore((s) =>
       isRunning && game?.id ? (s.elapsedSeconds[game.id] ?? 0) : 0,
@@ -97,21 +121,71 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
 
     const dims =
       variant === 'landscape'
-        ? 'w-[18.5rem] h-[10.5rem]'
+        ? 'w-[16.5rem] h-[9.4rem]'
         : variant === 'square'
-          ? 'w-[11.5rem] h-[11.5rem]'
-          : 'w-[12.2rem] h-[17.6rem]'
+          ? 'w-[10.5rem] h-[10.5rem]'
+          : 'w-[11rem] h-[16rem]'
 
     const title = game?.name ?? hubGame?.name ?? 'Untitled'
-    const rawCover =
+    const normTitle = title.trim().toLowerCase()
+    const isGta6 =
+      normTitle === 'grand theft auto vi' ||
+      normTitle === 'grand theft auto 6' ||
+      normTitle === 'gta 6' ||
+      normTitle === 'gta vi'
+    const primaryCover = isGta6
+      ? variant === 'landscape'
+        ? 'https://images.igdb.com/igdb/image/upload/t_1080p/scq3y1.jpg'
+        : 'https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co9rwo.jpg'
+      :
       variant === 'landscape'
         ? (game?.banner_path ??
           game?.background_path ??
           game?.cover_path ??
           hubGame?.backdrop_url ??
           hubGame?.cover_url)
-        : (game?.cover_path ?? hubGame?.cover_url)
-    const imageSrc = resolveConsoleHighResUrl(rawCover)
+        : (game?.cover_path ?? hubGame?.cover_url ?? hubGame?.backdrop_url)
+    const secondaryBackdrop = isGta6
+      ? 'https://images.igdb.com/igdb/image/upload/t_1080p/scq3y1.jpg'
+      : (game?.background_path ?? game?.banner_path ?? hubGame?.backdrop_url ?? hubGame?.cover_url)
+    const steamAppId = isGta6 ? null : (game?.steam_app_id ?? hubGame?.steam_app_id)
+    const igdbId = game?.igdb_id ?? hubGame?.igdb_id
+
+    const coverCandidates = useMemo(() => {
+      const chain =
+        variant === 'landscape'
+          ? buildBannerFallbackChain(
+              resolveConsoleTileCoverUrl(primaryCover, variant),
+              resolveConsoleTileCoverUrl(secondaryBackdrop, variant),
+              steamAppId,
+              igdbId,
+            )
+          : buildCoverFallbackChain(
+              resolveConsoleTileCoverUrl(primaryCover, variant),
+              resolveConsoleTileCoverUrl(secondaryBackdrop, variant),
+              steamAppId,
+              igdbId,
+            )
+      const rawResolved = resolveConsoleMediaUrl(primaryCover)
+      if (rawResolved && !chain.includes(rawResolved)) {
+        chain.splice(1, 0, rawResolved)
+      }
+      return chain
+    }, [primaryCover, secondaryBackdrop, steamAppId, igdbId, variant])
+
+    const [coverIdx, setCoverIdx] = useState(0)
+    useEffect(() => {
+      setCoverIdx(0)
+    }, [primaryCover, secondaryBackdrop, steamAppId, igdbId])
+
+    const imageSrc = coverCandidates[coverIdx] ?? null
+
+    const releaseDate = game?.release_date ?? hubGame?.release_date ?? null
+    const unreleased = isGameUnreleased(releaseDate)
+    const countdownLabel = useMemo(
+      () => (unreleased ? formatCompactCountdown(releaseDate) : null),
+      [unreleased, releaseDate],
+    )
 
     const score =
       game?.opencritic_score ??
@@ -120,11 +194,15 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
       hubGame?.metacritic_score ??
       (hubGame?.rating ? Math.round(hubGame.rating) : null)
 
-    const caption = game
-      ? game.total_playtime_seconds > 0
-        ? formatPlaytime(game.total_playtime_seconds)
-        : 'Ready to play'
-      : hubGame?.sale_price_formatted || hubGame?.release_date || 'Store'
+    const caption = countdownLabel
+      ? `Releases in ${countdownLabel}`
+      : game
+        ? game.total_playtime_seconds > 0
+          ? formatPlaytime(game.total_playtime_seconds)
+          : game.is_wishlist
+            ? releaseDate || 'Wishlisted'
+            : 'Ready to play'
+        : hubGame?.sale_price_formatted || hubGame?.release_date || 'Store'
     const tag = badge ?? (hubGame?.discount_percent ? `-${hubGame.discount_percent}%` : undefined)
     const downloading = typeof progress === 'number' && progress >= 0
 
@@ -138,37 +216,38 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
         }}
         className={`group relative shrink-0 text-left select-none outline-none cursor-pointer ${dims}`}
       >
-        {/* Light pool under the focused cover */}
-        <motion.div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-3 -bottom-3 h-10 rounded-full blur-2xl"
-          style={{ background: 'var(--console-ambient, #00e5ff)' }}
-          initial={false}
-          animate={{ opacity: isFocused ? 0.85 : 0, scale: isFocused ? 1.05 : 0.8 }}
-          transition={{ duration: 0.28 * speed }}
-        />
+        {/* Only mount the ambient light pool when this tile is actually focused to save GPU blur layers! */}
+        {isFocused && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-3 -bottom-3 h-8 rounded-full opacity-80 blur-xl"
+            style={{ background: 'var(--console-ambient, #00e5ff)' }}
+          />
+        )}
 
-        <motion.div
-          className={`absolute inset-0 overflow-hidden rounded-[1.15rem] transition-shadow ${
-            isLight ? 'bg-slate-200 shadow-lg' : 'bg-[#141b2d] shadow-[0_12px_34px_-8px_rgba(0,0,0,0.75)]'
+        <div
+          className={`absolute inset-0 overflow-hidden rounded-[1.15rem] transition-transform duration-150 ease-out ${
+            isLight
+              ? 'bg-slate-200 shadow-[0_12px_26px_-8px_rgba(15,23,42,0.28)]'
+              : 'bg-[#141b2d] shadow-[0_10px_28px_-8px_rgba(0,0,0,0.75)]'
           } ${
             isFocused
-              ? 'ring-[3px] ring-cyan-400 shadow-[0_18px_45px_rgba(0,229,255,0.38)]'
+              ? isLight
+                ? 'z-20 -translate-y-1.5 scale-[1.07] ring-[3px] ring-indigo-600 shadow-[0_18px_40px_rgba(79,70,229,0.35)]'
+                : 'z-20 -translate-y-1.5 scale-[1.07] ring-[3px] ring-cyan-400 shadow-[0_16px_38px_rgba(0,229,255,0.34)]'
               : isLight
-                ? 'ring-1 ring-slate-300'
-                : 'ring-1 ring-white/15'
+                ? 'z-1 ring-1 ring-slate-300/90'
+                : 'z-1 ring-1 ring-white/15'
           }`}
-          initial={false}
-          animate={{ scale: isFocused ? 1.08 : 1, y: isFocused ? -7 : 0 }}
-          transition={speed === 0 ? { duration: 0 } : SPRING}
-          style={{ zIndex: isFocused ? 20 : 1 }}
         >
           {imageSrc ? (
             <img
               src={imageSrc}
               alt={title}
+              loading="lazy"
               decoding="async"
               draggable={false}
+              onError={() => setCoverIdx((prev) => prev + 1)}
               className="h-full w-full object-cover"
             />
           ) : (
@@ -189,6 +268,11 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
                 <span className="size-1.5 rounded-full bg-slate-950 animate-ping" />
                 Playing · {formatElapsed(elapsedSeconds)}
               </span>
+            ) : countdownLabel ? (
+              <span className="flex items-center gap-1 rounded-full bg-amber-400/95 px-2.5 py-0.5 text-[0.68rem] font-extrabold text-slate-950 shadow tabular-nums">
+                <Clock className="size-2.5" />
+                {countdownLabel}
+              </span>
             ) : tag ? (
               <span className="rounded-full bg-cyan-400 px-2.5 py-0.5 text-[0.7rem] font-extrabold text-slate-950 shadow">
                 {tag}
@@ -201,8 +285,8 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
               <span />
             )}
 
-            {score && score > 0 ? (
-              <span className="flex items-center gap-1 rounded-lg border border-white/20 bg-black/75 px-2 py-0.5 text-[0.7rem] font-extrabold text-emerald-300 backdrop-blur-md">
+            {score && score > 0 && !unreleased ? (
+              <span className="flex items-center gap-1 rounded-lg border border-white/20 bg-black/80 px-2 py-0.5 text-[0.7rem] font-extrabold text-emerald-300">
                 <Sparkles className="size-2.5" />
                 {score}
               </span>
@@ -217,17 +301,13 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
               />
             </div>
           )}
-        </motion.div>
+        </div>
 
         {/* Caption under the tile */}
-        <motion.div
-          className="pointer-events-none absolute inset-x-0 -bottom-[3.6rem] flex flex-col gap-0.5 px-1"
-          initial={false}
-          animate={{
-            opacity: isFocused ? 1 : 0.65,
-            y: isFocused ? 0 : -3,
-          }}
-          transition={{ duration: 0.18 * speed }}
+        <div
+          className={`pointer-events-none absolute inset-x-0 -bottom-[3.6rem] flex flex-col gap-0.5 px-1 transition-opacity duration-150 ${
+            isFocused ? 'opacity-100' : isLight ? 'opacity-85' : 'opacity-65'
+          }`}
         >
           <div
             className={`truncate text-[0.98rem] font-bold tracking-tight ${
@@ -240,16 +320,20 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
             className={`truncate text-[0.78rem] font-medium ${
               isFocused
                 ? isLight
-                  ? 'text-indigo-600'
+                  ? 'text-indigo-700 font-bold'
                   : 'text-cyan-300'
-                : isLight
-                  ? 'text-slate-500'
-                  : 'text-slate-400'
+                : countdownLabel
+                  ? isLight
+                    ? 'text-amber-700 font-bold'
+                    : 'text-amber-300 font-bold'
+                  : isLight
+                    ? 'text-slate-600'
+                    : 'text-slate-400'
             }`}
           >
             {caption}
           </div>
-        </motion.div>
+        </div>
       </button>
     )
   },

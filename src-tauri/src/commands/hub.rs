@@ -2000,7 +2000,7 @@ fn make_steam_curated_hub_game(
             "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{steam_app_id}/library_600x900_2x.jpg"
         )),
         backdrop_url: Some(format!(
-            "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{steam_app_id}/library_hero.jpg"
+            "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{steam_app_id}/header.jpg"
         )),
         rating: Some(score),
         rating_count: Some(rating_count),
@@ -2397,6 +2397,26 @@ pub fn curated_master_hub_catalog() -> Vec<HubGame> {
         make_steam_curated_hub_game(250619, 553850, "Helldivers 2", "2024-02-08", 0, 83, 3600, &["Shooter", "Tactical", "Adventure"], &["PC (Microsoft Windows)", "PlayStation 5"], "Join the Helldivers and fight for freedom with friends across a hostile galaxy."),
         make_steam_curated_hub_game(241550, 730, "Counter-Strike 2", "2023-09-27", 0, 83, 4900, &["Shooter", "Tactical", "Sport"], &["PC (Microsoft Windows)", "Linux"], "The largest technical leap forward in Counter-Strike’s history."),
         make_steam_curated_hub_game(1020, 271590, "Grand Theft Auto V", "2015-04-14", 0, 97, 5600, &["Shooter", "Racing", "Adventure"], all_plats, "Three very different criminals plot their own chances of survival and success in Los Santos."),
+        HubGame {
+            igdb_id: 52189,
+            name: "Grand Theft Auto VI".to_string(),
+            summary: Some("Grand Theft Auto VI heads to the state of Leonida, home to the neon-soaked streets of Vice City and beyond in the biggest, most immersive evolution of the Grand Theft Auto series yet.".to_string()),
+            release_date: Some("2026-05-26".to_string()),
+            game_type: Some(0),
+            cover_url: Some("https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co9rwo.jpg".to_string()),
+            backdrop_url: Some("https://images.igdb.com/igdb/image/upload/t_1080p/scq3y1.jpg".to_string()),
+            rating: None,
+            rating_count: Some(9800),
+            metacritic_score: None,
+            opencritic_score: None,
+            hypes: Some(9950),
+            genres: vec!["Shooter".to_string(), "Racing".to_string(), "Adventure".to_string()],
+            platforms: vec!["PlayStation 5".to_string(), "Xbox Series X|S".to_string(), "PC (Microsoft Windows)".to_string()],
+            steam_app_id: None,
+            discount_percent: None,
+            sale_price_formatted: None,
+            original_price_formatted: None,
+        },
         make_steam_curated_hub_game(19530, 546560, "Half-Life: Alyx", "2020-03-23", 0, 93, 2700, &["Shooter", "Puzzle", "Adventure"], &["PC (Microsoft Windows)", "Linux"], "Valve’s VR return to the Half-Life series."),
         make_steam_curated_hub_game(135400, 1888160, "ARMORED CORE VI FIRES OF RUBICON", "2023-08-25", 0, 86, 2200, &["Shooter", "Simulator", "Adventure"], all_plats, "Dynamic, omni-directional mech battles from FromSoftware."),
         // Strategy / RTS / TBS / Tactical
@@ -2473,6 +2493,17 @@ pub fn apply_hub_filters_and_sort(
     }
     for g in &mut games {
         enrich_hub_game_canonical_tags(g);
+        let has_cover = g.cover_url.as_deref().is_some_and(|s| !s.trim().is_empty());
+        if !has_cover {
+            if let Some(aid) = g.steam_app_id.as_deref().map(str::trim).filter(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())) {
+                g.cover_url = Some(format!("https://cdn.akamai.steamstatic.com/steam/apps/{aid}/library_600x900.jpg"));
+                if g.backdrop_url.as_deref().unwrap_or("").trim().is_empty() {
+                    g.backdrop_url = Some(format!("https://cdn.akamai.steamstatic.com/steam/apps/{aid}/header.jpg"));
+                }
+            } else if let Some(bp) = g.backdrop_url.clone().filter(|s| !s.trim().is_empty()) {
+                g.cover_url = Some(bp);
+            }
+        }
     }
     crate::services::scores::enrich_hub_games_batch(None, &mut games);
     let mut genre_ids: Vec<i64> = Vec::new();
@@ -2498,6 +2529,12 @@ pub fn apply_hub_filters_and_sort(
     let mut filtered: Vec<HubGame> = games
         .into_iter()
         .filter(|g| {
+            let has_any_visual = g.cover_url.as_deref().is_some_and(|s| !s.trim().is_empty())
+                || g.backdrop_url.as_deref().is_some_and(|s| !s.trim().is_empty())
+                || g.steam_app_id.as_deref().is_some_and(|s| !s.trim().is_empty());
+            if !has_any_visual {
+                return false;
+            }
             let norm_name = g.name.trim().to_lowercase();
             if !seen.insert(g.igdb_id) || !seen_names.insert(norm_name.clone()) {
                 return false;
@@ -2736,7 +2773,10 @@ pub async fn search_hub_games(
     if config.mode == ProviderMode::Public {
         let games = resolver.search_games(&db, trimmed, offset, &filters).await?;
         let mut sorted = apply_hub_filters_and_sort(games, trimmed, &filters);
-        crate::services::scores::resolve_hub_games_scores_live(&db, &http.0, &mut sorted).await;
+        {
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
+            crate::services::scores::enrich_hub_games_batch(Some(&conn), &mut sorted);
+        }
         return Ok(sorted);
     }
 
@@ -3182,7 +3222,16 @@ pub fn hub_titles_match(returned_name: &str, expected_name: &str) -> bool {
     if a.is_empty() || b.is_empty() {
         return true;
     }
-    if a == b || a.starts_with(&b) || b.starts_with(&a) {
+    if a == b {
+        return true;
+    }
+    // Enforce strict sequel number & spin-off signature parity so GTA VI (6), GTA V (5), and GTA Vice City never collide
+    if crate::services::providers::steam::extract_sequel_or_spinoff_signature(&a)
+        != crate::services::providers::steam::extract_sequel_or_spinoff_signature(&b)
+    {
+        return false;
+    }
+    if crate::services::providers::steam::titles_match_on_word_boundaries(&a, &b) {
         return true;
     }
     let a_words: Vec<&str> = a.split_whitespace().collect();
@@ -3192,7 +3241,7 @@ pub fn hub_titles_match(returned_name: &str, expected_name: &str) -> bool {
     }
     let common = a_words.iter().filter(|w| b_words.contains(w)).count();
     let min_len = a_words.len().min(b_words.len()).max(1);
-    (common as f64 / min_len as f64) >= 0.65
+    (common as f64 / min_len as f64) >= 0.75
 }
 
 /// Finds a curated game by its `igdb_id` or by normalized title.
@@ -3231,7 +3280,7 @@ pub async fn fetch_popular_discounted_hub_games(
     db: &Database,
     http: &reqwest::Client,
 ) -> Vec<HubGame> {
-    let cache_key = "hub:discounted_games:v5";
+    let cache_key = "hub:discounted_games:v6";
     {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
         if let Some((payload, is_stale)) = MetadataCache::get(&conn, cache_key) {
@@ -3396,29 +3445,79 @@ pub async fn fetch_popular_discounted_hub_games(
                         None
                     };
 
+                    let item_type = item.get("type").and_then(Value::as_i64).unwrap_or(0);
+                    let large_capsule = item
+                        .get("large_capsule_image")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|s| s.starts_with("http"))
+                        .map(str::to_string);
+                    let header_img = item
+                        .get("header_image")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|s| s.starts_with("http"))
+                        .map(str::to_string);
+                    let verified_banner = large_capsule.clone().or_else(|| header_img.clone());
+                    if item_type != 0 && verified_banner.is_none() {
+                        continue;
+                    }
+
                     let aid_str = app_id.to_string();
                     if let Some(mut curated) = curated_by_appid
                         .get(&aid_str)
                         .cloned()
                         .or_else(|| catalog.iter().find(|c| hub_titles_match(&c.name, name)).cloned())
                     {
+                        let curated_norm = curated.name.to_lowercase();
+                        if discounted_games.iter().any(|existing| {
+                            existing.igdb_id == curated.igdb_id
+                                || existing.name.to_lowercase() == curated_norm
+                                || hub_titles_match(&existing.name, &curated.name)
+                                || (existing.steam_app_id.is_some()
+                                    && existing.steam_app_id == curated.steam_app_id)
+                        }) {
+                            continue;
+                        }
+                        seen_names.insert(curated_norm);
+                        if curated.backdrop_url.is_none() && verified_banner.is_some() {
+                            curated.backdrop_url = verified_banner;
+                        }
                         curated.discount_percent = Some(discount);
                         curated.sale_price_formatted = final_fmt;
                         curated.original_price_formatted = orig_fmt;
                         discounted_games.push(curated);
                     } else {
+                        if discounted_games.iter().any(|existing| {
+                            hub_titles_match(&existing.name, name)
+                                || existing.steam_app_id.as_deref() == Some(aid_str.as_str())
+                        }) {
+                            continue;
+                        }
+                        let cover_candidate = if item_type == 0 {
+                            Some(format!(
+                                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{app_id}/library_600x900_2x.jpg"
+                            ))
+                        } else {
+                            verified_banner.clone()
+                        };
+                        let backdrop_candidate = verified_banner.or_else(|| {
+                            if item_type == 0 {
+                                Some(format!(
+                                    "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{app_id}/header.jpg"
+                                ))
+                            } else {
+                                None
+                            }
+                        });
                         let mut g = HubGame {
                             igdb_id: 1_000_000_000 + app_id,
                             name: name.to_string(),
                             summary: Some(format!("Featured Steam Store Deal (-{discount}% Off).")),
                             release_date: None,
                             game_type: Some(0),
-                            cover_url: Some(format!(
-                                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{app_id}/library_600x900_2x.jpg"
-                            )),
-                            backdrop_url: Some(format!(
-                                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/{app_id}/library_hero.jpg"
-                            )),
+                            cover_url: cover_candidate,
+                            backdrop_url: backdrop_candidate,
                             rating: Some(84),
                             rating_count: Some(1250),
                             metacritic_score: None,
@@ -3426,7 +3525,7 @@ pub async fn fetch_popular_discounted_hub_games(
                             hypes: Some(420),
                             genres: vec!["Action".to_string(), "Adventure".to_string()],
                             platforms: vec!["PC (Microsoft Windows)".to_string()],
-                            steam_app_id: Some(aid_str),
+                            steam_app_id: if item_type == 0 { Some(aid_str) } else { None },
                             discount_percent: Some(discount),
                             sale_price_formatted: final_fmt,
                             original_price_formatted: orig_fmt,
@@ -4489,9 +4588,21 @@ pub async fn resolve_hub_trailer_stream(
     video_id: String,
     trailer_name: Option<String>,
 ) -> AppResult<ResolvedTrailerStream> {
-    let valid_id = validate_youtube_video_id(&video_id)?.to_string();
+    let raw_vid = video_id.trim();
+    let is_synthetic = raw_vid.is_empty() || raw_vid == "auto_trailer";
+    let valid_id = if is_synthetic {
+        String::new()
+    } else {
+        validate_youtube_video_id(raw_vid)?.to_string()
+    };
 
-    let yt_check_task = check_youtube_age_restricted_and_piped_stream(&http.0, &valid_id);
+    let yt_check_task = async {
+        if valid_id.is_empty() {
+            (false, None)
+        } else {
+            check_youtube_age_restricted_and_piped_stream(&http.0, &valid_id).await
+        }
+    };
 
     let steam_task = async {
         let resolved_app_id = match steam_app_id

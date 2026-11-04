@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Download, Loader2, Sparkles } from 'lucide-react'
+import { Download, Loader2, Sparkles } from 'lucide-react'
 import { listen } from '@tauri-apps/api/event'
 import { Modal } from '@/components/ui/modal'
 import { CoverMedia } from '@/components/ui/cover-media'
-import type { CoverOption } from '@/services/metadata'
+import { getArtworkFileSize, type CoverOption } from '@/services/metadata'
 
 interface LargeArtworkModalProps {
   gameId?: string | null
@@ -42,6 +42,39 @@ export function LargeArtworkModal({
   artworkType = 'cover',
 }: LargeArtworkModalProps) {
   const [progress, setProgress] = useState<ProgressPayload | null>(null)
+  const [probedSize, setProbedSize] = useState<number>(sizeBytes)
+  const [probingSize, setProbingSize] = useState<boolean>(false)
+
+  useEffect(() => {
+    if (!open || !option) {
+      setProgress(null)
+      setProbedSize(0)
+      setProbingSize(false)
+      return
+    }
+
+    if (sizeBytes > 0) {
+      setProbedSize(sizeBytes)
+      setProbingSize(false)
+    } else {
+      setProbedSize(0)
+      setProbingSize(true)
+      let cancelled = false
+      getArtworkFileSize(option.url)
+        .then((bytes) => {
+          if (!cancelled && bytes > 0) {
+            setProbedSize(bytes)
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) setProbingSize(false)
+        })
+      return () => {
+        cancelled = true
+      }
+    }
+  }, [open, option, sizeBytes])
 
   useEffect(() => {
     if (!open) {
@@ -53,6 +86,9 @@ export function LargeArtworkModal({
     listen<ProgressPayload>('artwork-download-progress', (event) => {
       if (!gameId || event.payload.game_id === gameId) {
         setProgress(event.payload)
+        if (event.payload.total_bytes && event.payload.total_bytes > 0) {
+          setProbedSize(event.payload.total_bytes)
+        }
       }
     })
       .then((fn) => {
@@ -69,7 +105,8 @@ export function LargeArtworkModal({
 
   if (!option) return null
 
-  const sizeFormatted = formatBytes(sizeBytes)
+  const effectiveSize = progress?.total_bytes || probedSize || sizeBytes
+  const sizeFormatted = probingSize && effectiveSize <= 0 ? 'Checking…' : formatBytes(effectiveSize)
   const isBanner = artworkType === 'banner'
   const isLogo = artworkType === 'logo'
 
@@ -78,18 +115,26 @@ export function LargeArtworkModal({
       <div className="flex flex-col gap-5 p-6">
         {/* Header */}
         <div className="flex items-start gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-500 shadow-xs">
-            <AlertTriangle className="size-5" />
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent/15 text-accent shadow-xs">
+            {option.is_animated ? <Sparkles className="size-5" /> : <Download className="size-5" />}
           </span>
           <div>
-            <h2 className="text-base font-bold text-text">Large Artwork Detected</h2>
+            <h2 className="text-base font-bold text-text">
+              {option.is_animated
+                ? `Download Live ${artworkType === 'banner' ? 'Banner' : 'Cover'}`
+                : 'Confirm Artwork Download'}
+            </h2>
             <p className="mt-0.5 text-xs text-muted">
-              This {artworkType} file is unusually large ({sizeFormatted}).
+              {probingSize && effectiveSize <= 0
+                ? 'Checking remote file size before downloading…'
+                : effectiveSize > 0
+                  ? `Download size: ${sizeFormatted} • Ready to download and apply.`
+                  : 'Review static preview below and click Download to apply.'}
             </p>
           </div>
         </div>
 
-        {/* Media Preview & Specs */}
+        {/* Pure Static Preview (animatedEnabled={false}, alwaysLive={false}) so it never plays at low FPS */}
         <div className="flex flex-col gap-3 rounded-2xl border border-border/80 bg-surface/70 p-3.5 shadow-xs">
           <div
             className={`relative overflow-hidden rounded-xl border border-border bg-bg/60 ${
@@ -102,13 +147,17 @@ export function LargeArtworkModal({
           >
             <CoverMedia
               src={option.thumbnail_url || option.url}
+              fallbackSrc={option.url}
               mime={!option.thumbnail_url ? option.mime : undefined}
+              isAnimated={option.is_animated}
+              animatedEnabled={false}
+              alwaysLive={false}
               className="size-full object-cover"
             />
             {option.is_animated && (
               <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-white shadow-xs">
                 <Sparkles className="size-3" />
-                LIVE COVER
+                LIVE {artworkType.toUpperCase()}
               </span>
             )}
           </div>
@@ -116,9 +165,18 @@ export function LargeArtworkModal({
           {/* Details Grid */}
           <div className="grid grid-cols-3 gap-2 pt-1 text-center font-mono">
             <div className="rounded-xl border border-border/60 bg-surface p-2">
-              <span className="block text-[10px] font-bold uppercase text-subtle">File Size</span>
-              <span className="mt-0.5 block text-xs font-black text-amber-400">
-                {sizeFormatted}
+              <span className="block text-[10px] font-bold uppercase text-subtle">
+                Download Size
+              </span>
+              <span className="mt-0.5 flex items-center justify-center gap-1 text-xs font-black text-amber-400">
+                {probingSize && effectiveSize <= 0 ? (
+                  <>
+                    <Loader2 className="size-3 animate-spin" />
+                    <span>Checking…</span>
+                  </>
+                ) : (
+                  sizeFormatted
+                )}
               </span>
             </div>
             <div className="rounded-xl border border-border/60 bg-surface p-2">
@@ -131,7 +189,7 @@ export function LargeArtworkModal({
               <span className="block text-[10px] font-bold uppercase text-subtle">Format</span>
               <span className="mt-0.5 block truncate text-xs font-bold text-text">
                 {option.is_animated
-                  ? 'Animated'
+                  ? `Live (${(option.mime?.split('/')[1] ?? 'WebP').toUpperCase()})`
                   : (option.mime?.split('/')[1] ?? 'Static').toUpperCase()}
               </span>
             </div>
@@ -149,23 +207,26 @@ export function LargeArtworkModal({
               <span className="font-mono font-black text-text">
                 {progress?.percent !== null && progress?.percent !== undefined
                   ? `${Math.round(progress.percent)}%`
-                  : progress && sizeBytes > 0
-                    ? `${Math.min(100, Math.round((progress.downloaded_bytes / sizeBytes) * 100))}%`
-                    : 'Streaming…'}
+                  : progress && effectiveSize > 0
+                    ? `${Math.min(100, Math.round((progress.downloaded_bytes / effectiveSize) * 100))}%`
+                    : '0%'}
               </span>
             </div>
 
             {/* Glowing progress bar */}
-            <div className="relative h-2 w-full overflow-hidden rounded-full bg-black/40 ring-1 ring-border/50">
+            <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-black/40 ring-1 ring-border/50">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-accent to-accent-hover shadow-[0_0_12px_var(--nx-accent)] transition-all duration-150 ease-out"
                 style={{
                   width: `${
                     progress?.percent !== null && progress?.percent !== undefined
-                      ? Math.min(100, Math.max(3, progress.percent))
-                      : progress && sizeBytes > 0
-                        ? Math.min(100, Math.max(3, (progress.downloaded_bytes / sizeBytes) * 100))
-                        : 10
+                      ? Math.min(100, Math.max(4, progress.percent))
+                      : progress && effectiveSize > 0
+                        ? Math.min(
+                            100,
+                            Math.max(4, (progress.downloaded_bytes / effectiveSize) * 100),
+                          )
+                        : 6
                   }%`,
                 }}
               />
@@ -174,16 +235,16 @@ export function LargeArtworkModal({
             <div className="flex items-center justify-between font-mono text-[10px] text-muted">
               <span>
                 {progress ? formatBytes(progress.downloaded_bytes) : '0 KB'} /{' '}
-                {progress?.total_bytes ? formatBytes(progress.total_bytes) : sizeFormatted}
+                {effectiveSize > 0 ? formatBytes(effectiveSize) : sizeFormatted}
               </span>
-              <span className="font-bold text-accent">Live Stream</span>
+              <span className="font-bold text-accent">Downloading…</span>
             </div>
           </div>
         ) : (
-          /* Notice text */
           <p className="text-xs leading-relaxed text-muted">
-            Large artwork files use more storage and increase memory usage while navigating your
-            library. Do you want to approve and download this file anyway?
+            {option.is_animated
+              ? 'Static preview shown above. Click Download & Apply below to download the full animated cover.'
+              : 'Click Download & Apply below to download and set this high-resolution artwork.'}
           </p>
         )}
 
@@ -208,7 +269,7 @@ export function LargeArtworkModal({
             ) : (
               <Download className="size-3.5" />
             )}
-            <span>{isDownloading ? 'Downloading…' : 'Approve & Download'}</span>
+            <span>{isDownloading ? 'Downloading…' : 'Download & Apply'}</span>
           </button>
         </div>
       </div>

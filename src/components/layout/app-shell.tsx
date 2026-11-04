@@ -54,6 +54,9 @@ import { useUpdaterStore } from '@/store/updater-store'
 import { markLaunchSuccessful } from '@/services/health-guard'
 import { cn } from '@/lib/utils'
 
+let hasCompletedInitialSplash = false
+let hasCheckedInitialConsoleRedirect = false
+
 export function AppShell() {
   useWindowDragDropImport()
   useMetadataUpdatedListener()
@@ -70,7 +73,7 @@ export function AppShell() {
 
   const navigate = useNavigate()
   const location = useLocation()
-  const [showSplash, setShowSplash] = useState(true)
+  const [showSplash, setShowSplash] = useState(() => !hasCompletedInitialSplash)
   const speed = useAnimationSpeed()
   const fillsScreen = useWindowFillsScreen()
   const loadProfiles = useProfileStore((s) => s.loadProfiles)
@@ -78,13 +81,22 @@ export function AppShell() {
   const isGateOpen = useProfileStore((s) => s.isGateOpen)
 
   useEffect(() => {
-    void loadProfiles(true)
+    // Ensure 16px root font-size and clean viewport layout whenever returning from Console Mode (#5)
+    document.documentElement.style.fontSize = ''
+    const alreadyHasActive = Boolean(useProfileStore.getState().activeProfile)
+    void loadProfiles(!hasCompletedInitialSplash && !alreadyHasActive)
   }, [loadProfiles])
 
   // Failsafe timer so StartupSplash can never stay stuck if an animation callback is skipped
   useEffect(() => {
-    if (!showSplash) return
-    const timer = window.setTimeout(() => setShowSplash(false), 2600)
+    if (!showSplash) {
+      hasCompletedInitialSplash = true
+      return
+    }
+    const timer = window.setTimeout(() => {
+      hasCompletedInitialSplash = true
+      setShowSplash(false)
+    }, 2600)
     return () => window.clearTimeout(timer)
   }, [showSplash])
 
@@ -98,13 +110,16 @@ export function AppShell() {
   useEffect(() => {
     if (settings) {
       useConsoleStore.getState().hydrateFromSettings(settings)
-      if (
-        (settings.console_start_in_console === '1' ||
-          settings.console_start_in_console === 'true') &&
-        location.pathname !== '/console'
-      ) {
-        useConsoleStore.getState().setLastDesktopRoute(location.pathname)
-        navigate('/console')
+      if (!hasCheckedInitialConsoleRedirect) {
+        hasCheckedInitialConsoleRedirect = true
+        if (
+          (settings.console_start_in_console === '1' ||
+            settings.console_start_in_console === 'true') &&
+          location.pathname !== '/console'
+        ) {
+          useConsoleStore.getState().setLastDesktopRoute(location.pathname)
+          navigate('/console')
+        }
       }
     }
   }, [settings, location.pathname, navigate])

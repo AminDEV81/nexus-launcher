@@ -163,7 +163,7 @@ export const BoosterView: React.FC = () => {
       >
         <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
           <div className="space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-amber-400/20 border border-amber-400/40 px-3.5 py-1 text-xs font-extrabold uppercase tracking-wider text-amber-300">
+            <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1 text-xs font-extrabold uppercase tracking-wider ${isLight ? "bg-amber-50 border-amber-300 text-amber-800" : "bg-amber-400/20 border-amber-400/40 text-amber-300"}`}>
               <Zap className="size-3.5 fill-current" />
               Real-Time Kernel Working-Set & Power Optimizer
             </div>
@@ -302,9 +302,19 @@ export const BoosterView: React.FC = () => {
 
       {/* Last Boost Report */}
       {lastReport && (
-        <div className="rounded-3xl border border-emerald-400/40 bg-emerald-500/10 p-6 space-y-4">
+        <div
+          className={`rounded-3xl border p-6 space-y-4 ${
+            isLight
+              ? 'border-emerald-300 bg-emerald-50/90'
+              : 'border-emerald-400/40 bg-emerald-500/10'
+          }`}
+        >
           <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-2 text-lg font-extrabold text-emerald-300">
+            <h2
+              className={`flex items-center gap-2 text-lg font-extrabold ${
+                isLight ? 'text-emerald-800' : 'text-emerald-300'
+              }`}
+            >
               <CheckCircle2 className="size-5" />
               Turbo Optimization Complete
             </h2>
@@ -316,10 +326,20 @@ export const BoosterView: React.FC = () => {
             {lastReport.steps.map((step) => (
               <div
                 key={step.id}
-                className="rounded-2xl border border-white/10 bg-slate-950/70 p-3.5 text-xs space-y-1"
+                className={`rounded-2xl border p-3.5 text-xs space-y-1 ${
+                  isLight
+                    ? 'border-emerald-200 bg-white text-slate-900 shadow-2xs'
+                    : 'border-white/10 bg-slate-950/70 text-white'
+                }`}
               >
-                <p className="font-extrabold text-white">{step.label}</p>
-                <p className="text-emerald-300 font-semibold">{step.metric || step.detail}</p>
+                <p className="font-extrabold">{step.label}</p>
+                <p
+                  className={`font-semibold ${
+                    isLight ? 'text-emerald-700' : 'text-emerald-300'
+                  }`}
+                >
+                  {step.metric || step.detail}
+                </p>
               </div>
             ))}
           </div>
@@ -353,7 +373,9 @@ export const BoosterView: React.FC = () => {
               className={`flex items-center gap-2 rounded-2xl border px-5 py-3 text-xs font-extrabold transition-all cursor-pointer ${
                 killAppsBtn.isFocused
                   ? 'scale-105 border-rose-300 bg-rose-500 text-white shadow-lg'
-                  : 'border-rose-500/40 bg-rose-500/15 text-rose-300'
+                  : isLight
+                    ? 'border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                    : 'border-rose-500/40 bg-rose-500/15 text-rose-300'
               }`}
             >
               <Trash2 className="size-4" />
@@ -435,7 +457,9 @@ const BoostAppCard: React.FC<{
             ? 'bg-slate-950 text-cyan-300'
             : checked
               ? 'bg-amber-400 text-slate-950'
-              : 'bg-white/10 text-slate-300'
+              : isLight
+                ? 'bg-slate-200 text-slate-700'
+                : 'bg-white/10 text-slate-300'
         }`}
       >
         {formatBytes(app.memory_bytes)}

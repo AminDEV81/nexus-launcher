@@ -1,16 +1,15 @@
 import type { ArtworkOption, Env } from '../types'
 
 const SGDB_BASE = 'https://www.steamgriddb.com/api/v2'
+const DEFAULT_SGDB_KEY = 'b852e99f9735844f4a44a6acad6cd456'
 
 async function querySgdb(path: string, env: Env): Promise<any> {
-  const apiKey = env.STEAMGRIDDB_API_KEY
-  if (!apiKey) {
-    throw new Error('STEAMGRIDDB_KEY_MISSING: Worker secret STEAMGRIDDB_API_KEY is not configured.')
-  }
+  const apiKey = env.STEAMGRIDDB_API_KEY || DEFAULT_SGDB_KEY
 
   const res = await fetch(`${SGDB_BASE}${path}`, {
     headers: {
       Authorization: `Bearer ${apiKey}`,
+      Accept: 'application/json',
     },
   })
 
@@ -32,17 +31,34 @@ function cleanTitle(str: string): string {
     .trim()
 }
 
+function isSafeAsset(item: any): boolean {
+  if (!item || item.nsfw === true || item.epilepsy === true) return false
+  const notes = String(item.notes || '').toLowerCase()
+  if (/(nsfw|18\+|nude|nudity|hentai|uncensored|lewd|erotic|topless|porn|xxx|r18)/.test(notes)) {
+    return false
+  }
+  return true
+}
+
 function normalizeAsset(
   item: any,
   type: 'cover' | 'hero' | 'logo',
   isAnimated: boolean,
 ): ArtworkOption {
+  const url = String(item.url || '').trim()
+  const thumb = String(item.thumb || url).trim()
+  const mime = item.mime || (isAnimated ? 'image/webp' : 'image/jpeg')
   return {
     id: String(item.id),
-    url: item.url,
-    thumbnail_url: item.thumb || item.url,
-    mime: item.mime || (isAnimated ? 'image/webp' : 'image/jpeg'),
-    is_animated: isAnimated,
+    url,
+    thumbnail_url: thumb || url,
+    mime,
+    is_animated:
+      isAnimated ||
+      Boolean(item.animated) ||
+      mime.startsWith('video/') ||
+      url.endsWith('.webm') ||
+      url.endsWith('.mp4'),
     width: item.width || 0,
     height: item.height || 0,
     provider: 'steamgrid',
@@ -51,37 +67,54 @@ function normalizeAsset(
   }
 }
 
-export async function searchSgdbGameId(name: string, env: Env): Promise<number | null> {
-  if (!name || !name.trim()) return null
+export async function searchSgdbGameIds(name: string, env: Env): Promise<number[]> {
+  if (!name || !name.trim()) return []
   const trimmed = name.trim()
-  const encoded = encodeURIComponent(trimmed)
-  let json = await querySgdb(`/search/autocomplete/${encoded}`, env)
 
-  // Fallback: If no results with full title, retry with cleaned title
-  if (!json?.data || !Array.isArray(json.data) || json.data.length === 0) {
-    const cleaned = cleanTitle(trimmed)
-    if (cleaned && cleaned !== trimmed.toLowerCase()) {
-      json = await querySgdb(`/search/autocomplete/${encodeURIComponent(cleaned)}`, env)
+  if (/^\d+$/.test(trimmed)) {
+    return [parseInt(trimmed, 10)]
+  }
+  const urlMatch = trimmed.match(/\/game\/(\d+)/)
+  if (urlMatch) {
+    return [parseInt(urlMatch[1], 10)]
+  }
+
+  const encoded = encodeURIComponent(trimmed)
+  const cleaned = cleanTitle(trimmed)
+  const queries = [querySgdb(`/search/autocomplete/${encoded}`, env).catch(() => null)]
+  if (cleaned && cleaned !== trimmed.toLowerCase()) {
+    queries.push(
+      querySgdb(`/search/autocomplete/${encodeURIComponent(cleaned)}`, env).catch(() => null),
+    )
+  }
+
+  const responses = await Promise.all(queries)
+  const ids: number[] = []
+  const seen = new Set<number>()
+
+  for (const json of responses) {
+    if (Array.isArray(json?.data)) {
+      for (const item of json.data.slice(0, 2)) {
+        const id = Number(item?.id)
+        if (id > 0 && !seen.has(id)) {
+          seen.add(id)
+          ids.push(id)
+        }
+      }
     }
   }
 
-  if (!json?.data || !Array.isArray(json.data) || json.data.length === 0) {
-    return null
-  }
+  return ids.slice(0, 2)
+}
 
-  // Check for exact title match among candidates first
-  const lower = trimmed.toLowerCase()
-  const exact = json.data.find((c: any) => c.name?.toLowerCase() === lower)
-  if (exact) {
-    return exact.id
-  }
-
-  return json.data[0].id
+export async function searchSgdbGameId(name: string, env: Env): Promise<number | null> {
+  const ids = await searchSgdbGameIds(name, env)
+  return ids[0] ?? null
 }
 
 async function fetchKindAssets(
   kind: 'grids' | 'heroes' | 'logos',
-  targetSegment: string, // e.g. "game/12345" or "steam/620"
+  targetSegment: string,
   env: Env,
 ): Promise<ArtworkOption[]> {
   const typeMap: Record<string, 'cover' | 'hero' | 'logo'> = {
@@ -93,37 +126,37 @@ async function fetchKindAssets(
 
   const promises: Promise<{ items: any[]; isAnimated: boolean }>[] = []
 
-  // 1. Static items (page 0)
-  promises.push(
-    querySgdb(`/${kind}/${targetSegment}?types=static&page=0&nsfw=false`, env)
-      .then((res) => ({ items: Array.isArray(res?.data) ? res.data : [], isAnimated: false }))
-      .catch(() => ({ items: [], isAnimated: false })),
-  )
-
-  // 2. For covers (grids), fetch page 1 static as well to get up to 100 static options
-  if (kind === 'grids') {
+  const staticPages = kind === 'grids' ? [0, 1, 2] : [0, 1]
+  for (const page of staticPages) {
     promises.push(
-      querySgdb(`/${kind}/${targetSegment}?types=static&page=1&nsfw=false`, env)
+      querySgdb(
+        `/${kind}/${targetSegment}?types=static&nsfw=false&humor=false&epilepsy=false&page=${page}`,
+        env,
+      )
         .then((res) => ({ items: Array.isArray(res?.data) ? res.data : [], isAnimated: false }))
         .catch(() => ({ items: [], isAnimated: false })),
     )
   }
 
-  // 3. Animated items (page 0)
-  promises.push(
-    querySgdb(`/${kind}/${targetSegment}?types=animated&page=0&nsfw=false`, env)
-      .then((res) => ({ items: Array.isArray(res?.data) ? res.data : [], isAnimated: true }))
-      .catch(() => ({ items: [], isAnimated: true })),
-  )
+  for (const page of [0, 1]) {
+    promises.push(
+      querySgdb(
+        `/${kind}/${targetSegment}?types=animated&nsfw=false&humor=false&epilepsy=false&page=${page}`,
+        env,
+      )
+        .then((res) => ({ items: Array.isArray(res?.data) ? res.data : [], isAnimated: true }))
+        .catch(() => ({ items: [], isAnimated: true })),
+    )
+  }
 
   const batches = await Promise.all(promises)
   const results: ArtworkOption[] = []
-  const seenIds = new Set<number | string>()
+  const seenUrls = new Set<string>()
 
   for (const batch of batches) {
     for (const item of batch.items) {
-      if (item && item.id && !seenIds.has(item.id)) {
-        seenIds.add(item.id)
+      if (isSafeAsset(item) && item.url && !seenUrls.has(item.url)) {
+        seenUrls.add(item.url)
         results.push(normalizeAsset(item, type, batch.isAnimated))
       }
     }
@@ -138,21 +171,24 @@ export async function getSgdbArtwork(
   gameId: number | null,
   env: Env,
 ): Promise<ArtworkOption[]> {
-  // Try canonical gameId first if available
+  const tasks: Promise<ArtworkOption[]>[] = []
   if (gameId) {
-    const assets = await fetchKindAssets(kind, `game/${gameId}`, env)
-    if (assets.length > 0) {
-      return assets
-    }
+    tasks.push(fetchKindAssets(kind, `game/${gameId}`, env))
   }
-
-  // Fallback to steam appId if gameId was missing or yielded no results
   if (appId) {
-    const assets = await fetchKindAssets(kind, `steam/${appId}`, env)
-    if (assets.length > 0) {
-      return assets
-    }
+    tasks.push(fetchKindAssets(kind, `steam/${appId}`, env))
   }
 
-  return []
+  const batches = await Promise.all(tasks)
+  const combined: ArtworkOption[] = []
+  const seen = new Set<string>()
+  for (const list of batches) {
+    for (const item of list) {
+      if (!seen.has(item.url)) {
+        seen.add(item.url)
+        combined.push(item)
+      }
+    }
+  }
+  return combined
 }

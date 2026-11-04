@@ -55,7 +55,7 @@ export function HubMediaShowcase({
   const [mediaTab, setMediaTab] = useState<'trailers' | 'screenshots'>(() =>
     videos.length > 0 ? 'trailers' : 'screenshots',
   )
-  const [inlineIndex, setInlineIndex] = useState<number | null>(activeTrailerIndex)
+  const [inlineIndex, setInlineIndex] = useState<number | null>(activeTrailerIndex ?? (videos.length > 0 ? 0 : null))
   const [resolvedStream, setResolvedStream] = useState<ResolvedTrailerStream | null>(null)
   const [resolvedForVideoId, setResolvedForVideoId] = useState<string | null>(null)
   const [isResolving, setIsResolving] = useState(false)
@@ -235,6 +235,9 @@ export function HubMediaShowcase({
 
   const effectiveYoutubeVideoId = (() => {
     if (!currentVideo) return ''
+    if (currentVideo.video_id === 'auto_trailer') {
+      return resolvedStream?.fallback_video_id || ''
+    }
     if (engineMode === 'yt_mirror' && resolvedStream?.fallback_video_id) {
       return resolvedStream.fallback_video_id
     }

@@ -1,4 +1,8 @@
-import { BaseSoundtrackProvider, extractCoreGameTitle, scoreAlbumMatchForGame } from './base-provider'
+import {
+  BaseSoundtrackProvider,
+  extractCoreGameTitle,
+  scoreAlbumMatchForGame,
+} from './base-provider'
 import type {
   DownloadSource,
   GameIdentity,
@@ -11,6 +15,10 @@ import type {
 } from '../../types'
 
 const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
+  'clair obscur expedition 33': [
+    'clair-obscur-expedition-33-original-soundtrack',
+    'clair-obscur-expedition-33',
+  ],
   'elden ring': ['elden-ring-original-soundtrack', 'elden-ring'],
   'the witcher 3 wild hunt': [
     'the-witcher-3-wild-hunt-official-soundtrack',
@@ -65,21 +73,18 @@ const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
     'hollow-knight-original-soundtrack',
     'hollow-knight-official-soundtrack',
   ],
-  'hades': ['hades-original-soundtrack', 'hades'],
+  hades: ['hades-original-soundtrack', 'hades'],
   'hades ii': ['hades-ii-original-soundtrack', 'hades-original-soundtrack'],
   'hades 2': ['hades-ii-original-soundtrack', 'hades-original-soundtrack'],
   'doom eternal': [
     'doom-eternal-original-game-soundtrack',
     'doom-eternal-original-soundtrack',
   ],
-  'doom': [
+  doom: [
     'doom-2016-original-game-soundtrack',
     'doom-original-game-soundtrack',
   ],
-  'nier automata': [
-    'nier-automata-original-soundtrack',
-    'nier-automata',
-  ],
+  'nier automata': ['nier-automata-original-soundtrack', 'nier-automata'],
   'persona 5 royal': [
     'persona-5-royal-original-soundtrack',
     'persona-5-original-soundtrack',
@@ -96,6 +101,7 @@ const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
     'dark-souls-iii-original-soundtrack',
     'dark-souls-3-original-soundtrack',
   ],
+  bloodborne: ['bloodborne-original-soundtrack', 'bloodborne'],
   'sekiro shadows die twice': [
     'sekiro-shadows-die-twice-original-soundtrack',
     'sekiro-shadows-die-twice',
@@ -118,9 +124,9 @@ const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
     'resident-evil-4-original-soundtrack',
   ],
   'alan wake 2': ['alan-wake-2-original-soundtrack', 'alan-wake-original-soundtrack'],
-  'control': ['control-original-soundtrack-2019', 'control-original-soundtrack'],
-  'celeste': ['celeste-original-soundtrack', 'celeste'],
-  'undertale': ['undertale-original-soundtrack', 'undertale'],
+  control: ['control-original-soundtrack-2019', 'control-original-soundtrack'],
+  celeste: ['celeste-original-soundtrack', 'celeste'],
+  undertale: ['undertale-original-soundtrack', 'undertale-soundtrack', 'undertale'],
   'final fantasy vii remake': [
     'final-fantasy-vii-remake-original-soundtrack',
     'final-fantasy-vii-original-soundtrack',
@@ -156,15 +162,50 @@ const KNOWN_KHINSIDER_SLUGS: Record<string, string[]> = {
     'armored-core-vi-fires-of-rubicon-original-soundtrack-2023',
   ],
   'monster hunter world': ['monster-hunter-world-original-soundtrack'],
-  'halo the master chief collection': ['halo-combat-evolved-original-soundtrack', 'halo-2-original-soundtrack'],
-  'mass effect legendary edition': ['mass-effect-original-soundtrack', 'mass-effect-2-original-videogame-score'],
-  'stray': ['stray-original-soundtrack-2022', 'stray-original-soundtrack'],
+  'halo the master chief collection': [
+    'halo-combat-evolved-original-soundtrack',
+    'halo-2-original-soundtrack',
+  ],
+  'mass effect legendary edition': [
+    'mass-effect-original-soundtrack',
+    'mass-effect-2-original-videogame-score',
+  ],
+  stray: ['stray-original-soundtrack-2022', 'stray-original-soundtrack'],
   'outer wilds': ['outer-wilds-original-soundtrack-2019', 'outer-wilds-original-soundtrack'],
   'disco elysium': ['disco-elysium-original-soundtrack-2019', 'disco-elysium-original-soundtrack'],
   'devil may cry 5': ['devil-may-cry-5-original-soundtrack'],
   'stardew valley': ['stardew-valley-original-soundtrack', 'stardew-valley-ost'],
-  'the legend of zelda breath of the wild': ['the-legend-of-zelda-breath-of-the-wild-original-soundtrack'],
-  'the legend of zelda tears of the kingdom': ['the-legend-of-zelda-tears-of-the-kingdom-original-soundtrack-2024'],
+  'the legend of zelda breath of the wild': [
+    'the-legend-of-zelda-breath-of-the-wild-original-soundtrack',
+  ],
+  'the legend of zelda tears of the kingdom': [
+    'the-legend-of-zelda-tears-of-the-kingdom-original-soundtrack-2024',
+  ],
+  portal: [
+    'portal-original-soundtrack',
+    'portal',
+    'the-orange-box-original-soundtrack',
+  ],
+  'portal 2': [
+    'portal-2-soundtrack-songs-to-test-by-collectors-edition',
+    'portal-2-soundtrack-songs-to-test-by',
+    'portal-2',
+  ],
+  'half life': ['half-life-original-soundtrack', 'half-life'],
+  'half life 2': ['half-life-2-original-soundtrack', 'half-life-2'],
+  'metal gear rising revengeance': [
+    'metal-gear-rising-revengeance-vocal-tracks',
+    'metal-gear-rising-revengeance-original-soundtrack',
+  ],
+  subnautica: ['subnautica-original-soundtrack', 'subnautica'],
+  'risk of rain 2': ['risk-of-rain-2-original-soundtrack', 'risk-of-rain-2'],
+  cuphead: ['cuphead-original-soundtrack', 'cuphead'],
+  'katana zero': ['katana-zero-original-soundtrack', 'katana-zero'],
+  ultrakill: ['ultrakill-infinite-hyperdeath', 'ultrakill-imperfect-hatred', 'ultrakill'],
+  terraria: ['terraria-official-soundtrack', 'terraria'],
+  'yakuza 0': ['yakuza-0-original-soundtrack', 'ryu-ga-gotoku-zero-original-soundtrack'],
+  'chrono trigger': ['chrono-trigger-original-sound-version', 'chrono-trigger'],
+  'metaphor refantazio': ['metaphor-refantazio-original-soundtrack'],
 }
 
 export class KHInsiderProvider extends BaseSoundtrackProvider {
@@ -228,10 +269,9 @@ export class KHInsiderProvider extends BaseSoundtrackProvider {
   }
 
   public async getAlbums(game: GameIdentity): Promise<SoundtrackAlbum[]> {
-    const query = this.cleanTitle(game.title)
+    const query = extractCoreGameTitle(game.title) || this.cleanTitle(game.title)
     if (!query) return []
 
-    // 1. Check known or derived direct slugs first
     const directSlugs = this.candidateSlugsForGame(game.title)
     const url = `${this.baseUrl}/search?search=${encodeURIComponent(query)}`
 
@@ -240,7 +280,6 @@ export class KHInsiderProvider extends BaseSoundtrackProvider {
       const scoredAlbums: { album: SoundtrackAlbum; score: number }[] = []
       const seenSlugs = new Set<string>()
 
-      // Case A: Redirected directly to an album page
       if (html.includes('id="songlist"')) {
         const h2Match = html.match(/<h2>([^<]+)<\/h2>/i)
         const songLinkMatch = html.match(
@@ -373,7 +412,6 @@ export class KHInsiderProvider extends BaseSoundtrackProvider {
         const row = trMatch[0]
         if (row.includes('id="songlist_header"') || row.includes('id="songlist_footer"')) continue
 
-        // Match all links to song pages inside the row regardless of whitespace/newlines
         const linkRegex =
           /<a\s+href="(\/game-soundtracks\/album\/[^"]+\.(?:mp3|flac|ogg|m4a))"[^>]*>([\s\S]*?)<\/a>/gi
         let lm: RegExpExecArray | null
@@ -479,11 +517,10 @@ export class KHInsiderProvider extends BaseSoundtrackProvider {
         : null
 
     if (!externalPath && game?.title) {
-      const cacheKey = this.cleanTitle(game.title).toLowerCase()
+      const cacheKey = extractCoreGameTitle(game.title).toLowerCase()
       let full = this.albumCache.get(cacheKey) || null
 
       if (!full) {
-        // Probe direct known slugs first in parallel for instant resolution!
         const candidateSlugs = this.candidateSlugsForGame(game.title).slice(0, 3)
         const probed = await Promise.all(
           candidateSlugs.map((slug) =>

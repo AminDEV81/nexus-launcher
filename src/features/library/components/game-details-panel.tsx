@@ -95,7 +95,7 @@ import { SidebarSoundtrackWidget } from '@/features/soundtrack/components/sideba
 import { HubScoreBadge } from '@/features/hub/components/hub-score-badge'
 import { resolveClientCriticScores } from '@/features/hub/utils/score'
 import { resolveNexusModsTarget } from '../utils/nexusmods'
-import { resolveNexusModsUrl } from '@/services/hub'
+import { resolveNexusModsUrl, searchHubGames } from '@/services/hub'
 import type { Game } from '@/types/models'
 
 const PANEL_WIDTH = 450
@@ -673,16 +673,25 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
               }}
             />
             <div className="flex items-center gap-2">
-              {game.igdb_id ? (
-                <button
-                  type="button"
-                  onClick={() => navigate(`/hub/${game.igdb_id}`)}
-                  className="group flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border/90 bg-surface px-4 text-xs font-bold text-text shadow-sm transition-all hover:border-accent/40 hover:bg-surface-raised hover:text-accent active:scale-[0.98]"
-                >
-                  <Compass className="size-4 text-accent transition-transform group-hover:rotate-45" />
-                  <span>Explore on Game Hub</span>
-                </button>
-              ) : null}
+              <button
+                type="button"
+                onClick={async () => {
+                  if (game.igdb_id) {
+                    navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })
+                    return
+                  }
+                  const results = await searchHubGames(game.name, 0).catch(() => [])
+                  if (results.length > 0) {
+                    navigate(`/hub/${results[0].igdb_id}`, { state: { expectedName: game.name } })
+                  } else {
+                    toast.info(`Could not find a Store page for "${game.name}"`)
+                  }
+                }}
+                className="group flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-border/90 bg-surface px-4 text-xs font-bold text-text shadow-sm transition-all hover:border-accent/40 hover:bg-surface-raised hover:text-accent active:scale-[0.98] cursor-pointer"
+              >
+                <Compass className="size-4 text-accent transition-transform group-hover:rotate-45" />
+                <span>View in Store</span>
+              </button>
 
               <IconButton
                 active={game.is_favorite}
@@ -786,6 +795,27 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
                 </AnimatePresence>
               </button>
             )}
+
+            {/* Item #9: View in Store Button for Installed & Wishlisted Games */}
+            <IconButton
+              onClick={() => {
+                void (async () => {
+                  if (game.igdb_id) {
+                    navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })
+                    return
+                  }
+                  const results = await searchHubGames(game.name, 0).catch(() => [])
+                  if (results.length > 0) {
+                    navigate(`/hub/${results[0].igdb_id}`, { state: { expectedName: game.name } })
+                  } else {
+                    toast.info(`Could not find a Store page for "${game.name}"`)
+                  }
+                })()
+              }}
+              label="View in Store"
+            >
+              <Compass className="size-4 text-accent" />
+            </IconButton>
 
             {/* Favorite Toggle Button */}
             <IconButton

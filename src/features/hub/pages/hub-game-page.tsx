@@ -32,6 +32,7 @@ import { HubSystemRequirements } from '../components/hub-system-requirements'
 import { HubDetailsSkeleton } from '../components/hub-game-skeleton'
 import { HubSimilarGames } from '../components/hub-similar-games'
 import { HubSoundtrackSection } from '@/features/soundtrack/components/hub/hub-soundtrack-section'
+import { ReleaseCountdownBanner } from '@/features/console/ui/ReleaseCountdownBanner'
 import { useGames } from '@/features/library/hooks/use-games'
 import { findLibraryEntry } from '../utils/in-library'
 import { formatReleaseDate, localDateKey } from '@/features/library/utils/format'
@@ -85,8 +86,11 @@ export function HubGamePage() {
     if (fallbackId) {
       return [{ name: 'Official Trailer', video_id: fallbackId }]
     }
+    if (game?.name) {
+      return [{ name: `${game.name} — Official Trailer`, video_id: 'auto_trailer' }]
+    }
     return []
-  }, [game?.videos, game?.trailer_url])
+  }, [game?.videos, game?.trailer_url, game?.name])
 
   function handlePlayInlineTrailer(index = 0) {
     playButtonClick()
@@ -235,6 +239,14 @@ export function HubGamePage() {
           onOpenTrailer={handlePlayInlineTrailer}
           onOpenRegionalPrice={() => setRegionalPriceModalOpen(true)}
         />
+
+        {/* Item #7: Live Release Countdown Banner on Store Game Page for Unreleased / Wishlisted Games! */}
+        {(!isReleased || inWishlist) && (
+          <ReleaseCountdownBanner
+            releaseDate={game.release_date}
+            isWishlist={inWishlist}
+          />
+        )}
 
         {/* ── 1.5 Telemetry Quick-Glance Strip ───────────────────────── */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

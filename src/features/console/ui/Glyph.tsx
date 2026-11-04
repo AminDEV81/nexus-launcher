@@ -1,6 +1,6 @@
 import React from 'react'
 import { useConsoleStore } from '../store/console-store'
-import type { ConsoleGlyphFamily } from '../theme/tokens'
+import { CONSOLE_THEMES, type ConsoleGlyphFamily } from '../theme/tokens'
 
 export type GlyphButton =
   | 'confirm'
@@ -33,6 +33,8 @@ export const Glyph: React.FC<GlyphProps> = ({
     family ? family : s.glyphOverride === 'auto' ? s.detectedGlyphFamily : s.glyphOverride,
   )
   const confirmSwap = useConsoleStore((s) => s.confirmSwap)
+  const themeId = useConsoleStore((s) => s.theme)
+  const isLight = Boolean(CONSOLE_THEMES[themeId]?.isLight)
 
   const resolvedButton: GlyphButton =
     confirmSwap && (button === 'confirm' || button === 'back')
@@ -58,7 +60,13 @@ export const Glyph: React.FC<GlyphProps> = ({
         guide: 'Home',
       }
       return (
-        <span className="inline-flex items-center justify-center rounded-md border border-white/30 bg-white/10 px-2 py-0.5 font-mono text-xs font-bold text-white shadow-inner">
+        <span
+          className={`inline-flex items-center justify-center rounded-md border px-2 py-0.5 font-mono text-xs font-bold shadow-inner ${
+            isLight
+              ? 'border-slate-300 bg-slate-800 text-white'
+              : 'border-white/30 bg-white/10 text-white'
+          }`}
+        >
           {keyMap[resolvedButton]}
         </span>
       )
@@ -70,7 +78,12 @@ export const Glyph: React.FC<GlyphProps> = ({
         return (
           <svg width={dim} height={dim} viewBox="0 0 28 28" className="shrink-0">
             <circle cx="14" cy="14" r="12" fill="#1e293b" stroke="#60a5fa" strokeWidth="2" />
-            <path d="M9.5 9.5L18.5 18.5M18.5 9.5L9.5 18.5" stroke="#60a5fa" strokeWidth="2.5" strokeLinecap="round" />
+            <path
+              d="M9.5 9.5L18.5 18.5M18.5 9.5L9.5 18.5"
+              stroke="#60a5fa"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
           </svg>
         )
       }
@@ -88,7 +101,16 @@ export const Glyph: React.FC<GlyphProps> = ({
         return (
           <svg width={dim} height={dim} viewBox="0 0 28 28" className="shrink-0">
             <circle cx="14" cy="14" r="12" fill="#1e293b" stroke="#e879f9" strokeWidth="2" />
-            <rect x="9" y="9" width="10" height="10" rx="1.5" fill="none" stroke="#e879f9" strokeWidth="2.3" />
+            <rect
+              x="9"
+              y="9"
+              width="10"
+              height="10"
+              rx="1.5"
+              fill="none"
+              stroke="#e879f9"
+              strokeWidth="2.3"
+            />
           </svg>
         )
       }
@@ -97,7 +119,13 @@ export const Glyph: React.FC<GlyphProps> = ({
         return (
           <svg width={dim} height={dim} viewBox="0 0 28 28" className="shrink-0">
             <circle cx="14" cy="14" r="12" fill="#1e293b" stroke="#34d399" strokeWidth="2" />
-            <path d="M14 8.2L19.6 18H8.4L14 8.2Z" fill="none" stroke="#34d399" strokeWidth="2.2" strokeLinejoin="round" />
+            <path
+              d="M14 8.2L19.6 18H8.4L14 8.2Z"
+              fill="none"
+              stroke="#34d399"
+              strokeWidth="2.2"
+              strokeLinejoin="round"
+            />
           </svg>
         )
       }
@@ -159,7 +187,15 @@ export const Glyph: React.FC<GlyphProps> = ({
   return (
     <span className={`inline-flex items-center gap-2 select-none ${className}`}>
       {renderBadge()}
-      {label && <span className="text-sm font-semibold tracking-wide text-slate-200">{label}</span>}
+      {label && (
+        <span
+          className={`text-sm font-semibold tracking-wide ${
+            isLight ? 'text-slate-700' : 'text-slate-200'
+          }`}
+        >
+          {label}
+        </span>
+      )}
     </span>
   )
 }

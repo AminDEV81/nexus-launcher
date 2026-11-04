@@ -5,6 +5,8 @@ export interface ConsoleDictionary {
     home: string
     library: string
     store: string
+    wishlist: string
+    memory: string
     downloads: string
     music: string
     dualsense: string
@@ -80,6 +82,8 @@ export const CONSOLE_STRINGS: Record<ConsoleLanguage, ConsoleDictionary> = {
       home: 'Home',
       library: 'Library',
       store: 'Store',
+      wishlist: 'Wishlist',
+      memory: 'Memories',
       downloads: 'Downloads',
       music: 'Music',
       dualsense: 'DualSense',
@@ -153,6 +157,8 @@ export const CONSOLE_STRINGS: Record<ConsoleLanguage, ConsoleDictionary> = {
       home: 'خانه',
       library: 'کتابخانه',
       store: 'فروشگاه',
+      wishlist: 'علاقه‌مندی‌ها',
+      memory: 'خاطرات',
       downloads: 'دانلودها',
       music: 'موسیقی',
       dualsense: 'دوال‌سنس',

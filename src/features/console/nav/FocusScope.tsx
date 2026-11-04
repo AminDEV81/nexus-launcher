@@ -6,6 +6,27 @@ import { selectNextCandidate, type FocusNode, type NavDirection, type ScopeConfi
 
 const HEADER_SCOPES = new Set(['console_top_tabs', 'console_top_actions'])
 
+// Suppress synthetic onMouseEnter focus thrashing when tiles scroll underneath a stationary cursor
+let lastWheelScrollTs = 0
+let pointerMovedSinceScroll = true
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'wheel',
+    () => {
+      lastWheelScrollTs = performance.now()
+      pointerMovedSinceScroll = false
+    },
+    { passive: true },
+  )
+  window.addEventListener(
+    'mousemove',
+    () => {
+      pointerMovedSinceScroll = true
+    },
+    { passive: true },
+  )
+}
+
 interface RegisteredItem {
   id: string
   scopeId: string
@@ -28,7 +49,10 @@ class NavigationController {
   private trapStack: string[] = []
   private scopeMemory: Record<string, string> = {}
   private focusedId: string | null = null
-  private listeners = new Set<(focusedId: string | null) => void>()
+  private globalListeners = new Set<(focusedId: string | null) => void>()
+  // Targeted O(1) per-item focus listeners so changing focus from tile A to tile B
+  // only updates 2 React components instead of broadcasting to 300+ registered items!
+  private itemListeners = new Map<string, Set<(isFocused: boolean) => void>>()
 
   private isScopeInsideTrap(scopeId: string, trapScopeId: string): boolean {
     let cur: string | undefined = scopeId
@@ -54,7 +78,6 @@ class NavigationController {
     if (config.trapFocus) {
       this.trapStack = this.trapStack.filter((id) => id !== config.id)
       this.trapStack.push(config.id)
-      // Immediately move focus into the newly opened trapFocus scope (#2)
       this.ensureFocusInsideActiveTrap()
     }
     return () => {
@@ -91,8 +114,9 @@ class NavigationController {
     return () => {
       this.items.delete(item.id)
       if (this.focusedId === item.id) {
+        const prev = this.focusedId
         this.focusedId = null
-        this.notify()
+        this.notifyChanged(prev, null)
       }
     }
   }
@@ -102,22 +126,53 @@ class NavigationController {
   }
 
   public subscribe(cb: (focusedId: string | null) => void): () => void {
-    this.listeners.add(cb)
+    this.globalListeners.add(cb)
     return () => {
-      this.listeners.delete(cb)
+      this.globalListeners.delete(cb)
     }
   }
 
-  private notify() {
-    for (const cb of this.listeners) {
-      cb(this.focusedId)
+  public subscribeItem(itemId: string, cb: (isFocused: boolean) => void): () => void {
+    let set = this.itemListeners.get(itemId)
+    if (!set) {
+      set = new Set()
+      this.itemListeners.set(itemId, set)
+    }
+    set.add(cb)
+    return () => {
+      const curSet = this.itemListeners.get(itemId)
+      if (curSet) {
+        curSet.delete(cb)
+        if (curSet.size === 0) {
+          this.itemListeners.delete(itemId)
+        }
+      }
+    }
+  }
+
+  private notifyChanged(prevId: string | null, nextId: string | null) {
+    if (prevId && prevId !== nextId) {
+      const prevSet = this.itemListeners.get(prevId)
+      if (prevSet) {
+        for (const cb of prevSet) cb(false)
+      }
+    }
+    if (nextId && nextId !== prevId) {
+      const nextSet = this.itemListeners.get(nextId)
+      if (nextSet) {
+        for (const cb of nextSet) cb(true)
+      }
+    }
+    for (const cb of this.globalListeners) {
+      cb(nextId)
     }
   }
 
   public setFocus(id: string, playSound = true, fromPointer = false): boolean {
     const item = this.items.get(id)
     if (!item || item.disabled) return false
-    const changed = this.focusedId !== id
+    const prevId = this.focusedId
+    const changed = prevId !== id
     this.focusedId = id
     this.scopeMemory[item.scopeId] = id
     useConsoleStore.getState().rememberFocus(item.scopeId, id)
@@ -132,9 +187,9 @@ class NavigationController {
     }
     if (changed) {
       if (playSound) consoleSoundEngine.play('move')
+      this.notifyChanged(prevId, id)
       item.onFocus?.()
     }
-    this.notify()
     return true
   }
 
@@ -147,6 +202,9 @@ class NavigationController {
       }
     }
 
+    const mainEl = typeof document !== 'undefined' ? document.querySelector('main') : null
+    const mainScrollY = mainEl ? mainEl.scrollTop : 0
+
     const nodes: FocusNode[] = []
     let idx = 0
     for (const item of this.items.values()) {
@@ -156,18 +214,12 @@ class NavigationController {
       const el = item.getElement()
       if (!el) continue
       const rect = el.getBoundingClientRect()
-      const style = typeof window !== 'undefined' ? window.getComputedStyle(el) : null
-      const hidden =
-        rect.width <= 0 ||
-        rect.height <= 0 ||
-        style?.display === 'none' ||
-        style?.visibility === 'hidden'
+      const hidden = rect.width <= 0 || rect.height <= 0
 
-      // Requirement #3: Use scroll-compensated document Y coordinates for elements inside <main>
-      // so scrolled-off-screen upper rows remain above lower rows instead of jumping to <header>!
-      const mainEl = el.closest('main')
-      const scrollY = mainEl ? mainEl.scrollTop : 0
-      const effectiveTop = mainEl ? rect.top + scrollY : rect.top
+      // Use scroll-compensated document Y coordinates for elements inside <main>
+      // without calling getComputedStyle(el) or el.closest('main') per item!
+      const inMain = mainEl ? mainEl.contains(el) : !HEADER_SCOPES.has(item.scopeId)
+      const effectiveTop = inMain ? rect.top + mainScrollY : rect.top
 
       nodes.push({
         id: item.id,
@@ -200,8 +252,6 @@ class NavigationController {
 
     const currentNode = nodes.find((n) => n.id === this.focusedId)
 
-    // Requirement #3: If moving 'up' from inside <main> (not in HEADER_SCOPES),
-    // always prefer upper items inside <main> before ever jumping into HEADER_SCOPES!
     if (dir === 'up' && currentNode && !HEADER_SCOPES.has(currentNode.scopeId) && !activeTrap) {
       const mainOnlyNodes = nodes.filter((n) => !HEADER_SCOPES.has(n.scopeId))
       const nextInMain = selectNextCandidate(
@@ -214,10 +264,8 @@ class NavigationController {
       if (nextInMain && nextInMain !== this.focusedId) {
         return this.setFocus(nextInMain, true)
       }
-      // Already at the very top of <main>: scroll <main> to 0 and move into header
-      const mainContainer = document.querySelector('main')
-      if (mainContainer instanceof HTMLElement && mainContainer.scrollTop > 4) {
-        animateScrollTo(mainContainer, 'y', 0)
+      if (mainEl instanceof HTMLElement && mainEl.scrollTop > 4) {
+        animateScrollTo(mainEl, 'y', 0)
       }
     }
 
@@ -358,8 +406,9 @@ export function useFocusable<T extends HTMLElement = HTMLElement>(
   )
 
   useEffect(() => {
-    return consoleNavController.subscribe((cur) => {
-      setIsFocused(cur === itemId)
+    setIsFocused(consoleNavController.getFocusedId() === itemId)
+    return consoleNavController.subscribeItem(itemId, (focused) => {
+      setIsFocused(focused)
     })
   }, [itemId])
 
@@ -419,6 +468,9 @@ export function useFocusable<T extends HTMLElement = HTMLElement>(
       'data-focused': isFocused ? 'true' : 'false',
       tabIndex: options.disabled ? -1 : 0,
       onMouseEnter: () => {
+        if (!pointerMovedSinceScroll && performance.now() - lastWheelScrollTs < 220) {
+          return
+        }
         if (!isFocused && !options.disabled) {
           consoleSoundEngine.unlock()
           consoleNavController.setFocus(itemId, true, true)
@@ -426,7 +478,7 @@ export function useFocusable<T extends HTMLElement = HTMLElement>(
       },
       onClick: () => {
         if (options.disabled) return
-        consoleNavController.setFocus(itemId, false)
+        consoleNavController.setFocus(itemId, false, true)
         consoleSoundEngine.play('confirm')
         options.onConfirm?.()
       },

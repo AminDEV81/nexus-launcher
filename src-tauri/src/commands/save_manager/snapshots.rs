@@ -45,13 +45,39 @@ impl SnapshotEngine {
         Self::get_snapshots_dir(profile_id, game_id).join(sanitize_safe_id_segment(snapshot_id))
     }
 
-    /// Creates and verifies a snapshot for all configured save locations of a game (Section 8).
+    /// Snapshots have been disabled by user request to prevent duplicate save storage bloat.
+    /// Per-user isolated saves in `current/<location_id>` remain fully active.
     pub fn create_snapshot(
         profile_id: &str,
         game_id: &str,
         label: &str,
         is_permanent: bool,
-        locations: &[(&str, &Path, &str)], // (location_id, src_path, expected_hash)
+        _locations: &[(&str, &Path, &str)],
+    ) -> SaveResult<SaveSnapshot> {
+        let snap_root = Self::get_snapshots_dir(profile_id, game_id);
+        if snap_root.exists() {
+            let _ = remove_path_all_with_retry(&snap_root);
+        }
+        Ok(SaveSnapshot {
+            id: uuid::Uuid::new_v4().to_string(),
+            profile_id: profile_id.to_string(),
+            game_id: game_id.to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            label: label.to_string(),
+            total_size_bytes: 0,
+            tree_hash: "disabled".to_string(),
+            is_permanent,
+            locations: Vec::new(),
+        })
+    }
+
+    #[allow(dead_code)]
+    fn _legacy_create_snapshot(
+        profile_id: &str,
+        game_id: &str,
+        label: &str,
+        is_permanent: bool,
+        locations: &[(&str, &Path, &str)],
     ) -> SaveResult<SaveSnapshot> {
         let snapshot_id = uuid::Uuid::new_v4().to_string();
         let snap_dir = Self::get_snapshot_dir(profile_id, game_id, &snapshot_id);
@@ -144,6 +170,11 @@ impl SnapshotEngine {
     /// Lists all snapshots for a given (profile_id, game_id) ordered from newest to oldest.
     pub fn list_snapshots(profile_id: &str, game_id: &str) -> SaveResult<Vec<SaveSnapshot>> {
         let snap_root = Self::get_snapshots_dir(profile_id, game_id);
+        if snap_root.exists() {
+            let _ = remove_path_all_with_retry(&snap_root);
+        }
+        return Ok(Vec::new());
+        #[allow(unreachable_code)]
         if !snap_root.exists() {
             return Ok(Vec::new());
         }

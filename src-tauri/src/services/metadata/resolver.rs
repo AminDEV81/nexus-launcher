@@ -103,12 +103,16 @@ impl MetadataProviderResolver {
             ProviderMode::Public
         };
 
+        let sgdb_key = read("steamgriddb_api_key").unwrap_or_else(|| {
+            crate::commands::metadata::steamgriddb::DEFAULT_STEAMGRIDDB_API_KEY.to_string()
+        });
+
         ResolvedConfig {
             mode,
             public_proxy_url: Some(nexus_cloud::DEFAULT_GATEWAY_URL.to_string()),
             igdb_client_id: read("igdb_client_id"),
             igdb_client_secret: read("igdb_client_secret"),
-            steamgriddb_api_key: read("steamgriddb_api_key"),
+            steamgriddb_api_key: Some(sgdb_key),
         }
     }
 
@@ -326,9 +330,9 @@ impl MetadataProviderResolver {
         match result {
             Ok(mut games) => {
                 self.circuit_breaker.record_success();
-                scores::resolve_hub_games_scores_live(db, &self.http, &mut games).await;
                 {
                     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
+                    scores::enrich_hub_games_batch(Some(&conn), &mut games);
                     if !games.is_empty() {
                         if let Ok(json) = serde_json::to_string(&games) {
                             let _ =
@@ -751,44 +755,54 @@ impl MetadataProviderResolver {
     ) -> AppResult<Vec<UnifiedArtwork>> {
         let config = self.get_config(db);
         let steam_provider = SteamArtworkProvider::new(self.http.clone());
+        let cloud_provider =
+            NexusCloudProvider::new(self.http.clone(), config.public_proxy_url.clone());
+        let sgdb_key_opt = config.steamgriddb_api_key.clone();
 
-        let steam_assets = steam_provider
-            .get_artwork_options(kind, steam_app_id, name)
-            .await
-            .unwrap_or_default();
-
-        let mut sgdb_assets = Vec::new();
-        match config.mode {
-            ProviderMode::Public => {
-                let cloud = NexusCloudProvider::new(self.http.clone(), config.public_proxy_url);
-                match cloud.get_artwork_options(kind, steam_app_id, name).await {
-                    Ok(assets) => sgdb_assets = assets,
+        // Concurrently query strictly safe (nsfw=false) SteamGridDB + Official Steam Store CDN:
+        let (direct_sgdb_assets, cloud_sgdb_assets, steam_assets) = tokio::join!(
+            async {
+                if let Some(key) = sgdb_key_opt {
+                    let direct = DirectSteamGridDbProvider::new(self.http.clone(), key);
+                    direct
+                        .get_artwork_options(kind, steam_app_id, name)
+                        .await
+                        .unwrap_or_default()
+                } else {
+                    Vec::new()
+                }
+            },
+            async {
+                match cloud_provider
+                    .get_artwork_options(kind, steam_app_id, name)
+                    .await
+                {
+                    Ok(assets) => assets,
                     Err(err) => {
                         log::warn!("Failed to fetch artwork options from cloud: {err}");
+                        Vec::new()
                     }
                 }
+            },
+            async {
+                steam_provider
+                    .get_artwork_options(kind, steam_app_id, name)
+                    .await
+                    .unwrap_or_default()
             }
-            ProviderMode::Custom => {
-                if let Some(key) = config.steamgriddb_api_key {
-                    let direct = DirectSteamGridDbProvider::new(self.http.clone(), key);
-                    if let Ok(assets) = direct.get_artwork_options(kind, steam_app_id, name).await {
-                        sgdb_assets = assets;
-                    }
-                }
-            }
-        }
+        );
 
         let mut combined = Vec::new();
         let mut seen_urls = std::collections::HashSet::new();
 
-        for asset in steam_assets {
-            if seen_urls.insert(asset.url.clone()) {
+        for asset in direct_sgdb_assets.into_iter().chain(cloud_sgdb_assets.into_iter()) {
+            if !asset.url.is_empty() && seen_urls.insert(asset.url.clone()) {
                 combined.push(asset);
             }
         }
 
-        for asset in sgdb_assets {
-            if seen_urls.insert(asset.url.clone()) {
+        for asset in steam_assets {
+            if !asset.url.is_empty() && seen_urls.insert(asset.url.clone()) {
                 combined.push(asset);
             }
         }

@@ -91,11 +91,10 @@ export const ConsoleRow: React.FC<ConsoleRowProps> = React.memo(
             )}
           </div>
 
-          {/* Horizontal Scroll Controls + Count Badge (#4) */}
           <div className="flex items-center gap-2.5">
             <span
               className={`mr-1 text-[0.75rem] font-bold uppercase tracking-widest ${
-                isLight ? 'text-slate-500' : 'text-slate-400'
+                isLight ? 'text-slate-600' : 'text-slate-400'
               }`}
             >
               {items.length} {items.length === 1 ? 'Title' : 'Titles'}
@@ -112,7 +111,9 @@ export const ConsoleRow: React.FC<ConsoleRowProps> = React.memo(
                   ? isLight
                     ? 'border-slate-300 bg-white text-slate-900 hover:bg-indigo-600 hover:text-white shadow-sm'
                     : 'border-white/20 bg-white/10 text-white hover:bg-cyan-400 hover:text-slate-950 hover:border-cyan-300 shadow'
-                  : 'opacity-25 cursor-default border-white/10 bg-white/5 text-slate-500'
+                  : isLight
+                    ? 'opacity-35 cursor-default border-slate-300/70 bg-slate-200/70 text-slate-400'
+                    : 'opacity-25 cursor-default border-white/10 bg-white/5 text-slate-500'
               }`}
             >
               <ChevronLeft className="size-5" />
@@ -129,7 +130,9 @@ export const ConsoleRow: React.FC<ConsoleRowProps> = React.memo(
                   ? isLight
                     ? 'border-slate-300 bg-white text-slate-900 hover:bg-indigo-600 hover:text-white shadow-sm'
                     : 'border-white/20 bg-white/10 text-white hover:bg-cyan-400 hover:text-slate-950 hover:border-cyan-300 shadow'
-                  : 'opacity-25 cursor-default border-white/10 bg-white/5 text-slate-500'
+                  : isLight
+                    ? 'opacity-35 cursor-default border-slate-300/70 bg-slate-200/70 text-slate-400'
+                    : 'opacity-25 cursor-default border-white/10 bg-white/5 text-slate-500'
               }`}
             >
               <ChevronRight className="size-5" />
@@ -137,31 +140,7 @@ export const ConsoleRow: React.FC<ConsoleRowProps> = React.memo(
           </div>
         </div>
 
-        {/* Floating Side Arrow Overlays on Row Hover (#4) */}
         <div className="relative">
-          {canScrollLeft && (
-            <button
-              type="button"
-              onClick={() => scrollByStep(-1)}
-              aria-label="Scroll left"
-              className="absolute left-1 top-1/2 -translate-y-1/2 z-30 flex size-12 items-center justify-center rounded-full border border-cyan-300/50 bg-slate-950/85 text-cyan-300 opacity-0 group-hover/row:opacity-100 hover:bg-cyan-400 hover:text-slate-950 transition-all shadow-2xl cursor-pointer"
-            >
-              <ChevronLeft className="size-6 stroke-[2.5]" />
-            </button>
-          )}
-
-          {canScrollRight && (
-            <button
-              type="button"
-              onClick={() => scrollByStep(1)}
-              aria-label="Scroll right"
-              className="absolute right-1 top-1/2 -translate-y-1/2 z-30 flex size-12 items-center justify-center rounded-full border border-cyan-300/50 bg-slate-950/85 text-cyan-300 opacity-0 group-hover/row:opacity-100 hover:bg-cyan-400 hover:text-slate-950 transition-all shadow-2xl cursor-pointer"
-            >
-              <ChevronRight className="size-6 stroke-[2.5]" />
-            </button>
-          )}
-
-          {/* Requirement #9: pt-9 (2.25rem) top padding ensures scaled-up covers never clip at the top! */}
           <div
             ref={scrollRef}
             onWheel={(e) => {
@@ -200,7 +179,13 @@ export const ConsoleRow: React.FC<ConsoleRowProps> = React.memo(
                       else if (item.hubGame) onSelectHubGame?.(item.hubGame)
                     }}
                     onFocusTile={() => {
-                      if (item.game) onFocusGame?.(item.game)
+                      if (item.game) {
+                        onFocusGame?.(item.game)
+                      } else if (item.hubGame) {
+                        useConsoleStore
+                          .getState()
+                          .setFocusedBackdropUrl(item.hubGame.backdrop_url ?? item.hubGame.cover_url)
+                      }
                     }}
                     onOptionsTile={() => {
                       if (item.game) onOptionsGame?.(item.game)

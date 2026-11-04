@@ -266,17 +266,7 @@ impl TransactionCoordinator {
             snapshot_targets.push((loc.id.as_str(), loc.os_path.as_path(), cur_th.hash));
         }
 
-        let ref_targets: Vec<(&str, &Path, &str)> = snapshot_targets
-            .iter()
-            .map(|(id, p, h)| (*id, *p, h.as_str()))
-            .collect();
-
         JournalManager::update_operation_state(conn, &op_id, "preflight_verified")?;
-        if let Err(e) = SnapshotEngine::create_snapshot(profile_id, game_id, "Pre-Launch Safety Snapshot", false, &ref_targets) {
-            log::warn!("Non-fatal pre-launch snapshot warning for {}: {}", game_id, e);
-        }
-        JournalManager::update_operation_state(conn, &op_id, "snapshot_created")?;
-        JournalManager::update_operation_state(conn, &op_id, "snapshot_verified")?;
 
         // Fast-path: if every location in profile_cur already has the exact same tree hash as live os_path,
         // skip destructive staging/commit replacement so open/locked save files are never disturbed!
@@ -493,24 +483,6 @@ impl TransactionCoordinator {
         }
 
         JournalManager::update_operation_state(conn, &op_id, "preflight_verified")?;
-
-        let mut snapshot_targets = Vec::new();
-        for (i, loc) in locations.iter().enumerate() {
-            let profile_cur = Self::get_profile_current_path(profile_id, game_id, &loc.id);
-            let cur_th = &os_hashes[i].2;
-            snapshot_targets.push((loc.id.as_str(), profile_cur, cur_th.hash.clone()));
-        }
-
-        let ref_targets: Vec<(&str, &Path, &str)> = snapshot_targets
-            .iter()
-            .map(|(id, p, h)| (*id, p.as_path(), h.as_str()))
-            .collect();
-
-        if let Err(e) = SnapshotEngine::create_snapshot(profile_id, game_id, "Post-Exit Safety Snapshot", false, &ref_targets) {
-            log::warn!("Non-fatal post-exit snapshot warning for {}: {}", game_id, e);
-        }
-        JournalManager::update_operation_state(conn, &op_id, "snapshot_created")?;
-        JournalManager::update_operation_state(conn, &op_id, "snapshot_verified")?;
 
         for (i, loc) in locations.iter().enumerate() {
             let staging = Self::get_staging_path(profile_id, game_id, &op_id, &loc.id);

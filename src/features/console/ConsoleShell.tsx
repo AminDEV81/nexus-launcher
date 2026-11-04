@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -44,13 +44,18 @@ import {
   consoleGuideListenerStart,
   consoleGuideListenerStop,
   consoleGetSystemStatus,
+  consoleListMonitors,
   type ConsoleSystemStatus,
 } from '@/services/console'
 import { useLaunchStore } from '@/store/launch-store'
 import { useProfileStore } from '@/store/profile-store'
 import { CONSOLE_THEMES } from './theme/tokens'
 import { CONSOLE_STRINGS } from './i18n/strings'
-import { useConsoleStore, type ConsoleTabId } from './store/console-store'
+import {
+  computeRecommendedMonitorScale,
+  useConsoleStore,
+  type ConsoleTabId,
+} from './store/console-store'
 import { consoleSoundEngine } from './audio/ui-sounds'
 import { configureScrollMotion } from './nav/smooth-scroll'
 import { describeGlyphFamily } from './input/InputManager'
@@ -66,6 +71,9 @@ import { HomeView } from './screens/HomeView'
 import { LibraryView } from './screens/LibraryView'
 import { GameHubView } from './screens/GameHubView'
 import { StoreView } from './screens/StoreView'
+import { WishlistView } from './screens/WishlistView'
+import { MemoryView } from './screens/MemoryView'
+import { isGameUnreleased } from '@/features/library/utils/format'
 import { StoreGameDetailView } from './screens/StoreGameDetailView'
 import { DownloadsView } from './screens/DownloadsView'
 import { MusicView } from './screens/MusicView'
@@ -79,6 +87,8 @@ const TAB_ORDER: ConsoleTabId[] = [
   'home',
   'library',
   'store',
+  'wishlist',
+  'memory',
   'downloads',
   'music',
   'dualsense',
@@ -92,6 +102,8 @@ const PRIMARY_TABS: ConsoleTabId[] = [
   'home',
   'library',
   'store',
+  'wishlist',
+  'memory',
   'downloads',
   'music',
   'dualsense',
@@ -114,7 +126,7 @@ const TopTabButton: React.FC<{
   isLight: boolean
   badgeCount?: number
   onSelect: () => void
-}> = ({ tabId, label, active, isLight, badgeCount, onSelect }) => {
+}> = React.memo(({ tabId, label, active, isLight, badgeCount, onSelect }) => {
   const { focusProps, isFocused } = useFocusable<HTMLButtonElement>({
     id: `console_tab_${tabId}`,
     scopeId: 'console_top_tabs',
@@ -145,8 +157,7 @@ const TopTabButton: React.FC<{
         </span>
       ) : null}
       {(active || isFocused) && (
-        <motion.span
-          layoutId="console-tab-underline"
+        <span
           className={`absolute inset-x-0 -bottom-0.5 h-[3px] rounded-full ${
             isFocused
               ? 'bg-cyan-400'
@@ -154,12 +165,12 @@ const TopTabButton: React.FC<{
                 ? 'bg-indigo-600'
                 : 'bg-white/80'
           }`}
-          transition={{ type: 'spring', stiffness: 520, damping: 40 }}
         />
       )}
     </button>
   )
-}
+})
+TopTabButton.displayName = 'TopTabButton'
 
 const TopIconButton: React.FC<{
   id: string
@@ -169,7 +180,7 @@ const TopIconButton: React.FC<{
   isLight: boolean
   onSelect: () => void
   children: React.ReactNode
-}> = ({ id, scopeId, label, active, isLight, onSelect, children }) => {
+}> = React.memo(({ id, scopeId, label, active, isLight, onSelect, children }) => {
   const { focusProps, isFocused } = useFocusable<HTMLButtonElement>({
     id,
     scopeId,
@@ -196,10 +207,127 @@ const TopIconButton: React.FC<{
       {children}
     </button>
   )
-}
+})
+TopIconButton.displayName = 'TopIconButton'
+
+/**
+ * Isolated Backdrop & Ambient Glow layer.
+ * Subscribes to `focusedGameId` and `ambientColor` independently so hovering/moving focus
+ * across game tiles NEVER triggers a re-render of `ConsoleShell` or any active screen!
+ */
+const ConsoleDynamicBackdropLayer: React.FC<{
+  games: Game[]
+  activeTab: ConsoleTabId
+  selectedGameId: string | null
+  selectedStoreHubGame: HubGame | null
+  widescreenMap: Record<string, string>
+  isLight: boolean
+  defaultAccent: string
+}> = React.memo(
+  ({
+    games,
+    activeTab,
+    selectedGameId,
+    selectedStoreHubGame,
+    widescreenMap,
+    isLight,
+    defaultAccent,
+  }) => {
+    const focusedGameId = useConsoleStore((s) => s.focusedGameId)
+    const focusedBackdropUrl = useConsoleStore((s) => s.focusedBackdropUrl)
+    const ambientColor = useConsoleStore((s) => s.ambientColor)
+
+    const backdropSrc = useMemo(() => {
+      if (selectedStoreHubGame) {
+        return resolveConsoleHighResUrl(
+          selectedStoreHubGame.backdrop_url ?? selectedStoreHubGame.cover_url,
+        )
+      }
+      const pickBestForGame = (g: Game | undefined): string | null => {
+        if (!g) return null
+        const lowName = g.name.trim().toLowerCase()
+        if (
+          lowName === 'grand theft auto vi' ||
+          lowName === 'grand theft auto 6' ||
+          lowName === 'gta 6' ||
+          lowName === 'gta vi'
+        ) {
+          return 'https://images.igdb.com/igdb/image/upload/t_1080p/scq3y1.jpg'
+        }
+        if (g.background_path || g.banner_path) {
+          return resolveConsoleHighResUrl(g.background_path ?? g.banner_path)
+        }
+        const ws = widescreenMap[g.id]
+        if (ws) {
+          return resolveConsoleHighResUrl(ws)
+        }
+        if (g.steam_app_id) {
+          return `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${g.steam_app_id}/header.jpg`
+        }
+        return resolveConsoleHighResUrl(g.cover_path)
+      }
+
+      if (selectedGameId) {
+        return pickBestForGame(games.find((g) => g.id === selectedGameId))
+      }
+      if (
+        activeTab !== 'home' &&
+        activeTab !== 'library' &&
+        activeTab !== 'wishlist' &&
+        activeTab !== 'memory' &&
+        activeTab !== 'store'
+      ) {
+        return null
+      }
+      if (focusedBackdropUrl) {
+        return resolveConsoleHighResUrl(focusedBackdropUrl)
+      }
+      const focused = focusedGameId ? games.find((g) => g.id === focusedGameId) : undefined
+      if (focused) {
+        return pickBestForGame(focused)
+      }
+      if (activeTab !== 'home' && activeTab !== 'library') return null
+      const fallback = [...games]
+        .filter((g) => g.last_played_at)
+        .sort((a, b) => (b.last_played_at ?? '').localeCompare(a.last_played_at ?? ''))[0]
+      return pickBestForGame(fallback ?? games[0])
+    }, [
+      games,
+      focusedGameId,
+      focusedBackdropUrl,
+      selectedGameId,
+      selectedStoreHubGame,
+      activeTab,
+      widescreenMap,
+    ])
+
+    const backdropIntensity =
+      activeTab === 'home' || selectedGameId || selectedStoreHubGame
+        ? 1
+        : isLight
+          ? 0.84
+          : 0.65
+
+    return (
+      <>
+        <ConsoleBackdrop src={backdropSrc} intensity={backdropIntensity} />
+        <div
+          className="pointer-events-none absolute inset-0 z-[1] transition-[background] duration-700 ease-out"
+          style={{
+            background: isLight
+              ? `radial-gradient(ellipse 75% 60% at 85% 0%, color-mix(in srgb, ${ambientColor} 28%, transparent) 0%, transparent 72%), radial-gradient(ellipse 65% 50% at 0% 100%, color-mix(in srgb, ${defaultAccent} 20%, transparent) 0%, transparent 72%)`
+              : `radial-gradient(ellipse 75% 60% at 85% 0%, color-mix(in srgb, ${ambientColor} 24%, transparent) 0%, transparent 72%), radial-gradient(ellipse 65% 50% at 0% 100%, color-mix(in srgb, ${defaultAccent} 15%, transparent) 0%, transparent 72%)`,
+          }}
+        />
+      </>
+    )
+  },
+)
+ConsoleDynamicBackdropLayer.displayName = 'ConsoleDynamicBackdropLayer'
 
 export const ConsoleShell: React.FC = () => {
   const navigate = useNavigate()
+  const shellRef = useRef<HTMLDivElement | null>(null)
   const activeTab = useConsoleStore((s) => s.activeTab)
   const setActiveTab = useConsoleStore((s) => s.setActiveTab)
   const selectedGameId = useConsoleStore((s) => s.selectedGameId)
@@ -207,7 +335,6 @@ export const ConsoleShell: React.FC = () => {
   const selectedStoreHubGame = useConsoleStore((s) => s.selectedStoreHubGame)
   const setSelectedStoreHubGame = useConsoleStore((s) => s.setSelectedStoreHubGame)
   const setFocusedGameId = useConsoleStore((s) => s.setFocusedGameId)
-  const ambientColor = useConsoleStore((s) => s.ambientColor)
   const themeId = useConsoleStore((s) => s.theme)
   const uiScale = useConsoleStore((s) => s.uiScale)
   const safeMargin = useConsoleStore((s) => s.safeMargin)
@@ -251,43 +378,10 @@ export const ConsoleShell: React.FC = () => {
   const t = CONSOLE_STRINGS.en
   const themeTokens = CONSOLE_THEMES[themeId] ?? CONSOLE_THEMES.cyberpunk
   const isLight = Boolean(themeTokens.isLight)
-  const focusedGameId = useConsoleStore((s) => s.focusedGameId)
-
-  // Always resolve high-resolution 1080p backdrop URLs on hover/focus
-  const backdropSrc = useMemo(() => {
-    if (selectedStoreHubGame) {
-      return resolveConsoleHighResUrl(
-        selectedStoreHubGame.backdrop_url ?? selectedStoreHubGame.cover_url,
-      )
-    }
-    const pickBestForGame = (g: Game | undefined): string | null => {
-      if (!g) return null
-      if (g.background_path || g.banner_path) {
-        return resolveConsoleHighResUrl(g.background_path ?? g.banner_path)
-      }
-      if (widescreenMap[g.id]) {
-        return resolveConsoleHighResUrl(widescreenMap[g.id])
-      }
-      if (g.steam_app_id) {
-        return `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${g.steam_app_id}/library_hero.jpg`
-      }
-      return resolveConsoleHighResUrl(g.cover_path)
-    }
-
-    if (selectedGameId) {
-      return pickBestForGame(games.find((g) => g.id === selectedGameId))
-    }
-    if (activeTab !== 'home' && activeTab !== 'library') return null
-    const focused = focusedGameId ? games.find((g) => g.id === focusedGameId) : undefined
-    const fallback = [...games]
-      .filter((g) => g.last_played_at)
-      .sort((a, b) => (b.last_played_at ?? '').localeCompare(a.last_played_at ?? ''))[0]
-    return pickBestForGame(focused ?? fallback ?? games[0])
-  }, [games, focusedGameId, selectedGameId, selectedStoreHubGame, activeTab, widescreenMap])
 
   const controllerLabel =
     activeControllerCount > 0 ? describeGlyphFamily(detectedGlyphFamily) : 'Keyboard & Mouse Ready'
-  const stageSeconds = 0.24 * animSpeed
+  const stageSeconds = 0.2 * animSpeed
 
   const refreshData = useCallback(async () => {
     const [gList, cList, dList] = await Promise.all([
@@ -303,14 +397,24 @@ export const ConsoleShell: React.FC = () => {
   // Enter borderless fullscreen Console Mode on mount
   useEffect(() => {
     void loadProfiles(false)
-    getAllSettings()
-      .then((raw) => hydrateFromSettings(raw))
-      .catch(() => {})
+    Promise.all([
+      getAllSettings().catch(() => undefined),
+      consoleListMonitors().catch(() => []),
+    ]).then(([raw, mons]) => {
+      hydrateFromSettings(raw)
+      if (!raw || raw['console_ui_scale'] === undefined) {
+        const monIdx =
+          raw && raw['console_monitor']
+            ? Number.parseInt(raw['console_monitor'], 10) || 0
+            : monitorIndex
+        const targetMon = mons[monIdx] ?? mons[0]
+        const rec = computeRecommendedMonitorScale(targetMon?.width, targetMon?.height)
+        void useConsoleStore.getState().updateConsoleSetting('uiScale', rec.scale)
+      }
+    })
     void consoleModeEnter(monitorIndex).catch(() => {})
-    consoleSoundEngine.play('boot')
     void refreshData()
 
-    // Fetch Hub store shelves in background
     getHubTopRated()
       .then(setTopRatedHub)
       .catch(() => {})
@@ -325,18 +429,20 @@ export const ConsoleShell: React.FC = () => {
       .catch(() => {})
   }, [hydrateFromSettings, loadProfiles, monitorIndex, refreshData])
 
-  // New Task #1: Poll running games every 2000ms and tick elapsed seconds every 1000ms
-  // so the `Stop · MM:SS` button counts up live and immediately resets when a game exits!
+  // Poll running games every 3000ms and tick elapsed seconds ONLY when a game is actually running!
   useEffect(() => {
     const syncRunning = () => {
       getRunningGames()
         .then((ids) => {
-          useLaunchStore.getState().hydrateRunning(ids)
+          const cur = useLaunchStore.getState().runningGameIds
+          if (cur.size !== ids.length || ids.some((id) => !cur.has(id))) {
+            useLaunchStore.getState().hydrateRunning(ids)
+          }
         })
         .catch(() => {})
     }
     syncRunning()
-    const pollId = window.setInterval(syncRunning, 2000)
+    const pollId = window.setInterval(syncRunning, 3000)
     const tickId = window.setInterval(() => {
       const state = useLaunchStore.getState()
       if (state.runningGameIds.size === 0) return
@@ -359,21 +465,21 @@ export const ConsoleShell: React.FC = () => {
     }
   }, [guideEnabled])
 
-  // Proportional 10-foot scaling
   useEffect(() => {
     const root = document.documentElement
-    const previous = root.style.fontSize
     const apply = () => {
-      const px = (window.innerHeight / 1080) * 19 * (uiScale / 100)
-      root.style.fontSize = `${Math.min(44, Math.max(9, px)).toFixed(2)}px`
+      if (exitingToDesktop) return
+      const ratio = Math.min(window.innerWidth / 1920, window.innerHeight / 1080)
+      const px = Math.max(0.82, ratio) * 14.5 * (uiScale / 100)
+      root.style.fontSize = `${Math.min(28, Math.max(11, px)).toFixed(2)}px`
     }
     apply()
     window.addEventListener('resize', apply)
     return () => {
       window.removeEventListener('resize', apply)
-      root.style.fontSize = previous
+      root.style.fontSize = ''
     }
-  }, [uiScale])
+  }, [uiScale, exitingToDesktop])
 
   useEffect(() => {
     const focusedId = document.querySelector('[data-focused="true"]')?.getAttribute('data-focus-id')
@@ -397,18 +503,19 @@ export const ConsoleShell: React.FC = () => {
         .catch(() => {})
     }
     updateStatus()
-    const id = window.setInterval(updateStatus, 10000)
+    const id = window.setInterval(updateStatus, 15000)
     return () => window.clearInterval(id)
   }, [])
 
-  // New Task #5: Smooth Console Exit Animation + Descending Harmonic Chord before returning to Desktop Mode
   const handleExitConsole = useCallback(async () => {
     if (exitingToDesktop) return
     setQuickSettingsOpen(false)
     setExitingToDesktop(true)
     consoleSoundEngine.play('close')
-    await new Promise((resolve) => window.setTimeout(resolve, 980))
+    await new Promise((resolve) => window.setTimeout(resolve, 950))
+    document.documentElement.style.fontSize = ''
     await consoleModeExit().catch(() => {})
+    window.dispatchEvent(new Event('resize'))
     navigate(lastDesktopRoute || '/')
   }, [exitingToDesktop, lastDesktopRoute, navigate, setQuickSettingsOpen])
 
@@ -481,42 +588,75 @@ export const ConsoleShell: React.FC = () => {
     true,
   )
 
-  const colorCacheRef = React.useRef<Map<string, string>>(new Map())
-  const colorTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const colorCacheRef = useRef<Map<string, string>>(new Map())
+  const checkedScreenshotsRef = useRef<Set<string>>(new Set())
+  const focusDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isScrollingRef = useRef(false)
+  const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleMainScroll = useCallback(() => {
+    isScrollingRef.current = true
+    if (scrollIdleTimerRef.current) {
+      clearTimeout(scrollIdleTimerRef.current)
+    }
+    scrollIdleTimerRef.current = setTimeout(() => {
+      isScrollingRef.current = false
+    }, 140)
+  }, [])
+
+  const applyAmbientColorToDom = useCallback((hex: string) => {
+    if (shellRef.current) {
+      shellRef.current.style.setProperty('--console-ambient', hex)
+    }
+    useConsoleStore.getState().setAmbientColor(hex)
+  }, [])
 
   const handleFocusGame = useCallback(
     (game: Game) => {
-      setFocusedGameId(game.id)
-      if (!game.background_path && !game.banner_path && !widescreenMap[game.id]) {
-        getGameScreenshots(game.id)
-          .then((shots) => {
-            if (shots && shots[0]) {
-              setWidescreenMap((prev) => ({ ...prev, [game.id]: shots[0] }))
-            }
-          })
-          .catch(() => {})
+      if (isScrollingRef.current) return
+      if (focusDebounceTimerRef.current) {
+        clearTimeout(focusDebounceTimerRef.current)
       }
-      const cached = colorCacheRef.current.get(game.id)
-      if (cached) {
-        useConsoleStore.getState().setAmbientColor(cached)
-        return
-      }
-      if (colorTimerRef.current) clearTimeout(colorTimerRef.current)
-      colorTimerRef.current = setTimeout(() => {
+      // Debounce rapid focus sweeps (e.g. holding D-Pad / moving mouse across tiles)
+      // so fast navigation never triggers redundant backdrop swaps or IPC calls!
+      focusDebounceTimerRef.current = setTimeout(() => {
+        setFocusedGameId(game.id)
+
+        if (
+          !game.background_path &&
+          !game.banner_path &&
+          !checkedScreenshotsRef.current.has(game.id)
+        ) {
+          checkedScreenshotsRef.current.add(game.id)
+          getGameScreenshots(game.id)
+            .then((shots) => {
+              if (shots && shots[0]) {
+                setWidescreenMap((prev) =>
+                  prev[game.id] === shots[0] ? prev : { ...prev, [game.id]: shots[0] },
+                )
+              }
+            })
+            .catch(() => {})
+        }
+
+        const cached = colorCacheRef.current.get(game.id)
+        if (cached) {
+          applyAmbientColorToDom(cached)
+          return
+        }
         consoleExtractDominantColor(game.id)
           .then((hex) => {
             if (hex && hex.startsWith('#')) {
               colorCacheRef.current.set(game.id, hex)
-              useConsoleStore.getState().setAmbientColor(hex)
+              applyAmbientColorToDom(hex)
             }
           })
           .catch(() => {})
-      }, 140)
+      }, 40)
     },
-    [setFocusedGameId, widescreenMap],
+    [applyAmbientColorToDom, setFocusedGameId],
   )
 
-  // New Task #1: Clicking the primary button while a game is running stops the game (just like Desktop sidebar)!
   const handlePlayOrResume = useCallback(
     async (game: Game) => {
       if (runningGameIds.has(game.id)) {
@@ -567,6 +707,13 @@ export const ConsoleShell: React.FC = () => {
     [refreshData],
   )
 
+  const handleOpenGameHub = useCallback(
+    (game: Game) => {
+      setSelectedGameId(game.id)
+    },
+    [setSelectedGameId],
+  )
+
   const handleSelectHubGame = useCallback(
     (hubGame: HubGame) => {
       setSelectedStoreHubGame(hubGame)
@@ -594,6 +741,33 @@ export const ConsoleShell: React.FC = () => {
       downloads.filter((d) => ['downloading', 'queued', 'extracting'].includes(d.status)).length,
     [downloads],
   )
+
+  const wishlistCount = useMemo(
+    () =>
+      games.filter(
+        (g) =>
+          !g.is_memory &&
+          !g.is_hidden &&
+          (g.is_wishlist || (isGameUnreleased(g.release_date) && !g.is_installed)),
+      ).length,
+    [games],
+  )
+
+  const memoryCount = useMemo(
+    () => games.filter((g) => g.is_memory && !g.is_hidden).length,
+    [games],
+  )
+
+  // Poll downloads while on the Downloads tab or when active downloads are running
+  useEffect(() => {
+    if (activeTab !== 'downloads' && activeDownloadsCount === 0) return
+    const id = window.setInterval(() => {
+      getDownloads()
+        .then(setDownloads)
+        .catch(() => {})
+    }, 1500)
+    return () => window.clearInterval(id)
+  }, [activeTab, activeDownloadsCount])
 
   const searchBtnFocus = useFocusable<HTMLButtonElement>({
     id: 'console_top_search_btn',
@@ -625,32 +799,30 @@ export const ConsoleShell: React.FC = () => {
 
   return (
     <div
+      ref={shellRef}
       style={
         {
           backgroundColor: themeTokens.bgPrimary,
           color: themeTokens.textPrimary,
-          padding: `${safeMargin}vh ${safeMargin}vw`,
-          '--console-ambient': ambientColor,
-          transition: '--console-ambient 650ms ease, background-color 350ms ease',
+          padding: `${Math.min(safeMargin, 1.2)}vh ${Math.min(safeMargin, 1.5)}vw`,
+          '--console-ambient': '#00e5ff',
+          transition: 'background-color 350ms ease',
         } as React.CSSProperties
       }
       className="relative w-screen h-screen overflow-hidden flex flex-col justify-between select-none"
     >
-      <style>{`@property --console-ambient { syntax: '<color>'; inherits: true; initial-value: #00e5ff; }`}</style>
-      <ConsoleBackdrop src={backdropSrc} intensity={activeTab === 'library' ? 0.65 : 1} />
-
-      {/* Brighter Ambient Radial Glow */}
-      <div
-        className="pointer-events-none absolute inset-0 z-[1]"
-        style={{
-          background: isLight
-            ? `radial-gradient(ellipse 70% 55% at 85% 0%, color-mix(in srgb, ${themeTokens.defaultAccent} 14%, transparent) 0%, transparent 70%)`
-            : `radial-gradient(ellipse 75% 60% at 85% 0%, color-mix(in srgb, var(--console-ambient) 26%, transparent) 0%, transparent 72%), radial-gradient(ellipse 65% 50% at 0% 100%, color-mix(in srgb, ${themeTokens.defaultAccent} 15%, transparent) 0%, transparent 72%)`,
-        }}
+      <ConsoleDynamicBackdropLayer
+        games={games}
+        activeTab={activeTab}
+        selectedGameId={selectedGameId}
+        selectedStoreHubGame={selectedStoreHubGame}
+        widescreenMap={widescreenMap}
+        isLight={isLight}
+        defaultAccent={themeTokens.defaultAccent}
       />
 
       {/* Top Navigation & Telemetry Header */}
-      <header className="relative z-30 flex items-center justify-between gap-6 px-10 pb-2 pt-6">
+      <header className="relative z-30 flex items-center justify-between gap-4 px-6 pb-1.5 pt-3">
         <div className="flex min-w-[15rem] items-center gap-4">
           <LogoMark className="size-[1.9rem] opacity-95" />
           {activeProfile && (
@@ -681,7 +853,7 @@ export const ConsoleShell: React.FC = () => {
         <FocusScope
           id="console_top_tabs"
           orientation="horizontal"
-          className="flex items-center gap-8"
+          className="flex items-center gap-5 lg:gap-6"
         >
           <span className="opacity-55">
             <Glyph button="lb" size="sm" />
@@ -693,7 +865,15 @@ export const ConsoleShell: React.FC = () => {
               label={t.tabs[tabId]}
               active={activeTab === tabId && !selectedGame && !selectedStoreHubGame}
               isLight={isLight}
-              badgeCount={tabId === 'downloads' ? activeDownloadsCount : undefined}
+              badgeCount={
+                tabId === 'downloads'
+                  ? activeDownloadsCount
+                  : tabId === 'wishlist'
+                    ? wishlistCount
+                    : tabId === 'memory'
+                      ? memoryCount
+                      : undefined
+              }
               onSelect={() => setActiveTab(tabId)}
             />
           ))}
@@ -795,32 +975,42 @@ export const ConsoleShell: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Scrollable Stage */}
+      {/* Main Scrollable Stage (Hardware-accelerated without mask-image tearing) */}
       <main
-        className="relative z-20 flex-1 overflow-y-auto no-scrollbar px-8 pb-4 pt-3"
-        style={{
-          WebkitMaskImage:
-            'linear-gradient(to bottom, transparent 0, #000 1.2rem, #000 calc(100% - 1.2rem), transparent 100%)',
-          maskImage:
-            'linear-gradient(to bottom, transparent 0, #000 1.2rem, #000 calc(100% - 1.2rem), transparent 100%)',
-        }}
+        onScroll={handleMainScroll}
+        className="relative z-20 flex-1 overflow-y-auto overscroll-contain no-scrollbar px-6 pb-3 pt-2 [transform:translateZ(0)]"
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={stageKey}
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            exit={{ opacity: 0, y: -8 }}
             transition={{ duration: stageSeconds, ease: [0.22, 1, 0.36, 1] }}
           >
             <ConsoleErrorBoundary resetKey={stageKey}>
               {selectedStoreHubGame ? (
                 <StoreGameDetailView
                   hubGame={selectedStoreHubGame}
+                  games={games}
                   onBack={() => setSelectedStoreHubGame(null)}
-                  onSelectSimilarHubGame={(hg) => setSelectedStoreHubGame(hg)}
+                  onSelectSimilarHubGame={handleSelectHubGame}
                   onGameAddedToLibrary={() => {
                     void refreshData()
+                  }}
+                  onPlayGame={(g) => {
+                    void handlePlayOrResume(g)
+                  }}
+                  onOpenGameHub={(g) => {
+                    setSelectedStoreHubGame(null)
+                    setSelectedGameId(g.id)
+                  }}
+                  onOpenMemoryTab={() => {
+                    setSelectedStoreHubGame(null)
+                    setActiveTab('memory')
+                  }}
+                  onSwitchToLegacyMode={() => {
+                    void handleExitConsole()
                   }}
                 />
               ) : selectedGame ? (
@@ -847,28 +1037,20 @@ export const ConsoleShell: React.FC = () => {
                   comingSoonHub={comingSoonHub}
                   dealsHub={discountedHub}
                   collections={collections}
-                  onPlayOrResume={(g) => {
-                    void handlePlayOrResume(g)
-                  }}
-                  onOpenGameHub={(g) => setSelectedGameId(g.id)}
+                  onPlayOrResume={handlePlayOrResume}
+                  onOpenGameHub={handleOpenGameHub}
                   onSelectHubGame={handleSelectHubGame}
                   onFocusGame={handleFocusGame}
-                  onToggleFavorite={(g) => {
-                    void handleToggleFavorite(g)
-                  }}
-                  onGoToDesktopScan={() => {
-                    void handleExitConsole()
-                  }}
+                  onToggleFavorite={handleToggleFavorite}
+                  onGoToDesktopScan={handleExitConsole}
                 />
               ) : activeTab === 'library' ? (
                 <LibraryView
                   games={games}
                   runningGameIds={runningGameIds}
-                  onSelectGame={(g) => setSelectedGameId(g.id)}
+                  onSelectGame={handleOpenGameHub}
                   onFocusGame={handleFocusGame}
-                  onToggleFavorite={(g) => {
-                    void handleToggleFavorite(g)
-                  }}
+                  onToggleFavorite={handleToggleFavorite}
                 />
               ) : activeTab === 'store' ? (
                 <StoreView
@@ -877,14 +1059,33 @@ export const ConsoleShell: React.FC = () => {
                   comingSoon={comingSoonHub}
                   discounted={discountedHub}
                   onSelectHubGame={handleSelectHubGame}
+                  onWishlistUpdated={refreshData}
+                />
+              ) : activeTab === 'wishlist' ? (
+                <WishlistView
+                  games={games}
+                  storeDeals={discountedHub}
+                  storeUpcoming={comingSoonHub}
+                  storeTopRated={topRatedHub}
+                  onOpenGameHub={handleOpenGameHub}
+                  onSelectHubGame={handleSelectHubGame}
+                  onFocusGame={handleFocusGame}
+                  onGoToStore={() => setActiveTab('store')}
+                  onRefreshGames={refreshData}
+                />
+              ) : activeTab === 'memory' ? (
+                <MemoryView
+                  games={games}
+                  onOpenGameHub={handleOpenGameHub}
+                  onFocusGame={handleFocusGame}
+                  onRefreshGames={refreshData}
+                  onSwitchToLegacyMode={handleExitConsole}
                 />
               ) : activeTab === 'downloads' ? (
                 <DownloadsView
                   downloads={downloads}
                   games={games}
-                  onRefresh={() => {
-                    void refreshData()
-                  }}
+                  onRefresh={refreshData}
                 />
               ) : activeTab === 'music' ? (
                 <MusicView games={games} />
@@ -898,9 +1099,7 @@ export const ConsoleShell: React.FC = () => {
                 <SettingsView />
               ) : (
                 <PowerView
-                  onExitToDesktop={() => {
-                    void handleExitConsole()
-                  }}
+                  onExitToDesktop={handleExitConsole}
                   onSwitchProfile={() => setProfileGateCompleted(false)}
                 />
               )}
@@ -911,7 +1110,7 @@ export const ConsoleShell: React.FC = () => {
 
       {/* Bottom Control Hints */}
       <footer
-        className={`relative z-30 flex items-center justify-between gap-4 px-10 pb-5 pt-2 ${
+        className={`relative z-30 flex items-center justify-between gap-4 px-6 pb-3 pt-1.5 ${
           isLight ? 'text-slate-600' : 'text-white/60'
         }`}
       >
@@ -926,22 +1125,15 @@ export const ConsoleShell: React.FC = () => {
         </div>
       </footer>
 
-      {/* 3.4-Second Cinematic Boot Intro (New Task #4) */}
       <ConsoleBootIntro open={booting} onFinish={() => setBooting(false)} />
-
-      {/* Smooth Console Exit Animation when returning to Legacy Mode (New Task #5) */}
       <ConsoleExitOutro open={exitingToDesktop} />
-
-      {/* Minimalist PS5-Style Who's Playing Gate (Bug #1 & #2) */}
       <WhoIsPlayingModal open={showProfileGate} onDone={() => setProfileGateCompleted(true)} />
 
       <QuickSettingsPanel
         open={quickSettingsOpen}
         onClose={() => setQuickSettingsOpen(false)}
         onOpenPowerMenu={() => setActiveTab('power')}
-        onExitConsoleMode={() => {
-          void handleExitConsole()
-        }}
+        onExitConsoleMode={handleExitConsole}
         onOpenBooster={() => setActiveTab('booster')}
       />
 
@@ -949,11 +1141,25 @@ export const ConsoleShell: React.FC = () => {
       <AuroraScreensaver />
 
       {controllerDisconnectedModal && (
-        <div className="fixed inset-0 z-[270] bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="max-w-md w-full p-8 rounded-3xl bg-slate-950 border border-amber-400/40 text-center space-y-4 shadow-2xl">
-            <Gamepad2 className="w-12 h-12 text-amber-400 mx-auto animate-bounce" />
-            <h2 className="text-2xl font-black text-white">Controller Disconnected</h2>
-            <p className="text-sm text-slate-300">Reconnect your controller to continue.</p>
+        <div className="fixed inset-0 z-[270] bg-black/70 backdrop-blur-md flex items-center justify-center p-6">
+          <div
+            className={`max-w-md w-full p-8 rounded-3xl border text-center space-y-4 shadow-2xl ${
+              isLight
+                ? 'bg-white border-amber-500/40 text-slate-900'
+                : 'bg-slate-950 border-amber-400/40 text-white'
+            }`}
+          >
+            <Gamepad2
+              className={`w-12 h-12 mx-auto animate-bounce ${
+                isLight ? 'text-amber-600' : 'text-amber-400'
+              }`}
+            />
+            <h2 className={`text-2xl font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>
+              Controller Disconnected
+            </h2>
+            <p className={`text-sm ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+              Reconnect your controller to continue.
+            </p>
             <button
               type="button"
               onClick={() => setControllerDisconnectedModal(false)}

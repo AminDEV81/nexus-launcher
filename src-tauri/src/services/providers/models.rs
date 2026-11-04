@@ -58,7 +58,7 @@ pub struct UnifiedArtwork {
     pub is_animated: bool,
     pub width: i64,
     pub height: i64,
-    pub provider: String, // "steam", "steamgrid", "local"
+    pub provider: String, // "steam", "steamgrid", "igdb", "local"
     pub artwork_type: String, // "cover", "hero", "logo", "screenshot"
 }
 
@@ -109,13 +109,17 @@ impl<'de> Deserialize<'de> for UnifiedArtwork {
 
 impl UnifiedArtwork {
     pub fn to_grid_option(&self) -> GridOption {
+        // Positive sequential IDs come from SteamGridDB community uploads (higher ID = newer upload).
+        // Non-numeric IDs (such as "steam-..." or "igdb-...") are mapped to negative IDs so they
+        // never masquerade as brand-new SteamGridDB uploads when sorting by Newest.
         let numeric_id = self
             .id
             .parse::<i64>()
             .unwrap_or_else(|_| {
                 let mut hasher = std::collections::hash_map::DefaultHasher::new();
                 std::hash::Hash::hash(&self.id, &mut hasher);
-                std::hash::Hasher::finish(&hasher) as i64
+                let h = (std::hash::Hasher::finish(&hasher) & 0x3FFF_FFFF) as i64;
+                -(h.max(1))
             });
 
         GridOption {

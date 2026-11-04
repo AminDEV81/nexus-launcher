@@ -5,72 +5,47 @@ import { isVideoAsset } from '@/lib/media-type'
 import { useInViewport } from '@/hooks/use-in-viewport'
 import { useWindowActive } from '@/hooks/use-window-active'
 
+const MAX_CONCURRENT_THUMBS = 4
+let activeThumbLoads = 0
+const thumbQueue: Array<() => void> = []
+
+function acquireThumbSlot(): Promise<() => void> {
+  return new Promise((resolve) => {
+    const tryStart = () => {
+      if (activeThumbLoads < MAX_CONCURRENT_THUMBS) {
+        activeThumbLoads++
+        let released = false
+        resolve(() => {
+          if (released) return
+          released = true
+          activeThumbLoads = Math.max(0, activeThumbLoads - 1)
+          const next = thumbQueue.shift()
+          if (next) next()
+        })
+      } else {
+        thumbQueue.push(tryStart)
+      }
+    }
+    tryStart()
+  })
+}
+
 interface CoverMediaProps {
   src: string
+  fallbackSrc?: string
   mime?: string | null
   className?: string
-  /**
-   * Whether `src` is a Live Cover (animated WebP or video) rather than
-   * a plain static image. Defaults to `false` so existing call sites
-   * (screenshots, generic thumbnails) keep rendering a plain `<img>`
-   * unless they opt in.
-   */
   isAnimated?: boolean
-  /**
-   * Per-game Live Cover kill switch (`games.animated_cover_enabled`).
-   * When `false`, the cover always shows its static first frame, even
-   * on hover. Defaults to `true`.
-   */
   animatedEnabled?: boolean
-  /**
-   * Plays the Live Cover without requiring hover — used for the
-   * selected card in the grid/list and for the details panel hero,
-   * which only renders for the selected game in the first place.
-   */
   alwaysLive?: boolean
-  /**
-   * Controlled hover state. Pass this when an overlay sitting on top
-   * of the cover (e.g. the grid card's play-button overlay) would
-   * otherwise intercept mouseenter/mouseleave before they reach this
-   * component — track hover on the outer card instead and forward it
-   * here. When omitted, CoverMedia tracks hover on itself.
-   */
   hovered?: boolean
-  /**
-   * Optional custom fallback element to render if image fails to load.
-   */
   fallback?: React.ReactNode
-  /**
-   * Optional callback when media loading fails.
-   */
   onError?: () => void
 }
 
-/**
- * Renders a cover/thumbnail. Three cases:
- *
- * - Plain static image (`isAnimated` false, not a video) — a regular
- *   `<img>`, same as always.
- * - Video Live Cover — a `<video>` that only plays while hovered (or
- *   `alwaysLive`) *and* in viewport; paused (and reset) otherwise. A
- *   `<canvas>` snapshot of the first frame is kept underneath as the
- *   static poster — without it, a `preload="metadata"` video shows
- *   nothing at all until it's actually played once, which is what
- *   made covers go blank when Live Cover was disabled.
- * - Animated-image Live Cover (WebP/GIF) — same canvas-poster
- *   approach, since `<img>` has no native pause.
- *
- * This keeps at most one Live Cover decoding/animating at a time
- * (whichever is hovered/selected), and unmounts the live media entirely
- * when it is off-screen or the Nexus window is unfocused — instead of
- * letting every visible Live Cover use a decoder in the background.
- *
- * Falls back to a small placeholder icon on a load error instead of
- * the browser's broken-image glyph, since a dead SteamGridDB URL or an
- * unsupported codec should degrade gracefully, not look broken.
- */
 export function CoverMedia({
   src,
+  fallbackSrc,
   mime,
   className,
   isAnimated = false,
@@ -80,13 +55,22 @@ export function CoverMedia({
   fallback,
   onError,
 }: CoverMediaProps) {
+  const [activeSrc, setActiveSrc] = useState(src)
+  const [triedFallback, setTriedFallback] = useState(false)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
+    setActiveSrc(src)
+    setTriedFallback(false)
     setFailed(false)
-  }, [src])
+  }, [src, fallbackSrc])
 
   const handleFail = () => {
+    if (!triedFallback && fallbackSrc && fallbackSrc !== activeSrc) {
+      setTriedFallback(true)
+      setActiveSrc(fallbackSrc)
+      return
+    }
     setFailed(true)
     onError?.()
   }
@@ -102,10 +86,19 @@ export function CoverMedia({
     )
   }
 
-  if (isVideoAsset(src, mime)) {
+  if (isVideoAsset(activeSrc, mime)) {
+    if (!animatedEnabled && !alwaysLive) {
+      return (
+        <StaticVideoThumbnail
+          src={activeSrc}
+          className={className}
+          onError={handleFail}
+        />
+      )
+    }
     return (
       <VideoCover
-        src={src}
+        src={activeSrc}
         className={className}
         canPlay={animatedEnabled}
         alwaysLive={alwaysLive}
@@ -118,7 +111,7 @@ export function CoverMedia({
   if (isAnimated) {
     return (
       <AnimatedImageCover
-        src={src}
+        src={activeSrc}
         className={className}
         canPlay={animatedEnabled}
         alwaysLive={alwaysLive}
@@ -130,7 +123,7 @@ export function CoverMedia({
 
   return (
     <img
-      src={src}
+      src={activeSrc}
       alt=""
       className={className}
       draggable={false}
@@ -138,6 +131,117 @@ export function CoverMedia({
       decoding="async"
       onError={handleFail}
     />
+  )
+}
+
+/**
+ * Pure static preview for `.webm`/`.mp4` Live Cover thumbnails when `animatedEnabled={false}`.
+ * Never calls `play()` — seeks once to `#t=0.75` (past any black intro fade) and stays strictly
+ * paused so the user sees a clear, completely static image of the Live Cover with zero FPS drop.
+ */
+function StaticVideoThumbnail({
+  src,
+  className,
+  onError,
+}: {
+  src: string
+  className?: string
+  onError: () => void
+}) {
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const inViewport = useInViewport(wrapperRef)
+  const [slotAcquired, setSlotAcquired] = useState(false)
+  const [frameReady, setFrameReady] = useState(false)
+  const releaseRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    setSlotAcquired(false)
+    setFrameReady(false)
+  }, [src])
+
+  useEffect(() => {
+    if (slotAcquired || !inViewport) return
+    let cancelled = false
+
+    acquireThumbSlot().then((release) => {
+      if (cancelled) {
+        release()
+        return
+      }
+      releaseRef.current = release
+      setSlotAcquired(true)
+    })
+
+    return () => {
+      cancelled = true
+      if (releaseRef.current) {
+        releaseRef.current()
+        releaseRef.current = null
+      }
+    }
+  }, [inViewport, slotAcquired, src])
+
+  function releaseSlot() {
+    if (releaseRef.current) {
+      releaseRef.current()
+      releaseRef.current = null
+    }
+  }
+
+  const videoSrcWithTime = src.includes('#') ? src : `${src}#t=0.75`
+
+  return (
+    <div
+      ref={wrapperRef}
+      className={cn(
+        'relative overflow-hidden bg-slate-800/80',
+        !frameReady && 'animate-pulse',
+        className,
+      )}
+    >
+      {slotAcquired && (
+        <video
+          src={videoSrcWithTime}
+          muted
+          playsInline
+          disablePictureInPicture
+          preload="metadata"
+          className={cn(
+            'pointer-events-none size-full object-cover transition-opacity duration-200',
+            frameReady ? 'opacity-100' : 'opacity-0',
+          )}
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget
+            v.pause()
+            const dur = v.duration
+            const target =
+              dur && Number.isFinite(dur) && dur > 0.3
+                ? Math.min(1.2, Math.max(0.4, dur * 0.35))
+                : 0.75
+            try {
+              v.currentTime = target
+            } catch {
+              setFrameReady(true)
+              releaseSlot()
+            }
+          }}
+          onLoadedData={(e) => {
+            e.currentTarget.pause()
+            setFrameReady(true)
+            releaseSlot()
+          }}
+          onSeeked={(e) => {
+            e.currentTarget.pause()
+            setFrameReady(true)
+            releaseSlot()
+          }}
+          onError={() => {
+            releaseSlot()
+            onError()
+          }}
+        />
+      )}
+    </div>
   )
 }
 
@@ -158,100 +262,66 @@ function VideoCover({
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
   const [selfHovered, setSelfHovered] = useState(false)
-  const [posterReady, setPosterReady] = useState(false)
-  const [liveTimedOut, setLiveTimedOut] = useState(false)
   const hovered = hoveredProp ?? selfHovered
   const inViewport = useInViewport(wrapperRef)
   const windowActive = useWindowActive()
 
-  useEffect(() => {
-    if (!alwaysLive) {
-      setLiveTimedOut(false)
-      return
-    }
-    setLiveTimedOut(false)
-    const timer = setTimeout(() => {
-      setLiveTimedOut(true)
-    }, 12000)
-    return () => clearTimeout(timer)
-  }, [alwaysLive, src])
-
-  const playing =
-    windowActive && canPlay && (hovered || (alwaysLive && !liveTimedOut)) && inViewport
-  // Fully unmount the media element when its host window is inactive. Calling
-  // `pause()` alone is not enough for every WebView2 codec path: keeping a
-  // sourced video in the DOM can retain its decoder and GPU texture.
-  const shouldRenderVideo = windowActive && inViewport
-  // Chromium (and the WebView2/WebKit views Tauri uses) suspends a
-  // `display: none` video's network loading entirely, so it never
-  // reaches `loadeddata` — which is why covers stayed blank until the
-  // first hover. Keep the video visible-but-behind-the-canvas (via
-  // z-index, not display) until a poster frame has actually been
-  // captured, then switch to display:none for real once there's a
-  // fallback frame to show underneath it.
-  const videoLoading = shouldRenderVideo && !posterReady
-
-  function drawPosterFrame() {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas || !video.videoWidth) return
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    canvas.getContext('2d')?.drawImage(video, 0, 0)
-    setPosterReady(true)
-  }
+  const playing = windowActive && canPlay && (hovered || alwaysLive) && inViewport
 
   useEffect(() => {
     const el = videoRef.current
     if (!el) return
     if (playing) {
-      el.play().catch(() => {
-        // Autoplay can still be rejected in some embedding contexts;
-        // the canvas poster stays visible either way, so there's
-        // nothing to recover from here.
-      })
+      el.play().catch(() => {})
     } else {
       el.pause()
-      el.currentTime = 0
+      try {
+        if (el.readyState >= 1) {
+          el.currentTime = 0.65
+        }
+      } catch {}
     }
-  }, [playing])
+  }, [playing, src])
 
   return (
     <div
       ref={wrapperRef}
-      className={cn('relative', className)}
+      className={cn('relative overflow-hidden bg-slate-800/80', className)}
       onMouseEnter={() => setSelfHovered(true)}
       onMouseLeave={() => setSelfHovered(false)}
     >
-      {/* Static poster underneath, always mounted so there's no flash
-          while the video is hidden — and so a disabled/never-played
-          Live Cover still shows *something* instead of a blank box. */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 size-full object-cover"
-        style={{ zIndex: videoLoading ? 1 : 0 }}
+      <video
+        ref={videoRef}
+        src={src}
+        className="size-full object-cover"
+        autoPlay={playing}
+        loop
+        muted
+        playsInline
+        disablePictureInPicture
+        preload="metadata"
+        onLoadedMetadata={(e) => {
+          const v = e.currentTarget
+          if (playing) {
+            v.play().catch(() => {})
+          } else {
+            try {
+              v.currentTime = 0.65
+            } catch {}
+          }
+        }}
+        onError={onError}
       />
-      {shouldRenderVideo && (
-        <video
-          ref={videoRef}
-          src={src}
-          className="absolute inset-0 size-full object-cover"
-          style={{ display: playing || videoLoading ? 'block' : 'none', zIndex: 0 }}
-          loop
-          muted
-          playsInline
-          disablePictureInPicture
-          preload="auto"
-          onLoadedData={drawPosterFrame}
-          onError={onError}
-        />
-      )}
     </div>
   )
 }
 
+/**
+ * Freezes animated `.webp` / `.gif` images onto a static `<canvas>` and unmounts the `<img>`
+ * whenever `playing` is false (`canPlay={false}` in the picker list and popup), so animated WebP
+ * covers never play at low FPS or consume CPU/GPU decoding in the background!
+ */
 function AnimatedImageCover({
   src,
   className,
@@ -272,69 +342,60 @@ function AnimatedImageCover({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [selfHovered, setSelfHovered] = useState(false)
   const [posterReady, setPosterReady] = useState(false)
-  const [liveTimedOut, setLiveTimedOut] = useState(false)
   const hovered = hoveredProp ?? selfHovered
   const inViewport = useInViewport(wrapperRef)
   const windowActive = useWindowActive()
 
   useEffect(() => {
-    if (!alwaysLive) {
-      setLiveTimedOut(false)
-      return
-    }
-    setLiveTimedOut(false)
-    const timer = setTimeout(() => {
-      setLiveTimedOut(true)
-    }, 12000)
-    return () => clearTimeout(timer)
-  }, [alwaysLive, src])
+    setPosterReady(false)
+  }, [src])
 
-  const playing =
-    windowActive && canPlay && (hovered || (alwaysLive && !liveTimedOut)) && inViewport
-  // An animated image has no pause API. Once its first frame is in the
-  // canvas, unmount it until it is actually needed again so it cannot keep
-  // decoding in the background.
-  const shouldRenderImage = windowActive && inViewport && (!posterReady || playing)
-  // Stay visible-but-behind-the-canvas until a poster frame is captured;
-  // a `display: none` image could not reliably load its first frame.
-  const imgLoading = shouldRenderImage && !posterReady
+  const playing = windowActive && canPlay && (hovered || alwaysLive) && inViewport
+  const shouldKeepImgMounted = !posterReady || playing
 
   function drawPosterFrame() {
     const img = imgRef.current
     const canvas = canvasRef.current
-    if (!img || !canvas || !img.naturalWidth) return
-    canvas.width = img.naturalWidth
-    canvas.height = img.naturalHeight
-    canvas.getContext('2d')?.drawImage(img, 0, 0)
-    setPosterReady(true)
+    if (!img || !canvas || !img.naturalWidth || !img.naturalHeight) return
+    try {
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        setPosterReady(true)
+      }
+    } catch {
+      setPosterReady(false)
+    }
   }
 
   return (
     <div
       ref={wrapperRef}
-      className={cn('relative', className)}
+      className={cn(
+        'relative overflow-hidden bg-slate-800/80',
+        !posterReady && 'animate-pulse',
+        className,
+      )}
       onMouseEnter={() => setSelfHovered(true)}
       onMouseLeave={() => setSelfHovered(false)}
     >
-      {/* Static poster: a canvas snapshot of the first decoded frame.
-          Always mounted underneath so there's no flash while the live
-          <img> is hidden. */}
       <canvas
         ref={canvasRef}
         className="absolute inset-0 size-full object-cover"
-        style={{ zIndex: imgLoading ? 1 : 0 }}
+        style={{ display: posterReady && !playing ? 'block' : 'none' }}
       />
-      {/* The real animated asset is only mounted to capture its poster or
-          while it is live. Unmounting is stronger than hiding it: WebP/GIF
-          decoding cannot continue in an inactive window. */}
-      {shouldRenderImage && (
+      {shouldKeepImgMounted && (
         <img
           ref={imgRef}
           src={src}
           alt=""
           draggable={false}
-          className="absolute inset-0 size-full object-cover"
-          style={{ display: playing || imgLoading ? 'block' : 'none', zIndex: 0 }}
+          loading="lazy"
+          decoding="async"
+          className="size-full object-cover"
+          style={{ display: !posterReady || playing ? 'block' : 'none' }}
           onLoad={drawPosterFrame}
           onError={onError}
         />

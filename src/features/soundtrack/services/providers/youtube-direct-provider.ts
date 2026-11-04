@@ -1,4 +1,4 @@
-import { BaseSoundtrackProvider } from './base-provider'
+import { BaseSoundtrackProvider, extractCoreGameTitle } from './base-provider'
 import type {
   GameIdentity,
   PlaybackSource,
@@ -9,6 +9,50 @@ import type {
   SoundtrackTrack,
 } from '../../types'
 import { soundtrackSearchYouTube } from '../tauri-soundtrack'
+
+const NON_ORIGINAL_YOUTUBE_MARKERS = [
+  'espanol',
+  'español',
+  'spanish',
+  'portugues',
+  'português',
+  'francais',
+  'français',
+  'fandub',
+  'dublado',
+  'traducida',
+  'subtitulado',
+  'en espanol',
+  'al espanol',
+  'cover',
+  'parody',
+  'parodia',
+  'karaoke',
+  'piano tutorial',
+  'synthesia',
+  'nightcore',
+  'slowed',
+  'mashup',
+  'gameplay',
+  'walkthrough',
+  'review',
+  'reaction',
+  'trailer',
+  'teaser',
+  'short',
+  'preview',
+]
+
+function isCleanOstVideo(title: string, query: string): boolean {
+  const low = title.toLowerCase()
+  const qLow = query.toLowerCase()
+  for (const marker of NON_ORIGINAL_YOUTUBE_MARKERS) {
+    if (low.includes(marker) && !qLow.includes(marker)) {
+      return false
+    }
+  }
+  return true
+}
 
 export class YouTubeDirectProvider extends BaseSoundtrackProvider {
   public id = 'youtube_direct'
@@ -76,25 +120,29 @@ export class YouTubeDirectProvider extends BaseSoundtrackProvider {
       })
     }
 
-    const cleanGame = this.cleanTitle(game?.title || track.artist || '')
+    const rawGame = extractCoreGameTitle(game?.title || '') || this.cleanTitle(track.artist || '')
     const cleanTrack = this.cleanTitle(track.title)
-    const query = `${cleanGame} ${cleanTrack} OST`.trim()
+    const words = rawGame.trim().split(/\s+/).filter(Boolean)
+    const query =
+      words.length <= 1 && rawGame
+        ? `${rawGame} "${cleanTrack}" Official Video Game Soundtrack OST`
+        : `${rawGame} ${cleanTrack} Official Soundtrack OST`.trim()
 
     try {
       const results = await soundtrackSearchYouTube(query, 6)
       if (results && results.length > 0) {
-        const nonGameplay = results.filter(
+        const authentic = results.filter(
           (r) =>
-            !/\b(?:gameplay|walkthrough|review|reaction|trailer|teaser|short)\b/i.test(r.title) &&
+            isCleanOstVideo(r.title, query) &&
             (r.duration_seconds === undefined ||
               r.duration_seconds === null ||
               r.duration_seconds === 0 ||
-              r.duration_seconds >= 38),
+              r.duration_seconds >= 45),
         )
-        const embedFriendly = [...nonGameplay].sort((a, b) => {
+        const embedFriendly = [...authentic].sort((a, b) => {
           const aTopic = /- Topic$/i.test(a.channel || '') ? 1 : 0
           const bTopic = /- Topic$/i.test(b.channel || '') ? 1 : 0
-          return aTopic - bTopic
+          return bTopic - aTopic
         })
 
         const pool = embedFriendly.length > 0 ? embedFriendly : results

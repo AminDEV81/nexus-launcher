@@ -109,7 +109,7 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
             </div>
 
             <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-2 rounded-full bg-cyan-400/20 border border-cyan-400/40 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-cyan-300">
+              <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-extrabold uppercase tracking-wider ${isLight ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-cyan-400/20 border-cyan-400/40 text-cyan-300"}`}>
                 <Sparkles className="size-3.5" />
                 {levelInfo.rankTitle} · Gamer Passport
               </div>
@@ -244,7 +244,7 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
                 <p className="text-xs text-slate-400">{circadian.dominantPersona.description}</p>
               </div>
             </div>
-            <span className="rounded-full bg-cyan-500/20 border border-cyan-400/30 px-3 py-1 text-xs font-extrabold text-cyan-300">
+            <span className={`rounded-full border px-3 py-1 text-xs font-extrabold ${isLight ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-cyan-500/20 border-cyan-400/30 text-cyan-300"}`}>
               {circadian.dominantPersona.tag}
             </span>
           </div>
@@ -411,7 +411,7 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
                     </p>
                     <p className="text-slate-400 mt-0.5">{s.started_at}</p>
                   </div>
-                  <span className="shrink-0 rounded-xl bg-cyan-500/20 px-3 py-1 font-extrabold text-cyan-300">
+                  <span className={`shrink-0 rounded-xl px-3 py-1 font-extrabold ${isLight ? "bg-indigo-50 text-indigo-700" : "bg-cyan-500/20 text-cyan-300"}`}>
                     {formatPlaytime(s.duration_seconds ?? 0)}
                   </span>
                 </div>

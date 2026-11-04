@@ -13,8 +13,29 @@ import {
   cropAndSaveImage,
   resetArtwork,
 } from '@/services/metadata'
-import type { ArtworkKind, CropRect } from '@/services/metadata'
+import type { ArtworkKind, CoverOption, CropRect } from '@/services/metadata'
 import type { Game } from '@/types/models'
+
+export type ArtworkSortMode = 'newest' | 'popular'
+
+/**
+ * Sorts artwork options dynamically:
+ * - `'newest'`: puts genuine SteamGridDB community uploads (`id > 0`) first, ordered by
+ *   descending SteamGridDB sequential upload ID (newest community uploads at the top),
+ *   followed by official Steam/IGDB high-res assets.
+ * - `'popular'`: preserves the provider's default popularity/score ranking.
+ */
+export function sortArtworkOptions(
+  options: CoverOption[] | undefined,
+  sortMode: ArtworkSortMode,
+): CoverOption[] {
+  if (!options || options.length === 0) return []
+  if (sortMode === 'popular') return options
+
+  const community = options.filter((o) => o.id > 0).sort((a, b) => b.id - a.id)
+  const official = options.filter((o) => o.id <= 0)
+  return [...community, ...official]
+}
 
 function syncGameInCache(queryClient: QueryClient, updatedGame: Game) {
   queryClient.setQueriesData<Game[]>({ queryKey: ['games'] }, (games) =>
@@ -28,12 +49,20 @@ function syncGameInCache(queryClient: QueryClient, updatedGame: Game) {
   queryClient.invalidateQueries({ queryKey: ['games'] })
 }
 
-export function useCoverOptions(gameId: string | undefined, enabled: boolean) {
+export function useCoverOptions(
+  gameId: string | undefined,
+  enabled: boolean,
+  customQuery?: string,
+  refreshTick = 0,
+) {
+  const normalizedQuery = customQuery?.trim() || ''
   return useQuery({
-    queryKey: ['cover-options', gameId],
-    queryFn: () => searchCoverOptions(gameId as string),
+    queryKey: ['cover-options', gameId, normalizedQuery, refreshTick],
+    queryFn: () => searchCoverOptions(gameId as string, normalizedQuery || undefined),
     enabled: Boolean(gameId) && enabled,
-    staleTime: 5 * 60_000,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
     retry: false,
   })
 }
@@ -81,22 +110,38 @@ export function useApplyCustomCover() {
   })
 }
 
-export function useBannerOptions(gameId: string | undefined, enabled: boolean) {
+export function useBannerOptions(
+  gameId: string | undefined,
+  enabled: boolean,
+  customQuery?: string,
+  refreshTick = 0,
+) {
+  const normalizedQuery = customQuery?.trim() || ''
   return useQuery({
-    queryKey: ['banner-options', gameId],
-    queryFn: () => searchBannerOptions(gameId as string),
+    queryKey: ['banner-options', gameId, normalizedQuery, refreshTick],
+    queryFn: () => searchBannerOptions(gameId as string, normalizedQuery || undefined),
     enabled: Boolean(gameId) && enabled,
-    staleTime: 5 * 60_000,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
     retry: false,
   })
 }
 
-export function useLogoOptions(gameId: string | undefined, enabled: boolean) {
+export function useLogoOptions(
+  gameId: string | undefined,
+  enabled: boolean,
+  customQuery?: string,
+  refreshTick = 0,
+) {
+  const normalizedQuery = customQuery?.trim() || ''
   return useQuery({
-    queryKey: ['logo-options', gameId],
-    queryFn: () => searchLogoOptions(gameId as string),
+    queryKey: ['logo-options', gameId, normalizedQuery, refreshTick],
+    queryFn: () => searchLogoOptions(gameId as string, normalizedQuery || undefined),
     enabled: Boolean(gameId) && enabled,
-    staleTime: 5 * 60_000,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: 'always',
     retry: false,
   })
 }

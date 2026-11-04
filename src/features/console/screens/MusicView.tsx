@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   BarChart3,
@@ -16,6 +16,7 @@ import {
   Music,
   Pause,
   Play,
+  Plus,
   Radio,
   Repeat,
   Search,
@@ -36,6 +37,7 @@ import {
   type VisualizerMode,
 } from '@/features/soundtrack/store/soundtrack-store'
 import { soundtrackResolver } from '@/features/soundtrack/services/soundtrack-resolver'
+import { scoreAlbumForUserSearchQuery } from '@/features/soundtrack/services/providers/base-provider'
 import { getAllCuratedSoundtracks } from '@/features/soundtrack/services/curated-soundtracks'
 import {
   getSoundtrackDownloads,
@@ -78,6 +80,83 @@ const SUB_TABS: Array<{ id: CenterSubTab; label: string; icon: typeof Sparkles }
   { id: 'downloaded', label: 'Local & Cached', icon: HardDrive },
 ]
 
+const CONSOLE_DISCOVERY_SEEDS: string[] = [
+  'Portal',
+  'Portal 2',
+  'Half-Life 2',
+  'Clair Obscur Expedition 33',
+  'Elden Ring',
+  'Cyberpunk 2077',
+  'The Witcher 3 Wild Hunt',
+  'Baldur Gate 3',
+  'Red Dead Redemption 2',
+  'God of War Ragnarok',
+  'Ghost of Tsushima',
+  'Hollow Knight',
+  'NieR Automata',
+  'Persona 5 Royal',
+  'Persona 3 Reload',
+  'Final Fantasy VII Rebirth',
+  'Final Fantasy XVI',
+  'Dark Souls III',
+  'Bloodborne',
+  'Sekiro Shadows Die Twice',
+  'Death Stranding',
+  'Hades II',
+  'Doom Eternal',
+  'The Elder Scrolls V Skyrim',
+  'Undertale',
+  'Celeste',
+  'Devil May Cry 5',
+  'Black Myth Wukong',
+  'Silent Hill 2',
+  'Resident Evil 4',
+  'Alan Wake 2',
+  'Grand Theft Auto V',
+  'The Last of Us Part I',
+  'Disco Elysium',
+  'Ori and the Will of the Wisps',
+  'Metaphor ReFantazio',
+  'Metal Gear Rising Revengeance',
+  'Subnautica',
+  'Risk of Rain 2',
+  'Cuphead',
+  'Lies of P',
+  'Armored Core VI Fires of Rubicon',
+  'Monster Hunter Wilds',
+  'Kingdom Come Deliverance II',
+  'Yakuza 0',
+  'Chrono Trigger',
+  'Mass Effect Legendary Edition',
+  'Halo The Master Chief Collection',
+  'Detroit Become Human',
+  'Outer Wilds',
+  'Stellar Blade',
+  'Hi-Fi Rush',
+  'Katana ZERO',
+  'ULTRAKILL',
+  'Terraria',
+  'BioShock Infinite',
+  'Dishonored',
+  'Deus Ex Human Revolution',
+  'Batman Arkham City',
+  'Uncharted 4',
+  'Marvel Spider-Man 2',
+  'Returnal',
+  'Shadow of the Colossus',
+  'Chrono Cross',
+  'Xenoblade Chronicles 3',
+  'Octopath Traveler II',
+  'Dragon Dogma 2',
+  'Alan Wake',
+  'Control',
+  'Frostpunk',
+  'Divinity Original Sin 2',
+  'Sea of Stars',
+  'Bastion',
+  'Transistor',
+]
+
 const VIBE_FILTERS: Array<{
   id: VibeFilterId
   label: string
@@ -112,6 +191,8 @@ const VIBE_FILTERS: Array<{
       'monster hunter',
       'bloodborne',
       'metal gear',
+      'cuphead',
+      'armored core',
     ],
   },
   {
@@ -152,6 +233,8 @@ const VIBE_FILTERS: Array<{
       'half-life',
       'portal',
       'helldivers',
+      'subnautica',
+      'risk of rain',
     ],
   },
   {
@@ -268,12 +351,17 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
     curatedAlbums[0] ?? null,
   )
   const [loadingOst, setLoadingOst] = useState(false)
+  const [enrichingFullAlbum, setEnrichingFullAlbum] = useState(false)
+  const [loadingMoreAlbums, setLoadingMoreAlbums] = useState(false)
+  const [visibleAlbumCount, setVisibleAlbumCount] = useState(24)
+  const [discoverySeedCursor, setDiscoverySeedCursor] = useState(0)
   const [statusLabel, setStatusLabel] = useState<string>('Console Soundtrack Center')
   const [customQuery, setCustomQuery] = useState('')
   const [localFiles, setLocalFiles] = useState<SoundtrackLocalFile[]>([])
   const [downloads, setDownloads] = useState<SoundtrackDownloadRow[]>([])
   const [scanningLocal, setScanningLocal] = useState(false)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const infiniteScrollSentinelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     void loadFavorites().catch(() => {})
@@ -285,12 +373,40 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
       .catch(() => {})
   }, [loadFavorites])
 
-  // Load album & tracklist when selectedSoundtrackGame changes, without auto-playing
+  // Automatically enrich initial active album with its full online tracklist
+  useEffect(() => {
+    const initial = curatedAlbums[0]
+    if (!initial || selectedSoundtrackGame) return
+    let cancelled = false
+    setEnrichingFullAlbum(true)
+    soundtrackResolver
+      .enrichAlbumWithFullTracklist(initial)
+      .then((enriched) => {
+        if (cancelled) return
+        if (enriched.tracks.length > initial.tracks.length) {
+          setActiveAlbumBundle((prev) =>
+            prev?.album.id === initial.album.id ? enriched : prev,
+          )
+          setResolvedAlbums((prev) =>
+            prev.map((a) => (a.album.id === initial.album.id ? enriched : a)),
+          )
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setEnrichingFullAlbum(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [curatedAlbums, selectedSoundtrackGame])
+
+  // Load album & full tracklist when selectedSoundtrackGame changes
   useEffect(() => {
     if (!selectedSoundtrackGame) return
     let cancelled = false
     setLoadingOst(true)
-    setStatusLabel(`Loaded OST for ${selectedSoundtrackGame.name}`)
+    setStatusLabel(`Loading Full OST for ${selectedSoundtrackGame.name}...`)
 
     soundtrackResolver
       .resolveGame({
@@ -303,18 +419,32 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
       .then((albums) => {
         if (cancelled) return
         if (albums.length > 0 && albums[0].tracks.length > 0) {
-          setResolvedAlbums(albums)
+          setResolvedAlbums((prev) => {
+            const combined = [...albums, ...prev]
+            return combined.filter(
+              (b, i, arr) => arr.findIndex((x) => x.album.title === b.album.title) === i,
+            )
+          })
           setActiveAlbumBundle(albums[0])
-          setStatusLabel(`${selectedSoundtrackGame.name} — Ready to Play`)
+          setStatusLabel(
+            `${selectedSoundtrackGame.name} — ${albums[0].tracks.length} Tracks Ready`,
+          )
         } else {
           return soundtrackResolver
             .searchOnlineSoundtracksFast(selectedSoundtrackGame.name)
             .then((online) => {
               if (cancelled) return
               if (online.length > 0 && online[0].tracks.length > 0) {
-                setResolvedAlbums(online)
+                setResolvedAlbums((prev) => {
+                  const combined = [...online, ...prev]
+                  return combined.filter(
+                    (b, i, arr) => arr.findIndex((x) => x.album.title === b.album.title) === i,
+                  )
+                })
                 setActiveAlbumBundle(online[0])
-                setStatusLabel(`${selectedSoundtrackGame.name} — Ready to Play`)
+                setStatusLabel(
+                  `${selectedSoundtrackGame.name} — ${online[0].tracks.length} Tracks Ready`,
+                )
               }
             })
         }
@@ -337,6 +467,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
     if (!q) {
       setResolvedAlbums(curatedAlbums)
       setActiveAlbumBundle(curatedAlbums[0] ?? null)
+      setVisibleAlbumCount(24)
       setStatusLabel('Console Soundtrack Center')
       return
     }
@@ -344,6 +475,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
     const lower = q.toLowerCase()
     const instantMatches = curatedAlbums.filter(
       (b) =>
+        scoreAlbumForUserSearchQuery(b.album.title, b.album.artist ?? '', q) > 0 ||
         b.album.title.toLowerCase().includes(lower) ||
         (b.album.artist ?? '').toLowerCase().includes(lower) ||
         b.tracks.some((t) => t.title.toLowerCase().includes(lower)),
@@ -351,7 +483,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
     if (instantMatches.length > 0) {
       setResolvedAlbums(instantMatches)
       setActiveAlbumBundle(instantMatches[0])
-      setStatusLabel(`Found ${instantMatches.length} Curated Match(es) for "${q}"`)
+      setStatusLabel(`Found ${instantMatches.length} Match(es) for "${q}"`)
     }
 
     searchTimerRef.current = setTimeout(() => {
@@ -359,13 +491,17 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
       soundtrackResolver
         .searchOnlineSoundtracksFast(q)
         .then((online) => {
-          const combined = [...instantMatches, ...online].filter(
-            (b, i, arr) => arr.findIndex((x) => x.album.title === b.album.title) === i,
+          const combined = [...online, ...instantMatches].filter(
+            (b, i, arr) =>
+              arr.findIndex(
+                (x) => x.album.title.toLowerCase() === b.album.title.toLowerCase(),
+              ) === i,
           )
           if (combined.length > 0) {
             setResolvedAlbums(combined)
             setActiveAlbumBundle(combined[0])
-            setStatusLabel(`Soundtrack Results for "${q}" (${combined.length} Albums)`)
+            setVisibleAlbumCount((prev) => Math.max(prev, combined.length))
+            setStatusLabel(`Soundtrack Results for "${q}" (${combined.length} Full Albums)`)
           } else {
             setStatusLabel(`No online OST results found for "${q}"`)
           }
@@ -376,6 +512,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
   }
 
   const filteredAlbums = useMemo(() => {
+    if (customQuery.trim()) return resolvedAlbums
     const activeVibe = VIBE_FILTERS.find((v) => v.id === vibeFilter)
     if (!activeVibe || activeVibe.keywords.length === 0) return resolvedAlbums
     const matches = resolvedAlbums.filter((b) => {
@@ -383,18 +520,71 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
       return activeVibe.keywords.some((kw) => hay.includes(kw))
     })
     return matches.length > 0 ? matches : resolvedAlbums
-  }, [resolvedAlbums, vibeFilter])
+  }, [resolvedAlbums, vibeFilter, customQuery])
+
+  const loadMoreSoundtracks = useCallback(async () => {
+    if (loadingMoreAlbums) return
+    setLoadingMoreAlbums(true)
+    setVisibleAlbumCount((prev) => prev + 18)
+
+    try {
+      const batchSize = 5
+      const seeds: string[] = []
+      for (let i = 0; i < batchSize; i++) {
+        seeds.push(
+          CONSOLE_DISCOVERY_SEEDS[
+            (discoverySeedCursor + i) % CONSOLE_DISCOVERY_SEEDS.length
+          ],
+        )
+      }
+      setDiscoverySeedCursor((prev) => (prev + batchSize) % CONSOLE_DISCOVERY_SEEDS.length)
+
+      const wave = await soundtrackResolver.fetchLiveRadioWave(seeds, 32)
+      if (wave.albums.length > 0) {
+        setResolvedAlbums((prev) => {
+          const existingTitles = new Set(prev.map((a) => a.album.title.toLowerCase().trim()))
+          const fresh = wave.albums.filter(
+            (a) =>
+              a.tracks.length > 0 &&
+              !existingTitles.has(a.album.title.toLowerCase().trim()),
+          )
+          return [...prev, ...fresh]
+        })
+      }
+    } catch {
+      // Keep existing catalog visible on error
+    } finally {
+      setLoadingMoreAlbums(false)
+    }
+  }, [discoverySeedCursor, loadingMoreAlbums])
+
+  // Automatic Infinite Scroll when user scrolls near the bottom of MusicView
+  useEffect(() => {
+    const node = infiniteScrollSentinelRef.current
+    if (!node) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (entry?.isIntersecting && !loadingMoreAlbums) {
+          void loadMoreSoundtracks()
+        }
+      },
+      { rootMargin: '280px' },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [loadMoreSoundtracks, loadingMoreAlbums])
 
   const startLiveRadioWave = (vibeId: VibeFilterId) => {
     const vibe = VIBE_FILTERS.find((v) => v.id === vibeId) ?? VIBE_FILTERS[0]
     const matchingAlbums =
       vibe.keywords.length === 0
-        ? curatedAlbums
-        : curatedAlbums.filter((b) => {
+        ? resolvedAlbums
+        : resolvedAlbums.filter((b) => {
             const hay = `${b.album.title} ${b.album.artist ?? ''}`.toLowerCase()
             return vibe.keywords.some((kw) => hay.includes(kw))
           })
-    const pool = (matchingAlbums.length > 0 ? matchingAlbums : curatedAlbums).flatMap((b) =>
+    const pool = (matchingAlbums.length > 0 ? matchingAlbums : resolvedAlbums).flatMap((b) =>
       b.tracks.map((t) => ({ track: t, album: b.album })),
     )
     if (pool.length === 0) return
@@ -411,7 +601,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
       },
       radioTracks,
     )
-    toast.success(`Started ${vibe.label} Live Radio (${radioTracks.length} tracks)`)
+    toast.success(`Started ${vibe.label} Live Radio (${radioTracks.length} full tracks)`)
   }
 
   const handleScanLocalFiles = async () => {
@@ -436,6 +626,26 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
         title: bundle.album.title,
         coverUrl: bundle.album.cover_url,
       })
+    }
+
+    // Automatically expand curated/short album tracklists to their full online tracklist (20-90 tracks)
+    if (bundle.album.provider_id === 'curated' || bundle.tracks.length < 15) {
+      setEnrichingFullAlbum(true)
+      soundtrackResolver
+        .enrichAlbumWithFullTracklist(bundle)
+        .then((enriched) => {
+          if (enriched.tracks.length > bundle.tracks.length) {
+            setActiveAlbumBundle((prev) =>
+              prev?.album.title === bundle.album.title ? enriched : prev,
+            )
+            setResolvedAlbums((prev) =>
+              prev.map((a) => (a.album.id === bundle.album.id ? enriched : a)),
+            )
+            setStatusLabel(`${enriched.album.title} (${enriched.tracks.length} Full Tracks)`)
+          }
+        })
+        .catch(() => {})
+        .finally(() => setEnrichingFullAlbum(false))
     }
   }
 
@@ -517,6 +727,14 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
     },
   })
 
+  const loadMoreBtnFocus = useFocusable<HTMLButtonElement>({
+    id: 'music_load_more_albums_btn',
+    scopeId: 'console_music_load_more',
+    onConfirm: () => {
+      void loadMoreSoundtracks()
+    },
+  })
+
   const displayedTracks: SoundtrackTrack[] =
     activeAlbumBundle?.tracks?.length
       ? activeAlbumBundle.tracks
@@ -543,7 +761,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* Top Search Bar + Sub-Tab Navigation (Matching Desktop SoundtrackCenterPage) */}
+      {/* Top Search Bar + Sub-Tab Navigation */}
       <div className="flex flex-col gap-4">
         <FocusScope
           id="console_music_search_bar"
@@ -596,7 +814,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
           </button>
         </FocusScope>
 
-        {/* Sub-Tabs Strip (Overview, My Games, Live Radios, Favorites, Queue, Local & Cached) */}
+        {/* Sub-Tabs Strip */}
         <FocusScope
           id="console_music_subtabs"
           orientation="horizontal"
@@ -623,11 +841,11 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
         </FocusScope>
       </div>
 
-      {/* Main Vinyl Deck + Tracklist / Sub-Tab Stage */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Main Vinyl Deck + Tracklist / Sub-Tab Stage (Equal Height on Desktop) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:items-stretch">
         {/* Left Vinyl Deck + Live Audio Visualizer + Scrubbing & Volume */}
         <div
-          className={`lg:col-span-5 rounded-3xl p-7 border backdrop-blur-xl flex flex-col items-center text-center relative overflow-hidden ${
+          className={`lg:col-span-5 lg:h-[520px] rounded-3xl p-6 border backdrop-blur-xl flex flex-col items-center justify-between text-center relative overflow-hidden ${
             isLight
               ? 'bg-white/90 border-slate-300 shadow-xl'
               : 'bg-slate-900/75 border-white/10 shadow-2xl'
@@ -642,9 +860,9 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
           )}
 
           {/* Vinyl Disc + Sleeve */}
-          <div className="relative z-10 w-52 h-52 mb-5 flex items-center justify-center">
+          <div className="relative z-10 w-40 h-40 mb-2 flex items-center justify-center shrink-0">
             <div
-              className={`w-48 h-48 rounded-full border-8 shadow-2xl flex items-center justify-center overflow-hidden ${
+              className={`w-36 h-36 rounded-full border-6 shadow-2xl flex items-center justify-center overflow-hidden ${
                 isLight ? 'border-slate-300 bg-slate-900' : 'border-slate-800/90 bg-slate-950'
               } ${isPlaying ? 'animate-spin' : ''}`}
               style={{ animationDuration: '9s' }}
@@ -728,7 +946,9 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                 shuffleFocus.isFocused
                   ? 'bg-cyan-400 text-slate-950 border-white scale-110'
                   : shuffle
-                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
+                    ? isLight
+                      ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
+                      : 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
                     : isLight
                       ? 'bg-slate-100 text-slate-600 border-slate-300'
                       : 'bg-slate-800/80 text-slate-400 border-white/10'
@@ -792,7 +1012,9 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                 repeatFocus.isFocused
                   ? 'bg-cyan-400 text-slate-950 border-white scale-110'
                   : repeatMode !== 'off'
-                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
+                    ? isLight
+                      ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
+                      : 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
                     : isLight
                       ? 'bg-slate-100 text-slate-600 border-slate-300'
                       : 'bg-slate-800/80 text-slate-400 border-white/10'
@@ -826,7 +1048,9 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                 vizFocus.isFocused
                   ? 'bg-cyan-400 text-slate-950 border-white scale-110'
                   : visualizerMode !== 'off'
-                    ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
+                    ? isLight
+                      ? 'bg-indigo-100 text-indigo-700 border-indigo-300'
+                      : 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40'
                     : isLight
                       ? 'bg-slate-100 text-slate-600 border-slate-300'
                       : 'bg-slate-800/80 text-slate-400 border-white/10'
@@ -868,14 +1092,15 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
           </div>
         </div>
 
-        {/* Right Stage: Switches by Sub-Tab */}
+        {/* Right Stage: Switches by Sub-Tab (Matches Left Vinyl Deck Height 1:1) */}
         <div
-          className={`lg:col-span-7 rounded-3xl p-6 border backdrop-blur-xl max-h-[540px] overflow-y-auto no-scrollbar ${
+          className={`lg:col-span-7 lg:h-[520px] rounded-3xl p-6 border backdrop-blur-xl flex flex-col overflow-hidden ${
             isLight
               ? 'bg-white/90 border-slate-300 shadow-xl'
               : 'bg-slate-900/75 border-white/10 shadow-2xl'
           }`}
         >
+          <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-1">
           {subTab === 'radios' ? (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -1003,7 +1228,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                   <button
                     type="button"
                     onClick={() => clearQueue()}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500/15 border border-rose-400/30 px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/25 cursor-pointer"
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold cursor-pointer ${isLight ? "bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100" : "bg-rose-500/15 border-rose-400/30 text-rose-300 hover:bg-rose-500/25"}`}
                   >
                     <Trash2 className="size-3.5" />
                     Clear Queue
@@ -1066,7 +1291,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                     void handleScanLocalFiles()
                   }}
                   disabled={scanningLocal}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-500/20 border border-cyan-400/40 px-3 py-1.5 text-xs font-extrabold text-cyan-300 hover:bg-cyan-500/30 cursor-pointer"
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-extrabold cursor-pointer ${isLight ? "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100" : "bg-cyan-500/20 border-cyan-400/40 text-cyan-300 hover:bg-cyan-500/30"}`}
                 >
                   <FolderSync className={`size-3.5 ${scanningLocal ? 'animate-spin' : ''}`} />
                   {scanningLocal ? 'Scanning...' : 'Scan Local Folder'}
@@ -1087,14 +1312,17 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                         const localTrack: SoundtrackTrack = {
                           id: lf.id,
                           album_id: 'local_files',
+                          disc_number: 1,
+                          track_number: idx + 1,
                           title: lf.title || lf.file_path.split(/[\\/]/).pop() || 'Local Track',
                           artist: lf.artist ?? 'Local Library',
-                          track_number: idx + 1,
                           duration_ms: lf.duration_ms ?? 180000,
-                          source_provider: 'local',
+                          preview_url: null,
                           stream_url: lf.file_path,
+                          download_url: null,
                           local_path: lf.file_path,
-                          is_Playable: true,
+                          provider_id: 'local',
+                          external_id: null,
                         }
                         void playTrack(localTrack, null, {
                           gameId: 'local',
@@ -1123,22 +1351,31 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
               )}
             </div>
           ) : (
-            /* Overview Tab: Active Album Tracklist */
+            /* Overview Tab: Active Album Complete Tracklist */
             <div>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between gap-3 mb-4">
                 <h3
                   className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
                     isLight ? 'text-slate-700' : 'text-slate-300'
                   }`}
                 >
-                  <Music className="w-4 h-4 text-cyan-400" />
-                  {activeAlbumBundle?.album.title ?? 'Tracklist'} ({displayedTracks.length} Tracks)
+                  <Music className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span className="truncate">
+                    {activeAlbumBundle?.album.title ?? 'Tracklist'} ({displayedTracks.length}{' '}
+                    Full Tracks)
+                  </span>
+                  {enrichingFullAlbum && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-cyan-400 font-bold">
+                      <Loader2 className="size-3 animate-spin" />
+                      Syncing Full Album...
+                    </span>
+                  )}
                 </h3>
                 {activeAlbumBundle && activeAlbumBundle.tracks.length > 0 && (
                   <button
                     type="button"
                     onClick={() => handleSelectAlbumBundle(activeAlbumBundle, true)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-400 px-3 py-1.5 text-xs font-black text-slate-950 hover:bg-cyan-300 cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-400 px-3 py-1.5 text-xs font-black text-slate-950 hover:bg-cyan-300 cursor-pointer shrink-0"
                   >
                     <Play className="size-3.5 fill-current" />
                     Play Full Album
@@ -1181,11 +1418,12 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
               </FocusScope>
             </div>
           )}
+          </div>
         </div>
       </div>
 
-      {/* Vibe Filter Pills + Curated & Online Albums Shelf */}
-      <div className="space-y-4">
+      {/* Vibe Filter Pills + Infinite Scroll Curated & Online Albums Shelf */}
+      <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3
             className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
@@ -1194,8 +1432,8 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
           >
             <Sparkles className="w-4 h-4 text-cyan-400" />
             {customQuery.trim()
-              ? `Soundtrack Albums Matching "${customQuery}"`
-              : 'Browse by Vibe & Curated Game Soundtracks'}
+              ? `Soundtrack Albums Matching "${customQuery}" (${filteredAlbums.length})`
+              : `Browse by Vibe & Full Game Soundtracks (${filteredAlbums.length} Loaded)`}
           </h3>
 
           <FocusScope
@@ -1221,7 +1459,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
           orientation="horizontal"
           className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
         >
-          {filteredAlbums.slice(0, 18).map((bundle) => (
+          {filteredAlbums.slice(0, visibleAlbumCount).map((bundle) => (
             <CuratedAlbumCard
               key={bundle.album.id}
               bundle={bundle}
@@ -1235,6 +1473,36 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
             />
           ))}
         </FocusScope>
+
+        {/* Infinite Scroll Sentinel + Explicit Load More Soundtracks Button */}
+        <div ref={infiniteScrollSentinelRef} className="pt-4 flex flex-col items-center gap-3">
+          <FocusScope id="console_music_load_more" orientation="horizontal">
+            <button
+              type="button"
+              {...loadMoreBtnFocus.focusProps}
+              disabled={loadingMoreAlbums}
+              className={`inline-flex items-center gap-2.5 rounded-2xl border px-7 py-3.5 text-sm font-black tracking-wide transition-all cursor-pointer outline-none ${
+                loadMoreBtnFocus.isFocused
+                  ? 'scale-105 bg-cyan-400 text-slate-950 border-white ring-4 ring-cyan-300/60 shadow-2xl'
+                  : isLight
+                    ? 'border-slate-300 bg-white text-slate-900 hover:bg-slate-100 shadow-md'
+                    : 'border-cyan-400/40 bg-slate-900/85 text-cyan-300 hover:bg-cyan-400/20 shadow-xl'
+              }`}
+            >
+              {loadingMoreAlbums ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading More Official Game Soundtracks...
+                </>
+              ) : (
+                <>
+                  <Plus className="size-4" />
+                  Load More Soundtracks (Endless Catalog)
+                </>
+              )}
+            </button>
+          </FocusScope>
+        </div>
       </div>
     </div>
   )
@@ -1460,7 +1728,7 @@ const LibraryOstCard: React.FC<{
       >
         {game.name}
       </div>
-      <div className="text-[10px] text-cyan-400 font-semibold truncate">Load Game OST</div>
+      <div className="text-[10px] text-cyan-400 font-semibold truncate">Load Full Game OST</div>
     </button>
   )
 }
@@ -1508,7 +1776,7 @@ const CuratedAlbumCard: React.FC<{
           {bundle.album.title}
         </div>
         <div className="text-[10px] text-slate-400 truncate">
-          {bundle.tracks.length} Tracks · {bundle.album.release_year ?? 'OST'}
+          {bundle.tracks.length} Tracks · {bundle.album.release_date ?? 'OST'}
         </div>
       </button>
       <button

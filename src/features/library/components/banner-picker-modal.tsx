@@ -1,6 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { open as openFileDialog } from '@tauri-apps/plugin-dialog'
-import { Loader2, Sparkles, ImageOff, Upload, Crop, RotateCcw } from 'lucide-react'
+import {
+  Loader2,
+  Sparkles,
+  ImageOff,
+  Upload,
+  Crop,
+  RotateCcw,
+  RefreshCw,
+  Search,
+  Clock,
+  Flame,
+  X,
+} from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
 import { CoverMedia } from '@/components/ui/cover-media'
 import { cn } from '@/lib/utils'
@@ -9,13 +21,15 @@ import {
   useApplyBanner,
   useApplyCustomBanner,
   useResetArtwork,
+  sortArtworkOptions,
+  type ArtworkSortMode,
 } from '../hooks/use-cover-options'
 import { useArtworkCrop } from '../hooks/use-artwork-crop'
 import { CropModal } from './crop-modal'
 import { LargeArtworkModal } from './large-artwork-modal'
 import type { CoverOption } from '@/services/metadata'
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 12
 
 interface BannerPickerModalProps {
   gameId: string | null
@@ -23,21 +37,27 @@ interface BannerPickerModalProps {
   onClose: () => void
 }
 
-/**
- * Mirrors `CoverPickerModal` almost exactly — same two-source (SteamGridDB
- * + local file), same Live/Static split, same "show more" paging — just
- * pointed at the `heroes` endpoint and laid out with wide (16:9) thumbnails
- * instead of portrait ones, since banners are landscape artwork.
- */
 export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalProps) {
   const [visibleStatic, setVisibleStatic] = useState(PAGE_SIZE)
-  const [visibleAnimated, setVisibleAnimated] = useState(PAGE_SIZE)
+  const [visibleAnimated, setVisibleAnimated] = useState(8)
   const [applyingUrl, setApplyingUrl] = useState<string | null>(null)
+  const [searchInput, setSearchInput] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const [sortMode, setSortMode] = useState<ArtworkSortMode>('newest')
+  const [refreshTick, setRefreshTick] = useState(0)
   const [pendingLargeOption, setPendingLargeOption] = useState<{
     option: CoverOption
     sizeBytes: number
   } | null>(null)
-  const { data: options, isPending, isError, error } = useBannerOptions(gameId ?? undefined, open)
+
+  const {
+    data: rawOptions,
+    isPending,
+    isFetching,
+    isError,
+    error,
+  } = useBannerOptions(gameId ?? undefined, open, submittedQuery, refreshTick)
+
   const applyBanner = useApplyBanner()
   const applyCustomBanner = useApplyCustomBanner()
   const resetArtwork = useResetArtwork()
@@ -46,14 +66,39 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
   useEffect(() => {
     if (open) {
       setVisibleStatic(PAGE_SIZE)
-      setVisibleAnimated(PAGE_SIZE)
+      setVisibleAnimated(8)
       setPendingLargeOption(null)
       setApplyingUrl(null)
+      setSearchInput('')
+      setSubmittedQuery('')
+      setRefreshTick((t) => t + 1)
     }
   }, [open, gameId])
 
+  const options = useMemo(
+    () => sortArtworkOptions(rawOptions, sortMode),
+    [rawOptions, sortMode],
+  )
+
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setVisibleStatic(PAGE_SIZE)
+    setVisibleAnimated(8)
+    setSubmittedQuery(searchInput.trim())
+  }
+
+  function handleLiveRefresh() {
+    setVisibleStatic(PAGE_SIZE)
+    setVisibleAnimated(8)
+    setRefreshTick((t) => t + 1)
+  }
+
   function handlePick(option: CoverOption, allowLarge = false) {
     if (!gameId) return
+    if (option.is_animated && !allowLarge) {
+      setPendingLargeOption({ option, sizeBytes: 0 })
+      return
+    }
     setApplyingUrl(option.url)
     applyBanner.mutate(
       { gameId, url: option.url, allowLarge },
@@ -80,7 +125,12 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
     if (!gameId) return
     const picked = await openFileDialog({
       multiple: false,
-      filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
+      filters: [
+        {
+          name: 'Image / Live Banner',
+          extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'webm', 'mp4'],
+        },
+      ],
     })
     if (typeof picked === 'string') {
       applyCustomBanner.mutate({ gameId, filePath: picked }, { onSuccess: onClose })
@@ -93,21 +143,42 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
   }
 
   const isApplying = applyBanner.isPending || applyCustomBanner.isPending || resetArtwork.isPending
-  const staticOptions = options?.filter((option) => !option.is_animated) ?? []
-  const animatedOptions = options?.filter((option) => option.is_animated) ?? []
+  const staticOptions = options.filter((option) => !option.is_animated)
+  const animatedOptions = options.filter((option) => option.is_animated)
 
   return (
     <>
-      <Modal open={open} onClose={onClose} widthClassName="max-w-2xl">
-        <div className="flex h-[34rem] flex-col p-5">
+      <Modal open={open} onClose={onClose} widthClassName="max-w-4xl">
+        <div className="flex h-[40rem] flex-col p-5">
           <div className="flex shrink-0 items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold text-text">Choose a Banner</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-bold text-text">Choose a Banner</h2>
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Live SteamGridDB
+                </span>
+                {!isPending && options.length > 0 && (
+                  <span className="rounded-full border border-border/70 bg-surface/80 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
+                    {options.length} Total ({staticOptions.length} Static • {animatedOptions.length} Live)
+                  </span>
+                )}
+              </div>
               <p className="mt-0.5 text-xs text-muted">
-                From Steam, SteamGridDB, or your own image.
+                Static previews in list for low data usage — click any Live Banner to check download size &amp; apply.
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2 pr-9">
+              <button
+                type="button"
+                onClick={handleLiveRefresh}
+                disabled={isFetching || isApplying}
+                title="Fetch latest community banners live from SteamGridDB"
+                className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface/70 px-3 py-1.5 text-xs font-semibold text-text shadow-xs transition-all duration-200 hover:bg-surface-raised hover:border-emerald-500/50 hover:text-emerald-400 hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={cn('size-3.5', isFetching && 'animate-spin text-emerald-400')} />
+                <span>Sync Live</span>
+              </button>
               <button
                 type="button"
                 onClick={handleReset}
@@ -144,49 +215,114 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
             </div>
           </div>
 
+          {/* Live SteamGridDB Search & Sort Bar */}
+          <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-surface/50 p-2">
+            <form onSubmit={handleSearchSubmit} className="relative flex flex-1 items-center min-w-[240px]">
+              <Search className="pointer-events-none absolute left-3 size-3.5 text-muted" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search by game title or paste SteamGridDB link/ID (e.g. 5439908)…"
+                className="w-full rounded-lg border border-border/70 bg-background/80 py-1.5 pl-8 pr-16 text-xs text-text placeholder:text-muted focus:border-accent focus:outline-none"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput('')
+                    setSubmittedQuery('')
+                  }}
+                  className="absolute right-12 rounded p-0.5 text-muted hover:text-text cursor-pointer"
+                  title="Clear custom search"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={isFetching}
+                className="absolute right-1.5 rounded-md bg-accent/20 px-2 py-0.5 text-[11px] font-bold text-accent hover:bg-accent hover:text-white transition-colors cursor-pointer"
+              >
+                Find
+              </button>
+            </form>
+
+            <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-background/70 p-0.5">
+              <button
+                type="button"
+                onClick={() => setSortMode('newest')}
+                className={cn(
+                  'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer',
+                  sortMode === 'newest'
+                    ? 'bg-accent text-white shadow-xs'
+                    : 'text-muted hover:text-text',
+                )}
+              >
+                <Clock className="size-3" />
+                <span>Newest Uploads</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode('popular')}
+                className={cn(
+                  'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer',
+                  sortMode === 'popular'
+                    ? 'bg-accent text-white shadow-xs'
+                    : 'text-muted hover:text-text',
+                )}
+              >
+                <Flame className="size-3" />
+                <span>Popular</span>
+              </button>
+            </div>
+          </div>
+
           {isPending && (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-muted">
               <Loader2 className="size-5 animate-spin text-accent" />
-              Looking up banners…
+              Fetching live banners from SteamGridDB…
             </div>
           )}
 
-          {isError && (
+          {!isPending && isError && (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-sm text-muted">
               <ImageOff className="size-6 text-subtle" />
               {error instanceof Error ? error.message : 'Could not load banners.'}
             </div>
           )}
 
-          {options && options.length === 0 && (
+          {!isPending && !isError && options.length === 0 && (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-sm text-muted">
               <ImageOff className="size-6 text-subtle" />
-              No banners found for this game — try Browse instead.
+              No banners found for this game — try searching by base title or SteamGridDB ID above.
             </div>
           )}
 
-          {options && options.length > 0 && (
-            <div className="mt-3 min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
-              <BannerSection
-                title="Live Banners"
-                icon={Sparkles}
-                options={animatedOptions}
-                visibleCount={visibleAnimated}
-                onShowMore={() => setVisibleAnimated((count) => count + PAGE_SIZE)}
-                disabled={isApplying}
-                applyingUrl={applyingUrl}
-                onPick={handlePick}
-                emptyMessage="No Live Banners found for this game."
-              />
+          {!isPending && options.length > 0 && (
+            <div className="mt-3 min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
               <BannerSection
                 title="Static Banners"
                 options={staticOptions}
                 visibleCount={visibleStatic}
                 onShowMore={() => setVisibleStatic((count) => count + PAGE_SIZE)}
+                onShowAll={() => setVisibleStatic(staticOptions.length)}
                 disabled={isApplying}
                 applyingUrl={applyingUrl}
                 onPick={handlePick}
                 emptyMessage="No static banners found for this game."
+              />
+              <BannerSection
+                title="Live Banners"
+                icon={Sparkles}
+                options={animatedOptions}
+                visibleCount={visibleAnimated}
+                onShowMore={() => setVisibleAnimated((count) => count + 8)}
+                onShowAll={() => setVisibleAnimated(animatedOptions.length)}
+                disabled={isApplying}
+                applyingUrl={applyingUrl}
+                onPick={handlePick}
+                emptyMessage="No Live Banners found for this game."
               />
             </div>
           )}
@@ -226,6 +362,7 @@ function BannerSection({
   options,
   visibleCount,
   onShowMore,
+  onShowAll,
   disabled,
   applyingUrl,
   onPick,
@@ -236,6 +373,7 @@ function BannerSection({
   options: CoverOption[]
   visibleCount: number
   onShowMore: () => void
+  onShowAll: () => void
   disabled: boolean
   applyingUrl: string | null
   onPick: (option: CoverOption) => void
@@ -259,7 +397,7 @@ function BannerSection({
       <div className="mt-2 grid grid-cols-2 gap-3">
         {visible.map((option) => (
           <BannerOptionThumb
-            key={option.id}
+            key={`${option.id}-${option.url}`}
             option={option}
             disabled={disabled}
             isApplying={applyingUrl === option.url}
@@ -268,13 +406,24 @@ function BannerSection({
         ))}
       </div>
       {hasMore && (
-        <button
-          type="button"
-          onClick={onShowMore}
-          className="mx-auto mt-4 flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-surface/70 px-5 py-2 text-xs font-bold text-text shadow-xs transition-all duration-200 hover:border-accent/60 hover:bg-surface-raised hover:text-accent hover:scale-105 hover:shadow-md active:scale-95 cursor-pointer"
-        >
-          <span>Show {PAGE_SIZE} More</span>
-        </button>
+        <div className="mt-4 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={onShowMore}
+            className="flex items-center justify-center gap-2 rounded-xl border border-border/80 bg-surface/70 px-5 py-2 text-xs font-bold text-text shadow-xs transition-all duration-200 hover:border-accent/60 hover:bg-surface-raised hover:text-accent hover:scale-105 hover:shadow-md active:scale-95 cursor-pointer"
+          >
+            <span>Show {Math.min(PAGE_SIZE, options.length - visibleCount)} More</span>
+          </button>
+          {options.length - visibleCount > PAGE_SIZE && (
+            <button
+              type="button"
+              onClick={onShowAll}
+              className="flex items-center justify-center gap-2 rounded-xl border border-accent/40 bg-accent/10 px-4 py-2 text-xs font-bold text-accent shadow-xs transition-all duration-200 hover:bg-accent hover:text-white active:scale-95 cursor-pointer"
+            >
+              <span>Show All ({options.length})</span>
+            </button>
+          )}
+        </div>
       )}
     </section>
   )
@@ -309,7 +458,6 @@ function BannerOptionThumb({
   isApplying: boolean
   onClick: () => void
 }) {
-  const usingFullAsset = !option.thumbnail_url
   const src = option.thumbnail_url || option.url
 
   return (
@@ -326,7 +474,11 @@ function BannerOptionThumb({
     >
       <CoverMedia
         src={src}
-        mime={usingFullAsset ? option.mime : undefined}
+        fallbackSrc={option.url}
+        mime={!option.thumbnail_url ? option.mime : undefined}
+        isAnimated={option.is_animated}
+        animatedEnabled={false}
+        alwaysLive={false}
         className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-108"
       />
       {option.is_animated && (
@@ -340,9 +492,9 @@ function BannerOptionThumb({
           <Loader2 className="size-6 animate-spin" />
         </div>
       ) : (
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end justify-center p-2.5">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end justify-center p-2.5">
           <span className="rounded-lg bg-accent/90 backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold text-white shadow-sm transition-transform duration-200 translate-y-1 group-hover:translate-y-0">
-            Apply Banner
+            {option.is_animated ? 'Check Size & Download' : 'Apply Banner'}
           </span>
         </div>
       )}

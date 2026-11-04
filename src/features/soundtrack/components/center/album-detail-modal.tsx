@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Disc3, Heart, Play, Shuffle, X } from 'lucide-react'
+import { Disc3, Heart, Loader2, Play, Shuffle, X } from 'lucide-react'
 import { assetUrl } from '@/lib/asset-url'
 import { playButtonClick } from '@/lib/sound-engine'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
@@ -8,6 +8,7 @@ import { useSoundtrackPlayer } from '../../hooks/use-soundtrack-player'
 import { deriveGameIdentityFromAlbum } from '../../store/soundtrack-store'
 import { TrackRow } from './track-row'
 import { resolveAlbumCoverFallback } from '../../services/curated-soundtracks'
+import { soundtrackResolver } from '../../services/soundtrack-resolver'
 import type { SoundtrackAlbumWithTracks, SoundtrackTrack } from '../../types'
 
 interface AlbumDetailModalProps {
@@ -31,25 +32,58 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
   const { playAlbum, currentAlbum, playbackState, favorites, toggleFavorite } =
     useSoundtrackPlayer()
 
-  const isCurrent = currentAlbum?.id === albumWithTracks?.album.id
+  const [enrichedBundle, setEnrichedBundle] = useState<SoundtrackAlbumWithTracks | null>(null)
+  const [enriching, setEnriching] = useState(false)
+
+  useEffect(() => {
+    setEnrichedBundle(null)
+    if (!albumWithTracks) return
+    if (
+      albumWithTracks.album.provider_id !== 'curated' &&
+      albumWithTracks.tracks.length >= 16
+    ) {
+      return
+    }
+    let cancelled = false
+    setEnriching(true)
+    soundtrackResolver
+      .enrichAlbumWithFullTracklist(albumWithTracks)
+      .then((full) => {
+        if (cancelled) return
+        if (full.tracks.length > albumWithTracks.tracks.length) {
+          setEnrichedBundle(full)
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setEnriching(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [albumWithTracks])
+
+  const activeBundle = enrichedBundle ?? albumWithTracks
+
+  const isCurrent = currentAlbum?.id === activeBundle?.album.id
   const isPlaying = isCurrent && playbackState === 'playing'
-  const isFavorite = albumWithTracks ? favorites.has(albumWithTracks.album.id) : false
+  const isFavorite = activeBundle ? favorites.has(activeBundle.album.id) : false
 
   // Group tracks by disc number
   const discGroups = useMemo<Map<number, SoundtrackTrack[]>>(() => {
-    if (!albumWithTracks) return new Map<number, SoundtrackTrack[]>()
+    if (!activeBundle) return new Map<number, SoundtrackTrack[]>()
     const map = new Map<number, SoundtrackTrack[]>()
-    for (const t of albumWithTracks.tracks) {
+    for (const t of activeBundle.tracks) {
       const disc = t.disc_number || 1
       const list = map.get(disc) || []
       list.push(t)
       map.set(disc, list)
     }
     return map
-  }, [albumWithTracks])
+  }, [activeBundle])
 
-  if (!albumWithTracks) return null
-  const { album, tracks } = albumWithTracks
+  if (!activeBundle) return null
+  const { album, tracks } = activeBundle
 
   function handlePlayAll() {
     playButtonClick()
@@ -62,7 +96,9 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
     void playAlbum(album, tracks, randomIdx, deriveGameIdentityFromAlbum(album))
   }
 
-  const durationStr = formatTotalDuration(album.total_duration_ms)
+  const totalMs =
+    album.total_duration_ms || tracks.reduce((acc, t) => acc + (t.duration_ms || 0), 0)
+  const durationStr = formatTotalDuration(totalMs)
 
   return (
     <AnimatePresence>
@@ -113,15 +149,15 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
             {/* Details & Actions */}
             <div className="flex flex-col min-w-0 flex-1 text-center sm:text-left">
               <span className="text-[11px] font-bold uppercase tracking-widest text-accent">
-                {album.album_type.replace('_', ' ')}
+                {(album.album_type || 'original_soundtrack').replace('_', ' ')}
               </span>
               <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-text mt-1">
                 {album.title}
               </h2>
               <p className="text-sm font-medium text-muted mt-1">{album.artist}</p>
 
-              <div className="mt-3 flex items-center justify-center sm:justify-start gap-3 font-mono text-xs text-subtle">
-                <span>{tracks.length} Tracks</span>
+              <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-3 font-mono text-xs text-subtle">
+                <span>{tracks.length} Full Tracks</span>
                 {durationStr && (
                   <>
                     <span>•</span>
@@ -133,6 +169,12 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
                     <span>•</span>
                     <span>{album.release_date}</span>
                   </>
+                )}
+                {enriching && (
+                  <span className="inline-flex items-center gap-1.5 text-accent font-bold">
+                    <Loader2 className="size-3 animate-spin" />
+                    <span>Expanding Complete Tracklist...</span>
+                  </span>
                 )}
               </div>
 

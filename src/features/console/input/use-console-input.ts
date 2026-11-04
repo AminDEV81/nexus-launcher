@@ -63,8 +63,6 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
 
     const dispatchAction = (action: ConsoleAction) => {
       markActivity()
-      // Requirement #6: When Controller Test Mode is active in the DualSense tab,
-      // lock out all menu navigation so pressing buttons only lights up the live controller visualizer!
       if (useConsoleStore.getState().controllerTestMode) {
         return
       }
@@ -228,7 +226,6 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
       }
     }
 
-    // Any first interaction (key, pointer or controller) unlocks WebAudio so UI sounds always work.
     const unlockAudio = () => consoleSoundEngine.unlock()
 
     const onMouseNavButton = (e: MouseEvent) => {
@@ -250,7 +247,6 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
     window.addEventListener('pointerdown', unlockAudio, { passive: true })
     window.addEventListener('gamepadconnected', unlockAudio)
 
-    // Poll DualSense counts every 1.2s (and immediately on mode change) for accurate deduplication and glyph switching (#7).
     const syncDualSense = () => {
       invoke<{ connectedCount?: number; emulatingCount?: number }>('dualsense_get_state')
         .then((snap) => {
@@ -268,9 +264,8 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
     }
     syncDualSense()
     window.addEventListener('nexus:dualsense-mode-changed', syncDualSense)
-    const dsInterval = window.setInterval(syncDualSense, 1200)
+    const dsInterval = window.setInterval(syncDualSense, 3000)
 
-    // Native DualSense input (Rust engine). Only polled while the browser cannot see a usable pad.
     let nativeInFlight = false
     const isBackgroundedOrGaming = () => {
       if (typeof document !== 'undefined') {
@@ -301,7 +296,6 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
           nativeInFlight = false
         })
     }
-    const nativeInterval = window.setInterval(pollNative, 16)
 
     // Idle screensaver check every 5s
     const idleInterval = window.setInterval(() => {
@@ -313,14 +307,32 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
       }
     }, 5000)
 
-    // 60Hz polling loop over every controller source (browser Gamepad API + native DualSense).
+    // Adaptive polling loop:
+    // - Runs at 60Hz ONLY when a gamepad or DualSense controller is actually connected!
+    // - When no controller is connected (keyboard & mouse usage), sleeps in a low-power 250ms (4Hz)
+    //   check so CPU usage is ~0%!
     let rafId = 0
+    let idleTimeoutId = 0
+    let cancelled = false
+
+    const scheduleNextPoll = (hasActiveController: boolean) => {
+      if (cancelled) return
+      if (hasActiveController) {
+        rafId = window.requestAnimationFrame(pollGamepads)
+      } else {
+        idleTimeoutId = window.setTimeout(() => {
+          rafId = window.requestAnimationFrame(pollGamepads)
+        }, 220)
+      }
+    }
+
     const pollGamepads = () => {
+      if (cancelled) return
       if (isBackgroundedOrGaming()) {
         prevStickDirRef.current = null
         repeatTimerRef.current.reset()
         prevButtonsRef.current = {}
-        rafId = window.requestAnimationFrame(pollGamepads)
+        scheduleNextPoll(false)
         return
       }
       const now = performance.now()
@@ -331,6 +343,14 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
 
       const st = useConsoleStore.getState()
       const counts = dualSenseCountsRef.current
+      const anyRawConnected = rawPads.some((p) => p && p.connected)
+
+      if (!anyRawConnected && counts.connected === 0 && prevPadCountRef.current === 0) {
+        needNativeRef.current = false
+        scheduleNextPoll(false)
+        return
+      }
+
       const descriptors = dedupeLogicalGamepads(
         rawPads.map((p) => (p ? { index: p.index, id: p.id, connected: p.connected } : null)),
         counts.emulating,
@@ -358,6 +378,7 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
         counts.emulating,
       )
       if (needNativeRef.current) {
+        pollNative()
         for (const native of nativeFramesRef.current) {
           const targetGlyph =
             st.glyphOverride !== 'auto'
@@ -371,8 +392,6 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
         nativeFramesRef.current = []
       }
 
-      // Requirement #7A: When ViGEm Xbox 360 emulation is active (counts.emulating > 0) and glyphOverride is 'auto',
-      // display Xbox glyphs ('xbox') so the UI matches the active virtual Xbox 360 controller!
       if (st.glyphOverride === 'auto' && counts.connected > 0) {
         for (const f of frames) {
           f.glyphFamily = counts.emulating > 0 ? 'xbox' : f.glyphFamily
@@ -403,7 +422,6 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
           const stickDir = applyStickDeadzoneAndLock(frame.lx, frame.ly, prevStickDirRef.current)
           if (stickDir) combinedDir = stickDir
 
-          // D-Pad buttons 12=Up, 13=Down, 14=Left, 15=Right
           if (frame.buttons[12]) combinedDir = 'up'
           else if (frame.buttons[13]) combinedDir = 'down'
           else if (frame.buttons[14]) combinedDir = 'left'
@@ -415,7 +433,6 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
 
           const justPressed = (idx: number) => Boolean(curBtns[idx] && !prevBtns[idx])
           if (curBtns.some((pressed, i) => pressed && !prevBtns[i])) {
-            // A controller press is real user activity: wake audio and the idle timer.
             consoleSoundEngine.unlock()
             st.setDetectedDevice(frame.glyphFamily, frames.length)
           }
@@ -444,12 +461,13 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
         }
       }
 
-      rafId = window.requestAnimationFrame(pollGamepads)
+      scheduleNextPoll(frames.length > 0 || counts.connected > 0)
     }
 
-    rafId = window.requestAnimationFrame(pollGamepads)
+    scheduleNextPoll(false)
 
     return () => {
+      cancelled = true
       window.removeEventListener('focus', onWindowFocus)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('mousedown', onMouseNavButton, true)
@@ -460,9 +478,9 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
       window.removeEventListener('gamepadconnected', unlockAudio)
       window.removeEventListener('nexus:dualsense-mode-changed', syncDualSense)
       window.clearInterval(dsInterval)
-      window.clearInterval(nativeInterval)
       window.clearInterval(idleInterval)
       window.cancelAnimationFrame(rafId)
+      window.clearTimeout(idleTimeoutId)
     }
   }, [active])
 }

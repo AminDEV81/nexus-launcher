@@ -315,27 +315,29 @@ pub async fn console_mode_enter(
 ) -> AppResult<bool> {
     if let Some(window) = app.get_webview_window("main") {
         // Save previous desktop geometry once before entering fullscreen
-        if !state.in_console_mode.load(Ordering::SeqCst) {
-            let pos = window
-                .outer_position()
-                .unwrap_or(tauri::PhysicalPosition::new(100, 100));
-            let size = window
-                .outer_size()
-                .unwrap_or(tauri::PhysicalSize::new(1440, 900));
-            let maximized = window.is_maximized().unwrap_or(false);
-            let fullscreen = window.is_fullscreen().unwrap_or(false);
+        {
             let mut prev = state
                 .previous_geometry
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
-            *prev = Some(SavedWindowGeometry {
-                x: pos.x,
-                y: pos.y,
-                width: size.width,
-                height: size.height,
-                maximized,
-                fullscreen,
-            });
+            if prev.is_none() {
+                let fullscreen = window.is_fullscreen().unwrap_or(false);
+                let maximized = window.is_maximized().unwrap_or(false);
+                let pos = window
+                    .outer_position()
+                    .unwrap_or(tauri::PhysicalPosition::new(100, 100));
+                let size = window
+                    .outer_size()
+                    .unwrap_or(tauri::PhysicalSize::new(1440, 900));
+                *prev = Some(SavedWindowGeometry {
+                    x: pos.x,
+                    y: pos.y,
+                    width: if fullscreen { 1440 } else { size.width.max(1024) },
+                    height: if fullscreen { 900 } else { size.height.max(640) },
+                    maximized: if fullscreen { false } else { maximized },
+                    fullscreen: false,
+                });
+            }
         }
 
         // Move to selected monitor if specified
@@ -367,7 +369,11 @@ pub async fn console_mode_exit(
 ) -> AppResult<bool> {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_fullscreen(false);
+        let _ = window.set_resizable(true);
         let _ = window.set_cursor_visible(true);
+
+        // Give Windows DWM & WebView2 45ms to exit fullscreen state cleanly before applying desktop bounds
+        tokio::time::sleep(Duration::from_millis(45)).await;
 
         let saved = state
             .previous_geometry
@@ -376,20 +382,31 @@ pub async fn console_mode_exit(
             .take();
 
         if let Some(geo) = saved {
-            if geo.fullscreen {
-                let _ = window.set_fullscreen(true);
-            } else if geo.maximized {
+            if geo.maximized {
+                let _ = window.unmaximize();
+                let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(1440.0, 900.0)));
+                tokio::time::sleep(Duration::from_millis(25)).await;
                 let _ = window.maximize();
             } else {
+                let w = geo.width.max(1024);
+                let h = geo.height.max(640);
                 let _ = window.unmaximize();
-                let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
-                    geo.width.max(1024),
-                    geo.height.max(640),
-                )));
+                let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(w, h)));
                 let _ = window.set_position(tauri::Position::Physical(
                     tauri::PhysicalPosition::new(geo.x, geo.y),
                 ));
+                // 1px bounds nudge forces Windows WebView2 ICoreWebView2Controller::put_Bounds to repaint 100% of client area
+                tokio::time::sleep(Duration::from_millis(25)).await;
+                let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(w + 1, h)));
+                let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(w, h)));
             }
+        } else {
+            let _ = window.unmaximize();
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(1440.0, 900.0)));
+            let _ = window.center();
+            tokio::time::sleep(Duration::from_millis(25)).await;
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(1441.0, 900.0)));
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize::new(1440.0, 900.0)));
         }
         let _ = window.set_focus();
     }

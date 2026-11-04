@@ -13,6 +13,8 @@ export type ConsoleTabId =
   | 'home'
   | 'library'
   | 'store'
+  | 'wishlist'
+  | 'memory'
   | 'downloads'
   | 'music'
   | 'dualsense'
@@ -46,6 +48,36 @@ export interface ConsoleSettingsState {
 export function clampUiScale(val: number): number {
   if (!Number.isFinite(val)) return 100
   return Math.max(80, Math.min(150, Math.round(val)))
+}
+
+export function computeRecommendedMonitorScale(
+  widthPx?: number,
+  heightPx?: number,
+): { scale: number; profileLabel: string } {
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+  const rawW =
+    widthPx && widthPx > 0
+      ? widthPx
+      : typeof window !== 'undefined' && window.screen?.width
+        ? Math.round(window.screen.width * dpr)
+        : 1920
+  const rawH =
+    heightPx && heightPx > 0
+      ? heightPx
+      : typeof window !== 'undefined' && window.screen?.height
+        ? Math.round(window.screen.height * dpr)
+        : 1080
+
+  if (rawW >= 3200 || rawH >= 1800) {
+    return { scale: 130, profileLabel: '4K UHD / Large Display (130%)' }
+  }
+  if (rawW >= 2400 || rawH >= 1350) {
+    return { scale: 115, profileLabel: '27"–32" QHD / Ultrawide (115%)' }
+  }
+  if (rawW < 1800 || rawH < 1000) {
+    return { scale: 92, profileLabel: 'Compact / Laptop Display (92%)' }
+  }
+  return { scale: 100, profileLabel: '24"–25" 1080p Standard (100%)' }
 }
 
 export function clampSafeMargin(val: number): number {
@@ -86,7 +118,10 @@ export function parseConsoleSettingsFromMap(
     consoleEnabled: b('console_enabled', true),
     startInConsole: b('console_start_in_console', false),
     monitorIndex: Math.max(0, Math.min(16, Number.parseInt(g('console_monitor', '0'), 10) || 0)),
-    uiScale: clampUiScale(Number.parseInt(g('console_ui_scale', '100'), 10)),
+    uiScale:
+      raw && raw['console_ui_scale'] !== undefined
+        ? clampUiScale(Number.parseInt(raw['console_ui_scale'], 10))
+        : computeRecommendedMonitorScale().scale,
     safeMargin: clampSafeMargin(Number.parseInt(g('console_safe_margin', '2'), 10)),
     theme,
     soundsEnabled: b('console_sounds', true),
@@ -120,12 +155,16 @@ export interface ConsoleSoundtrackTarget {
   igdbId?: number | null
 }
 
+// Non-reactive focus memory map so hovering/moving focus never triggers Zustand store broadcasts!
+const nonReactiveFocusMemory: Record<string, string> = {}
+
 interface ConsoleStoreState extends ConsoleSettingsState {
   activeTab: ConsoleTabId
   selectedGameId: string | null
   selectedStoreHubGame: HubGame | null
   selectedSoundtrackGame: ConsoleSoundtrackTarget | null
   focusedGameId: string | null
+  focusedBackdropUrl: string | null
   ambientColor: string
   detectedGlyphFamily: ConsoleGlyphFamily
   activeControllerCount: number
@@ -150,6 +189,7 @@ interface ConsoleStoreState extends ConsoleSettingsState {
   setSelectedSoundtrackGame: (target: ConsoleSoundtrackTarget | null) => void
   openGameSoundtrackInConsole: (target: ConsoleSoundtrackTarget) => void
   setFocusedGameId: (gameId: string | null, accentColor?: string) => void
+  setFocusedBackdropUrl: (url: string | null) => void
   setAmbientColor: (hex: string) => void
   setDetectedDevice: (family: ConsoleGlyphFamily, count?: number) => void
   setControllerDisconnectedModal: (open: boolean) => void
@@ -195,6 +235,7 @@ export const useConsoleStore = create<ConsoleStoreState>((set, get) => ({
   selectedStoreHubGame: null,
   selectedSoundtrackGame: null,
   focusedGameId: null,
+  focusedBackdropUrl: null,
   ambientColor: '#00e5ff',
   detectedGlyphFamily: 'playstation',
   activeControllerCount: 0,
@@ -205,7 +246,7 @@ export const useConsoleStore = create<ConsoleStoreState>((set, get) => ({
   quickSettingsOpen: false,
   safeAreaCalibrationOpen: false,
   lastDesktopRoute: '/',
-  focusMemory: {},
+  focusMemory: nonReactiveFocusMemory,
   osk: { open: false, title: '', initialValue: '' },
 
   hydrateFromSettings: (raw) => {
@@ -234,21 +275,38 @@ export const useConsoleStore = create<ConsoleStoreState>((set, get) => ({
   },
 
   setActiveTab: (tab) =>
-    set({
-      activeTab: tab,
-      selectedGameId: null,
-      selectedStoreHubGame: null,
-      controllerTestMode: false,
+    set((s) => {
+      if (
+        s.activeTab === tab &&
+        s.selectedGameId === null &&
+        s.selectedStoreHubGame === null &&
+        !s.controllerTestMode
+      ) {
+        return s
+      }
+      return {
+        activeTab: tab,
+        selectedGameId: null,
+        selectedStoreHubGame: null,
+        focusedBackdropUrl: null,
+        controllerTestMode: false,
+      }
     }),
   setSelectedGameId: (gameId) =>
-    set({
-      selectedGameId: gameId,
-      selectedStoreHubGame: null,
+    set((s) => {
+      if (s.selectedGameId === gameId && s.selectedStoreHubGame === null) return s
+      return {
+        selectedGameId: gameId,
+        selectedStoreHubGame: null,
+      }
     }),
   setSelectedStoreHubGame: (hubGame) =>
-    set({
-      selectedStoreHubGame: hubGame,
-      selectedGameId: null,
+    set((s) => {
+      if (s.selectedStoreHubGame === hubGame && s.selectedGameId === null) return s
+      return {
+        selectedStoreHubGame: hubGame,
+        selectedGameId: null,
+      }
     }),
   setSelectedSoundtrackGame: (target) => set({ selectedSoundtrackGame: target }),
   openGameSoundtrackInConsole: (target) =>
@@ -259,28 +317,54 @@ export const useConsoleStore = create<ConsoleStoreState>((set, get) => ({
       activeTab: 'music',
     }),
   setFocusedGameId: (gameId, accentColor) =>
-    set((s) => ({
-      focusedGameId: gameId,
-      ambientColor: accentColor || s.ambientColor,
-    })),
-  setAmbientColor: (hex) => set({ ambientColor: hex }),
+    set((s) => {
+      const nextColor = accentColor || s.ambientColor
+      if (s.focusedGameId === gameId && s.ambientColor === nextColor && s.focusedBackdropUrl === null) return s
+      return {
+        focusedGameId: gameId,
+        focusedBackdropUrl: null,
+        ambientColor: nextColor,
+      }
+    }),
+  setFocusedBackdropUrl: (url) =>
+    set((s) => {
+      if (s.focusedBackdropUrl === url) return s
+      return { focusedBackdropUrl: url }
+    }),
+  setAmbientColor: (hex) =>
+    set((s) => {
+      if (s.ambientColor === hex) return s
+      return { ambientColor: hex }
+    }),
   setDetectedDevice: (family, count) =>
-    set((s) => ({
-      detectedGlyphFamily: family,
-      activeControllerCount: count !== undefined ? count : s.activeControllerCount,
-    })),
-  setControllerDisconnectedModal: (open) => set({ controllerDisconnectedModal: open }),
-  setControllerTestMode: (active) => set({ controllerTestMode: active }),
-  setProfileGateCompleted: (done) => set({ profileGateCompleted: done }),
-  setScreensaverActive: (active) => set({ screensaverActive: active }),
-  setQuickSettingsOpen: (open) => set({ quickSettingsOpen: open }),
-  setSafeAreaCalibrationOpen: (open) => set({ safeAreaCalibrationOpen: open }),
-  setLastDesktopRoute: (route) => set({ lastDesktopRoute: route }),
-  rememberFocus: (scopeKey, focusId) =>
-    set((s) => ({
-      focusMemory: { ...s.focusMemory, [scopeKey]: focusId },
-    })),
-  getRememberedFocus: (scopeKey) => get().focusMemory[scopeKey],
+    set((s) => {
+      const nextCount = count !== undefined ? count : s.activeControllerCount
+      if (s.detectedGlyphFamily === family && s.activeControllerCount === nextCount) {
+        return s
+      }
+      return {
+        detectedGlyphFamily: family,
+        activeControllerCount: nextCount,
+      }
+    }),
+  setControllerDisconnectedModal: (open) =>
+    set((s) => (s.controllerDisconnectedModal === open ? s : { controllerDisconnectedModal: open })),
+  setControllerTestMode: (active) =>
+    set((s) => (s.controllerTestMode === active ? s : { controllerTestMode: active })),
+  setProfileGateCompleted: (done) =>
+    set((s) => (s.profileGateCompleted === done ? s : { profileGateCompleted: done })),
+  setScreensaverActive: (active) =>
+    set((s) => (s.screensaverActive === active ? s : { screensaverActive: active })),
+  setQuickSettingsOpen: (open) =>
+    set((s) => (s.quickSettingsOpen === open ? s : { quickSettingsOpen: open })),
+  setSafeAreaCalibrationOpen: (open) =>
+    set((s) => (s.safeAreaCalibrationOpen === open ? s : { safeAreaCalibrationOpen: open })),
+  setLastDesktopRoute: (route) =>
+    set((s) => (s.lastDesktopRoute === route ? s : { lastDesktopRoute: route })),
+  rememberFocus: (scopeKey, focusId) => {
+    nonReactiveFocusMemory[scopeKey] = focusId
+  },
+  getRememberedFocus: (scopeKey) => nonReactiveFocusMemory[scopeKey],
   openOsk: (title, initialValue, onSubmit) =>
     set({ osk: { open: true, title, initialValue, onSubmit } }),
   closeOsk: () => set({ osk: { open: false, title: '', initialValue: '' } }),

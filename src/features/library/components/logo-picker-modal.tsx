@@ -1,9 +1,25 @@
-import { useState } from 'react'
-import { ImageOff, Loader2, RotateCcw, Upload } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  Clock,
+  Flame,
+  ImageOff,
+  Loader2,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  Upload,
+  X,
+} from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
 import { CoverMedia } from '@/components/ui/cover-media'
 import { cn } from '@/lib/utils'
-import { useApplyLogo, useLogoOptions, useResetArtwork } from '../hooks/use-cover-options'
+import {
+  sortArtworkOptions,
+  useApplyLogo,
+  useLogoOptions,
+  useResetArtwork,
+  type ArtworkSortMode,
+} from '../hooks/use-cover-options'
 import { LargeArtworkModal } from './large-artwork-modal'
 import type { CoverOption } from '@/services/metadata'
 
@@ -16,14 +32,52 @@ interface LogoPickerModalProps {
 
 export function LogoPickerModal({ gameId, open, onClose, onBrowse }: LogoPickerModalProps) {
   const [visibleCount, setVisibleCount] = useState(12)
+  const [searchInput, setSearchInput] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const [sortMode, setSortMode] = useState<ArtworkSortMode>('newest')
+  const [refreshTick, setRefreshTick] = useState(0)
   const [pendingLargeOption, setPendingLargeOption] = useState<{
     option: CoverOption
     sizeBytes: number
   } | null>(null)
-  const { data: options, isPending, isError, error } = useLogoOptions(gameId ?? undefined, open)
+
+  const {
+    data: rawOptions,
+    isPending,
+    isFetching,
+    isError,
+    error,
+  } = useLogoOptions(gameId ?? undefined, open, submittedQuery, refreshTick)
+
   const applyLogo = useApplyLogo()
   const resetArtwork = useResetArtwork()
   const isApplying = applyLogo.isPending || resetArtwork.isPending
+
+  useEffect(() => {
+    if (open) {
+      setVisibleCount(12)
+      setPendingLargeOption(null)
+      setSearchInput('')
+      setSubmittedQuery('')
+      setRefreshTick((t) => t + 1)
+    }
+  }, [open, gameId])
+
+  const options = useMemo(
+    () => sortArtworkOptions(rawOptions, sortMode),
+    [rawOptions, sortMode],
+  )
+
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setVisibleCount(12)
+    setSubmittedQuery(searchInput.trim())
+  }
+
+  function handleLiveRefresh() {
+    setVisibleCount(12)
+    setRefreshTick((t) => t + 1)
+  }
 
   function pick(option: CoverOption, allowLarge = false) {
     if (!gameId) return
@@ -54,15 +108,31 @@ export function LogoPickerModal({ gameId, open, onClose, onBrowse }: LogoPickerM
   return (
     <>
       <Modal open={open} onClose={onClose} widthClassName="max-w-[min(92vw,1100px)]">
-        <div className="flex h-[min(72vh,620px)] flex-col p-6">
+        <div className="flex h-[min(75vh,650px)] flex-col p-6">
           <div className="flex shrink-0 items-start justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-text">Choose a Logo</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-semibold text-text">Choose a Logo</h2>
+                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Live SteamGridDB
+                </span>
+              </div>
               <p className="mt-0.5 text-xs text-muted">
-                Pick a logo from Steam, SteamGridDB, or use your own image.
+                Real-time community logos from SteamGridDB, official Steam logos, or your own image.
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2 pr-9">
+              <button
+                type="button"
+                onClick={handleLiveRefresh}
+                disabled={isFetching || isApplying}
+                title="Fetch latest community logos live from SteamGridDB"
+                className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface/70 px-3 py-1.5 text-xs font-semibold text-text shadow-xs transition-all duration-200 hover:bg-surface-raised hover:border-emerald-500/50 hover:text-emerald-400 hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={cn('size-3.5', isFetching && 'animate-spin text-emerald-400')} />
+                <span>Sync Live</span>
+              </button>
               <button
                 type="button"
                 onClick={reset}
@@ -86,24 +156,87 @@ export function LogoPickerModal({ gameId, open, onClose, onBrowse }: LogoPickerM
             </div>
           </div>
 
+          {/* Live SteamGridDB Search & Sort Bar */}
+          <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-surface/50 p-2">
+            <form onSubmit={handleSearchSubmit} className="relative flex flex-1 items-center min-w-[220px]">
+              <Search className="pointer-events-none absolute left-3 size-3.5 text-muted" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Search SteamGridDB by custom game title or edition…"
+                className="w-full rounded-lg border border-border/70 bg-background/80 py-1.5 pl-8 pr-16 text-xs text-text placeholder:text-muted focus:border-accent focus:outline-none"
+              />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput('')
+                    setSubmittedQuery('')
+                  }}
+                  className="absolute right-12 rounded p-0.5 text-muted hover:text-text cursor-pointer"
+                  title="Clear custom search"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={isFetching}
+                className="absolute right-1.5 rounded-md bg-accent/20 px-2 py-0.5 text-[11px] font-bold text-accent hover:bg-accent hover:text-white transition-colors cursor-pointer"
+              >
+                Find
+              </button>
+            </form>
+
+            <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-background/70 p-0.5">
+              <button
+                type="button"
+                onClick={() => setSortMode('newest')}
+                className={cn(
+                  'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer',
+                  sortMode === 'newest'
+                    ? 'bg-accent text-white shadow-xs'
+                    : 'text-muted hover:text-text',
+                )}
+              >
+                <Clock className="size-3" />
+                <span>Newest Uploads</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode('popular')}
+                className={cn(
+                  'flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer',
+                  sortMode === 'popular'
+                    ? 'bg-accent text-white shadow-xs'
+                    : 'text-muted hover:text-text',
+                )}
+              >
+                <Flame className="size-3" />
+                <span>Popular</span>
+              </button>
+            </div>
+          </div>
+
           {isPending && (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-muted">
               <Loader2 className="size-5 animate-spin text-accent" />
-              Looking up logos…
+              Fetching live logos from SteamGridDB…
             </div>
           )}
-          {isError && (
+          {!isPending && isError && (
             <Empty message={error instanceof Error ? error.message : 'Could not load logos.'} />
           )}
-          {options && options.length === 0 && (
-            <Empty message="No logos found for this game — try Browse instead." />
+          {!isPending && !isError && options.length === 0 && (
+            <Empty message="No logos found for this game — try searching by base title above or use Browse." />
           )}
-          {options && options.length > 0 && (
+          {!isPending && options.length > 0 && (
             <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {options.slice(0, visibleCount).map((option) => (
                   <LogoTile
-                    key={option.id}
+                    key={`${option.id}-${option.url}`}
                     option={option}
                     disabled={isApplying}
                     onClick={() => pick(option)}
@@ -176,7 +309,6 @@ function LogoTile({
         mime={option.thumbnail_url ? undefined : option.mime}
         className="size-full object-contain transition-transform duration-500 ease-out group-hover:scale-110"
       />
-      {/* Dim overlay & apply badge on hover */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 flex items-end justify-center p-2.5">
         <span className="rounded-lg bg-accent/90 backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold text-white shadow-sm transition-transform duration-200 translate-y-1 group-hover:translate-y-0">
           Apply Logo

@@ -60,13 +60,14 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
     onConfirm: () => {
       if (game) {
         if (onOpenSoundtrack) onOpenSoundtrack(game)
-        else useConsoleStore.getState().openGameSoundtrackInConsole({
-          id: game.id,
-          name: game.name,
-          coverUrl: game.cover_path,
-          steamAppId: game.steam_app_id,
-          igdbId: game.igdb_id,
-        })
+        else
+          useConsoleStore.getState().openGameSoundtrackInConsole({
+            id: game.id,
+            name: game.name,
+            coverUrl: game.cover_path,
+            steamAppId: game.steam_app_id,
+            igdbId: game.igdb_id,
+          })
       }
     },
   })
@@ -102,7 +103,7 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
     .join('   ·   ')
 
   return (
-    <div className="flex min-h-[19rem] max-w-[50rem] select-none flex-col justify-end pb-4">
+    <div className="flex min-h-[15.5rem] max-w-[46rem] select-none flex-col justify-end pb-3">
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={`info_${game.id}`}
@@ -114,31 +115,51 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
         >
           <div className="flex flex-wrap items-center gap-3 text-[0.95rem] font-semibold tracking-wide">
             {isRunning && (
-              <span className="flex items-center gap-2 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-emerald-300">
-                <span className="size-2 animate-pulse rounded-full bg-emerald-400" />
+              <span
+                className={`flex items-center gap-2 rounded-full border px-3 py-0.5 ${
+                  isLight
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-800 shadow-2xs'
+                    : 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+                }`}
+              >
+                <span className="size-2 animate-pulse rounded-full bg-emerald-500" />
                 Playing now
               </span>
             )}
             {score && score > 0 ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 px-3 py-0.5 text-xs font-extrabold text-emerald-300">
+              <span
+                className={`inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs font-extrabold ${
+                  isLight
+                    ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-800 shadow-2xs'
+                    : 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
+                }`}
+              >
                 <Sparkles className="size-3.5" />
                 Critic {score}
               </span>
             ) : null}
-            <span className={isLight ? 'text-slate-700' : 'text-slate-200/85'}>{meta}</span>
+            <span
+              className={
+                isLight
+                  ? 'text-slate-800 font-bold [text-shadow:0_1px_10px_rgba(255,255,255,0.9)]'
+                  : 'text-slate-200/85'
+              }
+            >
+              {meta}
+            </span>
           </div>
 
           {logoSrc ? (
             <img
               src={logoSrc}
               alt={game.name}
-              className="max-h-[5.8rem] max-w-[28rem] object-contain object-left drop-shadow-2xl"
+              className="max-h-[4.6rem] max-w-[24rem] object-contain object-left drop-shadow-2xl"
             />
           ) : (
             <h1
-              className={`line-clamp-2 text-[3.8rem] font-black leading-[1.02] tracking-tight ${
+              className={`line-clamp-2 text-[2.85rem] lg:text-[3.2rem] font-black leading-[1.02] tracking-tight ${
                 isLight
-                  ? 'text-slate-900'
+                  ? 'text-slate-950 [text-shadow:0_2px_22px_rgba(255,255,255,0.95)]'
                   : 'text-white [text-shadow:0_4px_36px_rgba(0,0,0,0.55)]'
               }`}
             >
@@ -149,7 +170,9 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
           {game.description && (
             <p
               className={`line-clamp-2 max-w-2xl text-[0.98rem] leading-relaxed ${
-                isLight ? 'text-slate-700' : 'text-slate-200/85'
+                isLight
+                  ? 'text-slate-800 font-medium [text-shadow:0_1px_14px_rgba(255,255,255,0.92)]'
+                  : 'text-slate-200/85'
               }`}
             >
               {game.description.replace(/<[^>]+>/g, '')}
@@ -168,7 +191,7 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
           {...playFocus.focusProps}
           animate={{ scale: playFocus.isFocused ? 1.06 : 1 }}
           transition={speed === 0 ? { duration: 0 } : SPRING}
-          className={`flex items-center gap-3 rounded-full px-8 py-3.5 text-[1.08rem] font-extrabold outline-none transition-colors cursor-pointer ${
+          className={`flex items-center gap-3 rounded-full px-6 py-2.5 text-[0.98rem] font-extrabold outline-none transition-colors cursor-pointer ${
             isRunning
               ? playFocus.isFocused
                 ? 'bg-rose-500 text-white shadow-[0_12px_40px_-6px_rgba(244,63,94,0.65)] ring-4 ring-rose-300/50'
@@ -176,7 +199,7 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
               : playFocus.isFocused
                 ? 'bg-cyan-400 text-slate-950 shadow-[0_12px_40px_-6px_rgba(0,229,255,0.65)] ring-4 ring-cyan-300/50'
                 : isLight
-                  ? 'bg-slate-900 text-white hover:bg-slate-800'
+                  ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-md'
                   : 'bg-white text-slate-950 hover:bg-cyan-300'
           }`}
         >
@@ -198,11 +221,11 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
           {...detailsFocus.focusProps}
           animate={{ scale: detailsFocus.isFocused ? 1.06 : 1 }}
           transition={speed === 0 ? { duration: 0 } : SPRING}
-          className={`flex items-center gap-2.5 rounded-full px-6 py-3.5 text-[1.02rem] font-bold outline-none backdrop-blur-md transition-colors cursor-pointer ${
+          className={`flex items-center gap-2.5 rounded-full px-5 py-2.5 text-[0.95rem] font-bold outline-none backdrop-blur-md transition-colors cursor-pointer ${
             detailsFocus.isFocused
               ? 'bg-cyan-400 text-slate-950 ring-4 ring-cyan-300/50'
               : isLight
-                ? 'bg-white/90 text-slate-800 border border-slate-300 hover:bg-white'
+                ? 'bg-white/90 text-slate-800 border border-slate-300 hover:bg-white shadow-xs'
                 : 'bg-white/15 text-white border border-white/15 hover:bg-white/25'
           }`}
         >
@@ -215,11 +238,11 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
           {...ostFocus.focusProps}
           animate={{ scale: ostFocus.isFocused ? 1.06 : 1 }}
           transition={speed === 0 ? { duration: 0 } : SPRING}
-          className={`flex items-center gap-2 rounded-full px-5 py-3.5 text-[1rem] font-bold outline-none backdrop-blur-md transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-[0.95rem] font-bold outline-none backdrop-blur-md transition-colors cursor-pointer ${
             ostFocus.isFocused
               ? 'bg-violet-400 text-slate-950 ring-4 ring-violet-300/50'
               : isLight
-                ? 'bg-white/90 text-slate-800 border border-slate-300 hover:bg-white'
+                ? 'bg-white/90 text-slate-800 border border-slate-300 hover:bg-white shadow-xs'
                 : 'bg-white/15 text-white border border-white/15 hover:bg-white/25'
           }`}
         >
@@ -234,11 +257,11 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
             aria-label={game.is_favorite ? 'Remove from favorites' : 'Add to favorites'}
             animate={{ scale: favFocus.isFocused ? 1.08 : 1 }}
             transition={speed === 0 ? { duration: 0 } : SPRING}
-            className={`flex size-[3.3rem] items-center justify-center rounded-full outline-none backdrop-blur-md transition-colors cursor-pointer ${
+            className={`flex size-[2.85rem] items-center justify-center rounded-full outline-none backdrop-blur-md transition-colors cursor-pointer ${
               favFocus.isFocused
                 ? 'bg-amber-400 text-slate-950 ring-4 ring-amber-300/50'
                 : isLight
-                  ? 'bg-white/90 text-slate-800 border border-slate-300'
+                  ? 'bg-white/90 text-slate-800 border border-slate-300 shadow-xs'
                   : 'bg-white/15 text-white border border-white/15'
             }`}
           >

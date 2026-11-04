@@ -28,8 +28,8 @@ impl Default for HttpClient {
             reqwest::Client::builder()
                 .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36")
                 .redirect(crate::commands::profiles::safe_ssrf_redirect_policy())
-                .connect_timeout(std::time::Duration::from_millis(1500))
-                .timeout(std::time::Duration::from_secs(5))
+                .connect_timeout(std::time::Duration::from_secs(8))
+                .timeout(std::time::Duration::from_secs(20))
                 .build()
                 .unwrap_or_else(|_| reqwest::Client::new()),
         )
@@ -60,7 +60,10 @@ fn get_credentials(db: &Database) -> Credentials {
     Credentials {
         igdb_client_id: read("igdb_client_id"),
         igdb_client_secret: read("igdb_client_secret"),
-        steamgriddb_api_key: read("steamgriddb_api_key"),
+        steamgriddb_api_key: Some(
+            read("steamgriddb_api_key")
+                .unwrap_or_else(|| steamgriddb::DEFAULT_STEAMGRIDDB_API_KEY.to_string()),
+        ),
     }
 }
 
@@ -86,12 +89,9 @@ fn get_game_lookup_fields(db: &Database, game_id: &str) -> (Option<String>, Stri
 async fn resolve_sgdb_game_id(
     http: &reqwest::Client,
     sgdb_key: &str,
-    steam_app_id: Option<&str>,
+    _steam_app_id: Option<&str>,
     name: &str,
 ) -> Option<i64> {
-    if steam_app_id.is_some() {
-        return None;
-    }
     steamgriddb::search_game_id(http, sgdb_key, name)
         .await
         .ok()
@@ -1214,15 +1214,54 @@ pub async fn sync_wishlist_metadata(
 /// command taking a page number, since SteamGridDB's grid endpoints
 /// don't paginate server-side and the full list is rarely large enough
 /// for that to matter.
+async fn resolve_effective_artwork_lookup(
+    db: &Database,
+    http: &reqwest::Client,
+    game_id: &str,
+    custom_query: Option<String>,
+) -> (Option<String>, String) {
+    let (mut steam_app_id, db_name) = get_game_lookup_fields(db, game_id);
+    if let Some(q) = custom_query.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
+        // If user entered a SteamGridDB URL (e.g. https://www.steamgriddb.com/game/5439908)
+        // or numeric SteamGridDB ID (5439908), pass it directly with no Steam App ID override
+        if steamgriddb::extract_sgdb_game_id_from_input(&q).is_some() {
+            return (None, q);
+        }
+        if !q.eq_ignore_ascii_case(&db_name) {
+            let steam_provider = crate::services::providers::SteamArtworkProvider::new(http.clone());
+            let custom_aid = steam_provider.resolve_app_id(&q).await;
+            return (custom_aid, q);
+        }
+    }
+
+    if steam_app_id.as_deref().map(str::trim).filter(|s| !s.is_empty()).is_none() && !db_name.trim().is_empty() {
+        let steam_provider = crate::services::providers::SteamArtworkProvider::new(http.clone());
+        if let Some(resolved_aid) = steam_provider.resolve_app_id(&db_name).await {
+            let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
+            conn.execute(
+                "UPDATE games SET steam_app_id = COALESCE(steam_app_id, ?1) WHERE id = ?2",
+                rusqlite::params![&resolved_aid, game_id],
+            )
+            .ok();
+            steam_app_id = Some(resolved_aid);
+        }
+    }
+
+    (steam_app_id, db_name)
+}
+
 #[tauri::command]
 pub async fn search_cover_options(
     db: State<'_, Database>,
+    http: State<'_, HttpClient>,
     resolver: State<'_, std::sync::Arc<crate::services::metadata::MetadataProviderResolver>>,
     game_id: String,
+    query: Option<String>,
 ) -> AppResult<Vec<GridOption>> {
-    let (steam_app_id, name) = get_game_lookup_fields(&db, &game_id);
+    let (steam_app_id, target_name) =
+        resolve_effective_artwork_lookup(&db, &http.0, &game_id, query).await;
     let options = resolver
-        .get_artwork_options(&db, "cover", steam_app_id.as_deref(), &name)
+        .get_artwork_options(&db, "cover", steam_app_id.as_deref(), &target_name)
         .await?;
 
     if options.is_empty() {
@@ -1308,12 +1347,15 @@ pub fn apply_custom_cover(
 #[tauri::command]
 pub async fn search_banner_options(
     db: State<'_, Database>,
+    http: State<'_, HttpClient>,
     resolver: State<'_, std::sync::Arc<crate::services::metadata::MetadataProviderResolver>>,
     game_id: String,
+    query: Option<String>,
 ) -> AppResult<Vec<GridOption>> {
-    let (steam_app_id, name) = get_game_lookup_fields(&db, &game_id);
+    let (steam_app_id, target_name) =
+        resolve_effective_artwork_lookup(&db, &http.0, &game_id, query).await;
     let options = resolver
-        .get_artwork_options(&db, "hero", steam_app_id.as_deref(), &name)
+        .get_artwork_options(&db, "hero", steam_app_id.as_deref(), &target_name)
         .await?;
 
     if options.is_empty() {
@@ -1328,12 +1370,15 @@ pub async fn search_banner_options(
 #[tauri::command]
 pub async fn search_logo_options(
     db: State<'_, Database>,
+    http: State<'_, HttpClient>,
     resolver: State<'_, std::sync::Arc<crate::services::metadata::MetadataProviderResolver>>,
     game_id: String,
+    query: Option<String>,
 ) -> AppResult<Vec<GridOption>> {
-    let (steam_app_id, name) = get_game_lookup_fields(&db, &game_id);
+    let (steam_app_id, target_name) =
+        resolve_effective_artwork_lookup(&db, &http.0, &game_id, query).await;
     let options = resolver
-        .get_artwork_options(&db, "logo", steam_app_id.as_deref(), &name)
+        .get_artwork_options(&db, "logo", steam_app_id.as_deref(), &target_name)
         .await?;
 
     if options.is_empty() {
@@ -1596,69 +1641,33 @@ pub async fn reset_artwork(
         return Ok(conn.query_row(&sql, [&game_id], Game::from_row)?);
     }
 
-    let credentials = get_credentials(&db);
-    let Some(sgdb_key) = credentials.steamgriddb_api_key else {
-        return Err(AppError::Invalid(
-            "Add your SteamGridDB API key in Settings first.".into(),
-        ));
-    };
-    let (steam_app_id, name) = get_game_lookup_fields(&db, &game_id);
-    let sgdb_game_id =
-        resolve_sgdb_game_id(&http.0, &sgdb_key, steam_app_id.as_deref(), &name).await;
-    if steam_app_id.is_none() && sgdb_game_id.is_none() {
-        return Err(AppError::NotFound(
-            "SteamGridDB doesn't have a match for this game.".into(),
-        ));
-    }
-
-    let (path, url, is_animated) = match kind.as_str() {
-        "cover" => {
-            let options = steamgriddb::search_grid_options(
-                &http.0,
-                &sgdb_key,
-                steam_app_id.as_deref(),
-                sgdb_game_id,
-            )
-            .await?;
-            let chosen = options
-                .iter()
-                .find(|option| !option.is_animated)
-                .or_else(|| options.first())
-                .ok_or_else(|| {
-                    AppError::NotFound("SteamGridDB has no cover for this game.".into())
-                })?;
-            let path =
-                artwork::download_artwork(&http.0, &app, &game_id, "cover", &chosen.url, false).await?;
-            (path, chosen.url.clone(), chosen.is_animated)
-        }
-        "banner" => {
-            let url = steamgriddb::get_artwork_url(
-                &http.0,
-                &sgdb_key,
-                steamgriddb::ArtworkKind::Hero,
-                steam_app_id.as_deref(),
-                sgdb_game_id,
-            )
-            .await?
-            .ok_or_else(|| AppError::NotFound("SteamGridDB has no banner for this game.".into()))?;
-            let path = artwork::download_artwork(&http.0, &app, &game_id, "banner", &url, false).await?;
-            (path, url, false)
-        }
-        "logo" => {
-            let url = steamgriddb::get_artwork_url(
-                &http.0,
-                &sgdb_key,
-                steamgriddb::ArtworkKind::Logo,
-                steam_app_id.as_deref(),
-                sgdb_game_id,
-            )
-            .await?
-            .ok_or_else(|| AppError::NotFound("SteamGridDB has no logo for this game.".into()))?;
-            let path = artwork::download_artwork(&http.0, &app, &game_id, "logo", &url, false).await?;
-            (path, url, false)
-        }
+    let resolver = app.state::<Arc<MetadataProviderResolver>>();
+    let (steam_app_id, name) =
+        resolve_effective_artwork_lookup(&db, &http.0, &game_id, None).await;
+    let resolver_kind = match kind.as_str() {
+        "cover" => "cover",
+        "banner" => "hero",
+        "logo" => "logo",
         _ => return Err(AppError::Invalid(format!("unknown artwork kind '{kind}'"))),
     };
+
+    let options = resolver
+        .get_artwork_options(&db, resolver_kind, steam_app_id.as_deref(), &name)
+        .await?;
+    let chosen = options
+        .iter()
+        .find(|option| !option.is_animated)
+        .or_else(|| options.first())
+        .ok_or_else(|| {
+            AppError::NotFound(format!("No default {kind} found for this game."))
+        })?;
+    let dl_url = if kind == "cover" {
+        upgrade_cover_url_to_highres(&chosen.url)
+    } else {
+        chosen.url.clone()
+    };
+    let path = artwork::download_artwork(&http.0, &app, &game_id, &kind, &dl_url, false).await?;
+    let (url, is_animated) = (dl_url, chosen.is_animated);
 
     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
     if kind == "cover" {
@@ -1821,3 +1830,12 @@ pub async fn repair_missing_covers(
     })
 }
 
+
+
+#[tauri::command]
+pub async fn get_artwork_file_size(
+    http: State<'_, HttpClient>,
+    url: String,
+) -> AppResult<u64> {
+    artwork::probe_artwork_size(&http.0, &url).await
+}

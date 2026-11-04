@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, Gamepad2, ShieldCheck, Cpu } from 'lucide-react'
 import { LogoMark } from '@/components/brand/logo-mark'
@@ -13,17 +13,28 @@ const BOOT_DURATION_MS = 3400
 
 export const ConsoleBootIntro: React.FC<ConsoleBootIntroProps> = ({ open, onFinish }) => {
   const [phase, setPhase] = useState<0 | 1 | 2>(0)
+  const onFinishRef = useRef(onFinish)
+  onFinishRef.current = onFinish
+  const hasPlayedBootSoundRef = useRef(false)
 
+  // Bug #6 Fix: Depend ONLY on `open` (keeping `onFinish` in a ref) and guard with `hasPlayedBootSoundRef`
+  // so parent re-renders NEVER reset the 3.4s timer or replay the boot anthem in a loop!
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      hasPlayedBootSoundRef.current = false
+      return
+    }
     setPhase(0)
-    consoleSoundEngine.unlock()
-    consoleSoundEngine.play('boot')
+    if (!hasPlayedBootSoundRef.current) {
+      hasPlayedBootSoundRef.current = true
+      consoleSoundEngine.unlock()
+      consoleSoundEngine.play('boot')
+    }
 
     const t1 = window.setTimeout(() => setPhase(1), 1050)
     const t2 = window.setTimeout(() => setPhase(2), 2150)
     const tDone = window.setTimeout(() => {
-      onFinish()
+      onFinishRef.current()
     }, BOOT_DURATION_MS)
 
     return () => {
@@ -31,14 +42,14 @@ export const ConsoleBootIntro: React.FC<ConsoleBootIntroProps> = ({ open, onFini
       window.clearTimeout(t2)
       window.clearTimeout(tDone)
     }
-  }, [open, onFinish])
+  }, [open])
 
   return (
     <AnimatePresence>
       {open && (
         <motion.div
           key="console-boot-intro"
-          onClick={onFinish}
+          onClick={() => onFinishRef.current()}
           initial={{ opacity: 1 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, scale: 1.08, filter: 'blur(16px)' }}

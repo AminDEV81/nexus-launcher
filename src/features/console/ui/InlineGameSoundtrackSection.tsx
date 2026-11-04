@@ -1,58 +1,50 @@
 import React, { useEffect, useState } from 'react'
-import { Music, Play, Pause, SkipForward, Disc3, Volume2, Loader2 } from 'lucide-react'
+import { Disc3, Heart, Loader2, Music, Pause, Play, Plus, Radio } from 'lucide-react'
 import { useSoundtrackStore } from '@/features/soundtrack/store/soundtrack-store'
 import { soundtrackResolver } from '@/features/soundtrack/services/soundtrack-resolver'
-import { lookupCuratedSoundtrack } from '@/features/soundtrack/services/curated-soundtracks'
 import type { SoundtrackAlbumWithTracks, SoundtrackTrack } from '@/features/soundtrack/types'
-import { useFocusable } from '../nav/FocusScope'
-import { resolveConsoleHighResUrl } from './Tile'
+import { FocusScope, useFocusable } from '../nav/FocusScope'
 
 export interface InlineGameSoundtrackSectionProps {
-  scopeId: string
   gameId: string
   gameName: string
   coverUrl?: string | null
   steamAppId?: string | null
-  igdbId?: number | null
+  igdbId?: number | string | null
   isLight: boolean
-  expandedByButton?: boolean
+  scopeId?: string
+  onOpenFullCenter?: () => void
 }
 
 export const InlineGameSoundtrackSection: React.FC<InlineGameSoundtrackSectionProps> = ({
-  scopeId,
   gameId,
   gameName,
   coverUrl,
   steamAppId,
   igdbId,
   isLight,
+  scopeId = 'console_inline_ost',
+  onOpenFullCenter,
 }) => {
+  const [albums, setAlbums] = useState<SoundtrackAlbumWithTracks[]>([])
+  const [selectedAlbumIdx, setSelectedAlbumIdx] = useState(0)
+  const [visibleTrackLimit, setVisibleTrackLimit] = useState(24)
+  const [loading, setLoading] = useState(true)
+
   const currentTrack = useSoundtrackStore((s) => s.currentTrack)
   const playbackState = useSoundtrackStore((s) => s.playbackState)
-  const togglePlay = useSoundtrackStore((s) => s.togglePlay)
-  const next = useSoundtrackStore((s) => s.next)
+  const favorites = useSoundtrackStore((s) => s.favorites)
   const playAlbum = useSoundtrackStore((s) => s.playAlbum)
-
-  const [bundle, setBundle] = useState<SoundtrackAlbumWithTracks | null>(() =>
-    lookupCuratedSoundtrack({
-      gameId,
-      title: gameName,
-      coverUrl: coverUrl ?? null,
-    }),
-  )
-  const [loading, setLoading] = useState(false)
+  const playTrack = useSoundtrackStore((s) => s.playTrack)
+  const togglePlay = useSoundtrackStore((s) => s.togglePlay)
+  const toggleFavorite = useSoundtrackStore((s) => s.toggleFavorite)
 
   useEffect(() => {
+    if (!gameName) return
     let cancelled = false
-    const immediate = lookupCuratedSoundtrack({
-      gameId,
-      title: gameName,
-      coverUrl: coverUrl ?? null,
-    })
-    if (immediate) {
-      setBundle(immediate)
-    }
     setLoading(true)
+    setSelectedAlbumIdx(0)
+    setVisibleTrackLimit(24)
 
     soundtrackResolver
       .resolveGame({
@@ -60,22 +52,23 @@ export const InlineGameSoundtrackSection: React.FC<InlineGameSoundtrackSectionPr
         title: gameName,
         coverUrl: coverUrl ?? null,
         steamAppId: steamAppId ?? null,
-        igdbId: igdbId ?? null,
+        igdbId:
+          typeof igdbId === 'string' ? Number.parseInt(igdbId, 10) || null : (igdbId ?? null),
       })
-      .then((albums) => {
+      .then((resolved) => {
         if (cancelled) return
-        if (albums.length > 0 && albums[0].tracks.length > 0) {
-          setBundle(albums[0])
-          return
+        if (resolved.length > 0 && resolved.some((a) => a.tracks.length > 0)) {
+          setAlbums(resolved.filter((a) => a.tracks.length > 0))
+          setLoading(false)
+        } else {
+          return soundtrackResolver.searchOnlineSoundtracksFast(gameName).then((online) => {
+            if (cancelled) return
+            setAlbums(online.filter((a) => a.tracks.length > 0))
+            setLoading(false)
+          })
         }
-        return soundtrackResolver.searchOnlineSoundtracksFast(gameName).then((online) => {
-          if (!cancelled && online.length > 0 && online[0].tracks.length > 0) {
-            setBundle(online[0])
-          }
-        })
       })
-      .catch(() => {})
-      .finally(() => {
+      .catch(() => {
         if (!cancelled) setLoading(false)
       })
 
@@ -84,201 +77,303 @@ export const InlineGameSoundtrackSection: React.FC<InlineGameSoundtrackSectionPr
     }
   }, [gameId, gameName, coverUrl, steamAppId, igdbId])
 
-  const tracks: SoundtrackTrack[] = bundle?.tracks ?? []
-  const isThisAlbumPlaying =
-    playbackState === 'playing' &&
-    Boolean(currentTrack && tracks.some((t) => t.id === currentTrack.id))
+  const activeBundle = albums[selectedAlbumIdx] ?? albums[0] ?? null
+  const tracks = activeBundle?.tracks ?? []
+  const visibleTracks = tracks.slice(0, visibleTrackLimit)
+  const isPlayingThisAlbum =
+    Boolean(currentTrack && tracks.some((t) => t.id === currentTrack.id)) &&
+    playbackState === 'playing'
 
-  const playAllBtn = useFocusable<HTMLButtonElement>({
-    id: `inline_ost_play_all_${gameId}`,
+  const playAllFocus = useFocusable<HTMLButtonElement>({
+    id: `${scopeId}_play_all`,
     scopeId,
     onConfirm: () => {
-      if (!bundle || tracks.length === 0) return
-      if (isThisAlbumPlaying) {
+      if (!activeBundle || tracks.length === 0) return
+      if (isPlayingThisAlbum) {
         togglePlay()
       } else {
-        void playAlbum(bundle.album, tracks, 0, {
+        void playAlbum(activeBundle.album, tracks, 0, {
           gameId,
           title: gameName,
-          coverUrl: coverUrl ?? bundle.album.cover_url,
+          coverUrl: activeBundle.album.cover_url ?? coverUrl ?? null,
         })
       }
     },
   })
 
-  const nextTrackBtn = useFocusable<HTMLButtonElement>({
-    id: `inline_ost_next_${gameId}`,
+  const openCenterFocus = useFocusable<HTMLButtonElement>({
+    id: `${scopeId}_open_center`,
     scopeId,
-    onConfirm: () => {
-      void next()
-    },
+    onConfirm: () => onOpenFullCenter?.(),
   })
-
-  const albumArt = resolveConsoleHighResUrl(bundle?.album.cover_url ?? coverUrl)
 
   return (
     <div
-      id="game-page-inline-soundtrack"
-      className={`rounded-3xl border p-6 space-y-5 transition-all ${
-        isLight
-          ? 'border-violet-300 bg-white/95 shadow-sm'
-          : 'border-violet-400/30 bg-gradient-to-br from-violet-950/35 via-[#0e1528] to-[#0a101f] shadow-xl'
+      className={`rounded-3xl p-6 border backdrop-blur-xl ${
+        isLight ? 'bg-white/92 border-slate-300 shadow-sm' : 'bg-slate-900/65 border-white/10'
       }`}
     >
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-        <div className="flex items-center gap-4">
-          <div className="relative size-16 shrink-0 overflow-hidden rounded-2xl border border-violet-400/40 bg-slate-900 shadow-lg">
-            {albumArt ? (
-              <img src={albumArt} alt={gameName} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-violet-300">
-                <Disc3 className={`size-8 ${isThisAlbumPlaying ? 'animate-spin' : ''}`} />
-              </div>
-            )}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex size-11 items-center justify-center rounded-2xl border ${
+              isLight
+                ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
+                : 'bg-cyan-500/15 border-cyan-400/30 text-cyan-400'
+            }`}
+          >
+            <Disc3 className={`size-5 ${isPlayingThisAlbum ? 'animate-spin' : ''}`} />
           </div>
           <div>
-            <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-violet-400">
-              <Music className="size-3.5" />
-              <span>Original Game Soundtrack (Inline Player)</span>
-              {loading && <Loader2 className="size-3.5 animate-spin text-cyan-400" />}
-            </div>
-            <h2
-              className={`mt-0.5 text-xl font-black ${
+            <h3
+              className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
                 isLight ? 'text-slate-900' : 'text-white'
               }`}
             >
-              {bundle?.album.title || `${gameName} — Official Soundtrack`}
-            </h2>
-            <p className="text-xs text-slate-400">
-              {bundle?.album.artist || `${tracks.length} Tracks Available`}
+              Official Game Soundtrack
+              {tracks.length > 0 && (
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${
+                    isLight
+                      ? 'bg-indigo-100 text-indigo-800'
+                      : 'bg-cyan-500/20 text-cyan-300'
+                  }`}
+                >
+                  {tracks.length} Full Tracks
+                </span>
+              )}
+            </h3>
+            <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              {activeBundle?.album.title ?? `${gameName} Original Soundtrack`}
             </p>
           </div>
         </div>
 
-        {tracks.length > 0 && (
-          <div className="flex items-center gap-3">
+        <FocusScope
+          id={`${scopeId}_header_actions`}
+          orientation="horizontal"
+          className="flex items-center gap-2.5"
+        >
+          {tracks.length > 0 && (
             <button
               type="button"
-              {...playAllBtn.focusProps}
-              className={`flex items-center gap-2 rounded-2xl px-6 py-3 text-xs font-extrabold transition-all cursor-pointer ${
-                playAllBtn.isFocused
-                  ? 'scale-105 bg-cyan-400 text-slate-950 ring-4 ring-cyan-300/50 shadow-lg'
-                  : 'bg-violet-500 text-white hover:bg-violet-400'
+              {...playAllFocus.focusProps}
+              className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-black transition-all cursor-pointer outline-none ${
+                playAllFocus.isFocused
+                  ? 'scale-105 bg-cyan-300 text-slate-950 ring-2 ring-white shadow-lg'
+                  : isLight
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-xs'
+                    : 'bg-cyan-400 text-slate-950 hover:bg-cyan-300'
               }`}
             >
-              {isThisAlbumPlaying ? (
+              {isPlayingThisAlbum ? (
                 <>
-                  <Pause className="size-4" />
-                  <span>Pause OST</span>
+                  <Pause className="size-3.5 fill-current" />
+                  Pause OST
                 </>
               ) : (
                 <>
-                  <Play className="size-4 fill-current" />
-                  <span>Play Soundtrack ({tracks.length})</span>
+                  <Play className="size-3.5 fill-current" />
+                  Play Full OST
                 </>
               )}
             </button>
+          )}
 
-            {isThisAlbumPlaying && (
-              <button
-                type="button"
-                {...nextTrackBtn.focusProps}
-                className={`flex items-center gap-1.5 rounded-2xl border px-4 py-3 text-xs font-bold transition-all cursor-pointer ${
-                  nextTrackBtn.isFocused
-                    ? 'scale-105 border-cyan-300 bg-cyan-400 text-slate-950'
-                    : isLight
-                      ? 'border-slate-300 bg-slate-100 text-slate-800'
-                      : 'border-white/15 bg-white/10 text-white'
-                }`}
-              >
-                <SkipForward className="size-4" />
-                <span>Next</span>
-              </button>
-            )}
-          </div>
-        )}
+          {onOpenFullCenter && (
+            <button
+              type="button"
+              {...openCenterFocus.focusProps}
+              className={`inline-flex items-center gap-1.5 rounded-2xl border px-3.5 py-2 text-xs font-extrabold transition-all cursor-pointer outline-none ${
+                openCenterFocus.isFocused
+                  ? 'scale-105 bg-cyan-400 text-slate-950 border-white shadow-lg'
+                  : isLight
+                    ? 'border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200'
+                    : 'border-white/15 bg-white/5 text-slate-200 hover:bg-white/10'
+              }`}
+            >
+              <Radio className={`size-3.5 ${isLight ? 'text-indigo-600' : 'text-cyan-400'}`} />
+              Open in Soundtrack Center
+            </button>
+          )}
+        </FocusScope>
       </div>
 
-      {tracks.length === 0 ? (
-        <p className="py-4 text-sm text-slate-400">
-          {loading
-            ? `Searching soundtrack providers for ${gameName}...`
-            : `No soundtrack tracks found for ${gameName}.`}
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-[20rem] overflow-y-auto no-scrollbar pr-1">
-          {tracks.slice(0, 18).map((track, idx) => (
-            <InlineOstTrackButton
-              key={`${track.id}_${idx}`}
-              id={`inline_ost_trk_${gameId}_${idx}`}
-              scopeId={scopeId}
-              index={idx + 1}
-              track={track}
-              active={currentTrack?.id === track.id}
-              playing={playbackState === 'playing' && currentTrack?.id === track.id}
-              isLight={isLight}
-              onSelect={() => {
-                if (!bundle) return
-                if (currentTrack?.id === track.id) {
-                  togglePlay()
-                } else {
-                  void playAlbum(bundle.album, tracks, idx, {
-                    gameId,
-                    title: gameName,
-                    coverUrl: coverUrl ?? bundle.album.cover_url,
-                  })
-                }
+      {/* Album Selector Tabs when multiple albums exist */}
+      {albums.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {albums.map((alb, i) => (
+            <button
+              key={alb.album.id}
+              type="button"
+              onClick={() => {
+                setSelectedAlbumIdx(i)
+                setVisibleTrackLimit(24)
               }}
-            />
+              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                selectedAlbumIdx === i
+                  ? isLight
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-cyan-400 text-slate-950'
+                  : isLight
+                    ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              {alb.album.title} ({alb.tracks.length})
+            </button>
           ))}
+        </div>
+      )}
+
+      {loading ? (
+        <div
+          className={`flex items-center justify-center gap-2.5 py-8 text-sm ${
+            isLight ? 'text-slate-600' : 'text-slate-400'
+          }`}
+        >
+          <Loader2
+            className={`size-4 animate-spin ${isLight ? 'text-indigo-600' : 'text-cyan-400'}`}
+          />
+          Resolving full soundtrack tracklist for {gameName}...
+        </div>
+      ) : tracks.length === 0 ? (
+        <div
+          className={`flex items-center justify-between py-4 text-xs ${
+            isLight ? 'text-slate-500' : 'text-slate-400'
+          }`}
+        >
+          <span>No indexed tracks found yet. Try searching in the Soundtrack Center.</span>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <FocusScope
+            id={scopeId}
+            className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[380px] overflow-y-auto pr-1"
+          >
+            {visibleTracks.map((track, idx) => (
+              <InlineTrackRow
+                key={track.id}
+                track={track}
+                index={idx}
+                scopeId={scopeId}
+                active={currentTrack?.id === track.id}
+                isPlaying={currentTrack?.id === track.id && playbackState === 'playing'}
+                isFavorite={favorites.has(`track:${track.id}`)}
+                isLight={isLight}
+                onPlay={() => {
+                  if (!activeBundle) return
+                  if (currentTrack?.id === track.id) {
+                    togglePlay()
+                  } else {
+                    void playTrack(
+                      track,
+                      activeBundle.album,
+                      {
+                        gameId,
+                        title: gameName,
+                        coverUrl: activeBundle.album.cover_url ?? coverUrl ?? null,
+                      },
+                      tracks,
+                    )
+                  }
+                }}
+                onToggleFav={() => {
+                  void toggleFavorite('track', track.id, {
+                    track,
+                    album: activeBundle?.album ?? null,
+                  })
+                }}
+              />
+            ))}
+          </FocusScope>
+
+          {tracks.length > visibleTrackLimit && (
+            <div className="flex justify-center pt-1">
+              <button
+                type="button"
+                onClick={() => setVisibleTrackLimit((prev) => prev + 30)}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-extrabold transition-all cursor-pointer ${
+                  isLight
+                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white'
+                    : 'border-cyan-400/40 bg-cyan-400/15 text-cyan-300 hover:bg-cyan-400 hover:text-slate-950'
+                }`}
+              >
+                <Plus className="size-3.5" />
+                Show More Tracks ({tracks.length - visibleTrackLimit} remaining)
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-const InlineOstTrackButton: React.FC<{
-  id: string
-  scopeId: string
-  index: number
+const InlineTrackRow: React.FC<{
   track: SoundtrackTrack
+  index: number
+  scopeId: string
   active: boolean
-  playing: boolean
+  isPlaying: boolean
+  isFavorite: boolean
   isLight: boolean
-  onSelect: () => void
-}> = ({ id, scopeId, index, track, active, playing, isLight, onSelect }) => {
+  onPlay: () => void
+  onToggleFav: () => void
+}> = ({ track, index, scopeId, active, isPlaying, isFavorite, isLight, onPlay, onToggleFav }) => {
   const { focusProps, isFocused } = useFocusable<HTMLButtonElement>({
-    id,
+    id: `${scopeId}_track_${track.id}_${index}`,
     scopeId,
-    onConfirm: onSelect,
+    onConfirm: onPlay,
   })
-  const sec = Math.max(0, Math.round((track.duration_ms || 0) / 1000))
-  const dur = sec > 0 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` : ''
+  const mins = track.duration_ms ? Math.floor(track.duration_ms / 60000) : 0
+  const secs = track.duration_ms ? Math.floor((track.duration_ms % 60000) / 1000) : 0
 
   return (
-    <button
-      type="button"
-      {...focusProps}
-      className={`flex items-center justify-between gap-3 rounded-2xl border p-3 text-left transition-all cursor-pointer ${
-        isFocused
-          ? 'scale-[1.02] border-cyan-300 bg-cyan-400 text-slate-950 shadow-md'
-          : active
-            ? 'border-violet-400 bg-violet-500/25 text-white'
-            : isLight
-              ? 'border-slate-200 bg-slate-50 text-slate-900 hover:bg-slate-100'
-              : 'border-white/10 bg-slate-950/60 text-slate-200 hover:bg-white/10'
-      }`}
-    >
-      <div className="flex min-w-0 items-center gap-2.5">
-        <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-black/20 font-mono text-xs font-bold">
-          {playing ? <Volume2 className="size-3.5 text-cyan-300 animate-pulse" /> : index}
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-xs font-extrabold">{track.title}</p>
-          {track.artist && <p className="truncate text-[10px] opacity-75">{track.artist}</p>}
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        {...focusProps}
+        className={`flex-1 flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-left transition-all cursor-pointer outline-none ${
+          isFocused
+            ? 'bg-cyan-400 text-slate-950 font-extrabold scale-[1.01] shadow-md'
+            : active
+              ? isLight
+                ? 'bg-indigo-50 text-indigo-900 border border-indigo-300 font-bold'
+                : 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 font-bold'
+              : isLight
+                ? 'bg-slate-100/90 text-slate-800 hover:bg-slate-200'
+                : 'bg-slate-800/45 text-slate-200 hover:bg-slate-800/80'
+        }`}
+      >
+        <div className="flex items-center gap-2.5 truncate pr-2">
+          <span className="text-[11px] font-mono opacity-65 w-5 shrink-0">
+            {isPlaying ? '▶' : String(index + 1).padStart(2, '0')}
+          </span>
+          <Music className="size-3.5 opacity-60 shrink-0" />
+          <span className="text-xs font-bold truncate">{track.title}</span>
         </div>
-      </div>
-      {dur && <span className="shrink-0 font-mono text-[11px] font-bold opacity-75">{dur}</span>}
-    </button>
+        <span className="text-[11px] font-mono opacity-75 shrink-0">
+          {track.duration_ms ? `${mins}:${secs.toString().padStart(2, '0')}` : 'OST'}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={onToggleFav}
+        className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+          isFavorite
+            ? isLight
+              ? 'bg-rose-50 border-rose-300 text-rose-600'
+              : 'bg-rose-500/20 border-rose-400/40 text-rose-400'
+            : isLight
+              ? 'bg-slate-100 border-slate-300 text-slate-500 hover:text-rose-500'
+              : 'bg-slate-800/45 border-white/10 text-slate-400 hover:text-rose-400'
+        }`}
+        title="Favorite Track"
+      >
+        <Heart className={`size-3.5 ${isFavorite ? 'fill-current' : ''}`} />
+      </button>
+    </div>
   )
 }
