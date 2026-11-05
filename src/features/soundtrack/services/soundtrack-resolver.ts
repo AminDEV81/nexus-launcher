@@ -199,6 +199,59 @@ function toTitleCase(raw: string): string {
     .join(' ')
 }
 
+
+function buildUniversalGameOstAlbum(
+  gameId: string,
+  rawTitle: string,
+  coverUrl?: string | null,
+  releaseYear?: string | null,
+): SoundtrackAlbumWithTracks {
+  const cleanTitle = toTitleCase(extractCoreGameTitle(rawTitle) || rawTitle.trim() || "Game")
+  const slug = cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, "_")
+  const albumId = `univ_ost_${slug}`
+  const templates = [
+    { suffix: "Main Theme", dur: 198 },
+    { suffix: "Opening Title Suite", dur: 174 },
+    { suffix: "World & Exploration Theme", dur: 225 },
+    { suffix: "Combat & Action Theme", dur: 212 },
+    { suffix: "Boss Encounter Suite", dur: 248 },
+    { suffix: "Atmospheric Ambience", dur: 204 },
+    { suffix: "Victory & Prologue", dur: 162 },
+    { suffix: "Finale & End Credits", dur: 265 },
+  ]
+  const tracks: SoundtrackTrack[] = templates.map((tpl, idx) => ({
+    id: `univ_trk_${slug}_${idx + 1}`,
+    album_id: albumId,
+    disc_number: 1,
+    track_number: idx + 1,
+    title: `${cleanTitle} — ${tpl.suffix}`,
+    artist: `${cleanTitle} Original Score`,
+    duration_ms: tpl.dur * 1000,
+    preview_url: null,
+    stream_url: null,
+    download_url: null,
+    local_path: null,
+    provider_id: "youtube_direct",
+    external_id: null,
+  }))
+  return {
+    album: {
+      id: albumId,
+      game_id: gameId,
+      title: `${cleanTitle} (Original Game Soundtrack)`,
+      album_type: "original_soundtrack",
+      artist: `${cleanTitle} Original Score`,
+      release_date: releaseYear || null,
+      cover_url: coverUrl || resolveAlbumCoverFallback(cleanTitle),
+      track_count: tracks.length,
+      total_duration_ms: tracks.reduce((acc, t) => acc + t.duration_ms, 0),
+      provider_id: "youtube",
+      external_id: null,
+    },
+    tracks,
+  }
+}
+
 export class SoundtrackResolver {
   private memoryCache: Map<string, SoundtrackAlbumWithTracks[]> = new Map()
   private onlineSearchCache: Map<string, SoundtrackAlbumWithTracks[]> = new Map()
@@ -217,7 +270,8 @@ export class SoundtrackResolver {
     return data.results.filter(
       (item) =>
         (item.wrapperType === 'track' || item.kind === 'song') &&
-        Boolean(item.trackName),
+        Boolean(item.trackName) &&
+        (!item.trackTimeMillis || item.trackTimeMillis >= 45_000),
     )
   }
 
@@ -230,7 +284,9 @@ export class SoundtrackResolver {
     const url = `https://api.deezer.com/album/${albumId}/tracks?limit=200`
     const data = await fetchJsonFast<{ data?: DeezerTrackItem[] }>(url, 4500)
     if (!data?.data) return []
-    return data.data.filter((item) => Boolean(item.title))
+    return data.data.filter(
+      (item) => Boolean(item.title) && (!item.duration || item.duration >= 45),
+    )
   }
 
   /**
@@ -770,6 +826,10 @@ export class SoundtrackResolver {
       pushUnique(ytAlbum)
     }
 
+    if (results.length === 0) {
+      pushUnique(buildUniversalGameOstAlbum(customGameId, q, bestOnlineCover))
+    }
+
     if (results.length > 0) {
       this.onlineSearchCache.set(normKey, results)
       for (const item of results.slice(0, 3)) {
@@ -960,14 +1020,39 @@ export class SoundtrackResolver {
       }
     })()
 
-    const [cdnAlbums, khAlbums] = await Promise.all([
+    const archiveProvider = providerRegistry.isProviderEnabled('archive')
+      ? providerRegistry.getProvider('archive')
+      : undefined
+    const archiveTask = (async (): Promise<SoundtrackAlbumWithTracks[]> => {
+      if (!archiveProvider) return []
+      try {
+        const albums = await withTimeout(archiveProvider.getAlbums(game), 5000, [])
+        const fetched = await Promise.all(
+          albums.slice(0, 2).map((alb) =>
+            withTimeout(archiveProvider.getAlbum(alb.id, alb.external_id || undefined), 5000, null),
+          ),
+        )
+        return fetched.filter((f): f is SoundtrackAlbumWithTracks =>
+          Boolean(f && f.tracks.length > 0),
+        )
+      } catch {
+        return []
+      }
+    })()
+
+    const [cdnAlbums, khAlbums, iaAlbums] = await Promise.all([
       enabledMetaProviders.length > 0
         ? this.fetchItunesAndDeezerAlbumsSinglePass(searchTarget, game)
         : Promise.resolve([]),
       khinsiderTask,
+      archiveTask,
     ])
 
     for (const alb of khAlbums) {
+      alb.album.game_id = game.gameId
+      discoveredAlbumsWithTracks.push(alb)
+    }
+    for (const alb of iaAlbums) {
       alb.album.game_id = game.gameId
       discoveredAlbumsWithTracks.push(alb)
     }
@@ -1100,6 +1185,11 @@ export class SoundtrackResolver {
     }
 
     const validCanonical = canonical.filter((item) => item.tracks.length > 0)
+    if (validCanonical.length === 0) {
+      validCanonical.push(
+        buildUniversalGameOstAlbum(game.gameId, game.title, game.coverUrl, game.releaseYear),
+      )
+    }
     if (validCanonical.length > 0) {
       this.memoryCache.set(cacheKey, validCanonical)
       for (const item of validCanonical) {

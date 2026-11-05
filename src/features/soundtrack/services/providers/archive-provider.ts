@@ -108,7 +108,11 @@ export class ArchiveOrgProvider extends BaseSoundtrackProvider {
 
       const audioFiles = data.files.filter((f) => {
         const lower = f.name.toLowerCase()
-        return AUDIO_EXTS.some((ext) => lower.endsWith(ext))
+        if (!AUDIO_EXTS.some((ext) => lower.endsWith(ext))) return false
+        if (/\b(?:sample|preview|30s|30sec|ringtone)\b/i.test(lower)) return false
+        const durSec = typeof f.length === "string" ? parseFloat(f.length) : (f.length || 0)
+        if (durSec > 0 && durSec < 45) return false
+        return true
       })
 
       if (audioFiles.length === 0) return null
@@ -143,7 +147,7 @@ export class ArchiveOrgProvider extends BaseSoundtrackProvider {
           title: trackTitle,
           artist: file.creator || artist,
           duration_ms: durationMs,
-          preview_url: streamUrl,
+          preview_url: null,
           stream_url: streamUrl,
           download_url: streamUrl,
           local_path: null,

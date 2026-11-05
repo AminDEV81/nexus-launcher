@@ -121,15 +121,31 @@ export function buildBannerFallbackChain(
 
   const normBackdrop = normalizeExternalImageUrl(backdropUrl)
   const normCover = normalizeExternalImageUrl(coverUrl)
+  const resolvedAppId = extractSteamAppId(normCover, normBackdrop, steamAppId, igdbId)
 
-  pushUnique(normBackdrop)
-
+  // If normBackdrop is an IGDB URL, push its 1080p HD version FIRST!
   if (normBackdrop && normBackdrop.includes('images.igdb.com/igdb/image/upload/')) {
     pushUnique(normBackdrop.replace(/\/t_[a-z0-9_]+\//i, '/t_1080p/'))
     pushUnique(normBackdrop.replace(/\/t_[a-z0-9_]+\//i, '/t_720p/'))
   }
 
-  const resolvedAppId = extractSteamAppId(normCover, normBackdrop, steamAppId, igdbId)
+  // If normBackdrop is a low-res Steam capsule (616x353 or 460x215 header.jpg), try 1920x620 library_hero.jpg FIRST!
+  const isLowResSteamCapsule =
+    normBackdrop &&
+    (normBackdrop.includes('capsule_616x353') ||
+      normBackdrop.includes('header.jpg') ||
+      normBackdrop.includes('capsule_467x181'))
+
+  if (resolvedAppId && isLowResSteamCapsule) {
+    pushUnique(
+      `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/library_hero.jpg`,
+    )
+    pushUnique(
+      `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/library_hero.jpg`,
+    )
+  }
+
+  pushUnique(normBackdrop)
 
   if (resolvedAppId) {
     if (normBackdrop?.includes('library_hero.jpg')) {

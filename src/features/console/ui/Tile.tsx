@@ -62,9 +62,13 @@ export function resolveConsoleHighResUrl(url: string | null | undefined): string
       .replace('/t_micro/', '/t_1080p/')
       .replace('/t_cover_small/', '/t_1080p/')
       .replace('/t_cover_big/', '/t_1080p/')
+      .replace('/t_cover_big_2x/', '/t_1080p/')
       .replace('/t_720p/', '/t_1080p/')
       .replace('/t_screenshot_med/', '/t_1080p/')
       .replace('/t_screenshot_big/', '/t_1080p/')
+  }
+  if (resolved.includes('steamstatic.com') && /\.\d+x\d+\.jpg/i.test(resolved)) {
+    return resolved.replace(/\.\d+x\d+\.jpg/i, '.1920x1080.jpg')
   }
   return resolved
 }

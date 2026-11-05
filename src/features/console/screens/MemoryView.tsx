@@ -390,7 +390,7 @@ export const MemoryView: React.FC<MemoryViewProps> = ({
         <FocusScope
           id="console_memory_grid"
           orientation="grid"
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
         >
           {displayedGames.map((game) => (
             <ConsoleMemoryPosterCard
@@ -463,7 +463,7 @@ const ConsoleMemoryPosterCard: React.FC<{
       {...focusProps}
       onMouseEnter={onFocusCard}
       onClick={onInspect}
-      className={`group relative aspect-[3/4] w-full overflow-hidden rounded-2xl border text-left transition-transform duration-150 cursor-pointer select-none outline-none ${
+      className={`group relative aspect-[3/4.15] min-h-[22rem] w-full overflow-hidden rounded-3xl border text-left transition-transform duration-150 cursor-pointer select-none outline-none ${
         isFocused
           ? isLight
             ? 'z-20 -translate-y-1.5 scale-[1.03] border-amber-500 ring-3 ring-amber-400/50 shadow-xl'
@@ -507,16 +507,23 @@ const ConsoleMemoryPosterCard: React.FC<{
       </div>
 
       {/* Bottom Dock: Title, Preserved Playtime & Restore/Reinstall Actions */}
-      <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end p-3">
-        <p className="line-clamp-1 text-sm font-black tracking-tight text-white drop-shadow">
+      <div className="absolute inset-x-0 bottom-0 flex flex-col justify-end p-4.5">
+        <p className="line-clamp-1 text-base sm:text-lg font-black tracking-tight text-white drop-shadow">
           {game.name}
         </p>
-        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-bold text-amber-300">
-          <Clock className="size-3" />
-          <span>{formatPlaytime(game.total_playtime_seconds)} Logged</span>
+        <div className="mt-1 flex items-center justify-between gap-2 text-xs font-bold text-amber-300">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="size-3.5" />
+            <span>{formatPlaytime(game.total_playtime_seconds)} Logged</span>
+          </span>
+          {game.developer && (
+            <span className="truncate max-w-[9rem] text-[11px] text-slate-300/85">
+              {game.developer}
+            </span>
+          )}
         </div>
 
-        <div className="mt-2 flex items-center justify-between gap-1.5 border-t border-white/15 pt-2">
+        <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/15 pt-3">
           <button
             type="button"
             disabled={busy}
@@ -525,14 +532,14 @@ const ConsoleMemoryPosterCard: React.FC<{
               onRestore()
             }}
             title="Restore to Library"
-            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-amber-400 px-2 py-1 text-[10px] font-black text-slate-950 hover:bg-amber-300 transition-colors cursor-pointer"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-amber-400 px-3 py-2 text-xs font-black text-slate-950 hover:bg-amber-300 transition-colors cursor-pointer shadow"
           >
             {busy ? (
-              <Loader2 className="size-3 animate-spin" />
+              <Loader2 className="size-3.5 animate-spin" />
             ) : (
-              <RotateCcw className="size-3" />
+              <RotateCcw className="size-3.5" />
             )}
-            <span>Restore</span>
+            <span>Restore to Library</span>
           </button>
 
           {onReinstallInLegacy && (
@@ -543,9 +550,9 @@ const ConsoleMemoryPosterCard: React.FC<{
                 onReinstallInLegacy()
               }}
               title="Switch to Legacy Mode to Reinstall"
-              className="flex size-6 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white hover:bg-cyan-400 hover:text-slate-950 transition-colors cursor-pointer"
+              className="flex size-8 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white hover:bg-cyan-400 hover:text-slate-950 transition-colors cursor-pointer"
             >
-              <Monitor className="size-3" />
+              <Monitor className="size-4" />
             </button>
           )}
 
@@ -557,9 +564,9 @@ const ConsoleMemoryPosterCard: React.FC<{
               onDelete()
             }}
             title="Permanently Delete Memory"
-            className="flex size-6 items-center justify-center rounded-lg border border-white/15 bg-black/55 text-slate-300 hover:border-rose-400 hover:bg-rose-500 hover:text-white transition-colors cursor-pointer"
+            className="flex size-8 items-center justify-center rounded-xl border border-white/15 bg-black/55 text-slate-300 hover:border-rose-400 hover:bg-rose-500 hover:text-white transition-colors cursor-pointer"
           >
-            <Trash2 className="size-3" />
+            <Trash2 className="size-4" />
           </button>
         </div>
       </div>

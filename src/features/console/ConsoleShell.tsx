@@ -394,6 +394,19 @@ export const ConsoleShell: React.FC = () => {
     setDownloads(dList)
   }, [])
 
+  const refreshStoreHubCatalog = useCallback(async () => {
+    const [top, nw, soon, deals] = await Promise.all([
+      getHubTopRated().catch(() => [] as HubGame[]),
+      getHubNewReleases().catch(() => [] as HubGame[]),
+      getHubComingSoon().catch(() => [] as HubGame[]),
+      getHubDiscountedGames().catch(() => [] as HubGame[]),
+    ])
+    if (top.length > 0) setTopRatedHub(top)
+    if (nw.length > 0) setNewReleasesHub(nw)
+    if (soon.length > 0) setComingSoonHub(soon)
+    if (deals.length > 0) setDiscountedHub(deals)
+  }, [])
+
   // Enter borderless fullscreen Console Mode on mount
   useEffect(() => {
     void loadProfiles(false)
@@ -507,17 +520,41 @@ export const ConsoleShell: React.FC = () => {
     return () => window.clearInterval(id)
   }, [])
 
-  const handleExitConsole = useCallback(async () => {
-    if (exitingToDesktop) return
-    setQuickSettingsOpen(false)
-    setExitingToDesktop(true)
-    consoleSoundEngine.play('close')
-    await new Promise((resolve) => window.setTimeout(resolve, 950))
+  const exitingToDesktopRef = useRef(false)
+  exitingToDesktopRef.current = exitingToDesktop
+
+  // Guard Console Mode fullscreen state: if an embedded <video> or <iframe> ever triggers
+  // document.exitFullscreen(), immediately re-assert Console Mode fullscreen on the Tauri window!
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && !exitingToDesktopRef.current) {
+        window.setTimeout(() => {
+          if (!exitingToDesktopRef.current) {
+            void consoleModeEnter(monitorIndex).catch(() => {})
+          }
+        }, 60)
+      }
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [monitorIndex])
+
+  const finishExitConsoleNow = useCallback(async () => {
     document.documentElement.style.fontSize = ''
     await consoleModeExit().catch(() => {})
     window.dispatchEvent(new Event('resize'))
     navigate(lastDesktopRoute || '/')
-  }, [exitingToDesktop, lastDesktopRoute, navigate, setQuickSettingsOpen])
+  }, [lastDesktopRoute, navigate])
+
+  const handleExitConsole = useCallback(async () => {
+    if (exitingToDesktop) return
+    exitingToDesktopRef.current = true
+    setQuickSettingsOpen(false)
+    setExitingToDesktop(true)
+    consoleSoundEngine.play('close')
+    await new Promise((resolve) => window.setTimeout(resolve, 1950))
+    await finishExitConsoleNow()
+  }, [exitingToDesktop, finishExitConsoleNow, setQuickSettingsOpen])
 
   const cycleTab = useCallback(
     (delta: number) => {
@@ -1060,6 +1097,7 @@ export const ConsoleShell: React.FC = () => {
                   discounted={discountedHub}
                   onSelectHubGame={handleSelectHubGame}
                   onWishlistUpdated={refreshData}
+                  onSyncStoreCatalog={refreshStoreHubCatalog}
                 />
               ) : activeTab === 'wishlist' ? (
                 <WishlistView
@@ -1126,7 +1164,7 @@ export const ConsoleShell: React.FC = () => {
       </footer>
 
       <ConsoleBootIntro open={booting} onFinish={() => setBooting(false)} />
-      <ConsoleExitOutro open={exitingToDesktop} />
+      <ConsoleExitOutro open={exitingToDesktop} onSkip={() => void finishExitConsoleNow()} />
       <WhoIsPlayingModal open={showProfileGate} onDone={() => setProfileGateCompleted(true)} />
 
       <QuickSettingsPanel

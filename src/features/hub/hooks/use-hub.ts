@@ -176,11 +176,18 @@ export function useRefreshHubCatalog() {
   return useMutation({
     mutationFn: async () => {
       clearPersistedHubShelves()
+      try {
+        localStorage.setItem('nexus_console_store_last_auto_sync_ts', String(Date.now()))
+      } catch {
+        // Ignore
+      }
       return hubService.refreshHubCatalog()
     },
     onSuccess: async () => {
+      clearPersistedHubShelves()
       await queryClient.invalidateQueries({ queryKey: ['hub'] })
-      await queryClient.refetchQueries({ queryKey: ['hub'], type: 'active' })
+      await queryClient.invalidateQueries({ queryKey: ['console-store-hero-details'] })
+      await queryClient.refetchQueries({ queryKey: ['hub'], type: 'all' })
     },
   })
 }

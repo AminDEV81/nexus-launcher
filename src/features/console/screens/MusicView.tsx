@@ -702,6 +702,12 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
       const modes: VisualizerMode[] = ['minimal', 'reactive', 'off']
       const nextMode = modes[(modes.indexOf(visualizerMode) + 1) % modes.length]
       setVisualizerMode(nextMode)
+      const labels: Record<VisualizerMode, string> = {
+        minimal: 'Visualizer: Spectrum Bars',
+        reactive: 'Visualizer: Dual Neon Wave',
+        off: 'Visualizer: Off',
+      }
+      toast.info(labels[nextMode])
     },
   })
 
@@ -845,7 +851,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:items-stretch">
         {/* Left Vinyl Deck + Live Audio Visualizer + Scrubbing & Volume */}
         <div
-          className={`lg:col-span-5 lg:h-[520px] rounded-3xl p-6 border backdrop-blur-xl flex flex-col items-center justify-between text-center relative overflow-hidden ${
+          className={`lg:col-span-5 lg:min-h-[560px] rounded-3xl p-6 border backdrop-blur-xl flex flex-col items-center justify-between text-center relative overflow-hidden ${
             isLight
               ? 'bg-white/90 border-slate-300 shadow-xl'
               : 'bg-slate-900/75 border-white/10 shadow-2xl'
@@ -860,9 +866,9 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
           )}
 
           {/* Vinyl Disc + Sleeve */}
-          <div className="relative z-10 w-40 h-40 mb-2 flex items-center justify-center shrink-0">
+          <div className="relative z-10 w-36 h-36 mb-1.5 flex items-center justify-center shrink-0">
             <div
-              className={`w-36 h-36 rounded-full border-6 shadow-2xl flex items-center justify-center overflow-hidden ${
+              className={`w-34 h-34 rounded-full border-6 shadow-2xl flex items-center justify-center overflow-hidden ${
                 isLight ? 'border-slate-300 bg-slate-900' : 'border-slate-800/90 bg-slate-950'
               } ${isPlaying ? 'animate-spin' : ''}`}
               style={{ animationDuration: '9s' }}
@@ -870,46 +876,114 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
               {activeCover ? (
                 <img src={activeCover} alt="" className="w-full h-full object-cover opacity-90" />
               ) : (
-                <Disc3 className="w-20 h-20 text-cyan-400/60" />
+                <Disc3 className="w-18 h-18 text-cyan-400/60" />
               )}
-              <div className="absolute w-12 h-12 rounded-full bg-slate-950 border-4 border-cyan-400/50 shadow-inner" />
+              <div className="absolute w-11 h-11 rounded-full bg-slate-950 border-4 border-cyan-400/50 shadow-inner" />
             </div>
           </div>
 
-          <div className="relative z-10 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-400 text-[11px] font-bold uppercase tracking-widest mb-2">
-            <Radio className="w-3.5 h-3.5" />
-            {statusLabel}
+          {/* Always-Visible Soundtrack Info Block (shrink-0 prevents clipping when Visualizer is active) */}
+          <div className="relative z-10 w-full shrink-0 space-y-1 px-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-400/30 text-cyan-400 text-[10.5px] font-bold uppercase tracking-widest">
+              <Radio className="w-3 h-3 shrink-0" />
+              <span className="truncate max-w-[16rem]">{statusLabel}</span>
+            </div>
+
+            <h2
+              className={`text-lg sm:text-xl font-black truncate ${
+                isLight ? 'text-slate-900' : 'text-white'
+              }`}
+            >
+              {currentTrack?.title ??
+                activeAlbumBundle?.tracks?.[0]?.title ??
+                'Select a Track to Play'}
+            </h2>
+            <p
+              className={`text-xs sm:text-sm font-semibold truncate ${
+                isLight ? 'text-slate-600' : 'text-slate-300'
+              }`}
+            >
+              {currentTrack?.artist ??
+                currentAlbum?.title ??
+                activeAlbumBundle?.album.title ??
+                'Click any track or Live Radio to begin listening'}
+            </p>
+            {(currentAlbum?.title || activeAlbumBundle?.album.title) && (
+              <p
+                className={`text-[11px] truncate ${
+                  isLight ? 'text-indigo-600 font-bold' : 'text-cyan-300/85 font-semibold'
+                }`}
+              >
+                Album: {currentAlbum?.title ?? activeAlbumBundle?.album.title}
+              </p>
+            )}
           </div>
 
-          <h2
-            className={`relative z-10 text-xl font-black line-clamp-1 ${
-              isLight ? 'text-slate-900' : 'text-white'
+          {/* Dedicated Interactive Audio Visualizer Panel */}
+          <div
+            className={`relative z-10 w-full shrink-0 rounded-2xl border p-2.5 mt-2.5 transition-all ${
+              isLight
+                ? 'border-slate-200 bg-slate-100/90'
+                : 'border-white/10 bg-black/35'
             }`}
           >
-            {currentTrack?.title ??
-              activeAlbumBundle?.tracks?.[0]?.title ??
-              'Select a Track to Play'}
-          </h2>
-          <p
-            className={`relative z-10 text-sm mt-1 line-clamp-1 ${
-              isLight ? 'text-slate-600' : 'text-slate-400'
-            }`}
-          >
-            {currentTrack?.artist ??
-              currentAlbum?.title ??
-              activeAlbumBundle?.album.title ??
-              'Click any track or Live Radio to begin listening'}
-          </p>
-
-          {/* Live Audio Visualizer Canvas */}
-          {visualizerMode !== 'off' && (
-            <div className="relative z-10 w-full h-12 mt-4 px-2">
-              <AudioVisualizer
-                mode={visualizerMode}
-                className="w-full h-full rounded-xl overflow-hidden"
-              />
+            <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+              <span
+                className={`flex items-center gap-1.5 font-mono text-[10px] font-black uppercase tracking-wider ${
+                  isLight ? 'text-indigo-700' : 'text-cyan-300'
+                }`}
+              >
+                <BarChart3 className="size-3.5" />
+                Audio Visualizer:{" "}
+                {visualizerMode === 'minimal'
+                  ? 'Spectrum Bars'
+                  : visualizerMode === 'reactive'
+                    ? 'Neon Waveform'
+                    : 'Paused / Off'}
+              </span>
+              <div className="flex items-center gap-1">
+                {([
+                  { id: 'minimal', label: 'Bars' },
+                  { id: 'reactive', label: 'Wave' },
+                  { id: 'off', label: 'Off' },
+                ] as const).map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setVisualizerMode(m.id)}
+                    className={`rounded-lg px-2 py-0.5 font-mono text-[9.5px] font-black uppercase cursor-pointer transition-colors ${
+                      visualizerMode === m.id
+                        ? isLight
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-cyan-400 text-slate-950'
+                        : isLight
+                          ? 'bg-white text-slate-600 hover:bg-slate-200'
+                          : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
+
+            {visualizerMode !== 'off' ? (
+              <div className="w-full h-12 px-1">
+                <AudioVisualizer
+                  mode={visualizerMode}
+                  className="w-full h-full rounded-xl overflow-hidden"
+                />
+              </div>
+            ) : (
+              <div
+                className={`flex h-8 items-center justify-center text-[11px] font-semibold ${
+                  isLight ? 'text-slate-500' : 'text-slate-400'
+                }`}
+              >
+                Select &ldquo;Bars&rdquo; or &ldquo;Wave&rdquo; to display live audio frequency spectrum
+              </div>
+            )}
+          </div>
 
           {/* Seek / Progress Scrub Bar */}
           <div className="relative z-10 w-full mt-4 space-y-1.5">
@@ -1094,7 +1168,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
 
         {/* Right Stage: Switches by Sub-Tab (Matches Left Vinyl Deck Height 1:1) */}
         <div
-          className={`lg:col-span-7 lg:h-[520px] rounded-3xl p-6 border backdrop-blur-xl flex flex-col overflow-hidden ${
+          className={`lg:col-span-7 lg:min-h-[560px] lg:max-h-[600px] rounded-3xl p-6 border backdrop-blur-xl flex flex-col overflow-hidden ${
             isLight
               ? 'bg-white/90 border-slate-300 shadow-xl'
               : 'bg-slate-900/75 border-white/10 shadow-2xl'

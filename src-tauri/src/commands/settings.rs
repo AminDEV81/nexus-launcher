@@ -21,12 +21,23 @@ pub fn get_setting(db: State<'_, Database>, key: String) -> AppResult<Option<Str
 
 #[tauri::command]
 pub fn set_setting(db: State<'_, Database>, key: String, value: String) -> AppResult<()> {
+    let clean_key = key.trim();
+    if clean_key.is_empty() || clean_key.len() > 128 || value.len() > 32_768 {
+        return Err(crate::error::AppError::Invalid("Invalid setting key or value length.".into()));
+    }
+    let sanitized_value = if clean_key.starts_with("console_") && clean_key != "console_mode_prompt_dismissed" {
+        crate::commands::console::validate_console_setting_value(clean_key, &value)
+            .unwrap_or_else(|| value.clone())
+    } else {
+        value.clone()
+    };
+
     let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
 
     conn.execute(
         "INSERT INTO settings (key, value) VALUES (?1, ?2)
          ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-        rusqlite::params![&key, &value],
+        rusqlite::params![clean_key, &sanitized_value],
     )?;
 
     if key == "metadata_provider_mode"

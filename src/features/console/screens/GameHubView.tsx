@@ -144,6 +144,7 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
   }
 
   const handleWatchTrailer = () => {
+    window.dispatchEvent(new CustomEvent('nexus:console-play-trailer'))
     const el = document.getElementById('console-inline-trailer-section')
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })

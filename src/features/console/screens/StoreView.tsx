@@ -49,6 +49,7 @@ export interface StoreViewProps {
   discounted: HubGame[]
   onSelectHubGame: (hubGame: HubGame) => void
   onWishlistUpdated?: () => void
+  onSyncStoreCatalog?: () => Promise<void> | void
 }
 
 type StoreCategoryTab = 'all' | 'deals' | 'new' | 'top' | 'soon'
@@ -377,6 +378,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
   discounted: propDiscounted,
   onSelectHubGame,
   onWishlistUpdated,
+  onSyncStoreCatalog,
 }) => {
   const themeId = useConsoleStore((s) => s.theme)
   const isLight = Boolean(CONSOLE_THEMES[themeId]?.isLight)
@@ -424,9 +426,21 @@ export const StoreView: React.FC<StoreViewProps> = ({
       if (refreshCatalog.isPending) return
       try {
         await refreshCatalog.mutateAsync()
+        await Promise.allSettled([
+          rqDeals.refetch(),
+          rqNew.refetch(),
+          rqTop.refetch(),
+          rqSoon.refetch(),
+          rqRec.refetch(),
+          genresQuery.refetch(),
+          Promise.resolve(onSyncStoreCatalog?.()),
+        ])
         localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()))
+        setShuffleSeed((prev) => prev + 1)
+        setHeroIndex(0)
+        setActivePreviewFrame(null)
         if (!silent) {
-          toast.success('Synced live Store catalog, Steam deals & upcoming releases!')
+          toast.success('Synced entire Store & Game Hub catalog (Deals, Trending, Top Rated & Coming Soon)!')
         }
       } catch {
         if (!silent) {
@@ -434,22 +448,24 @@ export const StoreView: React.FC<StoreViewProps> = ({
         }
       }
     },
-    [refreshCatalog],
+    [refreshCatalog, rqDeals, rqNew, rqTop, rqSoon, rqRec, genresQuery, onSyncStoreCatalog],
   )
 
+  // Automatic 12-Hour Store & Game Hub Sync (checks on mount and every 5 minutes for 12h expiry)
   useEffect(() => {
-    try {
-      const lastTs = Number(localStorage.getItem(AUTO_SYNC_STORAGE_KEY) || '0')
-      if (!lastTs || Date.now() - lastTs >= HUB_CACHE_TTL_MS) {
-        localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()))
-        void handleSyncLive(true)
+    const checkAndSync12h = () => {
+      try {
+        const lastTs = Number(localStorage.getItem(AUTO_SYNC_STORAGE_KEY) || '0')
+        if (!lastTs || Date.now() - lastTs >= HUB_CACHE_TTL_MS) {
+          localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()))
+          void handleSyncLive(true)
+        }
+      } catch {
+        // Ignore storage access errors
       }
-    } catch {
-      // Ignore storage access errors
     }
-    const id = window.setInterval(() => {
-      void handleSyncLive(true)
-    }, HUB_CACHE_TTL_MS)
+    checkAndSync12h()
+    const id = window.setInterval(checkAndSync12h, 5 * 60 * 1000)
     return () => window.clearInterval(id)
   }, [handleSyncLive])
 
@@ -511,12 +527,17 @@ export const StoreView: React.FC<StoreViewProps> = ({
 
   useEffect(() => {
     setActivePreviewFrame(null)
+  }, [heroGame?.igdb_id])
+
+  useEffect(() => {
     if (heroGame) {
-      useConsoleStore
-        .getState()
-        .setFocusedBackdropUrl(heroGame.backdrop_url ?? heroGame.cover_url)
+      const bestHdBackdrop =
+        activePreviewFrame ??
+        heroFrames[0] ??
+        resolveConsoleHighResUrl(heroGame.backdrop_url ?? heroGame.cover_url)
+      useConsoleStore.getState().setFocusedBackdropUrl(bestHdBackdrop)
     }
-  }, [heroGame])
+  }, [heroGame, heroFrames, activePreviewFrame])
 
   const activeSearchResults = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -606,7 +627,10 @@ export const StoreView: React.FC<StoreViewProps> = ({
 
   const heroBackdrop =
     activePreviewFrame ??
-    resolveConsoleHighResUrl(heroGame?.backdrop_url ?? heroGame?.cover_url)
+    heroFrames[0] ??
+    resolveConsoleHighResUrl(
+      heroDetails?.screenshot_urls?.[0] ?? heroGame?.backdrop_url ?? heroGame?.cover_url,
+    )
   const heroScore =
     heroGame?.opencritic_score ??
     heroGame?.metacritic_score ??
@@ -850,6 +874,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
       {heroGame && !isSearchMode && (
         <div className="space-y-2.5">
           <div
+            dir="ltr"
             onMouseEnter={() => setHeroPaused(true)}
             onMouseLeave={() => setHeroPaused(false)}
             className={`grid grid-cols-1 lg:grid-cols-12 overflow-hidden rounded-3xl border shadow-2xl ${
@@ -858,8 +883,8 @@ export const StoreView: React.FC<StoreViewProps> = ({
                 : 'border-white/10 bg-[#0b1020]/90'
             }`}
           >
-            {/* Main Widescreen Stage (Right 8 Columns on Desktop) */}
-            <div className="relative lg:order-2 lg:col-span-8 min-h-[19.5rem] sm:min-h-[21.5rem] overflow-hidden bg-slate-950 flex flex-col justify-between p-6">
+            {/* Main Widescreen Stage (Left 8 Columns on Desktop) */}
+            <div className="relative lg:order-1 lg:col-span-8 min-h-[19.5rem] sm:min-h-[21.5rem] overflow-hidden bg-slate-950 flex flex-col justify-between p-6">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`${heroGame.igdb_id}_${heroBackdrop ?? "default"}`}
@@ -953,12 +978,12 @@ export const StoreView: React.FC<StoreViewProps> = ({
               </div>
             </div>
 
-            {/* Left 4 Columns: 4-Screenshot Interactive Gallery & Live Telemetry Panel */}
+            {/* Right 4 Columns: 4-Screenshot Interactive Gallery & Live Telemetry Panel */}
             <div
-              className={`lg:order-1 lg:col-span-4 flex flex-col justify-between p-5 border-t lg:border-t-0 lg:border-r ${
+              className={`relative lg:order-2 lg:col-span-4 flex flex-col justify-between p-5 border-t lg:border-t-0 lg:border-l overflow-hidden ${
                 isLight
-                  ? 'border-slate-200/90 bg-slate-50/70'
-                  : 'border-white/10 bg-[#0d1428]/65'
+                  ? 'border-slate-200/95 bg-gradient-to-b from-white via-slate-50/95 to-indigo-50/40'
+                  : 'border-white/12 bg-gradient-to-b from-[#111932]/95 via-[#0c1326]/95 to-[#080d1a]/95'
               }`}
             >
               <div className="space-y-3.5">

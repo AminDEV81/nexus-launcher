@@ -799,7 +799,7 @@ pub async fn refresh_hub_catalog(db: State<'_, Database>) -> AppResult<i64> {
             rusqlite::params![next.to_string()],
         );
         let _ = conn.execute(
-            "DELETE FROM metadata_cache WHERE category IN ('feed', 'shelf_rotation', 'search', 'details')",
+            "DELETE FROM metadata_cache WHERE category IN ('feed', 'shelf_rotation', 'search', 'details', 'discounted', 'steam_price')",
             [],
         );
         next
@@ -3280,10 +3280,12 @@ pub async fn fetch_popular_discounted_hub_games(
     db: &Database,
     http: &reqwest::Client,
 ) -> Vec<HubGame> {
-    let cache_key = "hub:discounted_games:v6";
+    let nonce = get_hub_refresh_nonce(db);
+    let epoch_12h = chrono::Utc::now().timestamp() / (12 * 3600);
+    let cache_key = format!("hub:discounted_games:v7:{epoch_12h}:{nonce}");
     {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some((payload, is_stale)) = MetadataCache::get(&conn, cache_key) {
+        if let Some((payload, is_stale)) = MetadataCache::get(&conn, &cache_key) {
             if !is_stale {
                 if let Ok(games) = serde_json::from_str::<Vec<HubGame>>(&payload) {
                     if !games.is_empty() {
@@ -3591,7 +3593,7 @@ pub async fn fetch_popular_discounted_hub_games(
 
     if let Ok(json) = serde_json::to_string(&discounted_games) {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
-        let _ = MetadataCache::set(&conn, cache_key, "discounted", &json, 1800);
+        let _ = MetadataCache::set(&conn, &cache_key, "discounted", &json, 1800);
     }
 
     discounted_games
@@ -3649,7 +3651,7 @@ pub async fn resolve_nexusmods_url(
     let cache_key = "nexusmods:games_catalog:v1";
     let cached_json = {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
-        MetadataCache::get(&conn, cache_key).and_then(|(payload, is_stale)| {
+        MetadataCache::get(&conn, &cache_key).and_then(|(payload, is_stale)| {
             if !is_stale && !payload.is_empty() {
                 Some(payload)
             } else {
@@ -4668,12 +4670,12 @@ pub async fn resolve_hub_trailer_stream(
 
         let (res1, res2) = tokio::join!(
             tokio::time::timeout(
-                std::time::Duration::from_millis(2400),
-                crate::commands::soundtrack::youtube::search_youtube_videos_fast(&http.0, &q1, 8),
+                std::time::Duration::from_millis(4200),
+                crate::commands::soundtrack::youtube::search_youtube_trailer_videos_fast(&http.0, &q1, 8),
             ),
             tokio::time::timeout(
-                std::time::Duration::from_millis(2400),
-                crate::commands::soundtrack::youtube::search_youtube_videos_fast(&http.0, &q2, 8),
+                std::time::Duration::from_millis(4200),
+                crate::commands::soundtrack::youtube::search_youtube_trailer_videos_fast(&http.0, &q2, 8),
             )
         );
 

@@ -162,7 +162,21 @@ pub fn validate_console_setting_value(key: &str, value: &str) -> Option<String> 
             .ok()
             .map(|n| n.clamp(1, 120).to_string()),
         "console_theme" => {
-            if matches!(v, "cyberpunk" | "ps5" | "emerald" | "crimson" | "synthwave" | "oled" | "light") {
+            if matches!(
+                v,
+                "cyberpunk"
+                    | "ps5"
+                    | "emerald"
+                    | "crimson"
+                    | "synthwave"
+                    | "oled"
+                    | "light"
+                    | "glacier"
+                    | "sakura"
+                    | "solaris"
+                    | "mint"
+                    | "lavender"
+            ) {
                 Some(v.to_string())
             } else {
                 Some("cyberpunk".to_string())

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Tv, Monitor, Sparkles, Check, Gamepad2, MousePointerClick } from 'lucide-react'
+import { Tv, Monitor, Sparkles, Check, Gamepad2, MousePointerClick, Sun, Moon } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getSetting, setSetting } from '@/services/settings'
 import { useProfileStore } from '@/store/profile-store'
@@ -15,11 +15,30 @@ export const ModeSelectModal: React.FC = () => {
   const isGateOpen = useProfileStore((s) => s.isGateOpen)
   const isLoadingProfiles = useProfileStore((s) => s.isLoading)
   const activeProfile = useProfileStore((s) => s.activeProfile)
-  const resolvedMode = useThemeStore((s) => s.resolvedMode)
+  const themeMode = useThemeStore((s) => s.mode)
+  const setThemeMode = useThemeStore((s) => s.setMode)
   const consoleThemeId = useConsoleStore((s) => s.theme)
+  const setConsoleTheme = useConsoleStore((s) => s.setTheme)
 
   const isLight =
-    resolvedMode === 'light' || Boolean(CONSOLE_THEMES[consoleThemeId]?.isLight)
+    themeMode === 'light' ||
+    Boolean(CONSOLE_THEMES[consoleThemeId]?.isLight) ||
+    (typeof document !== 'undefined' &&
+      document.documentElement.getAttribute('data-theme') === 'light')
+
+  const handleToggleLightDark = () => {
+    if (isLight) {
+      setThemeMode('dark')
+      if (CONSOLE_THEMES[consoleThemeId]?.isLight) {
+        setConsoleTheme('cyberpunk')
+      }
+    } else {
+      setThemeMode('light')
+      if (!CONSOLE_THEMES[consoleThemeId]?.isLight) {
+        setConsoleTheme('light')
+      }
+    }
+  }
 
   const [open, setOpen] = useState(false)
   const [checkedSetting, setCheckedSetting] = useState(false)
@@ -72,6 +91,9 @@ export const ModeSelectModal: React.FC = () => {
     }
 
     if (choice === 'console') {
+      if (isLight && !CONSOLE_THEMES[consoleThemeId]?.isLight) {
+        setConsoleTheme('light')
+      }
       useConsoleStore.getState().setLastDesktopRoute(location.pathname || '/')
       navigate('/console')
     }
@@ -136,6 +158,32 @@ export const ModeSelectModal: React.FC = () => {
                   : 'radial-gradient(circle, #7c5cff 0%, #3b82f6 60%, transparent 100%)',
             }}
           />
+
+          {/* Quick Light / Dark Mode Switcher in Top Right */}
+          <div className="relative z-20 flex justify-end mb-1">
+            <button
+              type="button"
+              onClick={handleToggleLightDark}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                isLight
+                  ? 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100 shadow-2xs'
+                  : 'border-white/15 bg-white/10 text-slate-200 hover:bg-white/15'
+              }`}
+              title="Toggle Light / Dark Theme"
+            >
+              {isLight ? (
+                <>
+                  <Sun className="size-3.5 text-amber-500" />
+                  <span>Light Theme</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="size-3.5 text-cyan-300" />
+                  <span>Dark Theme</span>
+                </>
+              )}
+            </button>
+          </div>
 
           {/* Active User Greeting Pill */}
           <div className="relative z-10 flex flex-col items-center text-center">

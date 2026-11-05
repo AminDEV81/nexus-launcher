@@ -170,7 +170,7 @@ pub async fn extract_youtube_direct_audio_url(
     let (vr_resp, ios_resp, ts_resp, piped_resp, piped_mirror_resp) = tokio::join!(
         client
             .post(innertube_url)
-            .timeout(Duration::from_millis(2400))
+            .timeout(Duration::from_millis(4200))
             .header(
                 reqwest::header::USER_AGENT,
                 "com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 14; en_US; Quest 3; Build/UP1A.231005.007; Cronet/122.0.6261.64)"
@@ -179,7 +179,7 @@ pub async fn extract_youtube_direct_audio_url(
             .send(),
         client
             .post(innertube_url)
-            .timeout(Duration::from_millis(2400))
+            .timeout(Duration::from_millis(4200))
             .header(
                 reqwest::header::USER_AGENT,
                 "com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X;)"
@@ -188,7 +188,7 @@ pub async fn extract_youtube_direct_audio_url(
             .send(),
         client
             .post(innertube_url)
-            .timeout(Duration::from_millis(2400))
+            .timeout(Duration::from_millis(4200))
             .header(
                 reqwest::header::USER_AGENT,
                 "com.google.android.youtube/1.9 (Linux; U; Android 11; en_US)"
@@ -197,11 +197,11 @@ pub async fn extract_youtube_direct_audio_url(
             .send(),
         client
             .get(&piped_url)
-            .timeout(Duration::from_millis(2200))
+            .timeout(Duration::from_millis(3800))
             .send(),
         client
             .get(&piped_mirror_url)
-            .timeout(Duration::from_millis(2200))
+            .timeout(Duration::from_millis(3800))
             .send()
     );
 
@@ -280,7 +280,7 @@ pub async fn search_youtube_videos_fast(
 
     let res = client
         .get(url)
-        .timeout(Duration::from_millis(2400))
+        .timeout(Duration::from_millis(4200))
         .header(
             reqwest::header::USER_AGENT,
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -345,9 +345,9 @@ pub async fn search_youtube_videos_fast(
                     .and_then(|v| v.as_str())
                     .and_then(parse_duration_string);
 
-                // Reject 30-second previews/shorts (< 45 seconds)
+                // Reject 30-second / 45-second previews and shorts (< 60 seconds)
                 if let Some(dur) = duration_seconds {
-                    if dur > 0 && dur < 45 {
+                    if dur > 0 && dur < 60 {
                         continue;
                     }
                 }
@@ -367,8 +367,168 @@ pub async fn search_youtube_videos_fast(
         }
     }
 
+    // If direct YouTube HTML scraping returned empty, fallback to Piped API search
+    if results.is_empty() {
+        if let Ok(piped_list) = search_piped_music_fallback(client, trimmed, limit, true).await {
+            results.extend(piped_list);
+        }
+    }
+
     results.sort_by_key(|r| std::cmp::Reverse(ost_authenticity_score(r)));
     results.truncate(limit);
+
+    Ok(results)
+}
+
+async fn search_piped_music_fallback(
+    client: &reqwest::Client,
+    query: &str,
+    limit: usize,
+    ost_only: bool,
+) -> AppResult<Vec<YouTubeTrackResult>> {
+    let filter = if ost_only { "music_songs" } else { "videos" };
+    let endpoints = [
+        "https://pipedapi.kavin.rocks/search",
+        "https://api.piped.private.coffee/search",
+    ];
+    for base in endpoints {
+        let Ok(u) = reqwest::Url::parse_with_params(base, &[("q", query), ("filter", filter)]) else {
+            continue;
+        };
+        if let Ok(resp) = client.get(u).timeout(Duration::from_millis(3800)).send().await {
+            if resp.status().is_success() {
+                if let Ok(json) = resp.json::<Value>().await {
+                    if let Some(items) = json.get("items").and_then(Value::as_array) {
+                        let mut out = Vec::new();
+                        for it in items {
+                            if out.len() >= limit {
+                                break;
+                            }
+                            let url_field = it.get("url").and_then(Value::as_str).unwrap_or("");
+                            let vid = url_field
+                                .strip_prefix("/watch?v=")
+                                .unwrap_or_else(|| it.get("id").and_then(Value::as_str).unwrap_or(""));
+                            if vid.len() != 11 {
+                                continue;
+                            }
+                            let title = it.get("title").and_then(Value::as_str).unwrap_or("").to_string();
+                            let channel = it.get("uploaderName").and_then(Value::as_str).unwrap_or("").to_string();
+                            let dur = it.get("duration").and_then(Value::as_u64);
+                            if ost_only {
+                                if let Some(d) = dur {
+                                    if d > 0 && d < 60 {
+                                        continue;
+                                    }
+                                }
+                            }
+                            out.push(YouTubeTrackResult {
+                                video_id: vid.to_string(),
+                                title,
+                                channel,
+                                duration_seconds: dur,
+                                direct_audio_url: None,
+                            });
+                        }
+                        if !out.is_empty() {
+                            return Ok(out);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(Vec::new())
+}
+
+pub async fn search_youtube_trailer_videos_fast(
+    client: &reqwest::Client,
+    query: &str,
+    limit: usize,
+) -> AppResult<Vec<YouTubeTrackResult>> {
+    let trimmed = query.trim();
+    if trimmed.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let url = reqwest::Url::parse_with_params(
+        "https://www.youtube.com/results",
+        &[("search_query", trimmed)],
+    )
+    .map_err(|e| AppError::Other(e.to_string()))?;
+
+    let mut results = Vec::new();
+    if let Ok(res) = client
+        .get(url)
+        .timeout(Duration::from_millis(4200))
+        .header(
+            reqwest::header::USER_AGENT,
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        )
+        .header(reqwest::header::ACCEPT_LANGUAGE, "en-US,en;q=0.9")
+        .send()
+        .await
+    {
+        if res.status().is_success() {
+            if let Ok(html) = res.text().await {
+                let marker = "var ytInitialData = ";
+                if let Some(start_idx) = html.find(marker) {
+                    let json_slice = &html[start_idx + marker.len()..];
+                    if let Some(end_idx) = json_slice.find(";</script>") {
+                        if let Ok(val) = serde_json::from_str::<Value>(&json_slice[..end_idx]) {
+                            if let Some(items) = val
+                                .pointer("/contents/twoColumnSearchResultsRenderer/primaryContents/sectionListRenderer/contents/0/itemSectionRenderer/contents")
+                                .and_then(|v| v.as_array())
+                            {
+                                for item in items {
+                                    if results.len() >= limit {
+                                        break;
+                                    }
+                                    if let Some(vr) = item.get("videoRenderer") {
+                                        let video_id = match vr.get("videoId").and_then(|v| v.as_str()) {
+                                            Some(id) if !id.is_empty() => id.to_string(),
+                                            _ => continue,
+                                        };
+                                        let title = vr
+                                            .pointer("/title/runs/0/text")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or_default()
+                                            .to_string();
+                                        let channel = vr
+                                            .pointer("/ownerText/runs/0/text")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or_default()
+                                            .to_string();
+                                        let duration_seconds = vr
+                                            .pointer("/lengthText/simpleText")
+                                            .and_then(|v| v.as_str())
+                                            .and_then(parse_duration_string);
+                                        if let Some(dur) = duration_seconds {
+                                            if dur > 0 && dur < 25 {
+                                                continue;
+                                            }
+                                        }
+                                        results.push(YouTubeTrackResult {
+                                            video_id,
+                                            title,
+                                            channel,
+                                            duration_seconds,
+                                            direct_audio_url: None,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if results.is_empty() {
+        if let Ok(piped_list) = search_piped_music_fallback(client, trimmed, limit, false).await {
+            results.extend(piped_list);
+        }
+    }
 
     Ok(results)
 }

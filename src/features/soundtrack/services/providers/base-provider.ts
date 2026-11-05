@@ -247,7 +247,7 @@ export function scoreAlbumMatchForGame(
     if (effAlbumTokens[0] !== targetWord) {
       return 0
     }
-    if (effAlbumTokens.length > 3) {
+    if (effAlbumTokens.length > 6) {
       return 0
     }
   } else {
@@ -266,7 +266,7 @@ export function scoreAlbumMatchForGame(
       return 0
     }
 
-    if (effAlbumTokens.length > effGameTokens.length + 3) {
+    if (effAlbumTokens.length > effGameTokens.length + 6) {
       return 0
     }
   }
