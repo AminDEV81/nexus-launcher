@@ -78,9 +78,7 @@ export const ReleaseCountdownBanner: React.FC<ReleaseCountdownBannerProps> = ({
         <div className="flex items-center gap-3">
           <div
             className={`flex size-10 items-center justify-center rounded-xl ${
-              isLight
-                ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-emerald-400/20 text-emerald-300'
+              isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-400/20 text-emerald-300'
             }`}
           >
             <Sparkles className="size-5" />

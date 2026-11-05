@@ -381,9 +381,7 @@ export const ModeSelectModal: React.FC = () => {
               type="button"
               onClick={() => setDontShowAgain((v) => !v)}
               className={`flex items-center gap-3 text-xs sm:text-sm font-semibold cursor-pointer ${
-                isLight
-                  ? 'text-slate-600 hover:text-slate-900'
-                  : 'text-slate-300 hover:text-white'
+                isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-300 hover:text-white'
               }`}
             >
               <span

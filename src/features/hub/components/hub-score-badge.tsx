@@ -42,8 +42,7 @@ export function HubScoreBadge({
   )
 
   const normNameKey = (gameName ?? '').trim().toLowerCase()
-  const shouldFetchLive =
-    !isUnreleased && normNameKey.length >= 2 && !initialResolved.isVerified
+  const shouldFetchLive = !isUnreleased && normNameKey.length >= 2 && !initialResolved.isVerified
 
   const { data: liveScores } = useQuery({
     queryKey: ['hub', 'critic-scores', normNameKey, releaseDate ?? ''],

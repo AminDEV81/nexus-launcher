@@ -384,9 +384,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
       .then((enriched) => {
         if (cancelled) return
         if (enriched.tracks.length > initial.tracks.length) {
-          setActiveAlbumBundle((prev) =>
-            prev?.album.id === initial.album.id ? enriched : prev,
-          )
+          setActiveAlbumBundle((prev) => (prev?.album.id === initial.album.id ? enriched : prev))
           setResolvedAlbums((prev) =>
             prev.map((a) => (a.album.id === initial.album.id ? enriched : a)),
           )
@@ -426,9 +424,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
             )
           })
           setActiveAlbumBundle(albums[0])
-          setStatusLabel(
-            `${selectedSoundtrackGame.name} — ${albums[0].tracks.length} Tracks Ready`,
-          )
+          setStatusLabel(`${selectedSoundtrackGame.name} — ${albums[0].tracks.length} Tracks Ready`)
         } else {
           return soundtrackResolver
             .searchOnlineSoundtracksFast(selectedSoundtrackGame.name)
@@ -493,9 +489,8 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
         .then((online) => {
           const combined = [...online, ...instantMatches].filter(
             (b, i, arr) =>
-              arr.findIndex(
-                (x) => x.album.title.toLowerCase() === b.album.title.toLowerCase(),
-              ) === i,
+              arr.findIndex((x) => x.album.title.toLowerCase() === b.album.title.toLowerCase()) ===
+              i,
           )
           if (combined.length > 0) {
             setResolvedAlbums(combined)
@@ -532,9 +527,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
       const seeds: string[] = []
       for (let i = 0; i < batchSize; i++) {
         seeds.push(
-          CONSOLE_DISCOVERY_SEEDS[
-            (discoverySeedCursor + i) % CONSOLE_DISCOVERY_SEEDS.length
-          ],
+          CONSOLE_DISCOVERY_SEEDS[(discoverySeedCursor + i) % CONSOLE_DISCOVERY_SEEDS.length],
         )
       }
       setDiscoverySeedCursor((prev) => (prev + batchSize) % CONSOLE_DISCOVERY_SEEDS.length)
@@ -544,9 +537,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
         setResolvedAlbums((prev) => {
           const existingTitles = new Set(prev.map((a) => a.album.title.toLowerCase().trim()))
           const fresh = wave.albums.filter(
-            (a) =>
-              a.tracks.length > 0 &&
-              !existingTitles.has(a.album.title.toLowerCase().trim()),
+            (a) => a.tracks.length > 0 && !existingTitles.has(a.album.title.toLowerCase().trim()),
           )
           return [...prev, ...fresh]
         })
@@ -741,12 +732,11 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
     },
   })
 
-  const displayedTracks: SoundtrackTrack[] =
-    activeAlbumBundle?.tracks?.length
-      ? activeAlbumBundle.tracks
-      : queue.length > 0
-        ? queue
-        : (curatedAlbums[0]?.tracks ?? [])
+  const displayedTracks: SoundtrackTrack[] = activeAlbumBundle?.tracks?.length
+    ? activeAlbumBundle.tracks
+    : queue.length > 0
+      ? queue
+      : (curatedAlbums[0]?.tracks ?? [])
 
   const activeCover = resolveConsoleHighResUrl(
     currentAlbum?.cover_url ??
@@ -922,9 +912,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
           {/* Dedicated Interactive Audio Visualizer Panel */}
           <div
             className={`relative z-10 w-full shrink-0 rounded-2xl border p-2.5 mt-2.5 transition-all ${
-              isLight
-                ? 'border-slate-200 bg-slate-100/90'
-                : 'border-white/10 bg-black/35'
+              isLight ? 'border-slate-200 bg-slate-100/90' : 'border-white/10 bg-black/35'
             }`}
           >
             <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
@@ -934,7 +922,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                 }`}
               >
                 <BarChart3 className="size-3.5" />
-                Audio Visualizer:{" "}
+                Audio Visualizer:{' '}
                 {visualizerMode === 'minimal'
                   ? 'Spectrum Bars'
                   : visualizerMode === 'reactive'
@@ -942,11 +930,13 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                     : 'Paused / Off'}
               </span>
               <div className="flex items-center gap-1">
-                {([
-                  { id: 'minimal', label: 'Bars' },
-                  { id: 'reactive', label: 'Wave' },
-                  { id: 'off', label: 'Off' },
-                ] as const).map((m) => (
+                {(
+                  [
+                    { id: 'minimal', label: 'Bars' },
+                    { id: 'reactive', label: 'Wave' },
+                    { id: 'off', label: 'Off' },
+                  ] as const
+                ).map((m) => (
                   <button
                     key={m.id}
                     type="button"
@@ -980,7 +970,8 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                   isLight ? 'text-slate-500' : 'text-slate-400'
                 }`}
               >
-                Select &ldquo;Bars&rdquo; or &ldquo;Wave&rdquo; to display live audio frequency spectrum
+                Select &ldquo;Bars&rdquo; or &ldquo;Wave&rdquo; to display live audio frequency
+                spectrum
               </div>
             )}
           </div>
@@ -1000,9 +991,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
             />
             <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
               <span>{formatSeconds(currentTime)}</span>
-              <span>
-                {formatSeconds(duration || (currentTrack?.duration_ms ?? 0) / 1000)}
-              </span>
+              <span>{formatSeconds(duration || (currentTrack?.duration_ms ?? 0) / 1000)}</span>
             </div>
           </div>
 
@@ -1175,89 +1164,291 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
           }`}
         >
           <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar pr-1">
-          {subTab === 'radios' ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            {subTab === 'radios' ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3
+                    className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
+                      isLight ? 'text-slate-700' : 'text-slate-200'
+                    }`}
+                  >
+                    <Radio className="w-4 h-4 text-cyan-400" />
+                    Live Vibe Radio Stations (Instant Endless Mix)
+                  </h3>
+                </div>
+                <FocusScope
+                  id="console_music_radios_grid"
+                  className="grid grid-cols-1 sm:grid-cols-2 gap-3.5"
+                >
+                  {VIBE_FILTERS.map((vibe) => (
+                    <LiveRadioStationCard
+                      key={vibe.id}
+                      vibe={vibe}
+                      isLight={isLight}
+                      onPlayRadio={() => startLiveRadioWave(vibe.id)}
+                    />
+                  ))}
+                </FocusScope>
+              </div>
+            ) : subTab === 'games' ? (
+              <div className="space-y-4">
                 <h3
                   className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
                     isLight ? 'text-slate-700' : 'text-slate-200'
                   }`}
                 >
-                  <Radio className="w-4 h-4 text-cyan-400" />
-                  Live Vibe Radio Stations (Instant Endless Mix)
+                  <Gamepad2 className="w-4 h-4 text-cyan-400" />
+                  Your Installed & Library Games ({games.length})
                 </h3>
+                {games.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-8 text-center">
+                    No library games found yet. Use the search bar above to stream any game OST!
+                  </p>
+                ) : (
+                  <FocusScope
+                    id="console_music_my_games"
+                    className="grid grid-cols-2 sm:grid-cols-3 gap-3.5"
+                  >
+                    {games.map((g) => (
+                      <LibraryOstCard
+                        key={g.id}
+                        game={g}
+                        active={selectedSoundtrackGame?.id === g.id}
+                        isLight={isLight}
+                        onSelect={() => {
+                          setSelectedSoundtrackGame({
+                            id: g.id,
+                            name: g.name,
+                            coverUrl: g.cover_path,
+                            steamAppId: g.steam_app_id,
+                            igdbId: g.igdb_id,
+                          })
+                          setSubTab('overview')
+                        }}
+                      />
+                    ))}
+                  </FocusScope>
+                )}
               </div>
-              <FocusScope
-                id="console_music_radios_grid"
-                className="grid grid-cols-1 sm:grid-cols-2 gap-3.5"
-              >
-                {VIBE_FILTERS.map((vibe) => (
-                  <LiveRadioStationCard
-                    key={vibe.id}
-                    vibe={vibe}
-                    isLight={isLight}
-                    onPlayRadio={() => startLiveRadioWave(vibe.id)}
-                  />
-                ))}
-              </FocusScope>
-            </div>
-          ) : subTab === 'games' ? (
-            <div className="space-y-4">
-              <h3
-                className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
-                  isLight ? 'text-slate-700' : 'text-slate-200'
-                }`}
-              >
-                <Gamepad2 className="w-4 h-4 text-cyan-400" />
-                Your Installed & Library Games ({games.length})
-              </h3>
-              {games.length === 0 ? (
-                <p className="text-sm text-slate-400 py-8 text-center">
-                  No library games found yet. Use the search bar above to stream any game OST!
-                </p>
-              ) : (
-                <FocusScope
-                  id="console_music_my_games"
-                  className="grid grid-cols-2 sm:grid-cols-3 gap-3.5"
+            ) : subTab === 'favorites' ? (
+              <div className="space-y-4">
+                <h3
+                  className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
+                    isLight ? 'text-slate-700' : 'text-slate-200'
+                  }`}
                 >
-                  {games.map((g) => (
-                    <LibraryOstCard
-                      key={g.id}
-                      game={g}
-                      active={selectedSoundtrackGame?.id === g.id}
-                      isLight={isLight}
-                      onSelect={() => {
-                        setSelectedSoundtrackGame({
-                          id: g.id,
-                          name: g.name,
-                          coverUrl: g.cover_path,
-                          steamAppId: g.steam_app_id,
-                          igdbId: g.igdb_id,
-                        })
-                        setSubTab('overview')
-                      }}
-                    />
-                  ))}
-                </FocusScope>
-              )}
-            </div>
-          ) : subTab === 'favorites' ? (
-            <div className="space-y-4">
-              <h3
-                className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
-                  isLight ? 'text-slate-700' : 'text-slate-200'
-                }`}
-              >
-                <Heart className="w-4 h-4 text-rose-400" />
-                Favorite Tracks ({favoriteTrackEntries.length})
-              </h3>
-              {favoriteTrackEntries.length === 0 ? (
-                <p className="text-sm text-slate-400 py-10 text-center">
-                  No favorite tracks yet. Press the Heart icon on any track to save it here.
-                </p>
-              ) : (
-                <FocusScope id="console_music_fav_tracks" className="space-y-2">
-                  {favoriteTrackEntries.map(({ track, album }, idx) => (
+                  <Heart className="w-4 h-4 text-rose-400" />
+                  Favorite Tracks ({favoriteTrackEntries.length})
+                </h3>
+                {favoriteTrackEntries.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-10 text-center">
+                    No favorite tracks yet. Press the Heart icon on any track to save it here.
+                  </p>
+                ) : (
+                  <FocusScope id="console_music_fav_tracks" className="space-y-2">
+                    {favoriteTrackEntries.map(({ track, album }, idx) => (
+                      <TrackRowButton
+                        key={track.id}
+                        track={track}
+                        index={idx}
+                        active={currentTrack?.id === track.id}
+                        isFavorite={favorites.has(`track:${track.id}`)}
+                        isLight={isLight}
+                        onSelect={() => {
+                          void playTrack(
+                            track,
+                            album,
+                            album
+                              ? {
+                                  gameId: album.game_id || album.id,
+                                  title: album.title,
+                                  coverUrl: album.cover_url,
+                                }
+                              : null,
+                            favoriteTrackEntries.map((e) => e.track),
+                          )
+                        }}
+                        onToggleFav={() => {
+                          void toggleFavorite('track', track.id, { track, album })
+                        }}
+                      />
+                    ))}
+                  </FocusScope>
+                )}
+              </div>
+            ) : subTab === 'queue' ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3
+                    className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
+                      isLight ? 'text-slate-700' : 'text-slate-200'
+                    }`}
+                  >
+                    <ListMusic className="w-4 h-4 text-cyan-400" />
+                    Playback Queue ({queue.length} Tracks)
+                  </h3>
+                  {queue.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => clearQueue()}
+                      className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold cursor-pointer ${isLight ? 'bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100' : 'bg-rose-500/15 border-rose-400/30 text-rose-300 hover:bg-rose-500/25'}`}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Clear Queue
+                    </button>
+                  )}
+                </div>
+                {queue.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-10 text-center">
+                    Your playback queue is empty. Select any track or Live Radio to populate the
+                    queue.
+                  </p>
+                ) : (
+                  <FocusScope id="console_music_queue_list" className="space-y-2">
+                    {queue.map((track, idx) => (
+                      <div key={`${track.id}_${idx}`} className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <TrackRowButton
+                            track={track}
+                            index={idx}
+                            active={currentTrack?.id === track.id}
+                            isFavorite={favorites.has(`track:${track.id}`)}
+                            isLight={isLight}
+                            onSelect={() => {
+                              void playTrack(track, currentAlbum, null, queue)
+                            }}
+                            onToggleFav={() => {
+                              void toggleFavorite('track', track.id, {
+                                track,
+                                album: currentAlbum,
+                              })
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeFromQueue(idx)}
+                          className="p-2 rounded-xl text-slate-400 hover:text-rose-400 cursor-pointer"
+                          title="Remove from queue"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </FocusScope>
+                )}
+              </div>
+            ) : subTab === 'downloaded' ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3
+                    className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
+                      isLight ? 'text-slate-700' : 'text-slate-200'
+                    }`}
+                  >
+                    <HardDrive className="w-4 h-4 text-cyan-400" />
+                    Local & Cached Soundtracks ({localFiles.length + downloads.length})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleScanLocalFiles()
+                    }}
+                    disabled={scanningLocal}
+                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-extrabold cursor-pointer ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' : 'bg-cyan-500/20 border-cyan-400/40 text-cyan-300 hover:bg-cyan-500/30'}`}
+                  >
+                    <FolderSync className={`size-3.5 ${scanningLocal ? 'animate-spin' : ''}`} />
+                    {scanningLocal ? 'Scanning...' : 'Scan Local Folder'}
+                  </button>
+                </div>
+                {localFiles.length === 0 && downloads.length === 0 ? (
+                  <p className="text-sm text-slate-400 py-10 text-center">
+                    No local or downloaded soundtrack files indexed yet. Click &ldquo;Scan Local
+                    Folder&rdquo; to scan your soundtrack directory.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {localFiles.map((lf, idx) => (
+                      <button
+                        key={lf.id}
+                        type="button"
+                        onClick={() => {
+                          const localTrack: SoundtrackTrack = {
+                            id: lf.id,
+                            album_id: 'local_files',
+                            disc_number: 1,
+                            track_number: idx + 1,
+                            title: lf.title || lf.file_path.split(/[\\/]/).pop() || 'Local Track',
+                            artist: lf.artist ?? 'Local Library',
+                            duration_ms: lf.duration_ms ?? 180000,
+                            preview_url: null,
+                            stream_url: lf.file_path,
+                            download_url: null,
+                            local_path: lf.file_path,
+                            provider_id: 'local',
+                            external_id: null,
+                          }
+                          void playTrack(localTrack, null, {
+                            gameId: 'local',
+                            title: 'Local Soundtrack Library',
+                            coverUrl: null,
+                          })
+                        }}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-left transition-all cursor-pointer ${
+                          isLight
+                            ? 'bg-slate-100 hover:bg-slate-200 text-slate-900'
+                            : 'bg-slate-800/50 hover:bg-slate-800 text-white'
+                        }`}
+                      >
+                        <div className="truncate pr-3">
+                          <div className="text-sm font-bold truncate">
+                            {lf.title || lf.file_path.split(/[\\/]/).pop()}
+                          </div>
+                          <div className="text-xs text-slate-400 truncate">
+                            {lf.artist ?? 'Local File'} · {lf.album ?? ''}
+                          </div>
+                        </div>
+                        <Play className="size-4 text-cyan-400 shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Overview Tab: Active Album Complete Tracklist */
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h3
+                    className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
+                      isLight ? 'text-slate-700' : 'text-slate-300'
+                    }`}
+                  >
+                    <Music className="w-4 h-4 text-cyan-400 shrink-0" />
+                    <span className="truncate">
+                      {activeAlbumBundle?.album.title ?? 'Tracklist'} ({displayedTracks.length} Full
+                      Tracks)
+                    </span>
+                    {enrichingFullAlbum && (
+                      <span className="inline-flex items-center gap-1 text-[10px] text-cyan-400 font-bold">
+                        <Loader2 className="size-3 animate-spin" />
+                        Syncing Full Album...
+                      </span>
+                    )}
+                  </h3>
+                  {activeAlbumBundle && activeAlbumBundle.tracks.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectAlbumBundle(activeAlbumBundle, true)}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-400 px-3 py-1.5 text-xs font-black text-slate-950 hover:bg-cyan-300 cursor-pointer shrink-0"
+                    >
+                      <Play className="size-3.5 fill-current" />
+                      Play Full Album
+                    </button>
+                  )}
+                </div>
+
+                <FocusScope id="console_music_tracks" className="space-y-2">
+                  {displayedTracks.map((track, idx) => (
                     <TrackRowButton
                       key={track.id}
                       track={track}
@@ -1266,6 +1457,7 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                       isFavorite={favorites.has(`track:${track.id}`)}
                       isLight={isLight}
                       onSelect={() => {
+                        const album = activeAlbumBundle?.album ?? currentAlbum
                         void playTrack(
                           track,
                           album,
@@ -1276,222 +1468,20 @@ export const MusicView: React.FC<MusicViewProps> = ({ games = [] }) => {
                                 coverUrl: album.cover_url,
                               }
                             : null,
-                          favoriteTrackEntries.map((e) => e.track),
+                          displayedTracks,
                         )
                       }}
                       onToggleFav={() => {
-                        void toggleFavorite('track', track.id, { track, album })
+                        void toggleFavorite('track', track.id, {
+                          track,
+                          album: activeAlbumBundle?.album ?? currentAlbum,
+                        })
                       }}
                     />
                   ))}
                 </FocusScope>
-              )}
-            </div>
-          ) : subTab === 'queue' ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3
-                  className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
-                    isLight ? 'text-slate-700' : 'text-slate-200'
-                  }`}
-                >
-                  <ListMusic className="w-4 h-4 text-cyan-400" />
-                  Playback Queue ({queue.length} Tracks)
-                </h3>
-                {queue.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => clearQueue()}
-                    className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold cursor-pointer ${isLight ? "bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100" : "bg-rose-500/15 border-rose-400/30 text-rose-300 hover:bg-rose-500/25"}`}
-                  >
-                    <Trash2 className="size-3.5" />
-                    Clear Queue
-                  </button>
-                )}
               </div>
-              {queue.length === 0 ? (
-                <p className="text-sm text-slate-400 py-10 text-center">
-                  Your playback queue is empty. Select any track or Live Radio to populate the queue.
-                </p>
-              ) : (
-                <FocusScope id="console_music_queue_list" className="space-y-2">
-                  {queue.map((track, idx) => (
-                    <div key={`${track.id}_${idx}`} className="flex items-center gap-2">
-                      <div className="flex-1">
-                        <TrackRowButton
-                          track={track}
-                          index={idx}
-                          active={currentTrack?.id === track.id}
-                          isFavorite={favorites.has(`track:${track.id}`)}
-                          isLight={isLight}
-                          onSelect={() => {
-                            void playTrack(track, currentAlbum, null, queue)
-                          }}
-                          onToggleFav={() => {
-                            void toggleFavorite('track', track.id, {
-                              track,
-                              album: currentAlbum,
-                            })
-                          }}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeFromQueue(idx)}
-                        className="p-2 rounded-xl text-slate-400 hover:text-rose-400 cursor-pointer"
-                        title="Remove from queue"
-                      >
-                        <X className="size-4" />
-                      </button>
-                    </div>
-                  ))}
-                </FocusScope>
-              )}
-            </div>
-          ) : subTab === 'downloaded' ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3
-                  className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
-                    isLight ? 'text-slate-700' : 'text-slate-200'
-                  }`}
-                >
-                  <HardDrive className="w-4 h-4 text-cyan-400" />
-                  Local & Cached Soundtracks ({localFiles.length + downloads.length})
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleScanLocalFiles()
-                  }}
-                  disabled={scanningLocal}
-                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-extrabold cursor-pointer ${isLight ? "bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100" : "bg-cyan-500/20 border-cyan-400/40 text-cyan-300 hover:bg-cyan-500/30"}`}
-                >
-                  <FolderSync className={`size-3.5 ${scanningLocal ? 'animate-spin' : ''}`} />
-                  {scanningLocal ? 'Scanning...' : 'Scan Local Folder'}
-                </button>
-              </div>
-              {localFiles.length === 0 && downloads.length === 0 ? (
-                <p className="text-sm text-slate-400 py-10 text-center">
-                  No local or downloaded soundtrack files indexed yet. Click &ldquo;Scan Local
-                  Folder&rdquo; to scan your soundtrack directory.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {localFiles.map((lf, idx) => (
-                    <button
-                      key={lf.id}
-                      type="button"
-                      onClick={() => {
-                        const localTrack: SoundtrackTrack = {
-                          id: lf.id,
-                          album_id: 'local_files',
-                          disc_number: 1,
-                          track_number: idx + 1,
-                          title: lf.title || lf.file_path.split(/[\\/]/).pop() || 'Local Track',
-                          artist: lf.artist ?? 'Local Library',
-                          duration_ms: lf.duration_ms ?? 180000,
-                          preview_url: null,
-                          stream_url: lf.file_path,
-                          download_url: null,
-                          local_path: lf.file_path,
-                          provider_id: 'local',
-                          external_id: null,
-                        }
-                        void playTrack(localTrack, null, {
-                          gameId: 'local',
-                          title: 'Local Soundtrack Library',
-                          coverUrl: null,
-                        })
-                      }}
-                      className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-left transition-all cursor-pointer ${
-                        isLight
-                          ? 'bg-slate-100 hover:bg-slate-200 text-slate-900'
-                          : 'bg-slate-800/50 hover:bg-slate-800 text-white'
-                      }`}
-                    >
-                      <div className="truncate pr-3">
-                        <div className="text-sm font-bold truncate">
-                          {lf.title || lf.file_path.split(/[\\/]/).pop()}
-                        </div>
-                        <div className="text-xs text-slate-400 truncate">
-                          {lf.artist ?? 'Local File'} · {lf.album ?? ''}
-                        </div>
-                      </div>
-                      <Play className="size-4 text-cyan-400 shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Overview Tab: Active Album Complete Tracklist */
-            <div>
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <h3
-                  className={`text-sm font-black uppercase tracking-wider flex items-center gap-2 ${
-                    isLight ? 'text-slate-700' : 'text-slate-300'
-                  }`}
-                >
-                  <Music className="w-4 h-4 text-cyan-400 shrink-0" />
-                  <span className="truncate">
-                    {activeAlbumBundle?.album.title ?? 'Tracklist'} ({displayedTracks.length}{' '}
-                    Full Tracks)
-                  </span>
-                  {enrichingFullAlbum && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-cyan-400 font-bold">
-                      <Loader2 className="size-3 animate-spin" />
-                      Syncing Full Album...
-                    </span>
-                  )}
-                </h3>
-                {activeAlbumBundle && activeAlbumBundle.tracks.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAlbumBundle(activeAlbumBundle, true)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-400 px-3 py-1.5 text-xs font-black text-slate-950 hover:bg-cyan-300 cursor-pointer shrink-0"
-                  >
-                    <Play className="size-3.5 fill-current" />
-                    Play Full Album
-                  </button>
-                )}
-              </div>
-
-              <FocusScope id="console_music_tracks" className="space-y-2">
-                {displayedTracks.map((track, idx) => (
-                  <TrackRowButton
-                    key={track.id}
-                    track={track}
-                    index={idx}
-                    active={currentTrack?.id === track.id}
-                    isFavorite={favorites.has(`track:${track.id}`)}
-                    isLight={isLight}
-                    onSelect={() => {
-                      const album = activeAlbumBundle?.album ?? currentAlbum
-                      void playTrack(
-                        track,
-                        album,
-                        album
-                          ? {
-                              gameId: album.game_id || album.id,
-                              title: album.title,
-                              coverUrl: album.cover_url,
-                            }
-                          : null,
-                        displayedTracks,
-                      )
-                    }}
-                    onToggleFav={() => {
-                      void toggleFavorite('track', track.id, {
-                        track,
-                        album: activeAlbumBundle?.album ?? currentAlbum,
-                      })
-                    }}
-                  />
-                ))}
-              </FocusScope>
-            </div>
-          )}
+            )}
           </div>
         </div>
       </div>
@@ -1686,9 +1676,7 @@ const LiveRadioStationCard: React.FC<{
           Start Wave
         </span>
       </div>
-      <div
-        className={`mt-3 text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}
-      >
+      <div className={`mt-3 text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>
         {vibe.label}
       </div>
       <div className={`text-xs mt-0.5 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
@@ -1832,7 +1820,11 @@ const CuratedAlbumCard: React.FC<{
               : 'border-white/10 bg-slate-900/75 hover:bg-slate-800/80'
       }`}
     >
-      <button type="button" {...focusProps} className="w-full text-left outline-none cursor-pointer">
+      <button
+        type="button"
+        {...focusProps}
+        className="w-full text-left outline-none cursor-pointer"
+      >
         <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-slate-800 mb-2.5">
           {cover ? (
             <img src={cover} alt={bundle.album.title} className="h-full w-full object-cover" />
@@ -1843,9 +1835,7 @@ const CuratedAlbumCard: React.FC<{
           )}
         </div>
         <div
-          className={`text-xs font-extrabold truncate ${
-            isLight ? 'text-slate-900' : 'text-white'
-          }`}
+          className={`text-xs font-extrabold truncate ${isLight ? 'text-slate-900' : 'text-white'}`}
         >
           {bundle.album.title}
         </div>

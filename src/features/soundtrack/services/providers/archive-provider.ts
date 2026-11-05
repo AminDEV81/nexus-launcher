@@ -110,7 +110,7 @@ export class ArchiveOrgProvider extends BaseSoundtrackProvider {
         const lower = f.name.toLowerCase()
         if (!AUDIO_EXTS.some((ext) => lower.endsWith(ext))) return false
         if (/\b(?:sample|preview|30s|30sec|ringtone)\b/i.test(lower)) return false
-        const durSec = typeof f.length === "string" ? parseFloat(f.length) : (f.length || 0)
+        const durSec = typeof f.length === 'string' ? parseFloat(f.length) : f.length || 0
         if (durSec > 0 && durSec < 45) return false
         return true
       })

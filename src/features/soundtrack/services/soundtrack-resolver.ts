@@ -199,25 +199,24 @@ function toTitleCase(raw: string): string {
     .join(' ')
 }
 
-
 function buildUniversalGameOstAlbum(
   gameId: string,
   rawTitle: string,
   coverUrl?: string | null,
   releaseYear?: string | null,
 ): SoundtrackAlbumWithTracks {
-  const cleanTitle = toTitleCase(extractCoreGameTitle(rawTitle) || rawTitle.trim() || "Game")
-  const slug = cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, "_")
+  const cleanTitle = toTitleCase(extractCoreGameTitle(rawTitle) || rawTitle.trim() || 'Game')
+  const slug = cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_')
   const albumId = `univ_ost_${slug}`
   const templates = [
-    { suffix: "Main Theme", dur: 198 },
-    { suffix: "Opening Title Suite", dur: 174 },
-    { suffix: "World & Exploration Theme", dur: 225 },
-    { suffix: "Combat & Action Theme", dur: 212 },
-    { suffix: "Boss Encounter Suite", dur: 248 },
-    { suffix: "Atmospheric Ambience", dur: 204 },
-    { suffix: "Victory & Prologue", dur: 162 },
-    { suffix: "Finale & End Credits", dur: 265 },
+    { suffix: 'Main Theme', dur: 198 },
+    { suffix: 'Opening Title Suite', dur: 174 },
+    { suffix: 'World & Exploration Theme', dur: 225 },
+    { suffix: 'Combat & Action Theme', dur: 212 },
+    { suffix: 'Boss Encounter Suite', dur: 248 },
+    { suffix: 'Atmospheric Ambience', dur: 204 },
+    { suffix: 'Victory & Prologue', dur: 162 },
+    { suffix: 'Finale & End Credits', dur: 265 },
   ]
   const tracks: SoundtrackTrack[] = templates.map((tpl, idx) => ({
     id: `univ_trk_${slug}_${idx + 1}`,
@@ -231,7 +230,7 @@ function buildUniversalGameOstAlbum(
     stream_url: null,
     download_url: null,
     local_path: null,
-    provider_id: "youtube_direct",
+    provider_id: 'youtube_direct',
     external_id: null,
   }))
   return {
@@ -239,13 +238,13 @@ function buildUniversalGameOstAlbum(
       id: albumId,
       game_id: gameId,
       title: `${cleanTitle} (Original Game Soundtrack)`,
-      album_type: "original_soundtrack",
+      album_type: 'original_soundtrack',
       artist: `${cleanTitle} Original Score`,
       release_date: releaseYear || null,
       cover_url: coverUrl || resolveAlbumCoverFallback(cleanTitle),
       track_count: tracks.length,
       total_duration_ms: tracks.reduce((acc, t) => acc + t.duration_ms, 0),
-      provider_id: "youtube",
+      provider_id: 'youtube',
       external_id: null,
     },
     tracks,
@@ -261,9 +260,7 @@ export class SoundtrackResolver {
   /**
    * Fetches all songs belonging to an iTunes `collectionId` (up to 200 tracks).
    */
-  private async expandItunesAlbumFullTracklist(
-    collectionId: number,
-  ): Promise<ItunesSongItem[]> {
+  private async expandItunesAlbumFullTracklist(collectionId: number): Promise<ItunesSongItem[]> {
     const url = `https://itunes.apple.com/lookup?id=${collectionId}&entity=song&limit=200`
     const data = await fetchJsonFast<{ results?: ItunesSongItem[] }>(url, 4500)
     if (!data?.results) return []
@@ -278,9 +275,7 @@ export class SoundtrackResolver {
   /**
    * Fetches all tracks belonging to a Deezer `albumId` (up to 200 tracks).
    */
-  private async expandDeezerAlbumFullTracklist(
-    albumId: number,
-  ): Promise<DeezerTrackItem[]> {
+  private async expandDeezerAlbumFullTracklist(albumId: number): Promise<DeezerTrackItem[]> {
     const url = `https://api.deezer.com/album/${albumId}/tracks?limit=200`
     const data = await fetchJsonFast<{ data?: DeezerTrackItem[] }>(url, 4500)
     if (!data?.data) return []
@@ -313,8 +308,7 @@ export class SoundtrackResolver {
     ])
 
     const out: SoundtrackAlbumWithTracks[] = []
-    const gameId =
-      game?.gameId || `custom_${cleanQ.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`
+    const gameId = game?.gameId || `custom_${cleanQ.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`
 
     // 1. Process iTunes songs into grouped albums
     const itunesItems = itunesData?.results || []
@@ -367,11 +361,9 @@ export class SoundtrackResolver {
 
       const sortedGroups = Array.from(grouped.values()).sort((a, b) => {
         const sa =
-          scoreAlbumForUserSearchQuery(a.collectionName, a.artistName, cleanQ) +
-          a.songs.length * 3
+          scoreAlbumForUserSearchQuery(a.collectionName, a.artistName, cleanQ) + a.songs.length * 3
         const sb =
-          scoreAlbumForUserSearchQuery(b.collectionName, b.artistName, cleanQ) +
-          b.songs.length * 3
+          scoreAlbumForUserSearchQuery(b.collectionName, b.artistName, cleanQ) + b.songs.length * 3
         return sb - sa
       })
 
@@ -449,12 +441,7 @@ export class SoundtrackResolver {
         const albTitle = item.album?.title
         if (!albId || !albTitle || !item.title) continue
         if (
-          !isAuthenticSoundtrackCollection(
-            albTitle,
-            item.artist?.name || '',
-            undefined,
-            cleanQ,
-          )
+          !isAuthenticSoundtrackCollection(albTitle, item.artist?.name || '', undefined, cleanQ)
         ) {
           continue
         }
@@ -479,11 +466,9 @@ export class SoundtrackResolver {
 
       const sortedDzGroups = Array.from(dzGrouped.values()).sort((a, b) => {
         const sa =
-          scoreAlbumForUserSearchQuery(a.albumTitle, a.artistName, cleanQ) +
-          a.tracks.length * 3
+          scoreAlbumForUserSearchQuery(a.albumTitle, a.artistName, cleanQ) + a.tracks.length * 3
         const sb =
-          scoreAlbumForUserSearchQuery(b.albumTitle, b.artistName, cleanQ) +
-          b.tracks.length * 3
+          scoreAlbumForUserSearchQuery(b.albumTitle, b.artistName, cleanQ) + b.tracks.length * 3
         return sb - sa
       })
 
@@ -728,13 +713,15 @@ export class SoundtrackResolver {
             const gameCtx: GameIdentity = { gameId: customGameId, title: q }
             const albums = await withTimeout(archiveProvider.getAlbums(gameCtx), 4500, [])
             const fetched = await Promise.all(
-              albums.slice(0, 2).map((alb) =>
-                withTimeout(
-                  archiveProvider.getAlbum(alb.id, alb.external_id || undefined),
-                  4500,
-                  null,
+              albums
+                .slice(0, 2)
+                .map((alb) =>
+                  withTimeout(
+                    archiveProvider.getAlbum(alb.id, alb.external_id || undefined),
+                    4500,
+                    null,
+                  ),
                 ),
-              ),
             )
             return fetched.filter((f): f is SoundtrackAlbumWithTracks =>
               Boolean(f && f.tracks.length > 0),
@@ -952,11 +939,7 @@ export class SoundtrackResolver {
           const parsed = JSON.parse(cachedJson) as SoundtrackAlbumWithTracks[]
           if (Array.isArray(parsed)) {
             const verifiedCached = parsed
-              .filter(
-                (a) =>
-                  a.tracks &&
-                  a.tracks.length >= (curated ? curated.tracks.length : 1),
-              )
+              .filter((a) => a.tracks && a.tracks.length >= (curated ? curated.tracks.length : 1))
               .map((a) => ({
                 ...a,
                 tracks: a.tracks.map((t) => ({ ...t, preview_url: null })),
@@ -1028,9 +1011,15 @@ export class SoundtrackResolver {
       try {
         const albums = await withTimeout(archiveProvider.getAlbums(game), 5000, [])
         const fetched = await Promise.all(
-          albums.slice(0, 2).map((alb) =>
-            withTimeout(archiveProvider.getAlbum(alb.id, alb.external_id || undefined), 5000, null),
-          ),
+          albums
+            .slice(0, 2)
+            .map((alb) =>
+              withTimeout(
+                archiveProvider.getAlbum(alb.id, alb.external_id || undefined),
+                5000,
+                null,
+              ),
+            ),
         )
         return fetched.filter((f): f is SoundtrackAlbumWithTracks =>
           Boolean(f && f.tracks.length > 0),
@@ -1131,21 +1120,11 @@ export class SoundtrackResolver {
       const aCurated = a.album.provider_id === 'curated' ? 25 : 0
       const bCurated = b.album.provider_id === 'curated' ? 25 : 0
       const sa =
-        scoreAlbumMatchForGame(
-          a.album.title,
-          game.title,
-          a.album.release_date,
-          game.releaseYear,
-        ) +
+        scoreAlbumMatchForGame(a.album.title, game.title, a.album.release_date, game.releaseYear) +
         aCurated +
         Math.min(35, a.tracks.length)
       const sb =
-        scoreAlbumMatchForGame(
-          b.album.title,
-          game.title,
-          b.album.release_date,
-          game.releaseYear,
-        ) +
+        scoreAlbumMatchForGame(b.album.title, game.title, b.album.release_date, game.releaseYear) +
         bCurated +
         Math.min(35, b.tracks.length)
       return sb - sa || b.tracks.length - a.tracks.length
@@ -1511,11 +1490,7 @@ export class SoundtrackResolver {
       const fallbackQuery = cleanGame
         ? `${cleanGame} "${cleanTrack}" Official Video Game Soundtrack OST`
         : `${cleanTrack} ${track.artist || ''} Official Soundtrack OST`.trim()
-      const ytFallback = await withTimeout(
-        soundtrackSearchYouTube(fallbackQuery, 4),
-        4500,
-        [],
-      )
+      const ytFallback = await withTimeout(soundtrackSearchYouTube(fallbackQuery, 4), 4500, [])
       for (const r of ytFallback) {
         if (r.direct_audio_url && r.direct_audio_url.startsWith('http')) {
           pushCandidate({

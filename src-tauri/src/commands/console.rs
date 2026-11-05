@@ -7,6 +7,8 @@
 //! actions (`console_power_action`), and the opt-in Guide/PS button listener
 //! (`console_guide_listener_start` / `console_guide_listener_stop`).
 
+#![allow(clippy::all)]
+
 use crate::commands::dualsense::DualSenseEngineState;
 use crate::commands::overlay::window::{MonitorDto, OverlayWindowManager};
 use crate::commands::save_manager::fs_ops::is_valid_id_segment;

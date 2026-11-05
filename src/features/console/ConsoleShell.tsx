@@ -159,11 +159,7 @@ const TopTabButton: React.FC<{
       {(active || isFocused) && (
         <span
           className={`absolute inset-x-0 -bottom-0.5 h-[3px] rounded-full ${
-            isFocused
-              ? 'bg-cyan-400'
-              : isLight
-                ? 'bg-indigo-600'
-                : 'bg-white/80'
+            isFocused ? 'bg-cyan-400' : isLight ? 'bg-indigo-600' : 'bg-white/80'
           }`}
         />
       )}
@@ -302,11 +298,7 @@ const ConsoleDynamicBackdropLayer: React.FC<{
     ])
 
     const backdropIntensity =
-      activeTab === 'home' || selectedGameId || selectedStoreHubGame
-        ? 1
-        : isLight
-          ? 0.84
-          : 0.65
+      activeTab === 'home' || selectedGameId || selectedStoreHubGame ? 1 : isLight ? 0.84 : 0.65
 
     return (
       <>
@@ -1120,11 +1112,7 @@ export const ConsoleShell: React.FC = () => {
                   onSwitchToLegacyMode={handleExitConsole}
                 />
               ) : activeTab === 'downloads' ? (
-                <DownloadsView
-                  downloads={downloads}
-                  games={games}
-                  onRefresh={refreshData}
-                />
+                <DownloadsView downloads={downloads} games={games} onRefresh={refreshData} />
               ) : activeTab === 'music' ? (
                 <MusicView games={games} />
               ) : activeTab === 'dualsense' ? (

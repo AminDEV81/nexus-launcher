@@ -61,10 +61,7 @@ export function matchesFilters(game: Game, filters: AdvancedFilters): boolean {
       return false
     }
   }
-  if (
-    filters.genres.size > 0 &&
-    !game.genres.some((genre) => filters.genres.has(genre))
-  ) {
+  if (filters.genres.size > 0 && !game.genres.some((genre) => filters.genres.has(genre))) {
     return false
   }
   if (

@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { createPortal } from "react-dom"
-import { AnimatePresence, motion } from "framer-motion"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,15 +15,15 @@ import {
   RefreshCw,
   Tv,
   X,
-} from "lucide-react"
-import type { HubVideo } from "@/types/models"
+} from 'lucide-react'
+import type { HubVideo } from '@/types/models'
 import {
   openTrailerWindow,
   resolveHubTrailerStream,
   type ResolvedTrailerStream,
   type SteamTrailerMovie,
-} from "@/services/hub"
-import { FocusScope, useFocusable } from "../nav/FocusScope"
+} from '@/services/hub'
+import { FocusScope, useFocusable } from '../nav/FocusScope'
 
 function extractYouTubeId(url: string | null | undefined): string | null {
   if (!url) return null
@@ -41,11 +41,11 @@ export interface ConsoleTrailerShowcaseProps {
   isLight?: boolean
 }
 
-type MediaFilterMode = "all" | "trailers" | "screenshots"
+type MediaFilterMode = 'all' | 'trailers' | 'screenshots'
 
 interface UnifiedMediaItem {
   id: string
-  kind: "trailer" | "steam_movie" | "screenshot"
+  kind: 'trailer' | 'steam_movie' | 'screenshot'
   title: string
   thumbnailUrl: string | null
   video?: HubVideo
@@ -67,24 +67,24 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
     if (videos && videos.length > 0) return videos
     const ytId = extractYouTubeId(trailerUrl)
     if (ytId) return [{ name: `${gameName} — Official Trailer`, video_id: ytId }]
-    return [{ name: `${gameName} — Official Gameplay Trailer`, video_id: "auto_trailer" }]
+    return [{ name: `${gameName} — Official Gameplay Trailer`, video_id: 'auto_trailer' }]
   }, [videos, trailerUrl, gameName])
 
   const [resolvedStream, setResolvedStream] = useState<ResolvedTrailerStream | null>(null)
   const [loadingStream, setLoadingStream] = useState(true)
   const [directFailed, setDirectFailed] = useState(false)
   const [useEmbedFallback, setUseEmbedFallback] = useState(false)
-  const [filterMode, setFilterMode] = useState<MediaFilterMode>("all")
-  const [activeItemId, setActiveItemId] = useState<string>("")
-  const [activeKind, setActiveKind] = useState<"screenshot" | "trailer">(
-    screenshots.length > 0 ? "screenshot" : "trailer",
+  const [filterMode, setFilterMode] = useState<MediaFilterMode>('all')
+  const [activeItemId, setActiveItemId] = useState<string>('')
+  const [activeKind, setActiveKind] = useState<'screenshot' | 'trailer'>(
+    screenshots.length > 0 ? 'screenshot' : 'trailer',
   )
   const [lightboxShot, setLightboxShot] = useState<string | null>(null)
   const [trailerFullscreen, setTrailerFullscreen] = useState(false)
   const [fsHudVisible, setFsHudVisible] = useState(true)
 
   const stripScrollRef = useRef<HTMLDivElement | null>(null)
-  const lastResolvedVideoKeyRef = useRef<string>("")
+  const lastResolvedVideoKeyRef = useRef<string>('')
   const savedVideoTimeRef = useRef<number>(0)
   const fsHudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -107,7 +107,7 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
 
   const resolveTrailerSource = useCallback(
     async (video: HubVideo, force = false) => {
-      const vidKey = `${gameName}::${steamAppId ?? ""}::${video.video_id || "auto_trailer"}`
+      const vidKey = `${gameName}::${steamAppId ?? ''}::${video.video_id || 'auto_trailer'}`
       if (!force && lastResolvedVideoKeyRef.current === vidKey && resolvedStream) {
         return
       }
@@ -120,7 +120,7 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
         const res = await resolveHubTrailerStream({
           gameName,
           steamAppId: steamAppId ?? null,
-          videoId: video.video_id || "auto_trailer",
+          videoId: video.video_id || 'auto_trailer',
           trailerName: video.name ?? null,
         })
         setResolvedStream(res)
@@ -134,11 +134,11 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
   )
 
   useEffect(() => {
-    lastResolvedVideoKeyRef.current = ""
+    lastResolvedVideoKeyRef.current = ''
     savedVideoTimeRef.current = 0
-    setActiveItemId("")
+    setActiveItemId('')
     setTrailerFullscreen(false)
-    setActiveKind(screenshots.length > 0 ? "screenshot" : "trailer")
+    setActiveKind(screenshots.length > 0 ? 'screenshot' : 'trailer')
     const firstVideo = baseVideos[0]
     if (!firstVideo) return
     void resolveTrailerSource(firstVideo, true)
@@ -155,7 +155,7 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
     screenshots.forEach((shotUrl, idx) => {
       items.push({
         id: `media_shot_${idx}`,
-        kind: "screenshot",
+        kind: 'screenshot',
         title: `${gameName} — HD Screenshot #${idx + 1}`,
         thumbnailUrl: shotUrl,
         screenshotUrl: shotUrl,
@@ -167,7 +167,7 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
       steamMovies.forEach((mv, idx) => {
         items.push({
           id: `media_trailer_${idx}`,
-          kind: "steam_movie",
+          kind: 'steam_movie',
           title: mv.name || `${gameName} — Official Trailer #${idx + 1}`,
           thumbnailUrl: mv.thumbnail || fallbackThumb,
           steamMovie: mv,
@@ -178,16 +178,14 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
     } else {
       baseVideos.forEach((v, idx) => {
         const ytId =
-          v.video_id && v.video_id !== "auto_trailer"
+          v.video_id && v.video_id !== 'auto_trailer'
             ? v.video_id
             : resolvedStream?.fallback_video_id || null
         items.push({
           id: `media_trailer_${idx}`,
-          kind: "trailer",
+          kind: 'trailer',
           title: v.name || `${gameName} — Official Trailer #${idx + 1}`,
-          thumbnailUrl: ytId
-            ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg`
-            : fallbackThumb,
+          thumbnailUrl: ytId ? `https://i.ytimg.com/vi/${ytId}/hqdefault.jpg` : fallbackThumb,
           video: v,
           indexLabel: `TRAILER #${idx + 1}`,
         })
@@ -198,11 +196,11 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
   }, [steamMovies, baseVideos, screenshots, gameName, resolvedStream?.fallback_video_id])
 
   const filteredItems = useMemo<UnifiedMediaItem[]>(() => {
-    if (filterMode === "trailers") {
-      return allMediaItems.filter((m) => m.kind === "trailer" || m.kind === "steam_movie")
+    if (filterMode === 'trailers') {
+      return allMediaItems.filter((m) => m.kind === 'trailer' || m.kind === 'steam_movie')
     }
-    if (filterMode === "screenshots") {
-      const shots = allMediaItems.filter((m) => m.kind === "screenshot")
+    if (filterMode === 'screenshots') {
+      const shots = allMediaItems.filter((m) => m.kind === 'screenshot')
       return shots.length > 0 ? shots : allMediaItems
     }
     return allMediaItems
@@ -213,8 +211,8 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
       const exactIdx = filteredItems.findIndex((m) => m.id === activeItemId)
       if (exactIdx >= 0) return exactIdx
     }
-    if (activeKind === "trailer") {
-      const firstTrailerIdx = filteredItems.findIndex((m) => m.kind !== "screenshot")
+    if (activeKind === 'trailer') {
+      const firstTrailerIdx = filteredItems.findIndex((m) => m.kind !== 'screenshot')
       if (firstTrailerIdx >= 0) return firstTrailerIdx
     }
     return 0
@@ -223,7 +221,7 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
   const activeItem = filteredItems[activeIndex] ?? filteredItems[0] ?? null
 
   const trailerCount = useMemo(
-    () => allMediaItems.filter((m) => m.kind !== "screenshot").length,
+    () => allMediaItems.filter((m) => m.kind !== 'screenshot').length,
     [allMediaItems],
   )
   const screenshotCount = screenshots.length
@@ -232,18 +230,18 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
     (chosen: UnifiedMediaItem | undefined) => {
       if (!chosen) return
       setActiveItemId(chosen.id)
-      const isTr = chosen.kind !== "screenshot"
-      setActiveKind(isTr ? "trailer" : "screenshot")
+      const isTr = chosen.kind !== 'screenshot'
+      setActiveKind(isTr ? 'trailer' : 'screenshot')
 
-      if (chosen.kind === "trailer" && chosen.video) {
-        const vidKey = `${gameName}::${steamAppId ?? ""}::${chosen.video.video_id || "auto_trailer"}`
+      if (chosen.kind === 'trailer' && chosen.video) {
+        const vidKey = `${gameName}::${steamAppId ?? ''}::${chosen.video.video_id || 'auto_trailer'}`
         if (lastResolvedVideoKeyRef.current !== vidKey || !resolvedStream) {
           void resolveTrailerSource(chosen.video, true)
         } else {
           setDirectFailed(false)
           setUseEmbedFallback(false)
         }
-      } else if (chosen.kind === "steam_movie") {
+      } else if (chosen.kind === 'steam_movie') {
         setDirectFailed(false)
         setUseEmbedFallback(false)
       }
@@ -261,8 +259,8 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
   )
 
   const activateFirstTrailer = useCallback(() => {
-    setFilterMode("all")
-    const firstTrailer = allMediaItems.find((m) => m.kind !== "screenshot")
+    setFilterMode('all')
+    const firstTrailer = allMediaItems.find((m) => m.kind !== 'screenshot')
     if (firstTrailer) {
       selectMediaItem(firstTrailer)
     }
@@ -272,15 +270,15 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
   useEffect(() => {
     if (!trailerFullscreen && !lightboxShot) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "Backspace") {
+      if (e.key === 'Escape' || e.key === 'Backspace') {
         e.preventDefault()
         e.stopPropagation()
         setTrailerFullscreen(false)
         setLightboxShot(null)
       }
     }
-    window.addEventListener("keydown", onKeyDown, true)
-    return () => window.removeEventListener("keydown", onKeyDown, true)
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [trailerFullscreen, lightboxShot])
 
   // Listen for Hero "Screenshots & Trailers" / "Media & Trailers" button event
@@ -288,14 +286,14 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
     const onPlayTrailerEvent = () => {
       activateFirstTrailer()
     }
-    window.addEventListener("nexus:console-play-trailer", onPlayTrailerEvent)
-    return () => window.removeEventListener("nexus:console-play-trailer", onPlayTrailerEvent)
+    window.addEventListener('nexus:console-play-trailer', onPlayTrailerEvent)
+    return () => window.removeEventListener('nexus:console-play-trailer', onPlayTrailerEvent)
   }, [activateFirstTrailer])
 
   const directVideoUrl = useMemo(() => {
-    if (!activeItem || activeItem.kind === "screenshot") return null
+    if (!activeItem || activeItem.kind === 'screenshot') return null
     if (directFailed || useEmbedFallback) return null
-    if (activeItem.kind === "steam_movie" && activeItem.steamMovie) {
+    if (activeItem.kind === 'steam_movie' && activeItem.steamMovie) {
       return (
         activeItem.steamMovie.mp4_max ||
         activeItem.steamMovie.mp4_480 ||
@@ -306,20 +304,16 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
     }
     const smv = steamMovies[0]
     return (
-      smv?.mp4_max ||
-      smv?.mp4_480 ||
-      smv?.webm_max ||
-      resolvedStream?.direct_stream_url ||
-      null
+      smv?.mp4_max || smv?.mp4_480 || smv?.webm_max || resolvedStream?.direct_stream_url || null
     )
   }, [activeItem, directFailed, useEmbedFallback, resolvedStream, steamMovies])
 
   const youtubeVideoId = useMemo(() => {
-    if (!activeItem || activeItem.kind === "screenshot") return null
+    if (!activeItem || activeItem.kind === 'screenshot') return null
     if (resolvedStream?.is_age_restricted && resolvedStream?.fallback_video_id) {
       return resolvedStream.fallback_video_id
     }
-    if (activeItem.video?.video_id && activeItem.video.video_id !== "auto_trailer") {
+    if (activeItem.video?.video_id && activeItem.video.video_id !== 'auto_trailer') {
       return activeItem.video.video_id
     }
     return resolvedStream?.fallback_video_id ?? null
@@ -327,14 +321,14 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
 
   const scrollStrip = (dir: -1 | 1) => {
     if (!stripScrollRef.current) return
-    stripScrollRef.current.scrollBy({ left: dir * 420, behavior: "smooth" })
+    stripScrollRef.current.scrollBy({ left: dir * 420, behavior: 'smooth' })
   }
 
   const filterAllFocus = useFocusable<HTMLButtonElement>({
     id: `${scopeId}_media_filter_all`,
     scopeId,
     onConfirm: () => {
-      setFilterMode("all")
+      setFilterMode('all')
     },
   })
 
@@ -342,9 +336,9 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
     id: `${scopeId}_media_filter_trailers`,
     scopeId,
     onConfirm: () => {
-      setFilterMode("trailers")
-      setActiveKind("trailer")
-      const firstTrailer = allMediaItems.find((m) => m.kind !== "screenshot")
+      setFilterMode('trailers')
+      setActiveKind('trailer')
+      const firstTrailer = allMediaItems.find((m) => m.kind !== 'screenshot')
       if (firstTrailer) {
         selectMediaItem(firstTrailer)
       }
@@ -357,9 +351,9 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
     disabled: screenshotCount === 0,
     onConfirm: () => {
       if (screenshotCount > 0) {
-        setFilterMode("screenshots")
-        setActiveKind("screenshot")
-        setActiveItemId("media_shot_0")
+        setFilterMode('screenshots')
+        setActiveKind('screenshot')
+        setActiveItemId('media_shot_0')
       }
     },
   })
@@ -389,10 +383,10 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
     id: `${scopeId}_media_fullscreen`,
     scopeId,
     onConfirm: () => {
-      if (activeItem?.kind === "screenshot" && activeItem.screenshotUrl) {
+      if (activeItem?.kind === 'screenshot' && activeItem.screenshotUrl) {
         setLightboxShot(activeItem.screenshotUrl)
       } else {
-        if (activeItem?.kind === "screenshot") {
+        if (activeItem?.kind === 'screenshot') {
           activateFirstTrailer()
         }
         setTrailerFullscreen(true)
@@ -405,8 +399,8 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
       id="console-inline-trailer-section"
       className={`rounded-3xl border p-5 space-y-4 shadow-2xl ${
         isLight
-          ? "border-slate-300 bg-white/95"
-          : "border-white/15 bg-gradient-to-b from-[#10182f] via-[#0c1224] to-[#080d1a]"
+          ? 'border-slate-300 bg-white/95'
+          : 'border-white/15 bg-gradient-to-b from-[#10182f] via-[#0c1224] to-[#080d1a]'
       }`}
     >
       {/* Top Bar: Title + Filter Mode Tabs (Screenshots / Trailers / All) + Actions */}
@@ -415,11 +409,11 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
           <div
             className={`flex size-10 items-center justify-center rounded-2xl border ${
               isLight
-                ? "bg-indigo-50 border-indigo-200 text-indigo-600"
-                : "bg-cyan-500/20 border-cyan-400/40 text-cyan-300"
+                ? 'bg-indigo-50 border-indigo-200 text-indigo-600'
+                : 'bg-cyan-500/20 border-cyan-400/40 text-cyan-300'
             }`}
           >
-            {activeItem?.kind === "screenshot" ? (
+            {activeItem?.kind === 'screenshot' ? (
               <ImageIcon className="size-5" />
             ) : (
               <Film className="size-5" />
@@ -429,7 +423,7 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <h2
                 className={`text-lg font-black tracking-tight ${
-                  isLight ? "text-slate-900" : "text-white"
+                  isLight ? 'text-slate-900' : 'text-white'
                 }`}
               >
                 Media Showcase — Screenshots &amp; Trailers
@@ -437,27 +431,29 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
               <span
                 className={`rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase ${
                   isLight
-                    ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                    : "bg-cyan-500/20 border-cyan-400/40 text-cyan-300"
+                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                    : 'bg-cyan-500/20 border-cyan-400/40 text-cyan-300'
                 }`}
               >
                 {activeIndex + 1} / {filteredItems.length}
               </span>
-              {activeItem?.kind !== "screenshot" && (
+              {activeItem?.kind !== 'screenshot' && (
                 <span
                   className={`rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase ${
                     isLight
-                      ? "bg-emerald-50 border-emerald-300 text-emerald-800"
-                      : "bg-emerald-500/20 border-emerald-400/40 text-emerald-300"
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                      : 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'
                   }`}
                 >
-                  {resolvedStream?.stream_source || "HD Stream"}
+                  {resolvedStream?.stream_source || 'HD Stream'}
                 </span>
               )}
             </div>
-            <p className={`text-xs truncate max-w-xl ${isLight ? "text-slate-500" : "text-slate-400"}`}>
+            <p
+              className={`text-xs truncate max-w-xl ${isLight ? 'text-slate-500' : 'text-slate-400'}`}
+            >
               {activeItem?.title ||
-                "Switch seamlessly between 1080p Screenshots and Official HD Trailers"}
+                'Switch seamlessly between 1080p Screenshots and Official HD Trailers'}
             </p>
           </div>
         </div>
@@ -470,14 +466,14 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
               {...filterShotsFocus.focusProps}
               className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${
                 filterShotsFocus.isFocused
-                  ? "scale-105 border-cyan-300 bg-cyan-400 text-slate-950 shadow-lg"
-                  : filterMode === "screenshots" || activeItem?.kind === "screenshot"
+                  ? 'scale-105 border-cyan-300 bg-cyan-400 text-slate-950 shadow-lg'
+                  : filterMode === 'screenshots' || activeItem?.kind === 'screenshot'
                     ? isLight
-                      ? "border-indigo-600 bg-indigo-600 text-white shadow-xs"
-                      : "border-cyan-400 bg-cyan-500/20 text-cyan-300"
+                      ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                      : 'border-cyan-400 bg-cyan-500/20 text-cyan-300'
                     : isLight
-                      ? "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
-                      : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                      ? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
               }`}
             >
               <ImageIcon className="size-3.5" />
@@ -490,12 +486,12 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
             {...filterTrailersFocus.focusProps}
             className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${
               filterTrailersFocus.isFocused
-                ? "scale-105 border-rose-300 bg-rose-400 text-slate-950 shadow-lg"
-                : filterMode === "trailers" || activeItem?.kind !== "screenshot"
-                  ? "border-rose-500 bg-rose-500 text-white shadow-md"
+                ? 'scale-105 border-rose-300 bg-rose-400 text-slate-950 shadow-lg'
+                : filterMode === 'trailers' || activeItem?.kind !== 'screenshot'
+                  ? 'border-rose-500 bg-rose-500 text-white shadow-md'
                   : isLight
-                    ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                    : "border-rose-400/35 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25"
+                    ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                    : 'border-rose-400/35 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25'
             }`}
           >
             <Play className="size-3.5 fill-current" />
@@ -507,14 +503,14 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
             {...filterAllFocus.focusProps}
             className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${
               filterAllFocus.isFocused
-                ? "scale-105 border-cyan-300 bg-cyan-400 text-slate-950 shadow-lg"
-                : filterMode === "all"
+                ? 'scale-105 border-cyan-300 bg-cyan-400 text-slate-950 shadow-lg'
+                : filterMode === 'all'
                   ? isLight
-                    ? "border-indigo-600 bg-indigo-600 text-white shadow-xs"
-                    : "border-cyan-400 bg-cyan-500/20 text-cyan-300"
+                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-xs'
+                    : 'border-cyan-400 bg-cyan-500/20 text-cyan-300'
                   : isLight
-                    ? "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10"
+                    ? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10'
             }`}
           >
             <Layers className="size-3.5" />
@@ -529,10 +525,10 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
                 title="Previous Media"
                 className={`flex size-8 items-center justify-center rounded-xl border transition-all cursor-pointer ${
                   prevMediaFocus.isFocused
-                    ? "scale-110 border-cyan-300 bg-cyan-400 text-slate-950"
+                    ? 'scale-110 border-cyan-300 bg-cyan-400 text-slate-950'
                     : isLight
-                      ? "border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200"
-                      : "border-white/15 bg-white/10 text-white hover:bg-white/20"
+                      ? 'border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200'
+                      : 'border-white/15 bg-white/10 text-white hover:bg-white/20'
                 }`}
               >
                 <ChevronLeft className="size-4" />
@@ -543,10 +539,10 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
                 title="Next Media"
                 className={`flex size-8 items-center justify-center rounded-xl border transition-all cursor-pointer ${
                   nextMediaFocus.isFocused
-                    ? "scale-110 border-cyan-300 bg-cyan-400 text-slate-950"
+                    ? 'scale-110 border-cyan-300 bg-cyan-400 text-slate-950'
                     : isLight
-                      ? "border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200"
-                      : "border-white/15 bg-white/10 text-white hover:bg-white/20"
+                      ? 'border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200'
+                      : 'border-white/15 bg-white/10 text-white hover:bg-white/20'
                 }`}
               >
                 <ChevronRight className="size-4" />
@@ -554,20 +550,20 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
             </div>
           )}
 
-          {activeItem?.kind !== "screenshot" && (
+          {activeItem?.kind !== 'screenshot' && (
             <button
               type="button"
               {...retryBtnFocus.focusProps}
               title="Re-sync Trailer Stream"
               className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${
                 retryBtnFocus.isFocused
-                  ? "scale-105 border-cyan-300 bg-cyan-400 text-slate-950"
+                  ? 'scale-105 border-cyan-300 bg-cyan-400 text-slate-950'
                   : isLight
-                    ? "border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200"
-                    : "border-white/15 bg-white/10 text-white hover:bg-white/15"
+                    ? 'border-slate-300 bg-slate-100 text-slate-800 hover:bg-slate-200'
+                    : 'border-white/15 bg-white/10 text-white hover:bg-white/15'
               }`}
             >
-              <RefreshCw className={`size-3.5 ${loadingStream ? "animate-spin" : ""}`} />
+              <RefreshCw className={`size-3.5 ${loadingStream ? 'animate-spin' : ''}`} />
               <span>Re-sync</span>
             </button>
           )}
@@ -577,10 +573,10 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
             {...fullscreenBtnFocus.focusProps}
             className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-extrabold transition-all cursor-pointer ${
               fullscreenBtnFocus.isFocused
-                ? "scale-105 border-cyan-300 bg-cyan-400 text-slate-950"
+                ? 'scale-105 border-cyan-300 bg-cyan-400 text-slate-950'
                 : isLight
-                  ? "border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-                  : "border-cyan-400/40 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25"
+                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                  : 'border-cyan-400/40 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25'
             }`}
           >
             <Maximize2 className="size-3.5" />
@@ -591,7 +587,7 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
 
       {/* Main Switchable 16:9 Media Stage (Inline Page View) */}
       <div className="relative aspect-video max-h-[480px] w-full overflow-hidden rounded-2xl border border-white/15 bg-black shadow-2xl mx-auto">
-        {activeItem?.kind === "screenshot" && activeItem.screenshotUrl ? (
+        {activeItem?.kind === 'screenshot' && activeItem.screenshotUrl ? (
           <div className="group relative h-full w-full overflow-hidden bg-slate-950 flex items-center justify-center">
             <motion.img
               key={activeItem.screenshotUrl}
@@ -704,7 +700,9 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  void openTrailerWindow(youtubeVideoId, `${gameName} — Official Trailer`).catch(() => {})
+                  void openTrailerWindow(youtubeVideoId, `${gameName} — Official Trailer`).catch(
+                    () => {},
+                  )
                 }}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-black/80 px-3 py-2 text-xs font-extrabold text-white backdrop-blur-md hover:bg-rose-500 transition-colors cursor-pointer shadow-lg"
               >
@@ -749,8 +747,8 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
                 onClick={() => scrollStrip(-1)}
                 className={`flex size-7 items-center justify-center rounded-lg border cursor-pointer ${
                   isLight
-                    ? "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
+                    ? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/15'
                 }`}
                 title="Scroll Strip Left"
               >
@@ -761,8 +759,8 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
                 onClick={() => scrollStrip(1)}
                 className={`flex size-7 items-center justify-center rounded-lg border cursor-pointer ${
                   isLight
-                    ? "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/15"
+                    ? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/15'
                 }`}
                 title="Scroll Strip Right"
               >
@@ -796,7 +794,7 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
       )}
 
       {/* TRUE 100vw x 100vh EDGE-TO-EDGE FULLSCREEN VIDEO PORTAL (Rendered directly on document.body!) */}
-      {typeof document !== "undefined" &&
+      {typeof document !== 'undefined' &&
         trailerFullscreen &&
         createPortal(
           <div
@@ -841,7 +839,7 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
             {/* Auto-Hiding Floating Exit Fullscreen Button in Top-Right Corner */}
             <div
               className={`fixed right-6 top-6 z-[100000] flex items-center gap-3 transition-opacity duration-300 ${
-                fsHudVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+                fsHudVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
               }`}
             >
               <button
@@ -858,7 +856,7 @@ export const ConsoleTrailerShowcase: React.FC<ConsoleTrailerShowcaseProps> = ({
         )}
 
       {/* Fullscreen Lightbox for Screenshots (also rendered on document.body so it covers 100% of screen!) */}
-      {typeof document !== "undefined" &&
+      {typeof document !== 'undefined' &&
         lightboxShot &&
         createPortal(
           <AnimatePresence>
@@ -902,7 +900,7 @@ const MediaStripThumbButton: React.FC<{
     scopeId,
     onConfirm: onSelect,
   })
-  const isVideo = item.kind === "trailer" || item.kind === "steam_movie"
+  const isVideo = item.kind === 'trailer' || item.kind === 'steam_movie'
 
   return (
     <button
@@ -910,12 +908,12 @@ const MediaStripThumbButton: React.FC<{
       {...focusProps}
       className={`group relative h-24 w-44 shrink-0 overflow-hidden rounded-2xl border text-left transition-all cursor-pointer outline-none ${
         isFocused
-          ? "scale-105 border-cyan-300 ring-3 ring-cyan-400 shadow-xl z-10"
+          ? 'scale-105 border-cyan-300 ring-3 ring-cyan-400 shadow-xl z-10'
           : active
             ? isVideo
-              ? "border-rose-500 ring-2 ring-rose-500/60 opacity-100"
-              : "border-cyan-400 ring-2 ring-cyan-400/50 opacity-100"
-            : "border-white/15 opacity-75 hover:opacity-100"
+              ? 'border-rose-500 ring-2 ring-rose-500/60 opacity-100'
+              : 'border-cyan-400 ring-2 ring-cyan-400/50 opacity-100'
+            : 'border-white/15 opacity-75 hover:opacity-100'
       }`}
     >
       {item.thumbnailUrl ? (
@@ -943,8 +941,8 @@ const MediaStripThumbButton: React.FC<{
           <span
             className={`flex size-9 items-center justify-center rounded-full border shadow-lg transition-transform group-hover:scale-110 ${
               active || isFocused
-                ? "border-white bg-rose-500 text-white"
-                : "border-white/40 bg-black/70 text-white"
+                ? 'border-white bg-rose-500 text-white'
+                : 'border-white/40 bg-black/70 text-white'
             }`}
           >
             <Play className="size-4 fill-current translate-x-0.5" />
@@ -955,12 +953,14 @@ const MediaStripThumbButton: React.FC<{
       <div className="absolute inset-x-2 bottom-1.5 flex items-center justify-between gap-1">
         <span
           className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-            isVideo
-              ? "bg-rose-500/90 text-white"
-              : "bg-cyan-500/85 text-slate-950"
+            isVideo ? 'bg-rose-500/90 text-white' : 'bg-cyan-500/85 text-slate-950'
           }`}
         >
-          {isVideo ? <Play className="size-2.5 fill-current" /> : <ImageIcon className="size-2.5" />}
+          {isVideo ? (
+            <Play className="size-2.5 fill-current" />
+          ) : (
+            <ImageIcon className="size-2.5" />
+          )}
           {item.indexLabel}
         </span>
       </div>

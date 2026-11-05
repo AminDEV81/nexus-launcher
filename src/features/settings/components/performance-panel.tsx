@@ -245,9 +245,12 @@ export function PerformancePanel() {
               <Sparkles className="size-4.5" />
             </span>
             <div>
-              <div className="text-sm font-bold text-text">Sequential Multi-Part Queue (One by One)</div>
+              <div className="text-sm font-bold text-text">
+                Sequential Multi-Part Queue (One by One)
+              </div>
               <div className="text-xs text-subtle">
-                Downloads multi-part archives (Part 1, Part 2, Part 3…) sequentially to maximize per-file speed.
+                Downloads multi-part archives (Part 1, Part 2, Part 3…) sequentially to maximize
+                per-file speed.
               </div>
             </div>
           </div>

@@ -1,9 +1,9 @@
-import type { SystemRequirementDetail, SystemRequirements } from "@/types/models"
-import type { SystemSpecs } from "@/services/system"
+import type { SystemRequirementDetail, SystemRequirements } from '@/types/models'
+import type { SystemSpecs } from '@/services/system'
 
-export type TargetResolution = "1080p" | "1440p" | "4k"
-export type UpscalerMode = "native" | "quality" | "balanced" | "performance"
-export type GraphicsPreset = "low" | "medium" | "high" | "ultra"
+export type TargetResolution = '1080p' | '1440p' | '4k'
+export type UpscalerMode = 'native' | 'quality' | 'balanced' | 'performance'
+export type GraphicsPreset = 'low' | 'medium' | 'high' | 'ultra'
 
 export interface PresetFpsEstimate {
   preset: GraphicsPreset
@@ -13,7 +13,7 @@ export interface PresetFpsEstimate {
   fpsRangeText: string
   estVramGb: number
   vramSpillover: boolean
-  tier: "competitive" | "smooth" | "playable" | "struggling"
+  tier: 'competitive' | 'smooth' | 'playable' | 'struggling'
   tierLabel: string
   frameTimeMs: number
 }
@@ -26,7 +26,7 @@ export interface ResolutionMatrixRow {
 }
 
 export interface BottleneckAnalysis {
-  limitingFactor: "gpu" | "cpu" | "vram" | "ram" | "balanced"
+  limitingFactor: 'gpu' | 'cpu' | 'vram' | 'ram' | 'balanced'
   title: string
   description: string
   cpuLoadPercent: number
@@ -47,7 +47,7 @@ export interface FullFpsEstimationResult {
   recGpuScore: number
   minCpuScore: number
   recCpuScore: number
-  upscalerTechName: "DLSS" | "FSR" | "XeSS"
+  upscalerTechName: 'DLSS' | 'FSR' | 'XeSS'
   selectedResolution: TargetResolution
   selectedUpscaler: UpscalerMode
   activePresets: PresetFpsEstimate[]
@@ -88,27 +88,40 @@ export function snapGpuVramGb(vramBytes?: number | null, gpuName?: string | null
     if (rawGb >= 1.5) return Math.round(rawGb)
   }
   // Infer VRAM from GPU model name if OS/driver did not report dedicated bytes
-  const s = (gpuName || "").toLowerCase()
+  const s = (gpuName || '').toLowerCase()
   if (/5090/.test(s)) return 32
   if (/4090|3090|7900\s*xtx/.test(s)) return 24
   if (/7900\s*xt/.test(s)) return 20
-  if (/5080|4080|4070\s*ti\s*super|5070\s*ti|7900\s*gre|7800\s*xt|6950|6900|6800|9070|a770|7600\s*xt|4060\s*ti\s*16/.test(s)) return 16
+  if (
+    /5080|4080|4070\s*ti\s*super|5070\s*ti|7900\s*gre|7800\s*xt|6950|6900|6800|9070|a770|7600\s*xt|4060\s*ti\s*16/.test(
+      s,
+    )
+  )
+    return 16
   if (/5070|4070|3080\s*12|3060\s*12|7700\s*xt|6750|6700\s*xt|b580/.test(s)) return 12
   if (/3080|2080\s*ti|6700/.test(s)) return 10
-  if (/5060|4060|3070|3060\s*ti|2080|2070|2060\s*super|1080|1070|7600|6650|6600|5700|580\s*8|a750|a580/.test(s)) return 8
+  if (
+    /5060|4060|3070|3060\s*ti|2080|2070|2060\s*super|1080|1070|7600|6650|6600|5700|580\s*8|a750|a580/.test(
+      s,
+    )
+  )
+    return 8
   if (/4050|3060|2060|1660|1060|5600/.test(s)) return 6
   if (/3050|1650|1050\s*ti|970|960|580|570|5500|6500/.test(s)) return 4
   return 8
 }
 
-export function detectUpscalerTech(gpuName?: string | null): "DLSS" | "FSR" | "XeSS" {
-  const s = (gpuName || "").toLowerCase()
-  if (/rtx\s*(?:20|30|40|50)/.test(s)) return "DLSS"
-  if (/arc\s*[ab]\d+|iris\s*xe/.test(s)) return "XeSS"
-  return "FSR"
+export function detectUpscalerTech(gpuName?: string | null): 'DLSS' | 'FSR' | 'XeSS' {
+  const s = (gpuName || '').toLowerCase()
+  if (/rtx\s*(?:20|30|40|50)/.test(s)) return 'DLSS'
+  if (/arc\s*[ab]\d+|iris\s*xe/.test(s)) return 'XeSS'
+  return 'FSR'
 }
 
-export function estimateGpuPerformanceScore(gpuText?: string | null, vramGb?: number | null): number {
+export function estimateGpuPerformanceScore(
+  gpuText?: string | null,
+  vramGb?: number | null,
+): number {
   if (!gpuText) return vramGb ? Math.min(85, vramGb * 6) : 52
   const s = gpuText.toLowerCase()
   const isLaptop = /laptop|mobile|max-q/i.test(s)
@@ -122,10 +135,12 @@ export function estimateGpuPerformanceScore(gpuText?: string | null, vramGb?: nu
   else if (/rtx\s*5070|rtx\s*4070\s*ti\s*super/.test(s)) base = 96
   else if (/rtx\s*4070\s*(?:ti|super)|rtx\s*3090\s*ti|rtx\s*3090/.test(s)) base = 91
   else if (/rtx\s*4070|rtx\s*3080\s*ti|rtx\s*3080/.test(s)) base = 84
-  else if (/rtx\s*5060\s*ti|rtx\s*4060\s*ti|rtx\s*3070\s*ti|rtx\s*3070|rtx\s*2080\s*ti/.test(s)) base = 76
+  else if (/rtx\s*5060\s*ti|rtx\s*4060\s*ti|rtx\s*3070\s*ti|rtx\s*3070|rtx\s*2080\s*ti/.test(s))
+    base = 76
   else if (/rtx\s*5060|rtx\s*4060|rtx\s*3060\s*ti|rtx\s*2080\s*super|rtx\s*2080/.test(s)) base = 69
   else if (/rtx\s*3060|rtx\s*2070\s*super|rtx\s*2070|rtx\s*4050|gtx\s*1080\s*ti/.test(s)) base = 62
-  else if (/rtx\s*2060\s*super|rtx\s*2060|rtx\s*3050|gtx\s*1080|gtx\s*1660\s*(?:ti|super)/.test(s)) base = 53
+  else if (/rtx\s*2060\s*super|rtx\s*2060|rtx\s*3050|gtx\s*1080|gtx\s*1660\s*(?:ti|super)/.test(s))
+    base = 53
   else if (/gtx\s*1660|gtx\s*1070\s*ti|gtx\s*1070/.test(s)) base = 47
   else if (/gtx\s*1650\s*super|gtx\s*1060/.test(s)) base = 41
   else if (/gtx\s*1650|gtx\s*970|gtx\s*1050\s*ti/.test(s)) base = 33
@@ -135,7 +150,8 @@ export function estimateGpuPerformanceScore(gpuText?: string | null, vramGb?: nu
   else if (/rx\s*7900\s*xt|rx\s*9070|rx\s*6950\s*xt/.test(s)) base = 93
   else if (/rx\s*7900\s*gre|rx\s*7800\s*xt|rx\s*6900\s*xt|rx\s*6800\s*xt/.test(s)) base = 84
   else if (/rx\s*7700\s*xt|rx\s*6800|rx\s*6750\s*xt|rx\s*6700\s*xt/.test(s)) base = 74
-  else if (/rx\s*7600\s*xt|rx\s*7600|rx\s*6650\s*xt|rx\s*6600\s*xt|rx\s*5700\s*xt/.test(s)) base = 64
+  else if (/rx\s*7600\s*xt|rx\s*7600|rx\s*6650\s*xt|rx\s*6600\s*xt|rx\s*5700\s*xt/.test(s))
+    base = 64
   else if (/rx\s*6600|rx\s*5700|rx\s*5600\s*xt/.test(s)) base = 56
   else if (/rx\s*5500\s*xt|rx\s*6500\s*xt|rx\s*590|rx\s*580/.test(s)) base = 42
   else if (/rx\s*570|rx\s*480|rx\s*470|radeon\s*780m|radeon\s*890m/.test(s)) base = 35
@@ -162,15 +178,21 @@ export function estimateCpuPerformanceScore(
   logicalCores?: number | null,
   physicalCores?: number | null,
 ): number {
-  const s = (cpuText || "").toLowerCase()
+  const s = (cpuText || '').toLowerCase()
   const threads = logicalCores || (physicalCores ? physicalCores * 2 : 8)
 
   if (/9800x3d|9950x3d|7800x3d|7950x3d/.test(s)) return 105
   if (/9950x|9900x|7950x|14900k|13900k|ultra\s*9/.test(s)) return 98
   if (/9700x|7900x|7700x|5800x3d|5700x3d|14700k|13700k|12900k|ultra\s*7/.test(s)) return 90
   if (/9600x|7600x|7600|7500f|14600k|13600k|12700k|12700|5950x|5900x|ultra\s*5/.test(s)) return 83
-  if (/14500|14400|13500|13400|12600k|12600|12400|11900k|11700k|5800x|5700x|5600x|5600/.test(s)) return 74
-  if (/11600|11400|10900k|10700k|10700|10600k|10400|9900k|9700k|3900x|3800x|3700x|3600x|3600|5500/.test(s)) return 63
+  if (/14500|14400|13500|13400|12600k|12600|12400|11900k|11700k|5800x|5700x|5600x|5600/.test(s))
+    return 74
+  if (
+    /11600|11400|10900k|10700k|10700|10600k|10400|9900k|9700k|3900x|3800x|3700x|3600x|3600|5500/.test(
+      s,
+    )
+  )
+    return 63
   if (/13100|12100|10100|9600k|9400|8700k|8700|8400|2700x|2600x|2600|3300x|3100/.test(s)) return 52
   if (/7700k|7700|6700k|6700|4790k|1800x|1700|1600|1500x|2400g|2200g|8100/.test(s)) return 38
 
@@ -187,9 +209,9 @@ export function buildSynthesizedRequirements(
   genres: string[] = [],
   gameTitle?: string | null,
 ): { minimum: SystemRequirementDetail; recommended: SystemRequirementDetail } {
-  const titleLower = (gameTitle || "").toLowerCase()
+  const titleLower = (gameTitle || '').toLowerCase()
   const year = releaseDate ? Number(releaseDate.slice(0, 4)) || 2024 : 2024
-  const genreStr = genres.join(" ").toLowerCase()
+  const genreStr = genres.join(' ').toLowerCase()
 
   const isHeavyAAA =
     /cyberpunk|alan wake 2|wukong|grand theft auto vi|gta 6|gta vi|starfield|stalker 2|indiana jones|monster hunter wilds|avatar|flight simulator|senua/i.test(
@@ -201,32 +223,32 @@ export function buildSynthesizedRequirements(
     )
   const isIndie =
     isEsportsOrLight ||
-    genreStr.includes("indie") ||
-    genreStr.includes("puzzle") ||
-    genreStr.includes("card") ||
-    genreStr.includes("platform")
+    genreStr.includes('indie') ||
+    genreStr.includes('puzzle') ||
+    genreStr.includes('card') ||
+    genreStr.includes('platform')
 
   if (isIndie) {
     return {
       minimum: {
-        os: "Windows 10 64-bit",
-        processor: "Intel Core i3-8100 / AMD Ryzen 3 2200G",
-        memory: "8 GB RAM",
-        graphics: "NVIDIA GeForce GTX 1050 Ti (4 GB) / Radeon RX 560",
-        directx: "Version 11",
-        storage: "15 GB available space (SSD recommended)",
-        sound_card: "DirectX Compatible Audio Device",
-        additional_notes: "Targets 1080p @ 60 FPS (Standard Preset)",
+        os: 'Windows 10 64-bit',
+        processor: 'Intel Core i3-8100 / AMD Ryzen 3 2200G',
+        memory: '8 GB RAM',
+        graphics: 'NVIDIA GeForce GTX 1050 Ti (4 GB) / Radeon RX 560',
+        directx: 'Version 11',
+        storage: '15 GB available space (SSD recommended)',
+        sound_card: 'DirectX Compatible Audio Device',
+        additional_notes: 'Targets 1080p @ 60 FPS (Standard Preset)',
       },
       recommended: {
-        os: "Windows 10 / 11 64-bit",
-        processor: "Intel Core i5-10400 / AMD Ryzen 5 3600",
-        memory: "16 GB RAM",
-        graphics: "NVIDIA GeForce GTX 1660 Super (6 GB) / Radeon RX 5600 XT",
-        directx: "Version 12",
-        storage: "20 GB available space (NVMe SSD)",
-        sound_card: "DirectX Compatible Audio Device",
-        additional_notes: "Targets 1440p / 4K @ 120 FPS (High Preset)",
+        os: 'Windows 10 / 11 64-bit',
+        processor: 'Intel Core i5-10400 / AMD Ryzen 5 3600',
+        memory: '16 GB RAM',
+        graphics: 'NVIDIA GeForce GTX 1660 Super (6 GB) / Radeon RX 5600 XT',
+        directx: 'Version 12',
+        storage: '20 GB available space (NVMe SSD)',
+        sound_card: 'DirectX Compatible Audio Device',
+        additional_notes: 'Targets 1440p / 4K @ 120 FPS (High Preset)',
       },
     }
   }
@@ -234,52 +256,52 @@ export function buildSynthesizedRequirements(
   if (isHeavyAAA || year >= 2024) {
     return {
       minimum: {
-        os: "Windows 10 / 11 64-bit (22H2+)",
-        processor: "Intel Core i5-10400 / AMD Ryzen 5 3600 (6 Cores)",
-        memory: "16 GB RAM",
-        graphics: "NVIDIA GeForce RTX 2060 (6 GB) / AMD Radeon RX 6600 (8 GB)",
-        directx: "Version 12",
-        storage: "80 GB available space (SSD required)",
-        sound_card: "DirectX 12 Spatial Audio",
-        network: "Broadband Internet connection",
-        additional_notes: "Targets 1080p @ 45–60 FPS (Low/Medium Settings, DLSS/FSR Quality)",
+        os: 'Windows 10 / 11 64-bit (22H2+)',
+        processor: 'Intel Core i5-10400 / AMD Ryzen 5 3600 (6 Cores)',
+        memory: '16 GB RAM',
+        graphics: 'NVIDIA GeForce RTX 2060 (6 GB) / AMD Radeon RX 6600 (8 GB)',
+        directx: 'Version 12',
+        storage: '80 GB available space (SSD required)',
+        sound_card: 'DirectX 12 Spatial Audio',
+        network: 'Broadband Internet connection',
+        additional_notes: 'Targets 1080p @ 45–60 FPS (Low/Medium Settings, DLSS/FSR Quality)',
       },
       recommended: {
-        os: "Windows 11 64-bit",
-        processor: "Intel Core i7-12700K / AMD Ryzen 7 5800X3D (8 Cores)",
-        memory: "16 GB RAM",
-        graphics: "NVIDIA GeForce RTX 4070 (12 GB) / AMD Radeon RX 7800 XT (16 GB)",
-        directx: "Version 12 Ultimate",
-        storage: "80 GB available space (NVMe PCIe 4.0 SSD)",
-        sound_card: "DirectX 12 Spatial Audio",
-        network: "Broadband Internet connection",
-        additional_notes: "Targets 1440p / 4K @ 60+ FPS (High / Ultra Settings)",
+        os: 'Windows 11 64-bit',
+        processor: 'Intel Core i7-12700K / AMD Ryzen 7 5800X3D (8 Cores)',
+        memory: '16 GB RAM',
+        graphics: 'NVIDIA GeForce RTX 4070 (12 GB) / AMD Radeon RX 7800 XT (16 GB)',
+        directx: 'Version 12 Ultimate',
+        storage: '80 GB available space (NVMe PCIe 4.0 SSD)',
+        sound_card: 'DirectX 12 Spatial Audio',
+        network: 'Broadband Internet connection',
+        additional_notes: 'Targets 1440p / 4K @ 60+ FPS (High / Ultra Settings)',
       },
     }
   }
 
   return {
     minimum: {
-      os: "Windows 10 64-bit",
-      processor: "Intel Core i5-8400 / AMD Ryzen 5 2600",
-      memory: "8 GB RAM",
-      graphics: "NVIDIA GeForce GTX 1060 (6 GB) / AMD Radeon RX 580 (8 GB)",
-      directx: "Version 11 / 12",
-      storage: "50 GB available space",
-      sound_card: "DirectX Compatible Sound Card",
-      network: "Broadband Internet connection",
-      additional_notes: "Targets 1080p @ 60 FPS (Medium Preset)",
+      os: 'Windows 10 64-bit',
+      processor: 'Intel Core i5-8400 / AMD Ryzen 5 2600',
+      memory: '8 GB RAM',
+      graphics: 'NVIDIA GeForce GTX 1060 (6 GB) / AMD Radeon RX 580 (8 GB)',
+      directx: 'Version 11 / 12',
+      storage: '50 GB available space',
+      sound_card: 'DirectX Compatible Sound Card',
+      network: 'Broadband Internet connection',
+      additional_notes: 'Targets 1080p @ 60 FPS (Medium Preset)',
     },
     recommended: {
-      os: "Windows 10 / 11 64-bit",
-      processor: "Intel Core i7-9700K / AMD Ryzen 5 5600X",
-      memory: "16 GB RAM",
-      graphics: "NVIDIA GeForce RTX 3060 Ti (8 GB) / AMD Radeon RX 6700 XT",
-      directx: "Version 12",
-      storage: "50 GB available space (SSD recommended)",
-      sound_card: "DirectX Compatible Sound Card",
-      network: "Broadband Internet connection",
-      additional_notes: "Targets 1440p @ 60+ FPS (Ultra Preset)",
+      os: 'Windows 10 / 11 64-bit',
+      processor: 'Intel Core i7-9700K / AMD Ryzen 5 5600X',
+      memory: '16 GB RAM',
+      graphics: 'NVIDIA GeForce RTX 3060 Ti (8 GB) / AMD Radeon RX 6700 XT',
+      directx: 'Version 12',
+      storage: '50 GB available space (SSD recommended)',
+      sound_card: 'DirectX Compatible Sound Card',
+      network: 'Broadband Internet connection',
+      additional_notes: 'Targets 1440p @ 60+ FPS (Ultra Preset)',
     },
   }
 }
@@ -308,8 +330,8 @@ export function estimateGameFpsMatrix(params: {
   const recSpec = systemRequirements?.recommended || fallback.recommended
 
   const primaryGpu = pcSpecs?.gpus.find((g) => g.is_primary) ?? pcSpecs?.gpus[0]
-  const userGpuName = primaryGpu?.name || "NVIDIA GeForce RTX 3060 (Detected Profile)"
-  const userCpuName = pcSpecs?.cpu.brand || "8-Core Gaming Processor"
+  const userGpuName = primaryGpu?.name || 'NVIDIA GeForce RTX 3060 (Detected Profile)'
+  const userCpuName = pcSpecs?.cpu.brand || '8-Core Gaming Processor'
   const userRamGb = pcSpecs ? snapPhysicalRamGb(pcSpecs.memory.total_bytes) : 16
   const userVramGb = snapGpuVramGb(primaryGpu?.vram_bytes, userGpuName)
 
@@ -331,11 +353,17 @@ export function estimateGameFpsMatrix(params: {
 
   const minCpuScore = Math.max(
     32,
-    Math.min(60, estimateCpuPerformanceScore(minSpec.processor || fallback.minimum.processor, 6, 4)),
+    Math.min(
+      60,
+      estimateCpuPerformanceScore(minSpec.processor || fallback.minimum.processor, 6, 4),
+    ),
   )
   const recCpuScore = Math.max(
     minCpuScore + 12,
-    Math.min(86, estimateCpuPerformanceScore(recSpec.processor || fallback.recommended.processor, 12, 6)),
+    Math.min(
+      86,
+      estimateCpuPerformanceScore(recSpec.processor || fallback.recommended.processor, 12, 6),
+    ),
   )
 
   const minRamGb = Math.min(16, parseGigabytes(minSpec.memory) ?? 8)
@@ -384,19 +412,19 @@ export function estimateGameFpsMatrix(params: {
     TargetResolution,
     { label: string; sublabel: string; gpuMult: number; vramAddGb: number }
   > = {
-    "1080p": { label: "1080p FHD", sublabel: "1920 × 1080", gpuMult: 1.0, vramAddGb: 0 },
-    "1440p": { label: "1440p QHD", sublabel: "2560 × 1440", gpuMult: 0.68, vramAddGb: 1.4 },
-    "4k": { label: "4K Ultra HD", sublabel: "3840 × 2160", gpuMult: 0.39, vramAddGb: 3.2 },
+    '1080p': { label: '1080p FHD', sublabel: '1920 × 1080', gpuMult: 1.0, vramAddGb: 0 },
+    '1440p': { label: '1440p QHD', sublabel: '2560 × 1440', gpuMult: 0.68, vramAddGb: 1.4 },
+    '4k': { label: '4K Ultra HD', sublabel: '3840 × 2160', gpuMult: 0.39, vramAddGb: 3.2 },
   }
 
   const presetConfig: Record<
     GraphicsPreset,
     { label: string; gpuMult: number; cpuMult: number; vramDeltaGb: number }
   > = {
-    low: { label: "Low", gpuMult: 1.38, cpuMult: 1.15, vramDeltaGb: -1.4 },
-    medium: { label: "Medium", gpuMult: 1.16, cpuMult: 1.06, vramDeltaGb: -0.6 },
-    high: { label: "High", gpuMult: 1.0, cpuMult: 1.0, vramDeltaGb: 0 },
-    ultra: { label: "Ultra / RT", gpuMult: 0.74, cpuMult: 0.88, vramDeltaGb: 1.6 },
+    low: { label: 'Low', gpuMult: 1.38, cpuMult: 1.15, vramDeltaGb: -1.4 },
+    medium: { label: 'Medium', gpuMult: 1.16, cpuMult: 1.06, vramDeltaGb: -0.6 },
+    high: { label: 'High', gpuMult: 1.0, cpuMult: 1.0, vramDeltaGb: 0 },
+    ultra: { label: 'Ultra / RT', gpuMult: 0.74, cpuMult: 0.88, vramDeltaGb: 1.6 },
   }
 
   const upscalerConfig: Record<
@@ -419,23 +447,22 @@ export function estimateGameFpsMatrix(params: {
     const uc = upscalerConfig[upscaler]
 
     const upBoost =
-      res === "1080p" ? uc.gpuBoost1080 : res === "1440p" ? uc.gpuBoost1440 : uc.gpuBoost4k
+      res === '1080p' ? uc.gpuBoost1080 : res === '1440p' ? uc.gpuBoost1440 : uc.gpuBoost4k
 
     const estVramGb = Math.max(
       2.0,
       Math.round((base1080pHighVramGb + rc.vramAddGb + pc.vramDeltaGb - uc.vramSaveGb) * 10) / 10,
     )
     const vramSpillover = estVramGb > userVramGb + 0.3
-    const vramPenalty = vramSpillover
-      ? Math.max(0.52, 1 - (estVramGb - userVramGb) * 0.14)
-      : 1.0
+    const vramPenalty = vramSpillover ? Math.max(0.52, 1 - (estVramGb - userVramGb) * 0.14) : 1.0
 
     const rawGpuFps = gpuBase1080pHighFps * rc.gpuMult * pc.gpuMult * upBoost * vramPenalty
     const rawCpuFps = cpuCeilingBaseFps * pc.cpuMult
 
     // Soft harmonic blend between GPU-bound and CPU-bound FPS so whichever is lower dominates realistically
     const combinedFps =
-      ((rawGpuFps * rawCpuFps) / Math.pow(Math.pow(rawGpuFps, 2.6) + Math.pow(rawCpuFps, 2.6), 1 / 2.6)) *
+      ((rawGpuFps * rawCpuFps) /
+        Math.pow(Math.pow(rawGpuFps, 2.6) + Math.pow(rawCpuFps, 2.6), 1 / 2.6)) *
       ramFactor
 
     const avgFps = Math.max(12, Math.min(240, Math.round(combinedFps)))
@@ -446,20 +473,20 @@ export function estimateGameFpsMatrix(params: {
     const fpsRangeText = `${Math.max(10, avgFps - spread)}–${avgFps + spread} FPS`
     const frameTimeMs = Math.round((1000 / avgFps) * 10) / 10
 
-    let tier: PresetFpsEstimate["tier"] = "playable"
-    let tierLabel = "Playable (35–59 FPS)"
+    let tier: PresetFpsEstimate['tier'] = 'playable'
+    let tierLabel = 'Playable (35–59 FPS)'
     if (avgFps >= 100) {
-      tier = "competitive"
-      tierLabel = "High-Refresh (100+ FPS)"
+      tier = 'competitive'
+      tierLabel = 'High-Refresh (100+ FPS)'
     } else if (avgFps >= 60) {
-      tier = "smooth"
-      tierLabel = "Smooth 60+ FPS"
+      tier = 'smooth'
+      tierLabel = 'Smooth 60+ FPS'
     } else if (avgFps >= 35) {
-      tier = "playable"
-      tierLabel = "Console Smooth (35–59 FPS)"
+      tier = 'playable'
+      tierLabel = 'Console Smooth (35–59 FPS)'
     } else {
-      tier = "struggling"
-      tierLabel = "Heavy Load (<35 FPS)"
+      tier = 'struggling'
+      tierLabel = 'Heavy Load (<35 FPS)'
     }
 
     return {
@@ -476,16 +503,16 @@ export function estimateGameFpsMatrix(params: {
     }
   }
 
-  const resolutions: TargetResolution[] = ["1080p", "1440p", "4k"]
-  const presetsList: GraphicsPreset[] = ["low", "medium", "high", "ultra"]
+  const resolutions: TargetResolution[] = ['1080p', '1440p', '4k']
+  const presetsList: GraphicsPreset[] = ['low', 'medium', 'high', 'ultra']
 
   const matrix: ResolutionMatrixRow[] = resolutions.map((res) => {
     const rc = resConfig[res]
     const rowPresets = {
-      low: computeCell(res, "low", selectedUpscaler),
-      medium: computeCell(res, "medium", selectedUpscaler),
-      high: computeCell(res, "high", selectedUpscaler),
-      ultra: computeCell(res, "ultra", selectedUpscaler),
+      low: computeCell(res, 'low', selectedUpscaler),
+      medium: computeCell(res, 'medium', selectedUpscaler),
+      high: computeCell(res, 'high', selectedUpscaler),
+      ultra: computeCell(res, 'ultra', selectedUpscaler),
     }
     return {
       resolution: res,
@@ -503,9 +530,9 @@ export function estimateGameFpsMatrix(params: {
   const rcSel = resConfig[selectedResolution]
   const ucSel = upscalerConfig[selectedUpscaler]
   const upBoostSel =
-    selectedResolution === "1080p"
+    selectedResolution === '1080p'
       ? ucSel.gpuBoost1080
-      : selectedResolution === "1440p"
+      : selectedResolution === '1440p'
         ? ucSel.gpuBoost1440
         : ucSel.gpuBoost4k
 
@@ -514,29 +541,29 @@ export function estimateGameFpsMatrix(params: {
 
   const upscalerTechName = detectUpscalerTech(userGpuName)
 
-  let limitingFactor: BottleneckAnalysis["limitingFactor"] = "balanced"
-  let bnTitle = "Well-Balanced Gaming Configuration"
+  let limitingFactor: BottleneckAnalysis['limitingFactor'] = 'balanced'
+  let bnTitle = 'Well-Balanced Gaming Configuration'
   let bnDesc = `Your CPU and GPU work in harmony at ${rcSel.label}. GPU utilization will stay near 95–99% with stable frame pacing.`
   let cpuLoadPercent = Math.min(99, Math.max(35, Math.round((highCell.avgFps / rawCpuAtHigh) * 92)))
   let gpuLoadPercent = Math.min(99, Math.max(45, Math.round((highCell.avgFps / rawGpuAtHigh) * 98)))
 
   if (highCell.vramSpillover) {
-    limitingFactor = "vram"
+    limitingFactor = 'vram'
     gpuLoadPercent = 99
     bnTitle = `VRAM Capacity Limit at ${rcSel.label} (${highCell.estVramGb} GB Needed vs ${userVramGb} GB)`
     bnDesc = `High/Ultra textures at ${rcSel.label} exceed your ${userVramGb} GB VRAM buffer. Lower Texture Quality to Medium or enable ${upscalerTechName} Balanced/Performance to prevent frame-time stutter.`
   } else if (userRamGb < minRamGb) {
-    limitingFactor = "ram"
+    limitingFactor = 'ram'
     bnTitle = `System RAM Bottleneck (${userRamGb} GB Installed vs ${minRamGb} GB Minimum)`
     bnDesc = `Close background browsers and apps before launching to avoid pagefile disk swapping.`
   } else if (rawCpuAtHigh < rawGpuAtHigh * 0.85) {
-    limitingFactor = "cpu"
+    limitingFactor = 'cpu'
     cpuLoadPercent = 96
     gpuLoadPercent = Math.min(90, Math.max(55, Math.round((rawCpuAtHigh / rawGpuAtHigh) * 92)))
     bnTitle = `CPU-Bound Scenario at ${rcSel.label}`
     bnDesc = `Your ${userGpuName} is fast enough that frame rate at ${rcSel.label} is primarily paced by your processor (${userCpuName}). Increasing resolution or visual quality to High/Ultra will barely reduce FPS.`
   } else if (rawGpuAtHigh < rawCpuAtHigh * 0.82) {
-    limitingFactor = "gpu"
+    limitingFactor = 'gpu'
     gpuLoadPercent = 99
     cpuLoadPercent = Math.min(85, Math.max(38, Math.round((rawGpuAtHigh / rawCpuAtHigh) * 85)))
     bnTitle = `GPU-Bound at ${rcSel.label} (Normal Gaming Load)`
@@ -544,11 +571,11 @@ export function estimateGameFpsMatrix(params: {
   }
 
   const recommendedUpscaler: UpscalerMode =
-    selectedResolution === "4k"
-      ? "balanced"
-      : selectedResolution === "1440p" || highCell.avgFps < 60
-        ? "quality"
-        : "native"
+    selectedResolution === '4k'
+      ? 'balanced'
+      : selectedResolution === '1440p' || highCell.avgFps < 60
+        ? 'quality'
+        : 'native'
 
   return {
     userCpuName,

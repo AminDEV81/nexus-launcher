@@ -795,7 +795,7 @@ impl MetadataProviderResolver {
         let mut combined = Vec::new();
         let mut seen_urls = std::collections::HashSet::new();
 
-        for asset in direct_sgdb_assets.into_iter().chain(cloud_sgdb_assets.into_iter()) {
+        for asset in direct_sgdb_assets.into_iter().chain(cloud_sgdb_assets) {
             if !asset.url.is_empty() && seen_urls.insert(asset.url.clone()) {
                 combined.push(asset);
             }

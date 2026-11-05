@@ -184,9 +184,7 @@ export const ConsoleScorecardStrip: React.FC<ConsoleScorecardStripProps> = ({
           {effectiveOc && (
             <div
               className={`flex items-center gap-3 rounded-2xl border px-4 py-2.5 ${
-                isLight
-                  ? 'border-amber-200 bg-amber-50/70'
-                  : 'border-amber-400/30 bg-amber-500/10'
+                isLight ? 'border-amber-200 bg-amber-50/70' : 'border-amber-400/30 bg-amber-500/10'
               }`}
             >
               <div className="flex size-10 items-center justify-center rounded-xl bg-amber-400 text-slate-950 font-black text-sm tabular-nums shadow">
@@ -215,9 +213,7 @@ export const ConsoleScorecardStrip: React.FC<ConsoleScorecardStripProps> = ({
           {effectiveCommunity && (
             <div
               className={`flex items-center gap-3 rounded-2xl border px-4 py-2.5 ${
-                isLight
-                  ? 'border-indigo-200 bg-indigo-50/70'
-                  : 'border-cyan-400/30 bg-cyan-500/10'
+                isLight ? 'border-indigo-200 bg-indigo-50/70' : 'border-cyan-400/30 bg-cyan-500/10'
               }`}
             >
               <div className="flex size-10 items-center justify-center rounded-xl bg-cyan-400 text-slate-950 font-black text-sm tabular-nums shadow">

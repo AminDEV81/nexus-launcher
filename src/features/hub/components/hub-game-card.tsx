@@ -303,7 +303,10 @@ export const HubGameCard = memo(function HubGameCard({
         </div>
 
         {/* Bottom-left Platform & Hype micro-badges (visible when not hovered) */}
-        {(platformChips.length > 0 || (game.hypes && game.hypes >= 25) || livePrice || (game.discount_percent && game.discount_percent > 0)) && (
+        {(platformChips.length > 0 ||
+          (game.hypes && game.hypes >= 25) ||
+          livePrice ||
+          (game.discount_percent && game.discount_percent > 0)) && (
           <div className="pointer-events-none absolute inset-x-2.5 bottom-2 z-10 flex items-center justify-between gap-1 transition-opacity duration-200 group-hover/card:opacity-0">
             <div className="flex items-center gap-1">
               {platformChips.map((plat) => (

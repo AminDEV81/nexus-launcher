@@ -68,14 +68,7 @@ import type { HubGame } from '@/types/models'
 
 const SEARCH_DEBOUNCE_MS = 120
 
-type DropdownKey =
-  | 'sort'
-  | 'genres'
-  | 'platforms'
-  | 'release'
-  | 'rating'
-  | 'edition'
-  | null
+type DropdownKey = 'sort' | 'genres' | 'platforms' | 'release' | 'rating' | 'edition' | null
 
 const RELEASE_OPTIONS = [
   { key: 'upcoming', label: 'Upcoming Releases', shortLabel: 'Upcoming', icon: Clock },
@@ -173,9 +166,21 @@ const SORT_OPTIONS = [
 
 const GAME_CATEGORY_OPTIONS = [
   { key: 'all', label: 'All Editions', desc: 'Main games, remakes, remasters, and expansions' },
-  { key: 'main', label: 'Main & Standalone Games', desc: 'Full standalone releases & major remakes' },
-  { key: 'remake', label: 'Remakes, Remasters & Definitive', desc: 'Combined Remakes, HD Remasters & Director’s Cuts' },
-  { key: 'expansion', label: 'Expansions, DLC & Special Editions', desc: 'Story expansions, standalone DLC & Complete Editions' },
+  {
+    key: 'main',
+    label: 'Main & Standalone Games',
+    desc: 'Full standalone releases & major remakes',
+  },
+  {
+    key: 'remake',
+    label: 'Remakes, Remasters & Definitive',
+    desc: 'Combined Remakes, HD Remasters & Director’s Cuts',
+  },
+  {
+    key: 'expansion',
+    label: 'Expansions, DLC & Special Editions',
+    desc: 'Story expansions, standalone DLC & Complete Editions',
+  },
 ] as const
 
 const GAME_MODE_OPTIONS = [
@@ -208,24 +213,132 @@ const FALLBACK_DYNAMIC_SUGGESTIONS: Array<{
   score?: number
   cover?: string
 }> = [
-  { igdb_id: 119133, term: 'Elden Ring', tag: 'Action RPG • 2022', score: 96, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1245620/library_600x900_2x.jpg' },
-  { igdb_id: 1877, term: 'Cyberpunk 2077', tag: 'Sci-Fi RPG • 2020', score: 86, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1091500/library_600x900_2x.jpg' },
-  { igdb_id: 1942, term: 'The Witcher 3: Wild Hunt', tag: 'Dark Fantasy RPG • 2015', score: 93, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900_2x.jpg' },
-  { igdb_id: 119171, term: "Baldur's Gate 3", tag: 'CRPG Masterpiece • 2023', score: 96, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1086940/library_600x900_2x.jpg' },
-  { igdb_id: 25076, term: 'Red Dead Redemption 2', tag: 'Open World Epic • 2018', score: 97, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1174180/library_600x900_2x.jpg' },
-  { igdb_id: 204359, term: 'Black Myth: Wukong', tag: 'Action Mythology • 2024', score: 82, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2358720/library_600x900_2x.jpg' },
-  { igdb_id: 305152, term: 'Clair Obscur: Expedition 33', tag: 'Turn-Based RPG • 2025', score: 92, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1903340/header.jpg' },
-  { igdb_id: 279661, term: 'Kingdom Come: Deliverance II', tag: 'Medieval RPG • 2025', score: 89, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg' },
-  { igdb_id: 279650, term: 'Monster Hunter Wilds', tag: 'Co-op Action RPG • 2025', score: 89, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2246340/library_600x900_2x.jpg' },
-  { igdb_id: 112875, term: 'God of War Ragnarök', tag: 'Norse Action Epic • 2022', score: 94, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2322010/library_600x900_2x.jpg' },
-  { igdb_id: 221560, term: "Ghost of Tsushima Director's Cut", tag: 'Samurai Open World • 2024', score: 89, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2215430/library_600x900_2x.jpg' },
-  { igdb_id: 219588, term: 'Silent Hill 2', tag: 'Psychological Horror • 2024', score: 86, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2124490/library_600x900_2x.jpg' },
-  { igdb_id: 196867, term: 'Resident Evil 4', tag: 'Survival Horror • 2023', score: 93, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2050650/library_600x900_2x.jpg' },
-  { igdb_id: 252651, term: 'Metaphor: ReFantazio', tag: 'Fantasy JRPG • 2024', score: 94, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2679460/library_600x900_2x.jpg' },
-  { igdb_id: 228530, term: 'Hades II', tag: 'Roguelike Action • 2024', score: 90, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145350/library_600x900_2x.jpg' },
-  { igdb_id: 1020, term: 'Grand Theft Auto V', tag: 'Action / Open World', score: 97, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg' },
-  { igdb_id: 76882, term: 'Sekiro: Shadows Die Twice', tag: 'Shinobi Action • 2019', score: 90, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/814380/library_600x900_2x.jpg' },
-  { igdb_id: 250619, term: 'Helldivers 2', tag: 'Co-op Shooter • 2024', score: 83, cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/553850/library_600x900_2x.jpg' },
+  {
+    igdb_id: 119133,
+    term: 'Elden Ring',
+    tag: 'Action RPG • 2022',
+    score: 96,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1245620/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 1877,
+    term: 'Cyberpunk 2077',
+    tag: 'Sci-Fi RPG • 2020',
+    score: 86,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1091500/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 1942,
+    term: 'The Witcher 3: Wild Hunt',
+    tag: 'Dark Fantasy RPG • 2015',
+    score: 93,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 119171,
+    term: "Baldur's Gate 3",
+    tag: 'CRPG Masterpiece • 2023',
+    score: 96,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1086940/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 25076,
+    term: 'Red Dead Redemption 2',
+    tag: 'Open World Epic • 2018',
+    score: 97,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1174180/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 204359,
+    term: 'Black Myth: Wukong',
+    tag: 'Action Mythology • 2024',
+    score: 82,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2358720/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 305152,
+    term: 'Clair Obscur: Expedition 33',
+    tag: 'Turn-Based RPG • 2025',
+    score: 92,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1903340/header.jpg',
+  },
+  {
+    igdb_id: 279661,
+    term: 'Kingdom Come: Deliverance II',
+    tag: 'Medieval RPG • 2025',
+    score: 89,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 279650,
+    term: 'Monster Hunter Wilds',
+    tag: 'Co-op Action RPG • 2025',
+    score: 89,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2246340/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 112875,
+    term: 'God of War Ragnarök',
+    tag: 'Norse Action Epic • 2022',
+    score: 94,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2322010/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 221560,
+    term: "Ghost of Tsushima Director's Cut",
+    tag: 'Samurai Open World • 2024',
+    score: 89,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2215430/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 219588,
+    term: 'Silent Hill 2',
+    tag: 'Psychological Horror • 2024',
+    score: 86,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2124490/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 196867,
+    term: 'Resident Evil 4',
+    tag: 'Survival Horror • 2023',
+    score: 93,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2050650/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 252651,
+    term: 'Metaphor: ReFantazio',
+    tag: 'Fantasy JRPG • 2024',
+    score: 94,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/2679460/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 228530,
+    term: 'Hades II',
+    tag: 'Roguelike Action • 2024',
+    score: 90,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145350/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 1020,
+    term: 'Grand Theft Auto V',
+    tag: 'Action / Open World',
+    score: 97,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 76882,
+    term: 'Sekiro: Shadows Die Twice',
+    tag: 'Shinobi Action • 2019',
+    score: 90,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/814380/library_600x900_2x.jpg',
+  },
+  {
+    igdb_id: 250619,
+    term: 'Helldivers 2',
+    tag: 'Co-op Shooter • 2024',
+    score: 83,
+    cover: 'https://cdn.cloudflare.steamstatic.com/steam/apps/553850/library_600x900_2x.jpg',
+  },
 ]
 
 const DROPDOWN_SPRING = {
@@ -386,12 +499,7 @@ export function HubPage() {
   // Pool of all loaded home feed games for instant client-side fallback when filtering
   const homeFeedPool = useMemo(() => {
     const map = new Map<number, HubGame>()
-    for (const list of [
-      newReleases.data,
-      topRated.data,
-      recommended.data,
-      comingSoon.data,
-    ]) {
+    for (const list of [newReleases.data, topRated.data, recommended.data, comingSoon.data]) {
       if (!list) continue
       for (const g of list) {
         if (!map.has(g.igdb_id)) map.set(g.igdb_id, g)
@@ -461,14 +569,10 @@ export function HubPage() {
     return out
   }, [newReleases.data, topRated.data])
 
-  const firstError =
-    newReleases.error ?? comingSoon.error ?? topRated.error ?? recommended.error
+  const firstError = newReleases.error ?? comingSoon.error ?? topRated.error ?? recommended.error
   const missingKeys = isMissingIgdbKeys(firstError, providerMode)
   const allInitialPending =
-    newReleases.isPending &&
-    comingSoon.isPending &&
-    topRated.isPending &&
-    recommended.isPending
+    newReleases.isPending && comingSoon.isPending && topRated.isPending && recommended.isPending
 
   const isAnyFeedFetching =
     refreshCatalog.isPending ||
@@ -569,7 +673,8 @@ export function HubPage() {
     if (onSale && !query && release === null) return 'deals'
     if (release === 'new' && !query && minRating === null && !onSale) return 'new'
     if (release === 'upcoming' && !query && minRating === null && !onSale) return 'upcoming'
-    if (minRating === 85 && sort === 'rating' && !query && release === null && !onSale) return 'hall'
+    if (minRating === 85 && sort === 'rating' && !query && release === null && !onSale)
+      return 'hall'
     return null
   }, [isQuerying, onSale, release, query, minRating, sort])
 
@@ -603,8 +708,7 @@ export function HubPage() {
             <div
               className="absolute -left-20 -bottom-24 size-80 rounded-full opacity-80"
               style={{
-                background:
-                  'radial-gradient(circle, rgba(6, 182, 212, 0.14) 0%, transparent 70%)',
+                background: 'radial-gradient(circle, rgba(6, 182, 212, 0.14) 0%, transparent 70%)',
               }}
             />
             <div
@@ -764,10 +868,7 @@ export function HubPage() {
                   className="inline-flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface-raised/80 px-2.5 py-1.5 text-xs font-bold text-text transition-all hover:border-accent/50 hover:text-accent active:scale-95 disabled:opacity-60 cursor-pointer"
                 >
                   <RefreshCw
-                    className={cn(
-                      'size-3.5 text-accent',
-                      isAnyFeedFetching && 'animate-spin',
-                    )}
+                    className={cn('size-3.5 text-accent', isAnyFeedFetching && 'animate-spin')}
                   />
                   <span className="hidden sm:inline">
                     {isAnyFeedFetching ? 'Syncing…' : 'Sync Live'}
@@ -903,7 +1004,9 @@ export function HubPage() {
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   setSearchFocused(false)
-                                  navigate(`/hub/${item.igdb_id}`, { state: { expectedName: item.term } })
+                                  navigate(`/hub/${item.igdb_id}`, {
+                                    state: { expectedName: item.term },
+                                  })
                                 }}
                                 className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-surface text-subtle transition-all hover:border-accent hover:bg-accent hover:text-white cursor-pointer"
                               >
@@ -1087,13 +1190,9 @@ export function HubPage() {
                             .slice(0, 2)
                             .map((p) => p.abbreviation || p.name)
                             .join(', ') +
-                          (selectedPlatforms.length > 2
-                            ? ` +${selectedPlatforms.length - 2}`
-                            : '')
+                          (selectedPlatforms.length > 2 ? ` +${selectedPlatforms.length - 2}` : '')
                     }
-                    badgeCount={
-                      selectedPlatforms.length > 1 ? selectedPlatforms.length : undefined
-                    }
+                    badgeCount={selectedPlatforms.length > 1 ? selectedPlatforms.length : undefined}
                     active={selectedPlatforms.length > 0}
                     open={openDropdown === 'platforms'}
                     onClick={() => {
@@ -1393,14 +1492,8 @@ export function HubPage() {
                 <div className="relative">
                   <DropdownTriggerButton
                     icon={Layers}
-                    label={
-                      selectedCategoryLabel ??
-                      selectedModeLabel ??
-                      'Edition & Mode'
-                    }
-                    badgeCount={
-                      editionModeActiveCount > 0 ? editionModeActiveCount : undefined
-                    }
+                    label={selectedCategoryLabel ?? selectedModeLabel ?? 'Edition & Mode'}
+                    badgeCount={editionModeActiveCount > 0 ? editionModeActiveCount : undefined}
                     active={editionModeActiveCount > 0}
                     open={openDropdown === 'edition'}
                     onClick={() => {
@@ -1427,9 +1520,7 @@ export function HubPage() {
                               <button
                                 key={opt.key}
                                 type="button"
-                                onClick={() =>
-                                  setGameCategory(opt.key === 'all' ? null : opt.key)
-                                }
+                                onClick={() => setGameCategory(opt.key === 'all' ? null : opt.key)}
                                 className={cn(
                                   'flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-all cursor-pointer',
                                   selected
@@ -1459,9 +1550,7 @@ export function HubPage() {
                               <button
                                 key={opt.key}
                                 type="button"
-                                onClick={() =>
-                                  setGameMode(opt.key === 'all' ? null : opt.key)
-                                }
+                                onClick={() => setGameMode(opt.key === 'all' ? null : opt.key)}
                                 className={cn(
                                   'rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition-all cursor-pointer',
                                   selected
@@ -1632,9 +1721,7 @@ export function HubPage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setGameCategory(gameCategory === 'remake' ? null : 'remake')
-                }
+                onClick={() => setGameCategory(gameCategory === 'remake' ? null : 'remake')}
                 className={cn(
                   'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer',
                   gameCategory === 'remake'
@@ -1648,9 +1735,7 @@ export function HubPage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setGameCategory(gameCategory === 'expansion' ? null : 'expansion')
-                }
+                onClick={() => setGameCategory(gameCategory === 'expansion' ? null : 'expansion')}
                 className={cn(
                   'inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer',
                   gameCategory === 'expansion'
@@ -1773,11 +1858,10 @@ export function HubPage() {
                         <SlidersHorizontal className="size-4" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-text">
-                          Advanced Discovery Filters
-                        </h3>
+                        <h3 className="text-sm font-bold text-text">Advanced Discovery Filters</h3>
                         <p className="text-[11px] text-subtle">
-                          Combine genres, platforms, play modes, editions, release eras, and critic ratings
+                          Combine genres, platforms, play modes, editions, release eras, and critic
+                          ratings
                         </p>
                       </div>
                     </div>
@@ -1857,9 +1941,7 @@ export function HubPage() {
                               key={opt.key}
                               label={opt.label}
                               active={(gameCategory ?? 'all') === opt.key}
-                              onClick={() =>
-                                setGameCategory(opt.key === 'all' ? null : opt.key)
-                              }
+                              onClick={() => setGameCategory(opt.key === 'all' ? null : opt.key)}
                             />
                           ))}
                         </PanelSection>
@@ -1932,9 +2014,7 @@ export function HubPage() {
                             key={r.value}
                             label={r.label}
                             active={minRating === r.value}
-                            onClick={() =>
-                              setMinRating(minRating === r.value ? null : r.value)
-                            }
+                            onClick={() => setMinRating(minRating === r.value ? null : r.value)}
                           />
                         ))}
                       </PanelSection>
@@ -2146,9 +2226,7 @@ function DropdownOptionRow({
         </div>
         <div className="min-w-0">
           <div className="truncate text-xs font-bold text-text">{label}</div>
-          {description && (
-            <div className="truncate text-[10px] text-subtle">{description}</div>
-          )}
+          {description && <div className="truncate text-[10px] text-subtle">{description}</div>}
         </div>
       </div>
       {selected && (
@@ -2381,7 +2459,12 @@ function clientMatchesFilters(
         'edition',
       ].some((kw) => nameLow.includes(kw) || summaryLow.includes(kw))
 
-    if (opts.gameCategory === 'main' && gt !== undefined && gt !== null && ![0, 8, 9, 10].includes(gt)) {
+    if (
+      opts.gameCategory === 'main' &&
+      gt !== undefined &&
+      gt !== null &&
+      ![0, 8, 9, 10].includes(gt)
+    ) {
       return false
     }
     if (opts.gameCategory === 'remake' && !isRemakeOrRemaster) return false
@@ -2439,8 +2522,7 @@ function clientMatchesFilters(
   }
 
   if (opts.minRating !== null) {
-    const effectiveScore =
-      game.metacritic_score ?? game.opencritic_score ?? game.rating ?? 0
+    const effectiveScore = game.metacritic_score ?? game.opencritic_score ?? game.rating ?? 0
     if (effectiveScore < opts.minRating) return false
   }
 
@@ -2533,27 +2615,19 @@ function SearchResults({
       })
     } else if (sort === 'hypes') {
       filtered.sort(
-        (a, b) =>
-          (b.hypes ?? 0) - (a.hypes ?? 0) ||
-          (b.rating_count ?? 0) - (a.rating_count ?? 0),
+        (a, b) => (b.hypes ?? 0) - (a.hypes ?? 0) || (b.rating_count ?? 0) - (a.rating_count ?? 0),
       )
     } else if (sort === 'newest') {
-      filtered.sort((a, b) =>
-        (b.release_date ?? '').localeCompare(a.release_date ?? ''),
-      )
+      filtered.sort((a, b) => (b.release_date ?? '').localeCompare(a.release_date ?? ''))
     } else if (sort === 'oldest') {
       filtered.sort((a, b) =>
-        (a.release_date ?? '9999-99-99').localeCompare(
-          b.release_date ?? '9999-99-99',
-        ),
+        (a.release_date ?? '9999-99-99').localeCompare(b.release_date ?? '9999-99-99'),
       )
     } else if (sort === 'name') {
       filtered.sort((a, b) => a.name.localeCompare(b.name))
     } else if (sort === 'popularity') {
       filtered.sort(
-        (a, b) =>
-          (b.rating_count ?? 0) - (a.rating_count ?? 0) ||
-          (b.hypes ?? 0) - (a.hypes ?? 0),
+        (a, b) => (b.rating_count ?? 0) - (a.rating_count ?? 0) || (b.hypes ?? 0) - (a.hypes ?? 0),
       )
     }
 

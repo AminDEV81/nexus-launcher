@@ -328,7 +328,10 @@ export function AdvancedFiltersPanel() {
                           }
                         >
                           <span
-                            className={cn('size-1.5 rounded-full', !active && 'bg-current opacity-60')}
+                            className={cn(
+                              'size-1.5 rounded-full',
+                              !active && 'bg-current opacity-60',
+                            )}
                             style={active ? { backgroundColor: tag.color } : undefined}
                           />
                           {tag.name}

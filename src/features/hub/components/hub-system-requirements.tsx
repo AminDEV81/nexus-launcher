@@ -397,9 +397,9 @@ export function HubSystemRequirements({
       Math.max(
         25,
         Math.round(
-          (Math.min(1.15, userGpuScore / Math.max(1, recGpuScore)) * 45 +
+          Math.min(1.15, userGpuScore / Math.max(1, recGpuScore)) * 45 +
             Math.min(1.15, userCpuScore / Math.max(1, recCpuScore)) * 30 +
-            Math.min(1.15, userRamGb / Math.max(1, Math.min(recRamGb, 24))) * 25),
+            Math.min(1.15, userRamGb / Math.max(1, Math.min(recRamGb, 24))) * 25,
         ),
       ),
     )
@@ -441,7 +441,16 @@ export function HubSystemRequirements({
         selectedResolution,
         selectedUpscaler,
       }),
-    [pcSpecs, minimum, recommended, gameTitle, releaseDate, genres, selectedResolution, selectedUpscaler],
+    [
+      pcSpecs,
+      minimum,
+      recommended,
+      gameTitle,
+      releaseDate,
+      genres,
+      selectedResolution,
+      selectedUpscaler,
+    ],
   )
 
   const comparisonRows = [
@@ -521,7 +530,8 @@ export function HubSystemRequirements({
               </span>
             </div>
             <p className="text-xs text-subtle">
-              Intelligent component-by-component evaluation for {gameTitle || 'this title'} against your PC
+              Intelligent component-by-component evaluation for {gameTitle || 'this title'} against
+              your PC
             </p>
           </div>
         </div>
@@ -785,7 +795,8 @@ export function HubSystemRequirements({
                     </span>
                   </div>
                   <p className="text-[11px] text-muted">
-                    Select resolution and upscaling mode to simulate estimated Average FPS, 1% Low FPS, and VRAM usage on your rig
+                    Select resolution and upscaling mode to simulate estimated Average FPS, 1% Low
+                    FPS, and VRAM usage on your rig
                   </p>
                 </div>
               </div>
@@ -793,11 +804,13 @@ export function HubSystemRequirements({
               {/* Resolution & Upscaler Selectors */}
               <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface-raised p-1">
-                  {([
-                    { id: '1080p', label: '1080p FHD' },
-                    { id: '1440p', label: '1440p QHD' },
-                    { id: '4k', label: '4K UHD' },
-                  ] as const).map((r) => (
+                  {(
+                    [
+                      { id: '1080p', label: '1080p FHD' },
+                      { id: '1440p', label: '1440p QHD' },
+                      { id: '4k', label: '4K UHD' },
+                    ] as const
+                  ).map((r) => (
                     <button
                       key={r.id}
                       type="button"
@@ -815,12 +828,14 @@ export function HubSystemRequirements({
                 </div>
 
                 <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface-raised p-1">
-                  {([
-                    { id: 'native', label: 'Native' },
-                    { id: 'quality', label: `${fpsEstimation.upscalerTechName} Quality` },
-                    { id: 'balanced', label: 'Balanced' },
-                    { id: 'performance', label: 'Perf' },
-                  ] as const).map((u) => (
+                  {(
+                    [
+                      { id: 'native', label: 'Native' },
+                      { id: 'quality', label: `${fpsEstimation.upscalerTechName} Quality` },
+                      { id: 'balanced', label: 'Balanced' },
+                      { id: 'performance', label: 'Perf' },
+                    ] as const
+                  ).map((u) => (
                     <button
                       key={u.id}
                       type="button"
@@ -1154,9 +1169,7 @@ function RequirementCard({
           <span
             className={cn(
               'size-2.5 rounded-full',
-              isRecommended
-                ? 'bg-accent shadow-[0_0_10px_var(--nx-accent)]'
-                : 'bg-emerald-400',
+              isRecommended ? 'bg-accent shadow-[0_0_10px_var(--nx-accent)]' : 'bg-emerald-400',
             )}
           />
           <h3 className="text-sm font-extrabold uppercase tracking-wider text-text">

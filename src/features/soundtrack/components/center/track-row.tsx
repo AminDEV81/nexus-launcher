@@ -1,22 +1,13 @@
 import { memo, useState } from 'react'
-import { getSecondaryCoverFallbackUrl, resolveAlbumCoverFallback } from '../../services/curated-soundtracks'
 import {
-  Disc3,
-  Gamepad2,
-  HardDrive,
-  Heart,
-  ListMusic,
-  Play,
-  Radio,
-  Sparkles,
-} from 'lucide-react'
+  getSecondaryCoverFallbackUrl,
+  resolveAlbumCoverFallback,
+} from '../../services/curated-soundtracks'
+import { Disc3, Gamepad2, HardDrive, Heart, ListMusic, Play, Radio, Sparkles } from 'lucide-react'
 import { assetUrl } from '@/lib/asset-url'
 import { cn } from '@/lib/utils'
 import { playButtonClick } from '@/lib/sound-engine'
-import {
-  cleanGameTitleFromAlbumTitle,
-  useSoundtrackStore,
-} from '../../store/soundtrack-store'
+import { cleanGameTitleFromAlbumTitle, useSoundtrackStore } from '../../store/soundtrack-store'
 import type { GameIdentity, SoundtrackAlbum, SoundtrackTrack } from '../../types'
 
 interface TrackRowProps {
@@ -81,8 +72,7 @@ export const TrackRow = memo(function TrackRow({
     resolveAlbumCoverFallback(album?.title || game?.title) ||
     null
   const [imgSrc, setImgSrc] = useState<string | null>(initialCover)
-  const gameTitle =
-    game?.title || (album?.title ? cleanGameTitleFromAlbumTitle(album.title) : null)
+  const gameTitle = game?.title || (album?.title ? cleanGameTitleFromAlbumTitle(album.title) : null)
 
   function handleRowClick() {
     playButtonClick()

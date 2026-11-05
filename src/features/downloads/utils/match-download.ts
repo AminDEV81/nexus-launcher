@@ -51,9 +51,9 @@ export function matchDownloadToGame<
   }
 
   const norm = (v?: string | null) =>
-    (v ?? "")
+    (v ?? '')
       .toLowerCase()
-      .replace(/[^a-z0-9\u0600-\u06FF]+/g, "")
+      .replace(/[^a-z0-9\u0600-\u06FF]+/g, '')
       .trim()
 
   // 2. Match by explicit download game_name

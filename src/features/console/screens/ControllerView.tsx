@@ -180,7 +180,11 @@ const ActionTileBtn: React.FC<{
       <div className="flex items-center gap-4 min-w-0">
         <div
           className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${
-            isFocused ? 'bg-slate-950 text-cyan-300' : isLight ? 'bg-indigo-50 text-indigo-600' : 'bg-cyan-500/20 text-cyan-300'
+            isFocused
+              ? 'bg-slate-950 text-cyan-300'
+              : isLight
+                ? 'bg-indigo-50 text-indigo-600'
+                : 'bg-cyan-500/20 text-cyan-300'
           }`}
         >
           {icon}
@@ -299,8 +303,6 @@ export const ControllerView: React.FC = () => {
     }
   }
 
-
-
   return (
     <FocusScope id="console_dualsense_scope" orientation="vertical" className="space-y-7 pb-20">
       {/* Header Banner */}
@@ -312,16 +314,22 @@ export const ControllerView: React.FC = () => {
         }`}
       >
         <div className="flex items-center gap-5">
-          <div className={`flex size-16 items-center justify-center rounded-3xl border shadow-lg ${isLight ? "bg-indigo-50 border-indigo-200 text-indigo-600" : "bg-cyan-400/20 border-cyan-400/40 text-cyan-300"}`}>
+          <div
+            className={`flex size-16 items-center justify-center rounded-3xl border shadow-lg ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-cyan-400/20 border-cyan-400/40 text-cyan-300'}`}
+          >
             <Gamepad2 className="size-9" />
           </div>
           <div>
             <div className="flex items-center gap-2.5">
-              <span className={`rounded-full border px-3 py-0.5 text-xs font-extrabold uppercase ${isLight ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-cyan-400/20 border-cyan-400/40 text-cyan-300"}`}>
+              <span
+                className={`rounded-full border px-3 py-0.5 text-xs font-extrabold uppercase ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-cyan-400/20 border-cyan-400/40 text-cyan-300'}`}
+              >
                 DualSense Studio · Console Edition
               </span>
               {ds?.connected && (
-                <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs font-extrabold ${isLight ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-emerald-500/20 border-emerald-400/40 text-emerald-300"}`}>
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-0.5 text-xs font-extrabold ${isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-emerald-500/20 border-emerald-400/40 text-emerald-300'}`}
+                >
                   {ds.connectionType === 'Bluetooth' ? (
                     <Bluetooth className="size-3.5" />
                   ) : (
@@ -374,7 +382,9 @@ export const ControllerView: React.FC = () => {
         >
           <div className="flex w-full items-center justify-between text-xs font-extrabold uppercase tracking-wider text-cyan-400">
             <span>Physical Sony DualSense Input</span>
-            <span className={`flex items-center gap-1 ${isLight ? "text-emerald-700" : "text-emerald-300"}`}>
+            <span
+              className={`flex items-center gap-1 ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}
+            >
               <BatteryCharging className="size-4" />
               {ds?.batteryPercent ?? 0}%
             </span>
@@ -468,10 +478,10 @@ export const ControllerView: React.FC = () => {
           <div className="flex items-center gap-3.5">
             <span className="size-3.5 rounded-full bg-amber-400 animate-ping shrink-0" />
             <div>
-              <p className={`text-base font-black ${isLight ? "text-slate-900" : "text-white"}`}>
+              <p className={`text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>
                 Controller Input Test Mode Active (Menu Navigation Locked)
               </p>
-              <p className={`text-xs ${isLight ? "text-amber-800" : "text-amber-200"}`}>
+              <p className={`text-xs ${isLight ? 'text-amber-800' : 'text-amber-200'}`}>
                 Press any buttons, triggers, D-Pad, or thumbsticks to test live on the controller
                 diagram above without moving between menus. Press ESC or click Exit Test Mode when
                 finished.
@@ -635,13 +645,16 @@ export const ControllerView: React.FC = () => {
       {/* Driver Status Footer */}
       <div
         className={`flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-4 text-xs font-bold ${
-          isLight ? 'border-slate-300 bg-white/80 text-slate-700' : 'border-white/10 bg-white/[0.03] text-slate-300'
+          isLight
+            ? 'border-slate-300 bg-white/80 text-slate-700'
+            : 'border-white/10 bg-white/[0.03] text-slate-300'
         }`}
       >
         <span className="flex items-center gap-2">
           <ShieldCheck className="size-4 text-emerald-400" />
-          ViGEmBus Driver: {snapshot?.driverStatus?.vigembusInstalled ? 'Installed' : 'Not Installed'} ·
-          HidHide Driver: {snapshot?.driverStatus?.hidhideInstalled ? 'Installed' : 'Optional'}
+          ViGEmBus Driver:{' '}
+          {snapshot?.driverStatus?.vigembusInstalled ? 'Installed' : 'Not Installed'} · HidHide
+          Driver: {snapshot?.driverStatus?.hidhideInstalled ? 'Installed' : 'Optional'}
         </span>
         <span className="text-cyan-400">{snapshot?.driverStatus?.statusMessage || 'Ready'}</span>
       </div>

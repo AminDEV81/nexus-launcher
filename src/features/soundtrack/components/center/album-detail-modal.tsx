@@ -38,10 +38,7 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
   useEffect(() => {
     setEnrichedBundle(null)
     if (!albumWithTracks) return
-    if (
-      albumWithTracks.album.provider_id !== 'curated' &&
-      albumWithTracks.tracks.length >= 16
-    ) {
+    if (albumWithTracks.album.provider_id !== 'curated' && albumWithTracks.tracks.length >= 16) {
       return
     }
     let cancelled = false
@@ -133,7 +130,7 @@ export function AlbumDetailModal({ albumWithTracks, onClose }: AlbumDetailModalP
           <div className="relative flex flex-col sm:flex-row items-center sm:items-end gap-6 border-b border-border/80 bg-gradient-to-b from-surface-raised/60 via-surface/80 to-surface p-6 sm:p-8">
             {/* Artwork */}
             <div className="relative size-40 sm:size-48 shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-surface-raised shadow-card">
-              {(assetUrl(album.cover_url) || resolveAlbumCoverFallback(album.title)) ? (
+              {assetUrl(album.cover_url) || resolveAlbumCoverFallback(album.title) ? (
                 <img
                   src={assetUrl(album.cover_url) || resolveAlbumCoverFallback(album.title) || ''}
                   alt={album.title}

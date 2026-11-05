@@ -21,11 +21,7 @@ import { formatElapsed, formatPlaytime, isGameUnreleased } from '@/features/libr
 import { useLaunchStore } from '@/store/launch-store'
 import { formatBytes } from '@/features/library/utils/guess-name'
 import { getGameScreenshots } from '@/services/games'
-import {
-  getHubGameDetails,
-  resolveHubGameScores,
-  searchHubGames,
-} from '@/services/hub'
+import { getHubGameDetails, resolveHubGameScores, searchHubGames } from '@/services/hub'
 import { useConsoleStore } from '../store/console-store'
 import { CONSOLE_THEMES } from '../theme/tokens'
 import { FocusScope, useFocusable } from '../nav/FocusScope'
@@ -91,45 +87,41 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
       return null
     }
 
-    Promise.all([
-      getGameScreenshots(game.id).catch(() => [] as string[]),
-      fetchIgdbDetails(),
-    ]).then(([localShots, igdbData]) => {
-      if (cancelled) return
-      if (igdbData) {
-        setHubDetails(igdbData)
-        setScores((prev) => ({
-          metacritic: prev.metacritic ?? igdbData.metacritic_score ?? null,
-          opencritic: prev.opencritic ?? igdbData.opencritic_score ?? null,
-        }))
-      }
-      const merged = [
-        ...localShots,
-        ...(igdbData?.screenshot_urls ?? []),
-      ]
-        .map((u) => resolveConsoleHighResUrl(u))
-        .filter((u): u is string => Boolean(u))
-      setScreenshots(Array.from(new Set(merged)))
+    Promise.all([getGameScreenshots(game.id).catch(() => [] as string[]), fetchIgdbDetails()]).then(
+      ([localShots, igdbData]) => {
+        if (cancelled) return
+        if (igdbData) {
+          setHubDetails(igdbData)
+          setScores((prev) => ({
+            metacritic: prev.metacritic ?? igdbData.metacritic_score ?? null,
+            opencritic: prev.opencritic ?? igdbData.opencritic_score ?? null,
+          }))
+        }
+        const merged = [...localShots, ...(igdbData?.screenshot_urls ?? [])]
+          .map((u) => resolveConsoleHighResUrl(u))
+          .filter((u): u is string => Boolean(u))
+        setScreenshots(Array.from(new Set(merged)))
 
-      if (!game.metacritic_score && !game.opencritic_score) {
-        resolveHubGameScores({
-          gameName: game.name,
-          releaseDate: game.release_date ?? igdbData?.release_date,
-          metacriticScore: igdbData?.metacritic_score ?? null,
-          opencriticScore: igdbData?.opencritic_score ?? null,
-          igdbRating: igdbData?.rating ?? null,
-        })
-          .then((sc) => {
-            if (!cancelled) {
-              setScores((prev) => ({
-                metacritic: sc.metacritic ?? prev.metacritic,
-                opencritic: sc.opencritic ?? prev.opencritic,
-              }))
-            }
+        if (!game.metacritic_score && !game.opencritic_score) {
+          resolveHubGameScores({
+            gameName: game.name,
+            releaseDate: game.release_date ?? igdbData?.release_date,
+            metacriticScore: igdbData?.metacritic_score ?? null,
+            opencriticScore: igdbData?.opencritic_score ?? null,
+            igdbRating: igdbData?.rating ?? null,
           })
-          .catch(() => {})
-      }
-    })
+            .then((sc) => {
+              if (!cancelled) {
+                setScores((prev) => ({
+                  metacritic: sc.metacritic ?? prev.metacritic,
+                  opencritic: sc.opencritic ?? prev.opencritic,
+                }))
+              }
+            })
+            .catch(() => {})
+        }
+      },
+    )
 
     return () => {
       cancelled = true
@@ -224,8 +216,6 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
     scopeId: 'console_game_hub',
     onConfirm: onBack,
   })
-
-
 
   const backdrop = resolveConsoleHighResUrl(
     game.background_path ??
@@ -424,9 +414,7 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
                   ) : (
                     <Play className="w-4 h-4 fill-current" />
                   )}
-                  <span>
-                    {isRunning ? `Stop · ${formatElapsed(elapsedSeconds)}` : 'Play Now'}
-                  </span>
+                  <span>{isRunning ? `Stop · ${formatElapsed(elapsedSeconds)}` : 'Play Now'}</span>
                   <Glyph button="confirm" size="sm" />
                 </button>
               )}
@@ -572,4 +560,3 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
     </FocusScope>
   )
 }
-

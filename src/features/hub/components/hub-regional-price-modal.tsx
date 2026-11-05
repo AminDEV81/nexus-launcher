@@ -92,7 +92,9 @@ export function HubRegionalPriceModal({
   }, [overview])
 
   const effectiveAppId = steamAppId || overview?.steam_app_id || null
-  const steamStoreUrl = effectiveAppId ? `https://store.steampowered.com/app/${effectiveAppId}` : null
+  const steamStoreUrl = effectiveAppId
+    ? `https://store.steampowered.com/app/${effectiveAppId}`
+    : null
 
   if (!open) return null
 

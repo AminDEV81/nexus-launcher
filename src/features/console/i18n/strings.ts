@@ -126,7 +126,8 @@ export const CONSOLE_STRINGS: Record<ConsoleLanguage, ConsoleDictionary> = {
       comingSoon: 'Coming Soon & Wishlisted',
       wishlistDeals: 'Wishlist & Store Deals',
       emptyLibraryTitle: 'Your Console Library is Empty',
-      emptyLibraryDesc: 'Scan your PC drives to import Steam, Epic, GOG, and local games automatically.',
+      emptyLibraryDesc:
+        'Scan your PC drives to import Steam, Epic, GOG, and local games automatically.',
       scanGamesNow: 'Scan PC for Installed Games',
     },
     power: {
@@ -201,7 +202,8 @@ export const CONSOLE_STRINGS: Record<ConsoleLanguage, ConsoleDictionary> = {
       comingSoon: 'به‌زودی و لیست علاقه‌مندی',
       wishlistDeals: 'تخفیف‌های ویژه و علاقه‌مندی‌ها',
       emptyLibraryTitle: 'کتابخانه کنسول شما خالی است',
-      emptyLibraryDesc: 'درایوهای سیستم را اسکن کنید تا بازی‌های استیم، اپیک و نصب‌شده به‌طور خودکار اضافه شوند.',
+      emptyLibraryDesc:
+        'درایوهای سیستم را اسکن کنید تا بازی‌های استیم، اپیک و نصب‌شده به‌طور خودکار اضافه شوند.',
       scanGamesNow: 'اسکن خودکار بازی‌های نصب‌شده',
     },
     power: {
@@ -224,7 +226,8 @@ export const CONSOLE_STRINGS: Record<ConsoleLanguage, ConsoleDictionary> = {
       toggleBoost: 'تقویت رم و پردازنده',
       masterVolume: 'حجم صدای سیستم',
       closeGame: 'بستن بازی در حال اجرا',
-      gameBarHint: 'نکته: اگر Game Bar ویندوز دکمه Guide را می‌گیرد، Back + Start را ۱ ثانیه نگه دارید.',
+      gameBarHint:
+        'نکته: اگر Game Bar ویندوز دکمه Guide را می‌گیرد، Back + Start را ۱ ثانیه نگه دارید.',
     },
   },
 }

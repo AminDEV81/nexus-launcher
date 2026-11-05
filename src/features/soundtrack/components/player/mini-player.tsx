@@ -154,9 +154,9 @@ export function MiniPlayer() {
                     key={currentAlbum?.id || currentGame?.gameId || currentTrack.id}
                     className="font-semibold text-accent/90 truncate"
                   >
-                    {(currentAlbum &&
-                      (!currentGame ||
-                        (currentAlbum.game_id && currentGame.gameId !== currentAlbum.game_id)))
+                    {currentAlbum &&
+                    (!currentGame ||
+                      (currentAlbum.game_id && currentGame.gameId !== currentAlbum.game_id))
                       ? cleanGameTitleFromAlbumTitle(currentAlbum.title)
                       : currentGame?.title ||
                         (currentAlbum

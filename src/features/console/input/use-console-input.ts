@@ -372,11 +372,7 @@ export function useConsoleInputController(handlers: ConsoleInputHandlers = {}, a
         })
       }
 
-      needNativeRef.current = shouldUseNativePads(
-        frames.length,
-        counts.connected,
-        counts.emulating,
-      )
+      needNativeRef.current = shouldUseNativePads(frames.length, counts.connected, counts.emulating)
       if (needNativeRef.current) {
         pollNative()
         for (const native of nativeFramesRef.current) {

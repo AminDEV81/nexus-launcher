@@ -265,12 +265,21 @@ export function useHubGameDetails(igdbId: number, expectedName?: string | null) 
             opencritic: details.opencritic_score ?? null,
           },
         )
-        for (const shelfKey of ['new-releases', 'coming-soon', 'top-rated', 'recommended', 'discounted']) {
+        for (const shelfKey of [
+          'new-releases',
+          'coming-soon',
+          'top-rated',
+          'recommended',
+          'discounted',
+        ]) {
           queryClient.setQueryData<HubGame[]>(['hub', shelfKey], (old) => {
             if (!Array.isArray(old)) return old
             let changed = false
             const next = old.map((g) => {
-              if (g.igdb_id === details.igdb_id || g.name.toLowerCase() === details.name.toLowerCase()) {
+              if (
+                g.igdb_id === details.igdb_id ||
+                g.name.toLowerCase() === details.name.toLowerCase()
+              ) {
                 changed = true
                 return {
                   ...g,
@@ -319,17 +328,17 @@ export function useHubSearch(query: string, filters: HubSearchFilters = {}) {
     filters.platformIds && filters.platformIds.length > 0 ? filters.platformIds : undefined
   const hasFilter = Boolean(
     (gIds && gIds.length > 0) ||
-      filters.genreId != null ||
-      (pIds && pIds.length > 0) ||
-      filters.platformId != null ||
-      (filters.release && filters.release.length > 0) ||
-      filters.yearFrom != null ||
-      filters.yearTo != null ||
-      filters.minRating != null ||
-      (filters.sort && filters.sort.length > 0) ||
-      (filters.gameCategory && filters.gameCategory !== 'all') ||
-      (filters.gameMode && filters.gameMode !== 'all') ||
-      filters.onlyReleased,
+    filters.genreId != null ||
+    (pIds && pIds.length > 0) ||
+    filters.platformId != null ||
+    (filters.release && filters.release.length > 0) ||
+    filters.yearFrom != null ||
+    filters.yearTo != null ||
+    filters.minRating != null ||
+    (filters.sort && filters.sort.length > 0) ||
+    (filters.gameCategory && filters.gameCategory !== 'all') ||
+    (filters.gameMode && filters.gameMode !== 'all') ||
+    filters.onlyReleased,
   )
   const enabled = trimmed.length >= 2 || hasFilter
   const normalizedFilters: HubSearchFilters = {
@@ -349,13 +358,10 @@ export function useHubSearch(query: string, filters: HubSearchFilters = {}) {
 
   return useInfiniteQuery({
     queryKey: ['hub', 'search', trimmed.toLowerCase(), normalizedFilters],
-    queryFn: ({ pageParam }) =>
-      hubService.searchHubGames(trimmed, pageParam, normalizedFilters),
+    queryFn: ({ pageParam }) => hubService.searchHubGames(trimmed, pageParam, normalizedFilters),
     initialPageParam: 0,
     getNextPageParam: (lastPage: HubGame[], allPages: HubGame[][]) =>
-      lastPage.length < 16
-        ? undefined
-        : allPages.length * hubService.HUB_SEARCH_PAGE_SIZE,
+      lastPage.length < 16 ? undefined : allPages.length * hubService.HUB_SEARCH_PAGE_SIZE,
     enabled,
     staleTime: 30 * 60_000,
     refetchOnWindowFocus: false,

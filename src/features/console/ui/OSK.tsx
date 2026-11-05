@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react"
-import { AnimatePresence, motion } from "framer-motion"
+import React, { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   Compass,
   CornerDownLeft,
@@ -11,37 +11,37 @@ import {
   Space,
   Trash2,
   X,
-} from "lucide-react"
-import type { Game, HubGame } from "@/types/models"
-import { useConsoleStore } from "../store/console-store"
-import { CONSOLE_THEMES } from "../theme/tokens"
-import { FocusScope, useFocusable } from "../nav/FocusScope"
-import { Glyph } from "./Glyph"
-import { resolveConsoleHighResUrl } from "./Tile"
+} from 'lucide-react'
+import type { Game, HubGame } from '@/types/models'
+import { useConsoleStore } from '../store/console-store'
+import { CONSOLE_THEMES } from '../theme/tokens'
+import { FocusScope, useFocusable } from '../nav/FocusScope'
+import { Glyph } from './Glyph'
+import { resolveConsoleHighResUrl } from './Tile'
 
 const QUICK_CHIPS = [
-  "Action",
-  "RPG",
-  "Adventure",
-  "Shooter",
-  "Indie",
-  "Strategy",
-  "Horror",
-  "Racing",
+  'Action',
+  'RPG',
+  'Adventure',
+  'Shooter',
+  'Indie',
+  'Strategy',
+  'Horror',
+  'Racing',
 ]
 
 const EN_KEYPAD_ROWS: string[][] = [
-  ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
-  ["a", "s", "d", "f", "g", "h", "j", "k", "l", "-"],
-  ["z", "x", "c", "v", "b", "n", "m", ":", ".", "/"],
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+  ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+  ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', '-'],
+  ['z', 'x', 'c', 'v', 'b', 'n', 'm', ':', '.', '/'],
 ]
 
 const FA_KEYPAD_ROWS: string[][] = [
-  ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-  ["ض", "ص", "ث", "ق", "ف", "غ", "ع", "ه", "خ", "ح"],
-  ["ش", "س", "ی", "ب", "ل", "ا", "ت", "ن", "م", "ک"],
-  ["ظ", "ط", "ز", "ر", "ذ", "د", "پ", "و", "گ", "چ"],
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+  ['ض', 'ص', 'ث', 'ق', 'ف', 'غ', 'ع', 'ه', 'خ', 'ح'],
+  ['ش', 'س', 'ی', 'ب', 'ل', 'ا', 'ت', 'ن', 'م', 'ک'],
+  ['ظ', 'ط', 'ز', 'ر', 'ذ', 'د', 'پ', 'و', 'گ', 'چ'],
 ]
 
 const KeyCapButton: React.FC<{
@@ -52,10 +52,10 @@ const KeyCapButton: React.FC<{
   danger?: boolean
   isLight: boolean
   onPress: () => void
-}> = ({ id, label, className = "", accent, danger, isLight, onPress }) => {
+}> = ({ id, label, className = '', accent, danger, isLight, onPress }) => {
   const { focusProps, isFocused } = useFocusable<HTMLButtonElement>({
     id,
-    scopeId: "console-osk",
+    scopeId: 'console-osk',
     onConfirm: onPress,
   })
   return (
@@ -64,18 +64,18 @@ const KeyCapButton: React.FC<{
       {...focusProps}
       className={`flex h-11 w-full items-center justify-center rounded-xl border text-sm font-extrabold transition-all cursor-pointer select-none outline-none ${className} ${
         isFocused
-          ? "z-10 scale-105 border-cyan-300 bg-cyan-400 text-slate-950 ring-2 ring-white shadow-[0_0_20px_rgba(0,229,255,0.55)]"
+          ? 'z-10 scale-105 border-cyan-300 bg-cyan-400 text-slate-950 ring-2 ring-white shadow-[0_0_20px_rgba(0,229,255,0.55)]'
           : accent
             ? isLight
-              ? "border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-500 shadow-xs"
-              : "border-cyan-400/50 bg-cyan-500/25 text-cyan-200 hover:bg-cyan-500/35"
+              ? 'border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-500 shadow-xs'
+              : 'border-cyan-400/50 bg-cyan-500/25 text-cyan-200 hover:bg-cyan-500/35'
             : danger
               ? isLight
-                ? "border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100"
-                : "border-rose-400/35 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25"
+                ? 'border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                : 'border-rose-400/35 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25'
               : isLight
-                ? "border-slate-300 bg-white text-slate-800 hover:bg-slate-100 shadow-2xs"
-                : "border-white/12 bg-white/[0.07] text-slate-100 hover:bg-white/14"
+                ? 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100 shadow-2xs'
+                : 'border-white/12 bg-white/[0.07] text-slate-100 hover:bg-white/14'
       }`}
     >
       {label}
@@ -94,7 +94,7 @@ const LiveResultItem: React.FC<{
 }> = ({ id, title, subtitle, coverUrl, badge, isLight, onSelect }) => {
   const { focusProps, isFocused } = useFocusable<HTMLButtonElement>({
     id,
-    scopeId: "console-osk",
+    scopeId: 'console-osk',
     onConfirm: onSelect,
   })
   const img = resolveConsoleHighResUrl(coverUrl)
@@ -106,16 +106,16 @@ const LiveResultItem: React.FC<{
       className={`flex w-full items-center gap-3.5 rounded-2xl border p-2.5 text-left transition-all cursor-pointer outline-none ${
         isFocused
           ? isLight
-            ? "scale-[1.01] border-indigo-500 bg-indigo-50 text-slate-900 shadow-md ring-2 ring-indigo-400/40"
-            : "scale-[1.01] border-cyan-300 bg-cyan-400/20 text-white shadow-lg ring-2 ring-cyan-400/40"
+            ? 'scale-[1.01] border-indigo-500 bg-indigo-50 text-slate-900 shadow-md ring-2 ring-indigo-400/40'
+            : 'scale-[1.01] border-cyan-300 bg-cyan-400/20 text-white shadow-lg ring-2 ring-cyan-400/40'
           : isLight
-            ? "border-slate-200 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs"
-            : "border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]"
+            ? 'border-slate-200 bg-white text-slate-800 hover:bg-slate-50 shadow-2xs'
+            : 'border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]'
       }`}
     >
       <div
         className={`h-14 w-11 shrink-0 overflow-hidden rounded-xl ${
-          isLight ? "bg-slate-200" : "bg-slate-800"
+          isLight ? 'bg-slate-200' : 'bg-slate-800'
         }`}
       >
         {img ? (
@@ -128,25 +128,19 @@ const LiveResultItem: React.FC<{
       </div>
       <div className="min-w-0 flex-1">
         <p
-          className={`truncate text-sm font-extrabold ${
-            isLight ? "text-slate-900" : "text-white"
-          }`}
+          className={`truncate text-sm font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}
         >
           {title}
         </p>
-        <p
-          className={`truncate text-xs ${
-            isLight ? "text-slate-500" : "text-slate-400"
-          }`}
-        >
+        <p className={`truncate text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
           {subtitle}
         </p>
       </div>
       <span
         className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${
           isLight
-            ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-            : "border-cyan-400/30 bg-cyan-400/15 text-cyan-300"
+            ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+            : 'border-cyan-400/30 bg-cyan-400/15 text-cyan-300'
         }`}
       >
         {badge}
@@ -168,7 +162,7 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
   const setSelectedGameId = useConsoleStore((s) => s.setSelectedGameId)
   const setSelectedStoreHubGame = useConsoleStore((s) => s.setSelectedStoreHubGame)
   const [value, setValue] = useState(osk.initialValue)
-  const [kbLang, setKbLang] = useState<"en" | "fa">("en")
+  const [kbLang, setKbLang] = useState<'en' | 'fa'>('en')
 
   React.useEffect(() => {
     setValue(osk.initialValue)
@@ -187,16 +181,14 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
         (g) =>
           !g.is_hidden &&
           !g.is_memory &&
-          (g.name.toLowerCase().includes(q) ||
-            g.genres.some((gn) => gn.toLowerCase().includes(q))),
+          (g.name.toLowerCase().includes(q) || g.genres.some((gn) => gn.toLowerCase().includes(q))),
       )
       .slice(0, 5)
 
     const store = storeGames
       .filter(
         (hg) =>
-          hg.name.toLowerCase().includes(q) ||
-          hg.genres.some((gn) => gn.toLowerCase().includes(q)),
+          hg.name.toLowerCase().includes(q) || hg.genres.some((gn) => gn.toLowerCase().includes(q)),
       )
       .slice(0, 5)
 
@@ -210,7 +202,7 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
     closeOsk()
   }
 
-  const activeRows = kbLang === "en" ? EN_KEYPAD_ROWS : FA_KEYPAD_ROWS
+  const activeRows = kbLang === 'en' ? EN_KEYPAD_ROWS : FA_KEYPAD_ROWS
 
   return (
     <AnimatePresence>
@@ -223,25 +215,22 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
         onClick={closeOsk}
         className="fixed inset-0 z-[260] flex items-center justify-center bg-black/70 backdrop-blur-xl p-4 sm:p-6 select-none"
       >
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="w-full max-w-6xl"
-        >
+        <div onClick={(e) => e.stopPropagation()} className="w-full max-w-6xl">
           <FocusScope
             id="console-osk"
             trapFocus
             className={`w-full rounded-3xl border p-5 sm:p-7 shadow-[0_32px_90px_rgba(0,0,0,0.65)] ${
               isLight
-                ? "border-slate-300 bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900"
-                : "border-cyan-400/35 bg-gradient-to-b from-[#111930] via-[#0c1224] to-[#080c18] text-white"
+                ? 'border-slate-300 bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900'
+                : 'border-cyan-400/35 bg-gradient-to-b from-[#111930] via-[#0c1224] to-[#080c18] text-white'
             }`}
           >
             {/* Header Label */}
             <div className="mb-2.5 flex items-center justify-between text-xs font-extrabold uppercase tracking-wider">
-              <span className={isLight ? "text-indigo-600" : "text-cyan-400"}>
-                {osk.title || "Console On-Screen Keyboard & Instant Search"}
+              <span className={isLight ? 'text-indigo-600' : 'text-cyan-400'}>
+                {osk.title || 'Console On-Screen Keyboard & Instant Search'}
               </span>
-              <span className={isLight ? "text-slate-500" : "text-slate-400"}>
+              <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>
                 Press ESC or Back to Close
               </span>
             </div>
@@ -250,12 +239,12 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
             <div
               className={`flex items-center gap-3 rounded-2xl border-2 px-4 py-3 ${
                 isLight
-                  ? "border-indigo-400/60 bg-white shadow-sm"
-                  : "border-cyan-400/50 bg-slate-950/90 shadow-[0_0_35px_rgba(0,229,255,0.2)]"
+                  ? 'border-indigo-400/60 bg-white shadow-sm'
+                  : 'border-cyan-400/50 bg-slate-950/90 shadow-[0_0_35px_rgba(0,229,255,0.2)]'
               }`}
             >
               <Search
-                className={`size-5 shrink-0 ${isLight ? "text-indigo-600" : "text-cyan-400"}`}
+                className={`size-5 shrink-0 ${isLight ? 'text-indigo-600' : 'text-cyan-400'}`}
               />
               <input
                 type="text"
@@ -263,24 +252,24 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
                 autoFocus
                 onChange={(e) => setValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSubmit()
-                  if (e.key === "Escape") closeOsk()
+                  if (e.key === 'Enter') handleSubmit()
+                  if (e.key === 'Escape') closeOsk()
                 }}
                 placeholder="Search games, genres, or type with keyboard / controller..."
                 className={`w-full bg-transparent text-lg sm:text-xl font-extrabold outline-none ${
                   isLight
-                    ? "text-slate-900 placeholder:text-slate-400"
-                    : "text-white placeholder:text-slate-500"
+                    ? 'text-slate-900 placeholder:text-slate-400'
+                    : 'text-white placeholder:text-slate-500'
                 }`}
               />
               {value && (
                 <button
                   type="button"
-                  onClick={() => setValue("")}
+                  onClick={() => setValue('')}
                   className={`rounded-xl px-3 py-1.5 text-xs font-bold cursor-pointer shrink-0 ${
                     isLight
-                      ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                      : "bg-white/10 text-slate-300 hover:bg-white/20"
+                      ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                      : 'bg-white/10 text-slate-300 hover:bg-white/20'
                   }`}
                 >
                   Clear
@@ -291,8 +280,8 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
                 onClick={() => handleSubmit()}
                 className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold cursor-pointer shrink-0 ${
                   isLight
-                    ? "bg-indigo-600 text-white hover:bg-indigo-500"
-                    : "bg-cyan-400 text-slate-950 hover:bg-cyan-300"
+                    ? 'bg-indigo-600 text-white hover:bg-indigo-500'
+                    : 'bg-cyan-400 text-slate-950 hover:bg-cyan-300'
                 }`}
               >
                 <CornerDownLeft className="size-4" />
@@ -303,8 +292,8 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
                 onClick={closeOsk}
                 className={`rounded-xl border p-2 cursor-pointer shrink-0 ${
                   isLight
-                    ? "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
-                    : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10"
+                    ? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10'
                 }`}
               >
                 <X className="size-5" />
@@ -315,7 +304,7 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
             <div className="mt-3.5 flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
               <span
                 className={`mr-1 flex shrink-0 items-center gap-1 text-xs font-extrabold uppercase tracking-wider ${
-                  isLight ? "text-indigo-700" : "text-cyan-400"
+                  isLight ? 'text-indigo-700' : 'text-cyan-400'
                 }`}
               >
                 <Sparkles className="size-3.5" />
@@ -344,31 +333,29 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
               <div
                 dir="ltr"
                 className={`lg:col-span-7 flex flex-col justify-between rounded-2xl border p-4 space-y-2.5 ${
-                  isLight
-                    ? "border-slate-200 bg-slate-100/90"
-                    : "border-white/10 bg-white/[0.03]"
+                  isLight ? 'border-slate-200 bg-slate-100/90' : 'border-white/10 bg-white/[0.03]'
                 }`}
               >
                 <div
                   className={`flex items-center justify-between text-xs font-bold pb-1 ${
-                    isLight ? "text-slate-600" : "text-slate-400"
+                    isLight ? 'text-slate-600' : 'text-slate-400'
                   }`}
                 >
                   <span className="flex items-center gap-1.5 font-extrabold">
                     <Gamepad2 className="size-4 text-cyan-400" />
-                    Controller Keypad ({kbLang === "en" ? "EN · QWERTY" : "FA · فارسی"})
+                    Controller Keypad ({kbLang === 'en' ? 'EN · QWERTY' : 'FA · فارسی'})
                   </span>
                   <button
                     type="button"
-                    onClick={() => setKbLang((prev) => (prev === "en" ? "fa" : "en"))}
+                    onClick={() => setKbLang((prev) => (prev === 'en' ? 'fa' : 'en'))}
                     className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-black cursor-pointer transition-colors ${
                       isLight
-                        ? "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
-                        : "border-cyan-400/35 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25"
+                        ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                        : 'border-cyan-400/35 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25'
                     }`}
                   >
                     <Globe className="size-3" />
-                    <span>Switch to {kbLang === "en" ? "فارسی (FA)" : "English (EN)"}</span>
+                    <span>Switch to {kbLang === 'en' ? 'فارسی (FA)' : 'English (EN)'}</span>
                   </button>
                 </div>
 
@@ -423,7 +410,7 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
                     }
                     danger
                     isLight={isLight}
-                    onPress={() => setValue("")}
+                    onPress={() => setValue('')}
                   />
                   <KeyCapButton
                     id="osk_submit_btn"
@@ -443,19 +430,17 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
               {/* Right 5 Columns: Instant Live Results (Library & Store) */}
               <div
                 className={`lg:col-span-5 rounded-2xl border p-4 space-y-3 max-h-[22.5rem] overflow-y-auto no-scrollbar ${
-                  isLight
-                    ? "border-slate-200 bg-slate-100/90"
-                    : "border-white/10 bg-white/[0.03]"
+                  isLight ? 'border-slate-200 bg-slate-100/90' : 'border-white/10 bg-white/[0.03]'
                 }`}
               >
                 <div
                   className={`flex items-center justify-between text-xs font-bold ${
-                    isLight ? "text-slate-500" : "text-slate-400"
+                    isLight ? 'text-slate-500' : 'text-slate-400'
                   }`}
                 >
                   <span
                     className={`flex items-center gap-1.5 font-extrabold ${
-                      isLight ? "text-indigo-700" : "text-cyan-300"
+                      isLight ? 'text-indigo-700' : 'text-cyan-300'
                     }`}
                   >
                     <Compass className="size-3.5" />
@@ -467,7 +452,7 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
                 {liveMatches.lib.length === 0 && liveMatches.store.length === 0 ? (
                   <div
                     className={`py-12 text-center text-sm ${
-                      isLight ? "text-slate-500" : "text-slate-400"
+                      isLight ? 'text-slate-500' : 'text-slate-400'
                     }`}
                   >
                     No direct title matches for &ldquo;{value}&rdquo; — press Search to filter.
@@ -479,7 +464,7 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
                         key={`lib_${g.id}`}
                         id={`osk_res_lib_${g.id}`}
                         title={g.name}
-                        subtitle={g.genres.slice(0, 2).join(" · ") || "In Your Library"}
+                        subtitle={g.genres.slice(0, 2).join(' · ') || 'In Your Library'}
                         coverUrl={g.cover_path}
                         badge="Library"
                         isLight={isLight}
@@ -496,8 +481,8 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
                         title={hg.name}
                         subtitle={
                           hg.sale_price_formatted ||
-                          hg.genres.slice(0, 2).join(" · ") ||
-                          "Store Catalog"
+                          hg.genres.slice(0, 2).join(' · ') ||
+                          'Store Catalog'
                         }
                         coverUrl={hg.cover_url}
                         badge="Store"
@@ -515,9 +500,7 @@ export const ConsoleOSK: React.FC<ConsoleOSKProps> = ({ games = [], storeGames =
 
             <div
               className={`mt-4 flex flex-wrap items-center justify-between border-t pt-3.5 text-xs ${
-                isLight
-                  ? "border-slate-200 text-slate-500"
-                  : "border-white/10 text-slate-400"
+                isLight ? 'border-slate-200 text-slate-500' : 'border-white/10 text-slate-400'
               }`}
             >
               <span>Type directly on your physical keyboard or use the controller keypad</span>

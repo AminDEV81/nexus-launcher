@@ -88,13 +88,7 @@ export function CoverMedia({
 
   if (isVideoAsset(activeSrc, mime)) {
     if (!animatedEnabled && !alwaysLive) {
-      return (
-        <StaticVideoThumbnail
-          src={activeSrc}
-          className={className}
-          onError={handleFail}
-        />
-      )
+      return <StaticVideoThumbnail src={activeSrc} className={className} onError={handleFail} />
     }
     return (
       <VideoCover

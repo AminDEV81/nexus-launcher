@@ -310,7 +310,11 @@ export function TitleBar() {
         >
           {isMaximized ? <Copy className="size-3" /> : <Square className="size-3" />}
         </TitleBarButton>
-        <TitleBarButton label="Close" onClick={() => useCloseFlowStore.getState().openConfirm()} danger>
+        <TitleBarButton
+          label="Close"
+          onClick={() => useCloseFlowStore.getState().openConfirm()}
+          danger
+        >
           <X className="size-4" />
         </TitleBarButton>
       </div>

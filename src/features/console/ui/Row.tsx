@@ -184,7 +184,9 @@ export const ConsoleRow: React.FC<ConsoleRowProps> = React.memo(
                       } else if (item.hubGame) {
                         useConsoleStore
                           .getState()
-                          .setFocusedBackdropUrl(item.hubGame.backdrop_url ?? item.hubGame.cover_url)
+                          .setFocusedBackdropUrl(
+                            item.hubGame.backdrop_url ?? item.hubGame.cover_url,
+                          )
                       }
                     }}
                     onOptionsTile={() => {

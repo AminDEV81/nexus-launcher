@@ -307,7 +307,9 @@ export function scoreAlbumForUserSearchQuery(
 ): number {
   if (!albumTitle || !userQuery) return 0
   const lowAlbum = albumTitle.toLowerCase()
-  if (/\b(?:podcast|interview|audiobook|ringtone|karaoke|parody|tribute|lullaby)\b/.test(lowAlbum)) {
+  if (
+    /\b(?:podcast|interview|audiobook|ringtone|karaoke|parody|tribute|lullaby)\b/.test(lowAlbum)
+  ) {
     return 0
   }
 

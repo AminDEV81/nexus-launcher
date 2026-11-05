@@ -184,14 +184,14 @@ export function AppShell() {
       await markLaunchSuccessful(ver)
 
       startupTimer = window.setTimeout(() => {
-        if (typeof navigator === "undefined" || navigator.onLine !== false) {
+        if (typeof navigator === 'undefined' || navigator.onLine !== false) {
           void useUpdaterStore.getState().checkUpdates(false, true)
         }
       }, 1800)
 
       intervalId = window.setInterval(
         () => {
-          if (typeof navigator === "undefined" || navigator.onLine !== false) {
+          if (typeof navigator === 'undefined' || navigator.onLine !== false) {
             void useUpdaterStore.getState().checkUpdates(false, false)
           }
         },

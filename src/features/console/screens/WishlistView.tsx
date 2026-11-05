@@ -403,8 +403,7 @@ const WishlistLivePriceBadge: React.FC<{
       ? steamPrice.discount_percent
       : matchedHubGame?.discount_percent) ?? 0
 
-  const finalFormatted =
-    steamPrice?.final_formatted || matchedHubGame?.sale_price_formatted || null
+  const finalFormatted = steamPrice?.final_formatted || matchedHubGame?.sale_price_formatted || null
   const initialFormatted =
     steamPrice?.initial_formatted || matchedHubGame?.original_price_formatted || null
 
@@ -412,9 +411,7 @@ const WishlistLivePriceBadge: React.FC<{
     return (
       <span
         className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${
-          isLight
-            ? 'bg-emerald-100 text-emerald-800'
-            : 'bg-emerald-500/20 text-emerald-300'
+          isLight ? 'bg-emerald-100 text-emerald-800' : 'bg-emerald-500/20 text-emerald-300'
         }`}
       >
         Free to Play
@@ -554,15 +551,11 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
   )
   const releasedCount = wishlistGames.length - upcomingCount
   const dealsCount = useMemo(
-    () =>
-      wishlistGames.filter((g) => (matchHubGame(g)?.discount_percent ?? 0) > 0).length,
+    () => wishlistGames.filter((g) => (matchHubGame(g)?.discount_percent ?? 0) > 0).length,
     [wishlistGames, storeMatchMap],
   )
   const acclaimedCount = useMemo(
-    () =>
-      wishlistGames.filter(
-        (g) => (g.metacritic_score ?? g.opencritic_score ?? 0) >= 85,
-      ).length,
+    () => wishlistGames.filter((g) => (g.metacritic_score ?? g.opencritic_score ?? 0) >= 85).length,
     [wishlistGames],
   )
 
@@ -592,11 +585,9 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
     if (sortMode === 'release') {
       list.sort((a, b) => {
         const da =
-          parseStoredUtcDate(getEffectiveReleaseDate(a))?.getTime() ??
-          Number.MAX_SAFE_INTEGER
+          parseStoredUtcDate(getEffectiveReleaseDate(a))?.getTime() ?? Number.MAX_SAFE_INTEGER
         const db =
-          parseStoredUtcDate(getEffectiveReleaseDate(b))?.getTime() ??
-          Number.MAX_SAFE_INTEGER
+          parseStoredUtcDate(getEffectiveReleaseDate(b))?.getTime() ?? Number.MAX_SAFE_INTEGER
         return da - db
       })
     } else if (sortMode === 'score') {
@@ -788,7 +779,9 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
 
           <div
             className={`flex flex-wrap items-center gap-1 rounded-xl p-1 ${
-              isLight ? 'border border-slate-200/80 bg-slate-100' : 'border border-white/8 bg-black/35'
+              isLight
+                ? 'border border-slate-200/80 bg-slate-100'
+                : 'border border-white/8 bg-black/35'
             }`}
           >
             {(
@@ -919,9 +912,7 @@ export const WishlistView: React.FC<WishlistViewProps> = ({
           id="console_wishlist_empty"
           orientation="horizontal"
           className={`flex flex-col items-center justify-center rounded-3xl border px-6 py-16 text-center ${
-            isLight
-              ? 'border-slate-200 bg-white/90 shadow-sm'
-              : 'border-white/10 bg-[#0b1020]/75'
+            isLight ? 'border-slate-200 bg-white/90 shadow-sm' : 'border-white/10 bg-[#0b1020]/75'
           }`}
         >
           <div
@@ -1195,9 +1186,7 @@ const WishlistCountdownShowcaseCard: React.FC<{
                 <span
                   key={gn}
                   className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
-                    isLight
-                      ? 'bg-slate-100 text-slate-700'
-                      : 'bg-white/[0.06] text-slate-300'
+                    isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.06] text-slate-300'
                   }`}
                 >
                   {gn}
@@ -1445,9 +1434,7 @@ const WishlistDiscoveryPosterShelf: React.FC<{
   const [addingId, setAddingId] = useState<number | null>(null)
 
   const suggestions = useMemo(() => {
-    const existingCanon = new Set(
-      wishlistGames.map((g) => normalizeCanonicalStoreTitle(g.name)),
-    )
+    const existingCanon = new Set(wishlistGames.map((g) => normalizeCanonicalStoreTitle(g.name)))
     const existingIgdb = new Set(
       wishlistGames.map((g) => g.igdb_id).filter((id): id is number => Boolean(id)),
     )
@@ -1495,7 +1482,9 @@ const WishlistDiscoveryPosterShelf: React.FC<{
             Recommended For Your Launch Radar
           </h2>
         </div>
-        <span className={`inline-flex items-center gap-1 text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+        <span
+          className={`inline-flex items-center gap-1 text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}
+        >
           <Tag className="size-3" />
           Upcoming &amp; On Sale
         </span>
@@ -1532,9 +1521,7 @@ const DiscoveryPosterCard: React.FC<{
     id: `wishlist_disc_${game.igdb_id}`,
     scopeId: 'console_wishlist_discovery',
     onFocus: () => {
-      useConsoleStore
-        .getState()
-        .setFocusedBackdropUrl(game.backdrop_url ?? game.cover_url)
+      useConsoleStore.getState().setFocusedBackdropUrl(game.backdrop_url ?? game.cover_url)
     },
     onConfirm: onInspect,
     onOptions: onAdd,

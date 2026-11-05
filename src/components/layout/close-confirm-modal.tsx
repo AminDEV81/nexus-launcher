@@ -1,14 +1,6 @@
 import { useEffect } from 'react'
 import { motion } from 'framer-motion'
-import {
-  ArrowRight,
-  Download,
-  Gamepad2,
-  Layers,
-  Power,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react'
+import { ArrowRight, Download, Gamepad2, Layers, Power, ShieldCheck, Sparkles } from 'lucide-react'
 import { Modal } from '@/components/ui/modal'
 import { useCloseFlowStore } from '@/store/close-flow-store'
 import { useLaunchStore } from '@/store/launch-store'

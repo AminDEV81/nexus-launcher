@@ -63,9 +63,7 @@ export function InputContextMenu() {
       }
 
       const inputEl = target.closest('input, textarea') as
-        | HTMLInputElement
-        | HTMLTextAreaElement
-        | null
+        HTMLInputElement | HTMLTextAreaElement | null
 
       if (!inputEl || inputEl.disabled || inputEl.readOnly) {
         setMenu(null)
@@ -73,7 +71,16 @@ export function InputContextMenu() {
       }
 
       if (inputEl instanceof HTMLInputElement) {
-        const allowedTypes = new Set(['text', 'search', 'url', 'tel', 'email', 'password', 'number', ''])
+        const allowedTypes = new Set([
+          'text',
+          'search',
+          'url',
+          'tel',
+          'email',
+          'password',
+          'number',
+          '',
+        ])
         if (!allowedTypes.has((inputEl.type || 'text').toLowerCase())) {
           setMenu(null)
           return

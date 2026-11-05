@@ -137,9 +137,7 @@ export class ItunesAudioProvider extends BaseSoundtrackProvider {
       const songs = results.filter((r) => r.wrapperType === 'track' && r.trackName && r.previewUrl)
       if (!col || songs.length === 0) return null
 
-      const cover = col.artworkUrl100
-        ? col.artworkUrl100.replace('100x100bb', '1000x1000bb')
-        : null
+      const cover = col.artworkUrl100 ? col.artworkUrl100.replace('100x100bb', '1000x1000bb') : null
 
       let totalDurationMs = 0
       const tracks: SoundtrackTrack[] = songs.map((s, idx) => {

@@ -53,7 +53,12 @@ function useSmoothXboxStick(targetX: number, targetY: number, isDragging: boolea
       const dx = tgt.x - cur.x
       const dy = tgt.y - cur.y
 
-      if (Math.abs(dx) < 0.04 && Math.abs(dy) < 0.04 && Math.abs(cur.vx) < 0.04 && Math.abs(cur.vy) < 0.04) {
+      if (
+        Math.abs(dx) < 0.04 &&
+        Math.abs(dy) < 0.04 &&
+        Math.abs(cur.vx) < 0.04 &&
+        Math.abs(cur.vy) < 0.04
+      ) {
         cur.x = tgt.x
         cur.y = tgt.y
         cur.vx = 0
@@ -133,11 +138,7 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
 
     const normX = Math.round(128 + (dx / maxRadius) * 127)
     const normY = Math.round(128 + (dy / maxRadius) * 127)
-    onStickMove(
-      draggingStick,
-      Math.max(0, Math.min(255, normX)),
-      Math.max(0, Math.min(255, normY)),
-    )
+    onStickMove(draggingStick, Math.max(0, Math.min(255, normX)), Math.max(0, Math.min(255, normY)))
   }
 
   const stopStickDrag = () => {
@@ -281,7 +282,13 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
           </linearGradient>
 
           <filter id="xb-orig-shadow" x="-15%" y="-15%" width="130%" height="135%">
-            <feDropShadow dx="0" dy="20" stdDeviation="16" floodColor="#000000" floodOpacity="0.56" />
+            <feDropShadow
+              dx="0"
+              dy="20"
+              stdDeviation="16"
+              floodColor="#000000"
+              floodOpacity="0.56"
+            />
           </filter>
 
           <filter id="xb-orig-stick-shadow" x="-35%" y="-35%" width="170%" height="170%">
@@ -289,7 +296,13 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
           </filter>
 
           <filter id="xb-orig-btn-shadow" x="-25%" y="-25%" width="150%" height="150%">
-            <feDropShadow dx="0" dy="3" stdDeviation="2.2" floodColor="#000000" floodOpacity="0.58" />
+            <feDropShadow
+              dx="0"
+              dy="3"
+              stdDeviation="2.2"
+              floodColor="#000000"
+              floodOpacity="0.58"
+            />
           </filter>
 
           <filter id="xb-orig-glow" x="-45%" y="-45%" width="190%" height="190%">
@@ -411,11 +424,7 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
             <path
               d="M -19 -19 C -6 -7, 6 -7, 19 -19 M -21 18 C -7 2.5, 7 2.5, 21 18"
               stroke={
-                state.guide
-                  ? '#042F2E'
-                  : isConnected && isActiveController
-                    ? '#D1D5DB'
-                    : '#64748B'
+                state.guide ? '#042F2E' : isConnected && isActiveController ? '#D1D5DB' : '#64748B'
               }
               strokeWidth="4.6"
               strokeLinecap="round"
@@ -477,7 +486,16 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
             {...bindBtn('mute')}
             filter="url(#xb-orig-btn-shadow)"
           >
-            <rect x="-23" y="-12.5" width="46" height="25" rx="12.5" fill="#0D0F13" stroke="#2A2E38" strokeWidth="1.4" />
+            <rect
+              x="-23"
+              y="-12.5"
+              width="46"
+              height="25"
+              rx="12.5"
+              fill="#0D0F13"
+              stroke="#2A2E38"
+              strokeWidth="1.4"
+            />
             <rect
               x="-19"
               y="-9.5"
@@ -501,12 +519,34 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
           {/* ==================== 3D FACETED 8-WAY CIRCULAR HYBRID D-PAD (370, 362) ==================== */}
           <g transform="translate(370, 362)" filter="url(#xb-orig-btn-shadow)">
             <circle cx="0" cy="0" r="76" fill="#0B0D11" stroke="#282C36" strokeWidth="2.2" />
-            <circle cx="0" cy="0" r="70" fill="url(#xb-orig-dpad-dish)" stroke="#1C1F26" strokeWidth="1.5" />
+            <circle
+              cx="0"
+              cy="0"
+              r="70"
+              fill="url(#xb-orig-dpad-dish)"
+              stroke="#1C1F26"
+              strokeWidth="1.5"
+            />
 
             {/* 4 Sculpted Diagonal Facet Planes */}
-            <polygon points="-22,-22 -64,-22 -22,-64" fill="#171920" stroke="#262A34" strokeWidth="1" />
-            <polygon points="22,-22 64,-22 22,-64" fill="#1F222B" stroke="#262A34" strokeWidth="1" />
-            <polygon points="-22,22 -64,22 -22,64" fill="#12141A" stroke="#262A34" strokeWidth="1" />
+            <polygon
+              points="-22,-22 -64,-22 -22,-64"
+              fill="#171920"
+              stroke="#262A34"
+              strokeWidth="1"
+            />
+            <polygon
+              points="22,-22 64,-22 22,-64"
+              fill="#1F222B"
+              stroke="#262A34"
+              strokeWidth="1"
+            />
+            <polygon
+              points="-22,22 -64,22 -22,64"
+              fill="#12141A"
+              stroke="#262A34"
+              strokeWidth="1"
+            />
             <polygon points="22,22 64,22 22,64" fill="#181A22" stroke="#262A34" strokeWidth="1" />
 
             {/* UP */}
@@ -547,15 +587,56 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
             </g>
 
             {/* Concave Center Facet */}
-            <rect x="-22" y="-22" width="44" height="44" rx="4" fill="#181A21" stroke="#282C36" strokeWidth="1.2" />
+            <rect
+              x="-22"
+              y="-22"
+              width="44"
+              height="44"
+              rx="4"
+              fill="#181A21"
+              stroke="#282C36"
+              strokeWidth="1.2"
+            />
           </g>
 
           {/* ==================== 3D GLOSSY CARBON-BLACK ABXY DOME BUTTONS ==================== */}
           {[
-            { key: 'triangle', label: 'Y', cx: 760, cy: 144, active: state.y, color: '#F59E0B', textCol: '#94A3B8' },
-            { key: 'circle', label: 'B', cx: 826, cy: 206, active: state.b, color: '#EF4444', textCol: '#94A3B8' },
-            { key: 'cross', label: 'A', cx: 760, cy: 268, active: state.a, color: '#10B981', textCol: '#94A3B8' },
-            { key: 'square', label: 'X', cx: 694, cy: 206, active: state.x, color: '#3B82F6', textCol: '#94A3B8' },
+            {
+              key: 'triangle',
+              label: 'Y',
+              cx: 760,
+              cy: 144,
+              active: state.y,
+              color: '#F59E0B',
+              textCol: '#94A3B8',
+            },
+            {
+              key: 'circle',
+              label: 'B',
+              cx: 826,
+              cy: 206,
+              active: state.b,
+              color: '#EF4444',
+              textCol: '#94A3B8',
+            },
+            {
+              key: 'cross',
+              label: 'A',
+              cx: 760,
+              cy: 268,
+              active: state.a,
+              color: '#10B981',
+              textCol: '#94A3B8',
+            },
+            {
+              key: 'square',
+              label: 'X',
+              cx: 694,
+              cy: 206,
+              active: state.x,
+              color: '#3B82F6',
+              textCol: '#94A3B8',
+            },
           ].map((b) => (
             <g
               key={b.label}
@@ -596,7 +677,14 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
           {/* LEFT STICK (LS at 247, 200) */}
           <g transform="translate(247, 200)">
             <circle cx="0" cy="0" r="68" fill="#181A20" stroke="#2E323D" strokeWidth="2" />
-            <circle cx="0" cy="0" r="60" fill="url(#xb-orig-gimbal)" stroke="#07080B" strokeWidth="2.2" />
+            <circle
+              cx="0"
+              cy="0"
+              r="60"
+              fill="url(#xb-orig-gimbal)"
+              stroke="#07080B"
+              strokeWidth="2.2"
+            />
             <line
               x1="0"
               y1="0"
@@ -630,11 +718,7 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
                 cy="0"
                 r="51"
                 fill="url(#xb-orig-stick-dome)"
-                stroke={
-                  state.ls || Math.hypot(lxOffset, lyOffset) > 2.2
-                    ? '#10B981'
-                    : '#323642'
-                }
+                stroke={state.ls || Math.hypot(lxOffset, lyOffset) > 2.2 ? '#10B981' : '#323642'}
                 strokeWidth="2.2"
               />
               <circle
@@ -668,7 +752,14 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
           {/* RIGHT STICK (RS at 640, 351) */}
           <g transform="translate(640, 351)">
             <circle cx="0" cy="0" r="68" fill="#181A20" stroke="#2E323D" strokeWidth="2" />
-            <circle cx="0" cy="0" r="60" fill="url(#xb-orig-gimbal)" stroke="#07080B" strokeWidth="2.2" />
+            <circle
+              cx="0"
+              cy="0"
+              r="60"
+              fill="url(#xb-orig-gimbal)"
+              stroke="#07080B"
+              strokeWidth="2.2"
+            />
             <line
               x1="0"
               y1="0"
@@ -702,11 +793,7 @@ export const XboxSvgController: React.FC<XboxSvgControllerProps> = ({
                 cy="0"
                 r="51"
                 fill="url(#xb-orig-stick-dome)"
-                stroke={
-                  state.rs || Math.hypot(rxOffset, ryOffset) > 2.2
-                    ? '#10B981'
-                    : '#323642'
-                }
+                stroke={state.rs || Math.hypot(rxOffset, ryOffset) > 2.2 ? '#10B981' : '#323642'}
                 strokeWidth="2.2"
               />
               <circle

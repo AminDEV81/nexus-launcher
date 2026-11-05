@@ -111,8 +111,7 @@ export function parseConsoleSettingsFromMap(
       : 'auto'
 
   const comboRaw = g('console_guide_combo', 'both')
-  const guideCombo =
-    comboRaw === 'guide_only' || comboRaw === 'back_start' ? comboRaw : 'both'
+  const guideCombo = comboRaw === 'guide_only' || comboRaw === 'back_start' ? comboRaw : 'both'
 
   return {
     consoleEnabled: b('console_enabled', true),
@@ -129,7 +128,10 @@ export function parseConsoleSettingsFromMap(
     hapticsEnabled: b('console_haptics', true),
     confirmSwap: b('console_confirm_swap', false),
     glyphOverride,
-    idleMinutes: Math.max(1, Math.min(120, Number.parseInt(g('console_idle_minutes', '5'), 10) || 5)),
+    idleMinutes: Math.max(
+      1,
+      Math.min(120, Number.parseInt(g('console_idle_minutes', '5'), 10) || 5),
+    ),
     screensaverEnabled: b('console_screensaver', true),
     ostPreviewEnabled: b('console_ost_preview', false),
     guideEnabled: b('console_guide_enabled', false),
@@ -265,8 +267,7 @@ export const useConsoleStore = create<ConsoleStoreState>((set, get) => ({
 
     set({ [key]: normalized } as Partial<ConsoleStoreState>)
     const dbKey = SETTING_KEY_MAP[key]
-    const dbVal =
-      typeof normalized === 'boolean' ? (normalized ? '1' : '0') : String(normalized)
+    const dbVal = typeof normalized === 'boolean' ? (normalized ? '1' : '0') : String(normalized)
     try {
       await setSetting(dbKey, dbVal)
     } catch {
@@ -319,7 +320,12 @@ export const useConsoleStore = create<ConsoleStoreState>((set, get) => ({
   setFocusedGameId: (gameId, accentColor) =>
     set((s) => {
       const nextColor = accentColor || s.ambientColor
-      if (s.focusedGameId === gameId && s.ambientColor === nextColor && s.focusedBackdropUrl === null) return s
+      if (
+        s.focusedGameId === gameId &&
+        s.ambientColor === nextColor &&
+        s.focusedBackdropUrl === null
+      )
+        return s
       return {
         focusedGameId: gameId,
         focusedBackdropUrl: null,
@@ -348,7 +354,9 @@ export const useConsoleStore = create<ConsoleStoreState>((set, get) => ({
       }
     }),
   setControllerDisconnectedModal: (open) =>
-    set((s) => (s.controllerDisconnectedModal === open ? s : { controllerDisconnectedModal: open })),
+    set((s) =>
+      s.controllerDisconnectedModal === open ? s : { controllerDisconnectedModal: open },
+    ),
   setControllerTestMode: (active) =>
     set((s) => (s.controllerTestMode === active ? s : { controllerTestMode: active })),
   setProfileGateCompleted: (done) =>

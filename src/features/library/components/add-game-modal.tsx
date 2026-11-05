@@ -519,7 +519,8 @@ function ChooseStep({
               </span>
             </div>
             <p className="mt-0.5 text-xs text-muted leading-relaxed">
-              Detect installed games across Steam, Epic, GOG, EA, Ubisoft, Xbox &amp; Local Cracked / Repack folders
+              Detect installed games across Steam, Epic, GOG, EA, Ubisoft, Xbox &amp; Local Cracked
+              / Repack folders
             </p>
           </div>
         </div>
@@ -761,14 +762,18 @@ function SystemScanStep({ onBack, onComplete }: SystemScanStepProps) {
                 <span>Deep Scanning Installed Stores & Registries</span>
               </div>
               <p className="text-xs text-muted max-w-md mx-auto">
-                Scanning Steam, Epic, GOG, EA, Ubisoft, Xbox &amp; Cracked / Repack Game Folders across all drives...
+                Scanning Steam, Epic, GOG, EA, Ubisoft, Xbox &amp; Cracked / Repack Game Folders
+                across all drives...
               </p>
             </div>
 
             {/* Active Platform Indicators */}
             <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 max-w-lg">
               {[
-                { name: 'Cracked / Repacks', color: 'border-rose-500/35 text-rose-400 bg-rose-500/15' },
+                {
+                  name: 'Cracked / Repacks',
+                  color: 'border-rose-500/35 text-rose-400 bg-rose-500/15',
+                },
                 { name: 'Steam', color: 'border-sky-500/30 text-sky-400 bg-sky-500/10' },
                 { name: 'Epic Games', color: 'border-zinc-500/30 text-zinc-300 bg-zinc-500/10' },
                 {

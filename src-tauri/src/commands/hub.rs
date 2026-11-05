@@ -3651,7 +3651,7 @@ pub async fn resolve_nexusmods_url(
     let cache_key = "nexusmods:games_catalog:v1";
     let cached_json = {
         let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
-        MetadataCache::get(&conn, &cache_key).and_then(|(payload, is_stale)| {
+        MetadataCache::get(&conn, cache_key).and_then(|(payload, is_stale)| {
             if !is_stale && !payload.is_empty() {
                 Some(payload)
             } else {

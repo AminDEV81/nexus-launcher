@@ -88,7 +88,9 @@ export const PowerView: React.FC<PowerViewProps> = ({ onExitToDesktop, onSwitchP
 
   return (
     <div className="space-y-6 pb-20">
-      <h1 className={`text-[2.4rem] font-black tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}>
+      <h1
+        className={`text-[2.4rem] font-black tracking-tight ${isLight ? 'text-slate-900' : 'text-white'}`}
+      >
         Power & Session
       </h1>
       <FocusScope

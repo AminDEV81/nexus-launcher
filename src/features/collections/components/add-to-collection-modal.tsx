@@ -29,7 +29,12 @@ interface AddToCollectionModalProps {
   onClose: () => void
 }
 
-const PRESET_SUGGESTIONS = ['Favorites & Must-Play', 'Currently Playing', 'Completed 100%', 'Backlog']
+const PRESET_SUGGESTIONS = [
+  'Favorites & Must-Play',
+  'Currently Playing',
+  'Completed 100%',
+  'Backlog',
+]
 
 export function AddToCollectionModal({ gameId, open, onClose }: AddToCollectionModalProps) {
   const { data: game } = useGame(open && gameId ? gameId : undefined)
@@ -108,9 +113,7 @@ export function AddToCollectionModal({ gameId, open, onClose }: AddToCollectionM
           removeFromCollection.mutateAsync({ collectionId, gameId }),
         ),
       ])
-      toast.success(
-        `Updated collections for ${game?.name || 'game'} (${selected.size} assigned)`,
-      )
+      toast.success(`Updated collections for ${game?.name || 'game'} (${selected.size} assigned)`)
       handleClose()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not update collections.')
@@ -228,9 +231,7 @@ export function AddToCollectionModal({ gameId, open, onClose }: AddToCollectionM
             <div className="flex items-center gap-2 text-[11px] font-bold">
               <button
                 type="button"
-                onClick={() =>
-                  setSelected(new Set((collections ?? []).map((c) => c.id)))
-                }
+                onClick={() => setSelected(new Set((collections ?? []).map((c) => c.id)))}
                 className="text-accent hover:underline cursor-pointer"
               >
                 Select All
@@ -310,8 +311,7 @@ export function AddToCollectionModal({ gameId, open, onClose }: AddToCollectionM
                           {collection.name}
                         </span>
                         <span className="text-[11px] font-medium text-subtle">
-                          {collection.game_count}{' '}
-                          {collection.game_count === 1 ? 'game' : 'games'}
+                          {collection.game_count} {collection.game_count === 1 ? 'game' : 'games'}
                         </span>
                       </div>
                     </div>
@@ -352,9 +352,7 @@ export function AddToCollectionModal({ gameId, open, onClose }: AddToCollectionM
               <div className="flex size-10 items-center justify-center rounded-2xl bg-accent/12 text-accent">
                 <Sparkles className="size-5" />
               </div>
-              <p className="mt-2.5 text-xs font-bold text-text">
-                No collections created yet
-              </p>
+              <p className="mt-2.5 text-xs font-bold text-text">No collections created yet</p>
               <p className="mt-0.5 text-[11px] text-muted">
                 Type a name above or click a quick preset below to start organizing:
               </p>

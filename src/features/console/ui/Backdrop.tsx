@@ -139,9 +139,7 @@ export const ConsoleBackdrop: React.FC<ConsoleBackdropProps> = React.memo(
                       : undefined
                   }
                   className={`absolute inset-0 h-full w-full object-cover object-[68%_18%] ${
-                    isLight
-                      ? 'saturate-[1.18] contrast-[1.06]'
-                      : 'saturate-[1.1] contrast-[1.03]'
+                    isLight ? 'saturate-[1.18] contrast-[1.06]' : 'saturate-[1.1] contrast-[1.03]'
                   }`}
                 />
               )}

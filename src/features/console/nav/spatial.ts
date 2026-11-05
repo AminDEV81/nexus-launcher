@@ -63,7 +63,11 @@ export function isInHalfPlane(current: NavRect, candidate: NavRect, dir: NavDire
   }
 }
 
-export function computeAxisOverlap(current: NavRect, candidate: NavRect, dir: NavDirection): number {
+export function computeAxisOverlap(
+  current: NavRect,
+  candidate: NavRect,
+  dir: NavDirection,
+): number {
   if (dir === 'left' || dir === 'right') {
     const top = Math.max(current.top, candidate.top)
     const bottom = Math.min(current.top + current.height, candidate.top + candidate.height)
@@ -90,10 +94,8 @@ export function scoreSpatialCandidate(
   const { cx: ax, cy: ay } = rectCenter(current.rect)
   const { cx: bx, cy: by } = rectCenter(candidate.rect)
 
-  const primaryDistance =
-    dir === 'left' || dir === 'right' ? Math.abs(bx - ax) : Math.abs(by - ay)
-  const crossAxisOffset =
-    dir === 'left' || dir === 'right' ? Math.abs(by - ay) : Math.abs(bx - ax)
+  const primaryDistance = dir === 'left' || dir === 'right' ? Math.abs(bx - ax) : Math.abs(by - ay)
+  const crossAxisOffset = dir === 'left' || dir === 'right' ? Math.abs(by - ay) : Math.abs(bx - ax)
 
   const overlapRatio = computeAxisOverlap(current.rect, candidate.rect, dir)
   const overlapBonus = overlapRatio * 45

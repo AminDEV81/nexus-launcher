@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react"
-import { AnimatePresence, motion } from "framer-motion"
+import React, { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowRight,
   CheckCircle2,
@@ -9,10 +9,10 @@ import {
   Monitor,
   ShieldCheck,
   Sparkles,
-} from "lucide-react"
-import { LogoMark } from "@/components/brand/logo-mark"
-import { useConsoleStore } from "../store/console-store"
-import { CONSOLE_THEMES } from "../theme/tokens"
+} from 'lucide-react'
+import { LogoMark } from '@/components/brand/logo-mark'
+import { useConsoleStore } from '../store/console-store'
+import { CONSOLE_THEMES } from '../theme/tokens'
 
 export interface ConsoleExitOutroProps {
   open: boolean
@@ -62,26 +62,26 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
 
   const steps = [
     {
-      id: "hid",
+      id: 'hid',
       icon: Gamepad2,
-      title: "Spatial HID & Controller Engine",
-      detail: "Parking 10-foot focus graph & releasing exclusive gamepad lock",
+      title: 'Spatial HID & Controller Engine',
+      detail: 'Parking 10-foot focus graph & releasing exclusive gamepad lock',
       done: phase >= 1,
       active: phase === 0,
     },
     {
-      id: "vault",
+      id: 'vault',
       icon: ShieldCheck,
-      title: "Save Guardian & Session Telemetry",
-      detail: "Flushing playtime counters & profile state to SQLite vault",
+      title: 'Save Guardian & Session Telemetry',
+      detail: 'Flushing playtime counters & profile state to SQLite vault',
       done: phase >= 2,
       active: phase === 1,
     },
     {
-      id: "desktop",
+      id: 'desktop',
       icon: Monitor,
-      title: "Desktop Workspace Compositor",
-      detail: "Restoring multi-panel desktop window geometry & DPI scaling",
+      title: 'Desktop Workspace Compositor',
+      detail: 'Restoring multi-panel desktop window geometry & DPI scaling',
       done: progress >= 95,
       active: phase === 2,
     },
@@ -102,20 +102,20 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
           transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
           className={`fixed inset-0 z-[295] flex flex-col items-center justify-between overflow-hidden p-8 sm:p-12 select-none cursor-pointer ${
             isLight
-              ? "bg-gradient-to-b from-slate-50 via-white to-indigo-50/90 text-slate-900"
-              : "bg-[#040711]/98 text-white"
+              ? 'bg-gradient-to-b from-slate-50 via-white to-indigo-50/90 text-slate-900'
+              : 'bg-[#040711]/98 text-white'
           } backdrop-blur-2xl`}
         >
           {/* Ambient Dimensional Warp Core */}
           <motion.div
             initial={{ scale: 1.5, opacity: 0.2, rotate: 0 }}
             animate={{ scale: [1.5, 0.85, 1.15], opacity: [0.35, 0.75, 0.45], rotate: 45 }}
-            transition={{ duration: 2.0, ease: "easeInOut" }}
+            transition={{ duration: 2.0, ease: 'easeInOut' }}
             className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[38rem] w-[58rem] rounded-full blur-[125px]"
             style={{
               background: isLight
-                ? "radial-gradient(circle, rgba(79,70,229,0.28) 0%, rgba(6,182,212,0.22) 48%, transparent 80%)"
-                : "radial-gradient(circle, rgba(124,92,255,0.52) 0%, rgba(0,229,255,0.38) 45%, rgba(59,130,246,0.18) 70%, transparent 88%)",
+                ? 'radial-gradient(circle, rgba(79,70,229,0.28) 0%, rgba(6,182,212,0.22) 48%, transparent 80%)'
+                : 'radial-gradient(circle, rgba(124,92,255,0.52) 0%, rgba(0,229,255,0.38) 45%, rgba(59,130,246,0.18) 70%, transparent 88%)',
             }}
           />
 
@@ -123,8 +123,8 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
           <div
             className={`pointer-events-none absolute inset-0 [background-size:28px_28px] ${
               isLight
-                ? "bg-[radial-gradient(rgba(15,23,42,0.08)_1px,transparent_1px)] opacity-60"
-                : "bg-[radial-gradient(rgba(255,255,255,0.09)_1px,transparent_1px)] opacity-35"
+                ? 'bg-[radial-gradient(rgba(15,23,42,0.08)_1px,transparent_1px)] opacity-60'
+                : 'bg-[radial-gradient(rgba(255,255,255,0.09)_1px,transparent_1px)] opacity-35'
             }`}
           />
 
@@ -137,10 +137,10 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
               transition={{
                 duration: 1.65,
                 delay: idx * 0.22,
-                ease: "easeInOut",
+                ease: 'easeInOut',
               }}
               className={`pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-80 rounded-full border ${
-                isLight ? "border-indigo-400/35" : "border-cyan-400/35"
+                isLight ? 'border-indigo-400/35' : 'border-cyan-400/35'
               }`}
             />
           ))}
@@ -151,7 +151,7 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
             className={`relative z-10 flex w-full max-w-5xl items-center justify-between font-mono text-xs font-extrabold uppercase tracking-[0.22em] ${
-              isLight ? "text-indigo-700" : "text-cyan-300/85"
+              isLight ? 'text-indigo-700' : 'text-cyan-300/85'
             }`}
           >
             <span className="flex items-center gap-2">
@@ -180,8 +180,8 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
                 }}
                 className={`relative flex size-20 sm:size-24 flex-col items-center justify-center rounded-3xl border shadow-xl ${
                   isLight
-                    ? "border-slate-300 bg-white text-slate-800"
-                    : "border-white/15 bg-slate-950/90 text-cyan-300"
+                    ? 'border-slate-300 bg-white text-slate-800'
+                    : 'border-white/15 bg-slate-950/90 text-cyan-300'
                 }`}
               >
                 <Gamepad2 className="size-9 sm:size-10" />
@@ -194,24 +194,24 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
               <div className="relative flex items-center justify-center">
                 <motion.div
                   animate={{ rotate: 360 }}
-                  transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
                   className={`pointer-events-none absolute -inset-4 rounded-full border border-dashed ${
-                    isLight ? "border-indigo-400/50" : "border-cyan-400/45"
+                    isLight ? 'border-indigo-400/50' : 'border-cyan-400/45'
                   }`}
                 />
                 <motion.div
                   animate={{ rotate: -360 }}
-                  transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: 9, repeat: Infinity, ease: 'linear' }}
                   className={`pointer-events-none absolute -inset-8 rounded-full border ${
-                    isLight ? "border-violet-400/30" : "border-violet-400/30"
+                    isLight ? 'border-violet-400/30' : 'border-violet-400/30'
                   }`}
                 />
 
                 <div
                   className={`relative flex size-24 sm:size-28 items-center justify-center rounded-[2rem] border-2 shadow-2xl ${
                     isLight
-                      ? "border-indigo-500 bg-white shadow-[0_0_55px_rgba(79,70,229,0.28)]"
-                      : "border-cyan-400/70 bg-slate-950 shadow-[0_0_70px_rgba(0,229,255,0.45)]"
+                      ? 'border-indigo-500 bg-white shadow-[0_0_55px_rgba(79,70,229,0.28)]'
+                      : 'border-cyan-400/70 bg-slate-950 shadow-[0_0_70px_rgba(0,229,255,0.45)]'
                   }`}
                 >
                   <LogoMark className="size-14 sm:size-16" />
@@ -219,9 +219,7 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
                     animate={{ x: [0, 5, 0] }}
                     transition={{ duration: 1.0, repeat: Infinity }}
                     className={`absolute -bottom-2.5 flex items-center gap-1 rounded-full px-2.5 py-0.5 font-mono text-[10px] font-black shadow-lg ${
-                      isLight
-                        ? "bg-indigo-600 text-white"
-                        : "bg-cyan-400 text-slate-950"
+                      isLight ? 'bg-indigo-600 text-white' : 'bg-cyan-400 text-slate-950'
                     }`}
                   >
                     <span>{progress}%</span>
@@ -238,11 +236,11 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
                 className={`relative flex size-20 sm:size-24 flex-col items-center justify-center rounded-3xl border-2 shadow-2xl ${
                   phase >= 1
                     ? isLight
-                      ? "border-indigo-600 bg-indigo-50 text-indigo-700 shadow-[0_0_40px_rgba(79,70,229,0.25)]"
-                      : "border-emerald-400 bg-emerald-500/15 text-emerald-300 shadow-[0_0_45px_rgba(16,185,129,0.35)]"
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-[0_0_40px_rgba(79,70,229,0.25)]'
+                      : 'border-emerald-400 bg-emerald-500/15 text-emerald-300 shadow-[0_0_45px_rgba(16,185,129,0.35)]'
                     : isLight
-                      ? "border-slate-300 bg-white text-slate-500"
-                      : "border-white/15 bg-slate-950/90 text-slate-400"
+                      ? 'border-slate-300 bg-white text-slate-500'
+                      : 'border-white/15 bg-slate-950/90 text-slate-400'
                 }`}
               >
                 <Monitor className="size-9 sm:size-10" />
@@ -257,21 +255,21 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
               <div
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1 font-mono text-[10.5px] font-black uppercase tracking-[0.25em] ${
                   isLight
-                    ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                    : "border-cyan-400/35 bg-cyan-500/15 text-cyan-300"
+                    ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
+                    : 'border-cyan-400/35 bg-cyan-500/15 text-cyan-300'
                 }`}
               >
                 <Layers className="size-3.5" />
                 {phase === 0
-                  ? "Phase 1/3 · Deconstructing 10-Foot Spatial Canvas"
+                  ? 'Phase 1/3 · Deconstructing 10-Foot Spatial Canvas'
                   : phase === 1
-                    ? "Phase 2/3 · Synchronizing Library & Save Vault"
-                    : "Phase 3/3 · Activating Desktop Mode Workspace"}
+                    ? 'Phase 2/3 · Synchronizing Library & Save Vault'
+                    : 'Phase 3/3 · Activating Desktop Mode Workspace'}
               </div>
 
               <h1
                 className={`mt-3 text-3xl sm:text-5xl font-black tracking-tight ${
-                  isLight ? "text-slate-900" : "text-white"
+                  isLight ? 'text-slate-900' : 'text-white'
                 }`}
               >
                 Switching to Legacy Desktop Mode
@@ -289,11 +287,11 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
                       className={`h-2.5 rounded-sm transition-all duration-75 ${
                         lit
                           ? isLight
-                            ? "bg-gradient-to-t from-indigo-600 to-cyan-500 shadow-[0_0_8px_rgba(79,70,229,0.5)]"
-                            : "bg-gradient-to-t from-violet-500 via-cyan-400 to-emerald-300 shadow-[0_0_10px_rgba(0,229,255,0.75)]"
+                            ? 'bg-gradient-to-t from-indigo-600 to-cyan-500 shadow-[0_0_8px_rgba(79,70,229,0.5)]'
+                            : 'bg-gradient-to-t from-violet-500 via-cyan-400 to-emerald-300 shadow-[0_0_10px_rgba(0,229,255,0.75)]'
                           : isLight
-                            ? "bg-slate-300/70"
-                            : "bg-white/10"
+                            ? 'bg-slate-300/70'
+                            : 'bg-white/10'
                       }`}
                     />
                   )
@@ -301,7 +299,7 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
               </div>
               <div
                 className={`flex items-center justify-between font-mono text-[11px] font-bold ${
-                  isLight ? "text-slate-500" : "text-slate-400"
+                  isLight ? 'text-slate-500' : 'text-slate-400'
                 }`}
               >
                 <span>RESTORING WINDOW GEOMETRY &amp; DPI</span>
@@ -319,27 +317,27 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
                     className={`flex flex-col justify-between rounded-2xl border p-3.5 text-left transition-all duration-200 ${
                       st.done
                         ? isLight
-                          ? "border-emerald-300 bg-emerald-50/90 text-emerald-950 shadow-sm"
-                          : "border-emerald-400/45 bg-emerald-500/12 text-emerald-200"
+                          ? 'border-emerald-300 bg-emerald-50/90 text-emerald-950 shadow-sm'
+                          : 'border-emerald-400/45 bg-emerald-500/12 text-emerald-200'
                         : st.active
                           ? isLight
-                            ? "border-indigo-400 bg-indigo-50/90 text-indigo-950 shadow-md scale-[1.02]"
-                            : "border-cyan-400/50 bg-cyan-500/15 text-white shadow-lg scale-[1.02]"
+                            ? 'border-indigo-400 bg-indigo-50/90 text-indigo-950 shadow-md scale-[1.02]'
+                            : 'border-cyan-400/50 bg-cyan-500/15 text-white shadow-lg scale-[1.02]'
                           : isLight
-                            ? "border-slate-200 bg-white/80 text-slate-500"
-                            : "border-white/10 bg-white/[0.03] text-slate-400"
+                            ? 'border-slate-200 bg-white/80 text-slate-500'
+                            : 'border-white/10 bg-white/[0.03] text-slate-400'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <Icon
                         className={`size-4 ${
                           st.done
-                            ? "text-emerald-400"
+                            ? 'text-emerald-400'
                             : st.active
                               ? isLight
-                                ? "text-indigo-600"
-                                : "text-cyan-300"
-                              : "opacity-60"
+                                ? 'text-indigo-600'
+                                : 'text-cyan-300'
+                              : 'opacity-60'
                         }`}
                       />
                       {st.done ? (
@@ -368,7 +366,7 @@ export const ConsoleExitOutro: React.FC<ConsoleExitOutroProps> = ({ open, onSkip
           {/* Footer Hint */}
           <div
             className={`relative z-10 text-xs font-bold ${
-              isLight ? "text-slate-500" : "text-slate-400"
+              isLight ? 'text-slate-500' : 'text-slate-400'
             }`}
           >
             Click anywhere to complete transition immediately

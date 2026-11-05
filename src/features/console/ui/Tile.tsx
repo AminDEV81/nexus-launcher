@@ -141,8 +141,7 @@ export const ConsoleTile: React.FC<ConsoleTileProps> = React.memo(
       ? variant === 'landscape'
         ? 'https://images.igdb.com/igdb/image/upload/t_1080p/scq3y1.jpg'
         : 'https://images.igdb.com/igdb/image/upload/t_cover_big_2x/co9rwo.jpg'
-      :
-      variant === 'landscape'
+      : variant === 'landscape'
         ? (game?.banner_path ??
           game?.background_path ??
           game?.cover_path ??

@@ -142,7 +142,11 @@ export function LaunchBoostModal() {
       {
         id: 'power',
         title: 'Power & Full Bandwidth',
-        value: powerStep?.metric ? `${powerStep.metric} • 100% Net` : pct >= 50 ? 'Ultimate • 100%' : 'Engaging...',
+        value: powerStep?.metric
+          ? `${powerStep.metric} • 100% Net`
+          : pct >= 50
+            ? 'Ultimate • 100%'
+            : 'Engaging...',
         applied: Boolean(powerStep?.applied || pct >= 50),
         detail: 'Uncapped Pipe (No Limit)',
         icon: Gauge,
@@ -234,11 +238,7 @@ export function LaunchBoostModal() {
                   {/* Floating 3D Cover Thumbnail with Status Halo */}
                   <div className="relative shrink-0">
                     <motion.div
-                      animate={
-                        isReady
-                          ? { scale: [1, 1.04, 1] }
-                          : { scale: [1, 1.02, 1] }
-                      }
+                      animate={isReady ? { scale: [1, 1.04, 1] } : { scale: [1, 1.02, 1] }}
                       transition={{ duration: 2 * speed, repeat: Infinity }}
                       className={cn(
                         'relative h-20 w-15 overflow-hidden rounded-2xl border-2 bg-surface-raised shadow-xl transition-colors duration-300',
@@ -324,7 +324,9 @@ export function LaunchBoostModal() {
                     )}
 
                     <div className="mt-1 flex items-center gap-2 text-xs text-muted">
-                      {game?.developer && <span className="font-medium truncate">{game.developer}</span>}
+                      {game?.developer && (
+                        <span className="font-medium truncate">{game.developer}</span>
+                      )}
                       {game?.genres && game.genres.length > 0 && (
                         <>
                           <span className="size-1 rounded-full bg-muted/40" />
@@ -382,14 +384,29 @@ export function LaunchBoostModal() {
                       )}
                     />
 
-                    <svg viewBox={`0 0 ${DIAL_SIZE} ${DIAL_SIZE}`} className="size-full overflow-visible">
+                    <svg
+                      viewBox={`0 0 ${DIAL_SIZE} ${DIAL_SIZE}`}
+                      className="size-full overflow-visible"
+                    >
                       <defs>
-                        <linearGradient id={`modal-grad-${uid}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <linearGradient
+                          id={`modal-grad-${uid}`}
+                          x1="0%"
+                          y1="0%"
+                          x2="100%"
+                          y2="100%"
+                        >
                           <stop offset="0%" stopColor="var(--color-accent)" />
                           <stop offset="55%" stopColor="#06b6d4" />
                           <stop offset="100%" stopColor="#a855f7" />
                         </linearGradient>
-                        <linearGradient id={`modal-ready-${uid}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <linearGradient
+                          id={`modal-ready-${uid}`}
+                          x1="0%"
+                          y1="0%"
+                          x2="100%"
+                          y2="100%"
+                        >
                           <stop offset="0%" stopColor="#34d399" />
                           <stop offset="100%" stopColor="#06b6d4" />
                         </linearGradient>
@@ -689,7 +706,9 @@ export function LaunchBoostModal() {
                 <div className="flex-1">
                   <div className="mb-1 flex items-center justify-between font-mono text-[10px] font-bold uppercase tracking-wider text-subtle">
                     <span>
-                      {isReady ? 'Game Process Active — Enjoy Peak FPS!' : 'Allocating System Resources...'}
+                      {isReady
+                        ? 'Game Process Active — Enjoy Peak FPS!'
+                        : 'Allocating System Resources...'}
                     </span>
                     <span className={isReady ? 'text-emerald-400' : 'text-accent'}>
                       {Math.round(pct)}%

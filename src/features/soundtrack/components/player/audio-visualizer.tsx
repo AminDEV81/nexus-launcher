@@ -1,24 +1,24 @@
-import { useEffect, useRef } from "react"
-import { audioEngine } from "../../services/audio-engine"
-import { useSoundtrackStore, type VisualizerMode } from "../../store/soundtrack-store"
-import { useWindowActive } from "@/hooks/use-window-active"
+import { useEffect, useRef } from 'react'
+import { audioEngine } from '../../services/audio-engine'
+import { useSoundtrackStore, type VisualizerMode } from '../../store/soundtrack-store'
+import { useWindowActive } from '@/hooks/use-window-active'
 
 interface AudioVisualizerProps {
   mode?: VisualizerMode
   className?: string
 }
 
-export function AudioVisualizer({ mode = "minimal", className = "" }: AudioVisualizerProps) {
+export function AudioVisualizer({ mode = 'minimal', className = '' }: AudioVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  const isPlaying = useSoundtrackStore((s) => s.playbackState === "playing")
+  const isPlaying = useSoundtrackStore((s) => s.playbackState === 'playing')
   const windowActive = useWindowActive()
 
   useEffect(() => {
-    if (mode === "off") return
+    if (mode === 'off') return
 
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext("2d")
+    const ctx = canvas.getContext('2d')
     if (!ctx) return
 
     let animationId: number | null = null
@@ -32,20 +32,20 @@ export function AudioVisualizer({ mode = "minimal", className = "" }: AudioVisua
 
     // Multi-stop neon gradient that looks vivid in both Console Mode and Legacy Mode
     const barGrad = ctx.createLinearGradient(0, height, 0, 0)
-    barGrad.addColorStop(0, "rgba(6, 182, 212, 0.28)")
-    barGrad.addColorStop(0.55, "rgba(56, 189, 248, 0.88)")
-    barGrad.addColorStop(1, "rgba(168, 85, 247, 0.98)")
+    barGrad.addColorStop(0, 'rgba(6, 182, 212, 0.28)')
+    barGrad.addColorStop(0.55, 'rgba(56, 189, 248, 0.88)')
+    barGrad.addColorStop(1, 'rgba(168, 85, 247, 0.98)')
 
     const waveGrad = ctx.createLinearGradient(0, 0, width, 0)
-    waveGrad.addColorStop(0, "#06b6d4")
-    waveGrad.addColorStop(0.5, "#6366f1")
-    waveGrad.addColorStop(1, "#ec4899")
+    waveGrad.addColorStop(0, '#06b6d4')
+    waveGrad.addColorStop(0.5, '#6366f1')
+    waveGrad.addColorStop(1, '#ec4899')
 
     const renderFrame = (activePlaying: boolean) => {
       ctx.clearRect(0, 0, width, height)
 
       let hasData = false
-      if (activePlaying && analyser && audioEngine.getState() === "playing") {
+      if (activePlaying && analyser && audioEngine.getState() === 'playing') {
         analyser.getByteFrequencyData(dataArray)
         for (let i = 0; i < bufferLength; i++) {
           if (dataArray[i] > 0) {
@@ -73,7 +73,7 @@ export function AudioVisualizer({ mode = "minimal", className = "" }: AudioVisua
         }
       }
 
-      if (mode === "minimal") {
+      if (mode === 'minimal') {
         const barCount = 32
         const gap = 3
         const barWidth = (width - gap * (barCount - 1)) / barCount
@@ -90,10 +90,10 @@ export function AudioVisualizer({ mode = "minimal", className = "" }: AudioVisua
           ctx.fill()
 
           // Glowing peak cap
-          ctx.fillStyle = activePlaying ? "#22d3ee" : "rgba(34, 211, 238, 0.55)"
+          ctx.fillStyle = activePlaying ? '#22d3ee' : 'rgba(34, 211, 238, 0.55)'
           ctx.fillRect(x, Math.max(1, y - 3), barWidth, 2)
         }
-      } else if (mode === "reactive") {
+      } else if (mode === 'reactive') {
         const points = 40
         const sliceWidth = width / (points - 1)
 
@@ -101,7 +101,8 @@ export function AudioVisualizer({ mode = "minimal", className = "" }: AudioVisua
         ctx.beginPath()
         for (let i = 0; i < points; i++) {
           const v = (dataArray[i % bufferLength] || 30) / 255
-          const offset = Math.sin(now * (activePlaying ? 5.5 : 1.6) + i * 0.35) * v * (height * 0.38)
+          const offset =
+            Math.sin(now * (activePlaying ? 5.5 : 1.6) + i * 0.35) * v * (height * 0.38)
           const x = i * sliceWidth
           const y = height / 2 + offset
           if (i === 0) ctx.moveTo(x, y)
@@ -121,7 +122,7 @@ export function AudioVisualizer({ mode = "minimal", className = "" }: AudioVisua
           if (i === 0) ctx.moveTo(x, y)
           else ctx.lineTo(x, y)
         }
-        ctx.strokeStyle = "rgba(34, 211, 238, 0.45)"
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.45)'
         ctx.lineWidth = 1.6
         ctx.stroke()
       }
@@ -146,7 +147,7 @@ export function AudioVisualizer({ mode = "minimal", className = "" }: AudioVisua
     }
   }, [mode, isPlaying, windowActive])
 
-  if (mode === "off") return null
+  if (mode === 'off') return null
 
   return (
     <canvas

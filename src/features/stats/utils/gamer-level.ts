@@ -60,7 +60,10 @@ export function calculateGamerLevel(totalSeconds: number): GamerLevelInfo {
   const progressPercent = Math.min(100, Math.max(0, Math.round((currentLevelXp / xpNeeded) * 100)))
 
   const nextLevelHours = Math.max(1, Math.round((nextThreshold / 60) * 10) / 10)
-  const hoursToNextLevel = Math.max(0.1, Math.round(((nextThreshold - totalMinutes) / 60) * 10) / 10)
+  const hoursToNextLevel = Math.max(
+    0.1,
+    Math.round(((nextThreshold - totalMinutes) / 60) * 10) / 10,
+  )
 
   return {
     level,

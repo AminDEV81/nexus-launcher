@@ -75,10 +75,7 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
     }
   }, [open, gameId])
 
-  const options = useMemo(
-    () => sortArtworkOptions(rawOptions, sortMode),
-    [rawOptions, sortMode],
-  )
+  const options = useMemo(() => sortArtworkOptions(rawOptions, sortMode), [rawOptions, sortMode])
 
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -160,12 +157,14 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
                 </span>
                 {!isPending && options.length > 0 && (
                   <span className="rounded-full border border-border/70 bg-surface/80 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
-                    {options.length} Total ({staticOptions.length} Static • {animatedOptions.length} Live)
+                    {options.length} Total ({staticOptions.length} Static • {animatedOptions.length}{' '}
+                    Live)
                   </span>
                 )}
               </div>
               <p className="mt-0.5 text-xs text-muted">
-                Static previews in list for low data usage — click any Live Banner to check download size &amp; apply.
+                Static previews in list for low data usage — click any Live Banner to check download
+                size &amp; apply.
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2 pr-9">
@@ -176,7 +175,9 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
                 title="Fetch latest community banners live from SteamGridDB"
                 className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface/70 px-3 py-1.5 text-xs font-semibold text-text shadow-xs transition-all duration-200 hover:bg-surface-raised hover:border-emerald-500/50 hover:text-emerald-400 hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
               >
-                <RefreshCw className={cn('size-3.5', isFetching && 'animate-spin text-emerald-400')} />
+                <RefreshCw
+                  className={cn('size-3.5', isFetching && 'animate-spin text-emerald-400')}
+                />
                 <span>Sync Live</span>
               </button>
               <button
@@ -217,7 +218,10 @@ export function BannerPickerModal({ gameId, open, onClose }: BannerPickerModalPr
 
           {/* Live SteamGridDB Search & Sort Bar */}
           <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-surface/50 p-2">
-            <form onSubmit={handleSearchSubmit} className="relative flex flex-1 items-center min-w-[240px]">
+            <form
+              onSubmit={handleSearchSubmit}
+              className="relative flex flex-1 items-center min-w-[240px]"
+            >
               <Search className="pointer-events-none absolute left-3 size-3.5 text-muted" />
               <input
                 type="text"

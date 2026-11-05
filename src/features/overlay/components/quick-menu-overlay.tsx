@@ -48,8 +48,12 @@ export const QuickMenuOverlay: React.FC<QuickMenuOverlayProps> = ({
 
   useEffect(() => {
     if (!open) return
-    consoleGetMasterVolume().then(setVolume).catch(() => {})
-    consoleGetSystemStatus().then(setStatus).catch(() => {})
+    consoleGetMasterVolume()
+      .then(setVolume)
+      .catch(() => {})
+    consoleGetSystemStatus()
+      .then(setStatus)
+      .catch(() => {})
   }, [open])
 
   const handleClose = () => {
@@ -97,7 +101,9 @@ export const QuickMenuOverlay: React.FC<QuickMenuOverlayProps> = ({
     onConfirm: () => {
       const nextVal = Math.max(0, volume - 10)
       setVolume(nextVal)
-      void consoleSetMasterVolume(nextVal).then(setVolume).catch(() => {})
+      void consoleSetMasterVolume(nextVal)
+        .then(setVolume)
+        .catch(() => {})
     },
   })
 
@@ -107,7 +113,9 @@ export const QuickMenuOverlay: React.FC<QuickMenuOverlayProps> = ({
     onConfirm: () => {
       const nextVal = Math.min(100, volume + 10)
       setVolume(nextVal)
-      void consoleSetMasterVolume(nextVal).then(setVolume).catch(() => {})
+      void consoleSetMasterVolume(nextVal)
+        .then(setVolume)
+        .catch(() => {})
     },
   })
 

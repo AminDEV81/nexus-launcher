@@ -63,10 +63,7 @@ export function LogoPickerModal({ gameId, open, onClose, onBrowse }: LogoPickerM
     }
   }, [open, gameId])
 
-  const options = useMemo(
-    () => sortArtworkOptions(rawOptions, sortMode),
-    [rawOptions, sortMode],
-  )
+  const options = useMemo(() => sortArtworkOptions(rawOptions, sortMode), [rawOptions, sortMode])
 
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -130,7 +127,9 @@ export function LogoPickerModal({ gameId, open, onClose, onBrowse }: LogoPickerM
                 title="Fetch latest community logos live from SteamGridDB"
                 className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface/70 px-3 py-1.5 text-xs font-semibold text-text shadow-xs transition-all duration-200 hover:bg-surface-raised hover:border-emerald-500/50 hover:text-emerald-400 hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
               >
-                <RefreshCw className={cn('size-3.5', isFetching && 'animate-spin text-emerald-400')} />
+                <RefreshCw
+                  className={cn('size-3.5', isFetching && 'animate-spin text-emerald-400')}
+                />
                 <span>Sync Live</span>
               </button>
               <button
@@ -158,7 +157,10 @@ export function LogoPickerModal({ gameId, open, onClose, onBrowse }: LogoPickerM
 
           {/* Live SteamGridDB Search & Sort Bar */}
           <div className="mt-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-surface/50 p-2">
-            <form onSubmit={handleSearchSubmit} className="relative flex flex-1 items-center min-w-[220px]">
+            <form
+              onSubmit={handleSearchSubmit}
+              className="relative flex flex-1 items-center min-w-[220px]"
+            >
               <Search className="pointer-events-none absolute left-3 size-3.5 text-muted" />
               <input
                 type="text"

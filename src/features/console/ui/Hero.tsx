@@ -266,9 +266,7 @@ export const ConsoleHero: React.FC<ConsoleHeroProps> = ({
             }`}
           >
             <Heart
-              className={`size-5 ${
-                game.is_favorite ? 'fill-amber-400 text-amber-400' : ''
-              }`}
+              className={`size-5 ${game.is_favorite ? 'fill-amber-400 text-amber-400' : ''}`}
             />
           </motion.button>
         )}

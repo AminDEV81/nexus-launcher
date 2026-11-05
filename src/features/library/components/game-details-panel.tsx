@@ -188,7 +188,9 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
   const [installationEditorOpen, setInstallationEditorOpen] = useState(false)
   const [tagsEditorOpen, setTagsEditorOpen] = useState(false)
   const [playtimeEditorOpen, setPlaytimeEditorOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'soundtrack' | 'saves' | 'media' | 'launch'>('overview')
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'soundtrack' | 'saves' | 'media' | 'launch'
+  >('overview')
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [copiedFeedback, setCopiedFeedback] = useState(false)
 
@@ -358,18 +360,18 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
                     {game.name}
                   </h1>
                 )}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  playButtonClick()
-                  setRenameModalOpen(true)
-                }}
-                title="Rename Game"
-                className="rounded-xl border border-white/20 bg-black/60 p-1.5 text-white/70 hover:text-white hover:bg-black/80 hover:scale-105 active:scale-95 transition-all shadow-md backdrop-blur-md cursor-pointer"
-              >
-                <Pencil className="size-3.5" />
-              </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    playButtonClick()
+                    setRenameModalOpen(true)
+                  }}
+                  title="Rename Game"
+                  className="rounded-xl border border-white/20 bg-black/60 p-1.5 text-white/70 hover:text-white hover:bg-black/80 hover:scale-105 active:scale-95 transition-all shadow-md backdrop-blur-md cursor-pointer"
+                >
+                  <Pencil className="size-3.5" />
+                </button>
               </div>
             </div>
 
@@ -1016,9 +1018,7 @@ function PanelContent({ game, onClose }: { game: Game; onClose: () => void }) {
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-black tracking-tight text-text">
-                    Explore Mods
-                  </span>
+                  <span className="text-xs font-black tracking-tight text-text">Explore Mods</span>
                   <span className="rounded-md border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.2 font-mono text-[9px] font-extrabold uppercase tracking-wider text-amber-500 dark:text-amber-300">
                     NexusMods
                   </span>

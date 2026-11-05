@@ -3,16 +3,7 @@ import { useConsoleStore } from '../store/console-store'
 import { CONSOLE_THEMES, type ConsoleGlyphFamily } from '../theme/tokens'
 
 export type GlyphButton =
-  | 'confirm'
-  | 'back'
-  | 'secondary'
-  | 'tertiary'
-  | 'options'
-  | 'lb'
-  | 'rb'
-  | 'lt'
-  | 'rt'
-  | 'guide'
+  'confirm' | 'back' | 'secondary' | 'tertiary' | 'options' | 'lb' | 'rb' | 'lt' | 'rt' | 'guide'
 
 interface GlyphProps {
   button: GlyphButton

@@ -30,13 +30,7 @@ export interface ConsoleSystemStatus {
   launched_with_console_flag: boolean
 }
 
-export type ConsolePowerAction =
-  | 'sleep'
-  | 'hibernate'
-  | 'restart'
-  | 'shutdown'
-  | 'lock'
-  | 'cancel'
+export type ConsolePowerAction = 'sleep' | 'hibernate' | 'restart' | 'shutdown' | 'lock' | 'cancel'
 
 export function consoleModeEnter(monitorIndex?: number): Promise<boolean> {
   return call<boolean>('console_mode_enter', { monitorIndex: monitorIndex ?? null })

@@ -207,11 +207,7 @@ function drawRoundedRect(
   ctx.closePath()
 }
 
-function truncateCanvasText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-): string {
+function truncateCanvasText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text
   let out = text
   while (out.length > 1 && ctx.measureText(`${out}…`).width > maxWidth) {
@@ -606,11 +602,7 @@ export function GamerPassportModal({
 
     ctx.fillStyle = textMain
     ctx.font = '900 34px system-ui, -apple-system, sans-serif'
-    ctx.fillText(
-      truncateCanvasText(ctx, champGame?.name || 'No Game Logged Yet', 430),
-      cxText,
-      696,
-    )
+    ctx.fillText(truncateCanvasText(ctx, champGame?.name || 'No Game Logged Yet', 430), cxText, 696)
 
     const champSharePct =
       champGame && (summary?.total_playtime_seconds ?? 0) > 0
@@ -773,9 +765,7 @@ export function GamerPassportModal({
     const canvas = canvasRef.current
     const dataUrl = canvas ? canvas.toDataURL('image/png') : previewDataUrl
     if (!dataUrl) return
-    const safeName = (profile?.name || 'operative')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
+    const safeName = (profile?.name || 'operative').toLowerCase().replace(/[^a-z0-9]+/g, '-')
     const link = document.createElement('a')
     link.download = `nexus-stats-${safeName}-${activeTheme.id}.png`
     link.href = dataUrl
@@ -864,7 +854,9 @@ export function GamerPassportModal({
                 <div>
                   <div className="flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-accent">
                     <Sparkles className="size-3" />
-                    <span>1600×1000 RETINA INFOGRAPHIC GENERATOR • 8 DARK &amp; LIGHT PALETTES</span>
+                    <span>
+                      1600×1000 RETINA INFOGRAPHIC GENERATOR • 8 DARK &amp; LIGHT PALETTES
+                    </span>
                   </div>
                   <h2 className="text-xl font-black tracking-tight text-text sm:text-2xl">
                     Share Your Gaming State &amp; Telemetry
@@ -942,7 +934,8 @@ export function GamerPassportModal({
             <div className="flex items-center gap-2 text-xs text-muted">
               <ImageIcon className="size-4 text-accent" />
               <span>
-                Switch between Dark &amp; Light Mode palettes above, then copy or download in 1600×1000 HD.
+                Switch between Dark &amp; Light Mode palettes above, then copy or download in
+                1600×1000 HD.
               </span>
             </div>
 

@@ -106,7 +106,8 @@ export function MemoryPage() {
               <div className="flex items-center gap-2.5">
                 <h1 className="text-2xl font-black tracking-tight text-text">Memory Vault</h1>
                 <span className="rounded-full border border-amber-500/35 bg-amber-500/15 px-2.5 py-0.5 font-mono text-[11px] font-bold text-amber-600 dark:text-amber-300">
-                  {memoryGames.length} {memoryGames.length === 1 ? 'Archived Title' : 'Archived Titles'}
+                  {memoryGames.length}{' '}
+                  {memoryGames.length === 1 ? 'Archived Title' : 'Archived Titles'}
                 </span>
               </div>
               <p className="mt-0.5 text-xs text-muted">

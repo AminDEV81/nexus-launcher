@@ -162,7 +162,9 @@ export function MemoryCard({
                       {game.name}
                     </span>
                     <span className="text-[10px] text-subtle">
-                      {game.genres.length > 0 ? game.genres.slice(0, 2).join(' • ') : 'Memory Vault'}
+                      {game.genres.length > 0
+                        ? game.genres.slice(0, 2).join(' • ')
+                        : 'Memory Vault'}
                     </span>
                   </div>
                 )

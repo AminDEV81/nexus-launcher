@@ -216,9 +216,11 @@ npm run tauri dev
 ### Production Build
 
 To build a standalone, optimized Windows .exe installer:
+
 ```bash
 npm run tauri build
 ```
+
 The resulting executable will be available in src-tauri/target/release/bundle/msi/.
 
 ---

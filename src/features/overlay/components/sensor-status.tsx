@@ -25,9 +25,7 @@ const Row: React.FC<RowProps> = ({ icon, title, ok, detail, hint }) => (
         )}
       </div>
       <div className="mt-0.5 text-[11px] font-medium text-muted">{detail}</div>
-      {!ok && hint && (
-        <div className="mt-1 text-[10px] leading-relaxed text-amber-500">{hint}</div>
-      )}
+      {!ok && hint && <div className="mt-1 text-[10px] leading-relaxed text-amber-500">{hint}</div>}
     </div>
   </div>
 )

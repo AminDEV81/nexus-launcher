@@ -296,9 +296,7 @@ export const QuickSettingsPanel: React.FC<QuickSettingsPanelProps> = ({
                 {/* Quick Theme & Daylight Palette Switcher */}
                 <div
                   className={`p-4 rounded-2xl border space-y-2.5 ${
-                    isLight
-                      ? 'bg-slate-50 border-slate-200'
-                      : 'bg-white/[0.06] border-transparent'
+                    isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.06] border-transparent'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -347,9 +345,7 @@ export const QuickSettingsPanel: React.FC<QuickSettingsPanelProps> = ({
                 {/* Volume */}
                 <div
                   className={`p-4 rounded-2xl border space-y-2.5 ${
-                    isLight
-                      ? 'bg-slate-50 border-slate-200'
-                      : 'bg-white/[0.06] border-transparent'
+                    isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.06] border-transparent'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -381,9 +377,7 @@ export const QuickSettingsPanel: React.FC<QuickSettingsPanelProps> = ({
                     }`}
                   >
                     <div
-                      className={`h-full transition-all ${
-                        isLight ? 'bg-indigo-600' : 'bg-white'
-                      }`}
+                      className={`h-full transition-all ${isLight ? 'bg-indigo-600' : 'bg-white'}`}
                       style={{ width: `${volume}%` }}
                     />
                   </div>
@@ -420,9 +414,7 @@ export const QuickSettingsPanel: React.FC<QuickSettingsPanelProps> = ({
                 {/* Display, Cover & Text Scale Quick Control */}
                 <div
                   className={`p-4 rounded-2xl border space-y-2.5 ${
-                    isLight
-                      ? 'bg-slate-50 border-slate-200'
-                      : 'bg-white/[0.06] border-transparent'
+                    isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.06] border-transparent'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -438,9 +430,7 @@ export const QuickSettingsPanel: React.FC<QuickSettingsPanelProps> = ({
                     </span>
                     <span
                       className={`text-xs font-black px-2.5 py-0.5 rounded-full tabular-nums ${
-                        isLight
-                          ? 'bg-indigo-100 text-indigo-800'
-                          : 'bg-cyan-500/20 text-cyan-300'
+                        isLight ? 'bg-indigo-100 text-indigo-800' : 'bg-cyan-500/20 text-cyan-300'
                       }`}
                     >
                       {uiScale}%
@@ -492,9 +482,7 @@ export const QuickSettingsPanel: React.FC<QuickSettingsPanelProps> = ({
                 {/* Controller & Battery Telemetry */}
                 <div
                   className={`p-4 rounded-2xl border space-y-2 ${
-                    isLight
-                      ? 'bg-slate-50 border-slate-200'
-                      : 'bg-white/[0.06] border-transparent'
+                    isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.06] border-transparent'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -551,9 +539,7 @@ export const QuickSettingsPanel: React.FC<QuickSettingsPanelProps> = ({
                 {/* Mini Music Player */}
                 <div
                   className={`p-4 rounded-2xl border space-y-2.5 ${
-                    isLight
-                      ? 'bg-slate-50 border-slate-200'
-                      : 'bg-white/[0.06] border-transparent'
+                    isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.06] border-transparent'
                   }`}
                 >
                   <div className="flex items-center justify-between">

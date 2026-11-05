@@ -267,7 +267,9 @@ export function HubFeaturedHero({
                   {/* View Game */}
                   <button
                     type="button"
-                    onClick={() => navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })}
+                    onClick={() =>
+                      navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })
+                    }
                     className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-[0_10px_24px_-8px_var(--nx-accent)] transition-all hover:bg-accent-hover hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <span>View Game</span>
@@ -296,7 +298,9 @@ export function HubFeaturedHero({
                   {inMem ? (
                     <button
                       type="button"
-                      onClick={() => navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })}
+                      onClick={() =>
+                        navigate(`/hub/${game.igdb_id}`, { state: { expectedName: game.name } })
+                      }
                       className="inline-flex items-center gap-1.5 rounded-xl border border-amber-400/40 bg-amber-500/20 px-3 py-2 text-xs font-bold text-amber-300 backdrop-blur-md transition-colors hover:bg-amber-500/30 cursor-pointer"
                     >
                       <RotateCcw className="size-3.5 text-amber-400" />

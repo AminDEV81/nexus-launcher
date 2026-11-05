@@ -55,9 +55,15 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
   const [sessions, setSessions] = useState<RecentSession[]>([])
 
   useEffect(() => {
-    getStatsSummary().then(setSummary).catch(() => {})
-    getPlaytimeByGenre().then(setGenres).catch(() => {})
-    getRecentSessions().then(setSessions).catch(() => {})
+    getStatsSummary()
+      .then(setSummary)
+      .catch(() => {})
+    getPlaytimeByGenre()
+      .then(setGenres)
+      .catch(() => {})
+    getRecentSessions()
+      .then(setSessions)
+      .catch(() => {})
   }, [])
 
   const levelInfo = useMemo(
@@ -109,7 +115,9 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
             </div>
 
             <div className="space-y-1.5">
-              <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-extrabold uppercase tracking-wider ${isLight ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-cyan-400/20 border-cyan-400/40 text-cyan-300"}`}>
+              <div
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-extrabold uppercase tracking-wider ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-cyan-400/20 border-cyan-400/40 text-cyan-300'}`}
+              >
                 <Sparkles className="size-3.5" />
                 {levelInfo.rankTitle} · Gamer Passport
               </div>
@@ -120,7 +128,9 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
               >
                 {activeProfile?.name || 'Nexus Player'}
               </h1>
-              <p className={`text-xs font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+              <p
+                className={`text-xs font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}
+              >
                 {levelInfo.currentXp} / {levelInfo.xpForNextLevel} XP ({levelInfo.hoursToNextLevel}h
                 to Level {levelInfo.level + 1})
               </p>
@@ -238,13 +248,17 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
             <div className="flex items-center gap-2.5">
               <Compass className="size-5 text-cyan-400" />
               <div>
-                <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                <h2
+                  className={`text-lg font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}
+                >
                   {circadian.dominantPersona.title}
                 </h2>
                 <p className="text-xs text-slate-400">{circadian.dominantPersona.description}</p>
               </div>
             </div>
-            <span className={`rounded-full border px-3 py-1 text-xs font-extrabold ${isLight ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "bg-cyan-500/20 border-cyan-400/30 text-cyan-300"}`}>
+            <span
+              className={`rounded-full border px-3 py-1 text-xs font-extrabold ${isLight ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-cyan-500/20 border-cyan-400/30 text-cyan-300'}`}
+            >
               {circadian.dominantPersona.tag}
             </span>
           </div>
@@ -258,7 +272,9 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
                 }`}
               >
                 <p className="text-[11px] font-bold text-slate-400">{b.label}</p>
-                <p className={`mt-1 text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                <p
+                  className={`mt-1 text-base font-black ${isLight ? 'text-slate-900' : 'text-white'}`}
+                >
                   {b.percentage}%
                 </p>
                 <p className="text-[10px] text-cyan-400 font-semibold">{b.hours}h</p>
@@ -283,9 +299,7 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
             <Trophy className="size-5 text-amber-400" />
             Gamer Trophies & Milestones
           </h2>
-          <span className="text-xs font-extrabold text-amber-400">
-            {unlockedCount} Unlocked
-          </span>
+          <span className="text-xs font-extrabold text-amber-400">{unlockedCount} Unlocked</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -355,7 +369,9 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
             Genre Mastery Breakdown
           </h2>
           {genres.length === 0 ? (
-            <p className="text-sm text-slate-400">Play games across genres to populate your breakdown.</p>
+            <p className="text-sm text-slate-400">
+              Play games across genres to populate your breakdown.
+            </p>
           ) : (
             <div className="space-y-3">
               {genres.slice(0, 6).map((g) => {
@@ -406,12 +422,16 @@ export const PassportView: React.FC<PassportViewProps> = ({ games = [] }) => {
                   }`}
                 >
                   <div className="min-w-0 pr-3">
-                    <p className={`truncate font-extrabold text-sm ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                    <p
+                      className={`truncate font-extrabold text-sm ${isLight ? 'text-slate-900' : 'text-white'}`}
+                    >
                       {s.game_name}
                     </p>
                     <p className="text-slate-400 mt-0.5">{s.started_at}</p>
                   </div>
-                  <span className={`shrink-0 rounded-xl px-3 py-1 font-extrabold ${isLight ? "bg-indigo-50 text-indigo-700" : "bg-cyan-500/20 text-cyan-300"}`}>
+                  <span
+                    className={`shrink-0 rounded-xl px-3 py-1 font-extrabold ${isLight ? 'bg-indigo-50 text-indigo-700' : 'bg-cyan-500/20 text-cyan-300'}`}
+                  >
                     {formatPlaytime(s.duration_seconds ?? 0)}
                   </span>
                 </div>

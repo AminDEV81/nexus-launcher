@@ -105,10 +105,7 @@ export const MemoryView: React.FC<MemoryViewProps> = ({
     }
   }, [onRefreshGames])
 
-  const memoryGames = useMemo(
-    () => games.filter((g) => g.is_memory && !g.is_hidden),
-    [games],
-  )
+  const memoryGames = useMemo(() => games.filter((g) => g.is_memory && !g.is_hidden), [games])
 
   const displayedGames = useMemo(() => {
     let list = [...memoryGames]
@@ -318,7 +315,9 @@ export const MemoryView: React.FC<MemoryViewProps> = ({
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Preserved Memories
                 </p>
-                <p className={`font-mono text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                <p
+                  className={`font-mono text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}
+                >
                   {memoryGames.length} Titles Archived
                 </p>
               </div>
@@ -334,7 +333,9 @@ export const MemoryView: React.FC<MemoryViewProps> = ({
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Archived Playtime
                 </p>
-                <p className={`font-mono text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                <p
+                  className={`font-mono text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}
+                >
                   {totalPlaytimeHours} Hours Logged
                 </p>
               </div>
@@ -350,7 +351,9 @@ export const MemoryView: React.FC<MemoryViewProps> = ({
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Veteran &amp; Legend Ranks
                 </p>
-                <p className={`font-mono text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}>
+                <p
+                  className={`font-mono text-sm font-black ${isLight ? 'text-slate-900' : 'text-white'}`}
+                >
                   {veteranCount} High-Mastery Games
                 </p>
               </div>

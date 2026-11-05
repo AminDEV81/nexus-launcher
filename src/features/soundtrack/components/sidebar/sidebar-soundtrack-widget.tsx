@@ -54,8 +54,7 @@ function formatSeconds(sec: number) {
 }
 
 function formatTotalRuntime(ms: number, tracks: SoundtrackTrack[]) {
-  const computedMs =
-    ms && ms > 0 ? ms : tracks.reduce((sum, t) => sum + (t.duration_ms || 0), 0)
+  const computedMs = ms && ms > 0 ? ms : tracks.reduce((sum, t) => sum + (t.duration_ms || 0), 0)
   if (!computedMs || computedMs <= 0) return ''
   const totalSec = Math.floor(computedMs / 1000)
   const h = Math.floor(totalSec / 3600)
@@ -121,7 +120,7 @@ export function SidebarSoundtrackWidget({
   // Check if currently playing track belongs to this game's active album (or any album of this game)
   const isPlayingThisGame = Boolean(
     currentTrack &&
-      albumsWithTracks.some((alb) => alb.tracks.some((t) => t.id === currentTrack.id)),
+    albumsWithTracks.some((alb) => alb.tracks.some((t) => t.id === currentTrack.id)),
   )
 
   const activeOrFeaturedTrack: SoundtrackTrack | null = useMemo(() => {
@@ -220,8 +219,7 @@ export function SidebarSoundtrackWidget({
     })
   }
 
-  const coverUrl =
-    assetUrl(primaryAlbum?.album.cover_url) || assetUrl(game.cover_path) || undefined
+  const coverUrl = assetUrl(primaryAlbum?.album.cover_url) || assetUrl(game.cover_path) || undefined
   const runtimeLabel = primaryAlbum
     ? formatTotalRuntime(primaryAlbum.album.total_duration_ms, primaryAlbum.tracks)
     : ''

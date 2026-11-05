@@ -271,13 +271,7 @@ export function BoosterScanDial({
                   y1={y1}
                   x2={x2}
                   y2={y2}
-                  stroke={
-                    lit
-                      ? isDone
-                        ? '#34d399'
-                        : 'var(--color-accent)'
-                      : 'currentColor'
-                  }
+                  stroke={lit ? (isDone ? '#34d399' : 'var(--color-accent)') : 'currentColor'}
                   strokeWidth={isCardinal ? 2.6 : isMajor ? 1.8 : 1.1}
                   strokeLinecap="round"
                   className={cn(
@@ -320,9 +314,7 @@ export function BoosterScanDial({
             strokeWidth="7.5"
             strokeLinecap="round"
             strokeDasharray={CIRC}
-            strokeDashoffset={
-              phase === 'idle' && pct === 0 ? CIRC * 0.72 : strokeOffset
-            }
+            strokeDashoffset={phase === 'idle' && pct === 0 ? CIRC * 0.72 : strokeOffset}
             transform={`rotate(-90 ${CENTER} ${CENTER})`}
             filter={`url(#glow-${uid})`}
             className={cn(
@@ -552,9 +544,7 @@ export function ReactorTelemetryPills({
         <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-subtle">
           Modules
         </span>
-        <span className="mt-0.5 font-mono text-xs font-black text-accent">
-          {moduleCount} Armed
-        </span>
+        <span className="mt-0.5 font-mono text-xs font-black text-accent">{moduleCount} Armed</span>
       </div>
     </div>
   )

@@ -502,28 +502,35 @@ export const StoreGameDetailView: React.FC<StoreGameDetailViewProps> = ({
                 {statusKind === 'installed' && (
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-bold">
-                      ✓ Installed in your Library ({formatPlaytime(matchedLibraryGame?.total_playtime_seconds ?? 0)} played) — Ready to launch immediately.
+                      ✓ Installed in your Library (
+                      {formatPlaytime(matchedLibraryGame?.total_playtime_seconds ?? 0)} played) —
+                      Ready to launch immediately.
                     </span>
                   </div>
                 )}
                 {statusKind === 'uninstalled' && (
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-bold">
-                      ⚠ In Your Library (Not Installed Yet): Switch to Legacy (Desktop) Mode to install or configure the game executable on your PC.
+                      ⚠ In Your Library (Not Installed Yet): Switch to Legacy (Desktop) Mode to
+                      install or configure the game executable on your PC.
                     </span>
                   </div>
                 )}
                 {statusKind === 'memory' && (
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-bold">
-                      ★ Saved in Your Memory Vault ({formatPlaytime(matchedLibraryGame?.total_playtime_seconds ?? 0)} preserved): Open the Memories tab to inspect or restore, or switch to Legacy Mode to reinstall.
+                      ★ Saved in Your Memory Vault (
+                      {formatPlaytime(matchedLibraryGame?.total_playtime_seconds ?? 0)} preserved):
+                      Open the Memories tab to inspect or restore, or switch to Legacy Mode to
+                      reinstall.
                     </span>
                   </div>
                 )}
                 {statusKind === 'wishlist' && (
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-bold">
-                      ♥ Currently in your Wishlist — Promote to your Library anytime or switch to Legacy Mode to install.
+                      ♥ Currently in your Wishlist — Promote to your Library anytime or switch to
+                      Legacy Mode to install.
                     </span>
                   </div>
                 )}

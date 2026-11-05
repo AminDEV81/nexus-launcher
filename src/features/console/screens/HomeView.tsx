@@ -138,16 +138,10 @@ export const HomeView: React.FC<HomeViewProps> = React.memo(
           >
             <FolderSearch className="w-10 h-10" />
           </div>
-          <h2
-            className={`text-3xl font-black mb-2 ${isLight ? 'text-slate-900' : 'text-white'}`}
-          >
+          <h2 className={`text-3xl font-black mb-2 ${isLight ? 'text-slate-900' : 'text-white'}`}>
             {t.home.emptyLibraryTitle}
           </h2>
-          <p
-            className={`text-base max-w-lg mb-8 ${
-              isLight ? 'text-slate-600' : 'text-slate-400'
-            }`}
-          >
+          <p className={`text-base max-w-lg mb-8 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
             {t.home.emptyLibraryDesc}
           </p>
           <button

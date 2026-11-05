@@ -1,5 +1,12 @@
 import type { Env, ArtworkOption } from './types'
-import { isAllowlistedPath, canonicalizeQuery, validateGameId, clampOffset, buildCanonicalCacheUrl, resolveCorsOrigin } from './security/validation'
+import {
+  isAllowlistedPath,
+  canonicalizeQuery,
+  validateGameId,
+  clampOffset,
+  buildCanonicalCacheUrl,
+  resolveCorsOrigin,
+} from './security/validation'
 import { checkRateLimit } from './security/rate-limit'
 import { deduplicate } from './cache/deduplication'
 import { matchEdgeCache, putEdgeCache, TTL } from './cache/edge-cache'

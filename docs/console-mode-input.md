@@ -1,16 +1,20 @@
 # Console Mode Input Architecture & DualSense / ViGEm Deduplication
 
 ## 1. The DualSense + ViGEm / HidHide Challenge
+
 Nexus Launcher includes a built-in multi-controller DualSense engine (`src-tauri/src/commands/dualsense/`) that can:
+
 1. Cloak the physical Sony DualSense controller from standard APIs via **HidHide**.
 2. Spawn a virtual **Xbox 360 (XInput)** controller via **ViGEmBus**.
 
 Consequently, depending on whether HidHide and ViGEm emulation are active, the Chromium WebView's `navigator.getGamepads()` may see:
+
 - **Both** the physical DualSense (`054c:0ce6` / `054c:0df2`) AND the virtual Xbox 360 pad (`XInput STANDARD GAMEPAD`) for the same physical controller in the user's hands.
 - **Only** the virtual Xbox 360 pad (when HidHide cloaks the physical HID device from WebView2).
 - **Zero** browser gamepads (if exclusive HID mode or OS policy hides the device from Chromium).
 
 ## 2. Logical Player Deduplication Strategy
+
 `InputManager` (`src/features/console/input/InputManager.ts`) resolves physical and virtual devices into unified **Logical Players (P1–P4)**:
 
 1. **DualSense Engine Telemetry Sync**:
@@ -22,6 +26,7 @@ Consequently, depending on whether HidHide and ViGEm emulation are active, the C
    - When the Rust DualSense worker reads HID input reports from a connected DualSense and the browser sees 0 gamepads, the backend emits `console://input` state snapshots so Console Mode remains 100% responsive even if WebView2 Gamepad API is blocked or cloaked.
 
 ## 3. Analog Stick Hysteresis & Repeat Timing
+
 - **Dead Zone**: Engage threshold `0.35`, release threshold `0.22` (radial hysteresis prevents boundary flutter).
 - **45-Degree Directional Lock**: Dominant axis must exceed `1.25x` orthogonal axis magnitude to prevent accidental diagonal double-stepping.
 - **Repeat Cadence**:

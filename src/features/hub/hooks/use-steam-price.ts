@@ -34,17 +34,20 @@ export function useSteamPrice(
   gameName?: string | null,
   enabled = true,
 ) {
-  const cleanId =
-    steamAppId !== null && steamAppId !== undefined ? String(steamAppId).trim() : ''
+  const cleanId = steamAppId !== null && steamAppId !== undefined ? String(steamAppId).trim() : ''
   const cleanName = typeof gameName === 'string' ? gameName.trim() : ''
-  const cleanCountry = typeof countryCode === 'string' && countryCode.trim() ? countryCode.trim() : 'us'
+  const cleanCountry =
+    typeof countryCode === 'string' && countryCode.trim() ? countryCode.trim() : 'us'
   const hasId = cleanId.length > 0
   const hasName = cleanName.length > 0
   return useQuery<SteamRegionalPrice | null>({
     queryKey: ['steam-price', cleanId, cleanName, cleanCountry],
     queryFn: () =>
       getSteamGamePrice(hasId ? cleanId : null, cleanCountry, hasName ? cleanName : null),
-    enabled: Boolean(enabled) && (hasId || hasName) && (typeof navigator === 'undefined' || navigator.onLine !== false),
+    enabled:
+      Boolean(enabled) &&
+      (hasId || hasName) &&
+      (typeof navigator === 'undefined' || navigator.onLine !== false),
     retry: false,
     staleTime: 10 * 60 * 1000, // 10 minutes fresh
     gcTime: 30 * 60 * 1000,
@@ -58,10 +61,10 @@ export function useSteamRegionalPrices(
   activeCountry?: string,
   gameName?: string | null,
 ) {
-  const cleanId =
-    steamAppId !== null && steamAppId !== undefined ? String(steamAppId).trim() : ''
+  const cleanId = steamAppId !== null && steamAppId !== undefined ? String(steamAppId).trim() : ''
   const cleanName = typeof gameName === 'string' ? gameName.trim() : ''
-  const cleanCountry = typeof activeCountry === 'string' && activeCountry.trim() ? activeCountry.trim() : 'us'
+  const cleanCountry =
+    typeof activeCountry === 'string' && activeCountry.trim() ? activeCountry.trim() : 'us'
   const hasId = cleanId.length > 0
   const hasName = cleanName.length > 0
   return useQuery<SteamPriceOverview | null>({

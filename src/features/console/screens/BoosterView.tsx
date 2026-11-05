@@ -77,9 +77,7 @@ export const BoosterView: React.FC = () => {
     try {
       const report = await runGameBoost()
       setLastReport(report)
-      toast.success(
-        `Turbo Game Boost engaged! Freed ${formatBytes(report.freed_ram_bytes)}`,
-      )
+      toast.success(`Turbo Game Boost engaged! Freed ${formatBytes(report.freed_ram_bytes)}`)
       refreshTelemetryAndApps()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Boost failed')
@@ -163,7 +161,9 @@ export const BoosterView: React.FC = () => {
       >
         <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
           <div className="space-y-2 max-w-2xl">
-            <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1 text-xs font-extrabold uppercase tracking-wider ${isLight ? "bg-amber-50 border-amber-300 text-amber-800" : "bg-amber-400/20 border-amber-400/40 text-amber-300"}`}>
+            <div
+              className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1 text-xs font-extrabold uppercase tracking-wider ${isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-400/20 border-amber-400/40 text-amber-300'}`}
+            >
               <Zap className="size-3.5 fill-current" />
               Real-Time Kernel Working-Set & Power Optimizer
             </div>
@@ -174,7 +174,9 @@ export const BoosterView: React.FC = () => {
             >
               Nexus System Booster & RAM Purge
             </h1>
-            <p className={`text-sm leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+            <p
+              className={`text-sm leading-relaxed ${isLight ? 'text-slate-600' : 'text-slate-300'}`}
+            >
               Reclaims background memory via Win32 EmptyWorkingSet, switches Windows into High
               Performance scheduling, and suspends non-essential desktop bloatware before launch.
             </p>
@@ -333,11 +335,7 @@ export const BoosterView: React.FC = () => {
                 }`}
               >
                 <p className="font-extrabold">{step.label}</p>
-                <p
-                  className={`font-semibold ${
-                    isLight ? 'text-emerald-700' : 'text-emerald-300'
-                  }`}
-                >
+                <p className={`font-semibold ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>
                   {step.metric || step.detail}
                 </p>
               </div>

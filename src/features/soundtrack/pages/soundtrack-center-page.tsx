@@ -260,8 +260,11 @@ const DYNAMIC_DISCOVERY_SEEDS = [
 function normalizeGameOstKey(rawTitle: string): string {
   return cleanGameTitleFromAlbumTitle(rawTitle)
     .toLowerCase()
-    .replace(/\b(original|official|video\s*game|game|soundtrack|score|ost|music|album|deluxe|edition|complete|vol\.?\s*\d+|volume\s*\d+)\b/gi, "")
-    .replace(/[^a-z0-9]+/g, " ")
+    .replace(
+      /\b(original|official|video\s*game|game|soundtrack|score|ost|music|album|deluxe|edition|complete|vol\.?\s*\d+|volume\s*\d+)\b/gi,
+      '',
+    )
+    .replace(/[^a-z0-9]+/g, ' ')
     .trim()
 }
 
@@ -522,7 +525,6 @@ function useDebouncedValue<T>(value: T, ms: number): T {
   return debounced
 }
 
-
 type StudioEqPresetId = 'flat' | 'boss_bass' | 'symphonic' | 'cyber_synth' | 'night_lofi'
 
 const STUDIO_EQ_PRESETS: Array<{
@@ -566,8 +568,8 @@ const STUDIO_EQ_PRESETS: Array<{
 const EQ_FREQ_LABELS = ['32', '64', '125', '250', '500', '1k', '2k', '4k', '8k', '16k']
 
 const WAVEFORM_BAR_HEIGHTS = [
-  28, 42, 64, 50, 78, 92, 60, 45, 84, 96, 72, 54, 68, 88, 100, 76, 58, 44, 66, 86, 94, 70,
-  52, 80, 98, 82, 62, 48, 74, 90, 65, 50, 85, 95, 75, 56, 40, 68, 88, 72, 55, 46, 60, 36,
+  28, 42, 64, 50, 78, 92, 60, 45, 84, 96, 72, 54, 68, 88, 100, 76, 58, 44, 66, 86, 94, 70, 52, 80,
+  98, 82, 62, 48, 74, 90, 65, 50, 85, 95, 75, 56, 40, 68, 88, 72, 55, 46, 60, 36,
 ]
 
 export function SoundtrackCenterPage() {
@@ -617,7 +619,7 @@ export function SoundtrackCenterPage() {
     volume,
     isMuted,
     repeatMode,
-     setVolume,
+    setVolume,
     toggleMute,
     cycleRepeatMode,
     toggleShuffle,
@@ -794,8 +796,7 @@ export function SoundtrackCenterPage() {
       const alb = entry.album
         ? {
             ...entry.album,
-            cover_url:
-              entry.album.cover_url || resolveAlbumCoverFallback(entry.album.title),
+            cover_url: entry.album.cover_url || resolveAlbumCoverFallback(entry.album.title),
           }
         : null
       if (alb && !albMap.has(alb.id)) {
@@ -804,20 +805,19 @@ export function SoundtrackCenterPage() {
       if (!trkMap.has(trkId)) {
         trkMap.set(trkId, {
           track: { ...entry.track, album_id: entry.track.album_id || alb?.id || '' },
-          album:
-            alb || {
-              id: entry.track.album_id || `fav_alb_${trkId}`,
-              game_id: null,
-              title: entry.track.artist || entry.track.title,
-              album_type: 'original_soundtrack',
-              artist: entry.track.artist || 'Original Game Soundtrack',
-              release_date: null,
-              cover_url: resolveAlbumCoverFallback(entry.track.title),
-              track_count: 1,
-              total_duration_ms: entry.track.duration_ms || 0,
-              provider_id: entry.track.provider_id || 'curated',
-              external_id: null,
-            },
+          album: alb || {
+            id: entry.track.album_id || `fav_alb_${trkId}`,
+            game_id: null,
+            title: entry.track.artist || entry.track.title,
+            album_type: 'original_soundtrack',
+            artist: entry.track.artist || 'Original Game Soundtrack',
+            release_date: null,
+            cover_url: resolveAlbumCoverFallback(entry.track.title),
+            track_count: 1,
+            total_duration_ms: entry.track.duration_ms || 0,
+            provider_id: entry.track.provider_id || 'curated',
+            external_id: null,
+          },
         })
       }
     }
@@ -1071,7 +1071,9 @@ export function SoundtrackCenterPage() {
     setRadioWaveGeneration((g) => g + 1)
 
     // Pick 3 rotating online seeds for this station (advances cursor every click!)
-    const prevCursor = radioSeedCursorRef.current[station.id] ?? Math.floor(Math.random() * station.onlineSeeds.length)
+    const prevCursor =
+      radioSeedCursorRef.current[station.id] ??
+      Math.floor(Math.random() * station.onlineSeeds.length)
     const totalSeeds = station.onlineSeeds.length
     const pickedSeeds: string[] = [
       station.onlineSeeds[prevCursor % totalSeeds],
@@ -1190,9 +1192,7 @@ export function SoundtrackCenterPage() {
       // Put onlineDiscovered first when searching so newly fetched online soundtracks appear at the top!
       const orderedPool = [
         ...onlineDiscovered,
-        ...albumsWithTracks.filter(
-          (a) => !onlineDiscovered.some((o) => o.album.id === a.album.id),
-        ),
+        ...albumsWithTracks.filter((a) => !onlineDiscovered.some((o) => o.album.id === a.album.id)),
       ]
       return orderedPool.filter(
         (a) =>
@@ -1533,13 +1533,11 @@ export function SoundtrackCenterPage() {
 
               {/* Visualizer Mode Switcher */}
               <div className="hidden 2xl:flex items-center gap-0.5 rounded-2xl border border-border/80 bg-surface p-1">
-                {(
-                  [
-                    { id: 'minimal' as const, label: 'Bars', icon: BarChart3 },
-                    { id: 'reactive' as const, label: 'Wave', icon: Activity },
-                    { id: 'off' as const, label: 'Off', icon: EyeOff },
-                  ]
-                ).map((v) => {
+                {[
+                  { id: 'minimal' as const, label: 'Bars', icon: BarChart3 },
+                  { id: 'reactive' as const, label: 'Wave', icon: Activity },
+                  { id: 'off' as const, label: 'Off', icon: EyeOff },
+                ].map((v) => {
                   const VIcon = v.icon
                   const active = visualizerMode === v.id
                   return (
@@ -1669,17 +1667,15 @@ export function SoundtrackCenterPage() {
               <div className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/75 p-4 shadow-inner xl:col-span-4">
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <span className="font-mono text-[10px] font-extrabold uppercase tracking-wider text-subtle">
-                     Direct-Drive Turntable Deck A
+                    Direct-Drive Turntable Deck A
                   </span>
                   {/* Vinyl Platter RPM Speed Selector */}
                   <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-0.5">
-                    {(
-                      [
-                        { rate: 0.85 as const, label: '0.85x Slow' },
-                        { rate: 1.0 as const, label: '33⅓ RPM' },
-                        { rate: 1.15 as const, label: '45 RPM' },
-                      ]
-                    ).map((spd) => (
+                    {[
+                      { rate: 0.85 as const, label: '0.85x Slow' },
+                      { rate: 1.0 as const, label: '33⅓ RPM' },
+                      { rate: 1.15 as const, label: '45 RPM' },
+                    ].map((spd) => (
                       <button
                         key={spd.label}
                         type="button"
@@ -1767,7 +1763,8 @@ export function SoundtrackCenterPage() {
                       {cleanGameTitleFromAlbumTitle(heroAlbum.album.title)}
                     </div>
                     <div className="truncate font-mono text-[10px] text-subtle">
-                      {heroAlbum.album.artist || 'Official Game Score'} • {heroAlbum.tracks.length} Tracks
+                      {heroAlbum.album.artist || 'Official Game Score'} • {heroAlbum.tracks.length}{' '}
+                      Tracks
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -1853,7 +1850,10 @@ export function SoundtrackCenterPage() {
                       type="button"
                       onClick={() => {
                         playButtonClick()
-                        if (currentTrack && (!studioDeckAlbumId || currentAlbum?.id === heroAlbum.album.id)) {
+                        if (
+                          currentTrack &&
+                          (!studioDeckAlbumId || currentAlbum?.id === heroAlbum.album.id)
+                        ) {
                           togglePlay()
                         } else if (heroAlbum.tracks.length > 0) {
                           void playAlbum(
@@ -1946,7 +1946,7 @@ export function SoundtrackCenterPage() {
                         <div
                           key={`wf-${i}`}
                           style={{
-                            height: `${ isPlaying ? Math.min(100, Math.max(20, h + ((i * 7) % 15) - 7)) : h }%`,
+                            height: `${isPlaying ? Math.min(100, Math.max(20, h + ((i * 7) % 15) - 7)) : h}%`,
                           }}
                           className={cn(
                             'flex-1 rounded-full transition-all duration-150 group-hover/wave:opacity-95',
@@ -2002,7 +2002,7 @@ export function SoundtrackCenterPage() {
                             playButtonClick()
                             setCustomEqOffsets((prev) => {
                               const next = [...prev]
-                              next[idx] = ((next[idx] ?? 0) + 2) > 4 ? -4 : (next[idx] ?? 0) + 2
+                              next[idx] = (next[idx] ?? 0) + 2 > 4 ? -4 : (next[idx] ?? 0) + 2
                               return next
                             })
                           }}
@@ -2079,7 +2079,9 @@ export function SoundtrackCenterPage() {
                       <Heart
                         className={cn(
                           'size-3.5',
-                          currentTrack && effectiveFavoriteIds.has(currentTrack.id) && 'fill-current',
+                          currentTrack &&
+                            effectiveFavoriteIds.has(currentTrack.id) &&
+                            'fill-current',
                         )}
                       />
                       <span>Favorite</span>
@@ -2096,7 +2098,8 @@ export function SoundtrackCenterPage() {
                       LIVE TRACK RACK
                     </span>
                     <h4 className="truncate text-xs font-extrabold text-text">
-                      {cleanGameTitleFromAlbumTitle(heroAlbum.album.title)} ({heroAlbum.tracks.length})
+                      {cleanGameTitleFromAlbumTitle(heroAlbum.album.title)} (
+                      {heroAlbum.tracks.length})
                     </h4>
                   </div>
                   <button
@@ -2196,36 +2199,34 @@ export function SoundtrackCenterPage() {
 
         {/* ── 3. Spring-Morphing Navigation Tabs ───────────────────────────── */}
         <nav className="flex items-center gap-1.5 overflow-x-auto border-b border-border/60 pb-3 no-scrollbar">
-          {(
-            [
-              { id: 'overview' as const, label: 'Discover & Featured', icon: Sparkles },
-              {
-                id: 'radios' as const,
-                label: 'Live Online Radios (6)',
-                icon: Radio,
-              },
-              {
-                id: 'games' as const,
-                label: `My Library OSTs (${libraryMatchedAlbums.length})`,
-                icon: Gamepad2,
-              },
-              {
-                id: 'favorites' as const,
-                label: `Favorites (${favoritedAlbums.length + favoritedTracks.length})`,
-                icon: Heart,
-              },
-              {
-                id: 'queue' as const,
-                label: `Live Queue (${queue.length})`,
-                icon: ListMusic,
-              },
-              {
-                id: 'downloaded' as const,
-                label: `Local / Offline (${downloadedTracks.length})`,
-                icon: HardDrive,
-              },
-            ]
-          ).map((tab) => {
+          {[
+            { id: 'overview' as const, label: 'Discover & Featured', icon: Sparkles },
+            {
+              id: 'radios' as const,
+              label: 'Live Online Radios (6)',
+              icon: Radio,
+            },
+            {
+              id: 'games' as const,
+              label: `My Library OSTs (${libraryMatchedAlbums.length})`,
+              icon: Gamepad2,
+            },
+            {
+              id: 'favorites' as const,
+              label: `Favorites (${favoritedAlbums.length + favoritedTracks.length})`,
+              icon: Heart,
+            },
+            {
+              id: 'queue' as const,
+              label: `Live Queue (${queue.length})`,
+              icon: ListMusic,
+            },
+            {
+              id: 'downloaded' as const,
+              label: `Local / Offline (${downloadedTracks.length})`,
+              icon: HardDrive,
+            },
+          ].map((tab) => {
             const Icon = tab.icon
             const active = activeTab === tab.id
             return (
@@ -2370,7 +2371,9 @@ export function SoundtrackCenterPage() {
                           onClick={() => void handlePlayMoodStation(station)}
                           className={cn(
                             'group relative flex items-start justify-between gap-3 overflow-hidden rounded-2xl border bg-gradient-to-br p-4 text-left shadow-xs transition-all hover:border-accent/50 hover:shadow-md cursor-pointer',
-                            isStationActive ? 'border-accent ring-1 ring-accent/35' : 'border-border/80',
+                            isStationActive
+                              ? 'border-accent ring-1 ring-accent/35'
+                              : 'border-border/80',
                             station.gradient,
                           )}
                         >
@@ -2500,7 +2503,8 @@ export function SoundtrackCenterPage() {
                         )}
                       </button>
                       <span className="font-mono text-[10px] text-subtle">
-                        Showing {Math.min(visibleAlbumLimit, filteredAlbums.length)} of {filteredAlbums.length} loaded albums
+                        Showing {Math.min(visibleAlbumLimit, filteredAlbums.length)} of{' '}
+                        {filteredAlbums.length} loaded albums
                       </span>
                     </div>
                   </>
@@ -2728,9 +2732,7 @@ export function SoundtrackCenterPage() {
                       <div className="font-mono text-[10px] font-black uppercase tracking-[0.2em] text-rose-400">
                         Personal Masterpiece Vault
                       </div>
-                      <h3 className="text-xl font-black text-text">
-                        Favorite Albums &amp; Tracks
-                      </h3>
+                      <h3 className="text-xl font-black text-text">Favorite Albums &amp; Tracks</h3>
                       <p className="mt-0.5 text-xs text-muted">
                         {favoritedAlbums.length} Favorite Albums • {favoritedTracks.length} Favorite
                         Tracks
@@ -2824,9 +2826,7 @@ export function SoundtrackCenterPage() {
                       <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 2xl:grid-cols-3">
                         {favoritedTracks.map((t, idx) => {
                           const resolvedAlb =
-                            albumsById.get(t.album_id) ??
-                            savedFavoriteTracks?.[t.id]?.album ??
-                            null
+                            albumsById.get(t.album_id) ?? savedFavoriteTracks?.[t.id]?.album ?? null
                           return (
                             <TrackRow
                               key={t.id}
@@ -2925,36 +2925,36 @@ export function SoundtrackCenterPage() {
                 </div>
               ) : (
                 <>
-                <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 2xl:grid-cols-3">
-                  {queue.slice(0, visibleTrackLimit).map((t, idx) => {
-                    const resolvedAlb = albumsById.get(t.album_id) ?? currentAlbum
-                    return (
-                      <TrackRow
-                        key={`${t.id}_${idx}`}
-                        track={t}
-                        album={resolvedAlb}
-                        game={deriveGameIdentityFromAlbum(resolvedAlb)}
-                        index={idx}
-                        allTracks={queue}
-                        variant="card"
-                        badgeType="queue"
-                        onOpenAlbum={handleOpenAlbumById}
-                      />
-                    )
-                  })}
-                </div>
-                {queue.length > visibleTrackLimit && (
-                  <div className="mt-4 flex justify-center">
-                    <button
-                      type="button"
-                      onClick={() => setVisibleTrackLimit((prev) => prev + 18)}
-                      className="inline-flex items-center gap-2 rounded-2xl border border-accent/40 bg-surface-raised px-6 py-2.5 text-xs font-extrabold text-text shadow-sm transition-all hover:border-accent hover:bg-accent hover:text-white active:scale-95 cursor-pointer"
-                    >
-                      <Sparkles className="size-3.5 text-accent" />
-                      <span>More Tracks ({queue.length - visibleTrackLimit} more)</span>
-                    </button>
+                  <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 2xl:grid-cols-3">
+                    {queue.slice(0, visibleTrackLimit).map((t, idx) => {
+                      const resolvedAlb = albumsById.get(t.album_id) ?? currentAlbum
+                      return (
+                        <TrackRow
+                          key={`${t.id}_${idx}`}
+                          track={t}
+                          album={resolvedAlb}
+                          game={deriveGameIdentityFromAlbum(resolvedAlb)}
+                          index={idx}
+                          allTracks={queue}
+                          variant="card"
+                          badgeType="queue"
+                          onOpenAlbum={handleOpenAlbumById}
+                        />
+                      )
+                    })}
                   </div>
-                )}
+                  {queue.length > visibleTrackLimit && (
+                    <div className="mt-4 flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setVisibleTrackLimit((prev) => prev + 18)}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-accent/40 bg-surface-raised px-6 py-2.5 text-xs font-extrabold text-text shadow-sm transition-all hover:border-accent hover:bg-accent hover:text-white active:scale-95 cursor-pointer"
+                      >
+                        <Sparkles className="size-3.5 text-accent" />
+                        <span>More Tracks ({queue.length - visibleTrackLimit} more)</span>
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </motion.div>

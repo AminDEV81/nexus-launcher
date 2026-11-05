@@ -68,7 +68,9 @@ const DownloadRowCard: React.FC<{
   // cover change made in Legacy Mode immediately reflects in Console Mode Downloads!
   const coverCandidates = useMemo(() => {
     const primaryLocalOrCustom = resolveConsoleMediaUrl(matchedGame?.cover_path)
-    const secondaryBanner = resolveConsoleHighResUrl(matchedGame?.banner_path ?? matchedGame?.background_path)
+    const secondaryBanner = resolveConsoleHighResUrl(
+      matchedGame?.banner_path ?? matchedGame?.background_path,
+    )
     const dlCover = resolveConsoleHighResUrl(dl.cover_url)
     const chain = buildCoverFallbackChain(
       primaryLocalOrCustom ?? dlCover,
@@ -126,8 +128,7 @@ const DownloadRowCard: React.FC<{
     id: `dl_cancel_${dl.id}`,
     scopeId: 'console_downloads_scope',
     onConfirm: () => {
-      const action =
-        isActive || isPaused ? cancelDownload(dl.id) : deleteDownload(dl.id, false)
+      const action = isActive || isPaused ? cancelDownload(dl.id) : deleteDownload(dl.id, false)
       void action
         .then(() => {
           toast.success(
@@ -177,7 +178,9 @@ const DownloadRowCard: React.FC<{
                 {title}
               </h3>
               {matchedGame && (
-                <p className={`text-[11px] font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                <p
+                  className={`text-[11px] font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}
+                >
                   Linked to Library · {matchedGame.developer || 'PC Edition'}
                 </p>
               )}
@@ -311,9 +314,7 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
 
   const activeList = useMemo(
     () =>
-      downloads.filter((d) =>
-        ['downloading', 'queued', 'paused', 'extracting'].includes(d.status),
-      ),
+      downloads.filter((d) => ['downloading', 'queued', 'paused', 'extracting'].includes(d.status)),
     [downloads],
   )
   const completedList = useMemo(
@@ -321,10 +322,7 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
     [downloads],
   )
   const pausedOrFailedList = useMemo(
-    () =>
-      downloads.filter((d) =>
-        ['paused', 'failed', 'cancelled'].includes(d.status),
-      ),
+    () => downloads.filter((d) => ['paused', 'failed', 'cancelled'].includes(d.status)),
     [downloads],
   )
 
@@ -339,9 +337,7 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
 
   const handleClearCompleted = async () => {
     if (completedList.length === 0) return
-    await Promise.all(
-      completedList.map((d) => deleteDownload(d.id, false).catch(() => {})),
-    )
+    await Promise.all(completedList.map((d) => deleteDownload(d.id, false).catch(() => {})))
     toast.success(`Cleared ${completedList.length} completed download(s)`)
     onRefresh()
   }
@@ -375,7 +371,9 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
               >
                 Download Center &amp; Queue
               </h1>
-              <p className={`text-xs sm:text-sm ${isLight ? 'text-slate-600' : 'text-slate-300/80'}`}>
+              <p
+                className={`text-xs sm:text-sm ${isLight ? 'text-slate-600' : 'text-slate-300/80'}`}
+              >
                 Multi-connection segmented engine synced with your Library artwork
               </p>
             </div>
@@ -467,16 +465,15 @@ export const DownloadsView: React.FC<DownloadsViewProps> = ({
               : 'No downloads in this filter'}
           </p>
           <p className={`mt-1 text-sm ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-            Any game downloads started from the Store or Game Hub will appear here with live
-            Library cover art and progress.
+            Any game downloads started from the Store or Game Hub will appear here with live Library
+            cover art and progress.
           </p>
         </div>
       ) : (
         <div className="space-y-4">
           {filteredDownloads.map((dl) => {
             const matchedGame =
-              matchDownloadToGame(dl, games) ??
-              games.find((g) => g.id === dl.game_id)
+              matchDownloadToGame(dl, games) ?? games.find((g) => g.id === dl.game_id)
             return (
               <DownloadRowCard
                 key={dl.id}

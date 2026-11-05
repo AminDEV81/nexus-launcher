@@ -69,8 +69,8 @@ function hasValidStoreCover(hg: HubGame | null | undefined): boolean {
   if (!hg) return false
   return Boolean(
     (hg.cover_url && hg.cover_url.trim().length > 0) ||
-      (hg.backdrop_url && hg.backdrop_url.trim().length > 0) ||
-      (hg.steam_app_id && String(hg.steam_app_id).trim().length > 0),
+    (hg.backdrop_url && hg.backdrop_url.trim().length > 0) ||
+    (hg.steam_app_id && String(hg.steam_app_id).trim().length > 0),
   )
 }
 
@@ -218,10 +218,7 @@ function getImageIdentitySignature(url: string): string {
   }
 }
 
-function buildHeroPreviewFrames(
-  game: HubGame | null,
-  detailScreenshots: string[] = [],
-): string[] {
+function buildHeroPreviewFrames(game: HubGame | null, detailScreenshots: string[] = []): string[] {
   if (!game) return []
   const frames: string[] = []
   const seenSigs = new Set<string>()
@@ -384,8 +381,12 @@ export const StoreView: React.FC<StoreViewProps> = ({
   const isLight = Boolean(CONSOLE_THEMES[themeId]?.isLight)
   const openOsk = useConsoleStore((s) => s.openOsk)
 
-  const { newReleases: rqNew, comingSoon: rqSoon, topRated: rqTop, recommended: rqRec } =
-    useHubHomeFeed()
+  const {
+    newReleases: rqNew,
+    comingSoon: rqSoon,
+    topRated: rqTop,
+    recommended: rqRec,
+  } = useHubHomeFeed()
   const rqDeals = useHubDiscountedGames(true)
   const genresQuery = useHubGenres()
   const refreshCatalog = useRefreshHubCatalog()
@@ -407,10 +408,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
     () => dedupeAndMergeStoreGames((rqSoon.data?.length ? rqSoon.data : propComingSoon) ?? []),
     [rqSoon.data, propComingSoon],
   )
-  const recommended = useMemo(
-    () => dedupeAndMergeStoreGames(rqRec.data ?? []),
-    [rqRec.data],
-  )
+  const recommended = useMemo(() => dedupeAndMergeStoreGames(rqRec.data ?? []), [rqRec.data])
 
   const [category, setCategory] = useState<StoreCategoryTab>('all')
   const [selectedGenreId, setSelectedGenreId] = useState<number | null>(null)
@@ -440,7 +438,9 @@ export const StoreView: React.FC<StoreViewProps> = ({
         setHeroIndex(0)
         setActivePreviewFrame(null)
         if (!silent) {
-          toast.success('Synced entire Store & Game Hub catalog (Deals, Trending, Top Rated & Coming Soon)!')
+          toast.success(
+            'Synced entire Store & Game Hub catalog (Deals, Trending, Top Rated & Coming Soon)!',
+          )
         }
       } catch {
         if (!silent) {
@@ -551,8 +551,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
         hg.name.toLowerCase().includes(q) ||
         hg.genres.some((gn) => gn.toLowerCase().includes(q))
       const genreOk =
-        !selectedGenreName ||
-        hg.genres.some((gn) => gn.toLowerCase().includes(selectedGenreName))
+        !selectedGenreName || hg.genres.some((gn) => gn.toLowerCase().includes(selectedGenreName))
       return nameOk && genreOk
     })
 
@@ -750,15 +749,11 @@ export const StoreView: React.FC<StoreViewProps> = ({
           <div className="flex flex-1 sm:flex-initial items-center justify-end gap-2">
             <div
               className={`flex flex-1 sm:w-72 items-center gap-2 rounded-xl border px-3 py-1.5 ${
-                isLight
-                  ? 'border-slate-200 bg-slate-100/90'
-                  : 'border-white/10 bg-black/40'
+                isLight ? 'border-slate-200 bg-slate-100/90' : 'border-white/10 bg-black/40'
               }`}
             >
               <Search
-                className={`size-3.5 shrink-0 ${
-                  isLight ? 'text-slate-500' : 'text-slate-400'
-                }`}
+                className={`size-3.5 shrink-0 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}
               />
               <input
                 type="text"
@@ -887,7 +882,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
             <div className="relative lg:order-1 lg:col-span-8 min-h-[19.5rem] sm:min-h-[21.5rem] overflow-hidden bg-slate-950 flex flex-col justify-between p-6">
               <AnimatePresence mode="wait">
                 <motion.div
-                  key={`${heroGame.igdb_id}_${heroBackdrop ?? "default"}`}
+                  key={`${heroGame.igdb_id}_${heroBackdrop ?? 'default'}`}
                   initial={{ opacity: 0, scale: 1.03 }}
                   animate={{ opacity: 0.88, scale: 1 }}
                   exit={{ opacity: 0 }}
@@ -1058,9 +1053,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
               {/* Bottom Telemetry & Price Box inside Right Panel */}
               <div
                 className={`mt-4 flex items-center justify-between rounded-2xl border p-3 ${
-                  isLight
-                    ? 'border-slate-200 bg-white shadow-2xs'
-                    : 'border-white/10 bg-black/35'
+                  isLight ? 'border-slate-200 bg-white shadow-2xs' : 'border-white/10 bg-black/35'
                 }`}
               >
                 <div>
@@ -1165,7 +1158,8 @@ export const StoreView: React.FC<StoreViewProps> = ({
                   : 'border-white/10 bg-white/[0.04] text-slate-400'
               }`}
             >
-              No games with verified artwork found matching your search. Try another keyword or clear genre filters.
+              No games with verified artwork found matching your search. Try another keyword or
+              clear genre filters.
             </div>
           ) : (
             <FocusScope
@@ -1444,9 +1438,7 @@ const SpotlightDockCard: React.FC<{
       </div>
       <div className="min-w-0 flex-1">
         <p
-          className={`truncate text-xs font-extrabold ${
-            isLight ? 'text-slate-900' : 'text-white'
-          }`}
+          className={`truncate text-xs font-extrabold ${isLight ? 'text-slate-900' : 'text-white'}`}
         >
           {game.name}
         </p>
@@ -1483,26 +1475,20 @@ const SteamDealBentoCard: React.FC<{
     id,
     scopeId: 'console_store_bento_deals',
     onFocus: () => {
-      useConsoleStore
-        .getState()
-        .setFocusedBackdropUrl(game.backdrop_url ?? game.cover_url)
+      useConsoleStore.getState().setFocusedBackdropUrl(game.backdrop_url ?? game.cover_url)
     },
     onConfirm: onSelect,
   })
 
   const score =
-    game.opencritic_score ??
-    game.metacritic_score ??
-    (game.rating ? Math.round(game.rating) : null)
+    game.opencritic_score ?? game.metacritic_score ?? (game.rating ? Math.round(game.rating) : null)
 
   return (
     <button
       type="button"
       {...focusProps}
       onMouseEnter={() => {
-        useConsoleStore
-          .getState()
-          .setFocusedBackdropUrl(game.backdrop_url ?? game.cover_url)
+        useConsoleStore.getState().setFocusedBackdropUrl(game.backdrop_url ?? game.cover_url)
       }}
       className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border text-left transition-all duration-200 cursor-pointer outline-none ${
         isFocused
@@ -1637,9 +1623,7 @@ const StoreChartColumn: React.FC<{
             type="button"
             onClick={onViewAll}
             className={`text-[11px] font-bold cursor-pointer ${
-              isLight
-                ? 'text-indigo-600 hover:text-indigo-800'
-                : 'text-cyan-300 hover:text-white'
+              isLight ? 'text-indigo-600 hover:text-indigo-800' : 'text-cyan-300 hover:text-white'
             }`}
           >
             More →
@@ -1676,26 +1660,20 @@ const StoreChartRowItem: React.FC<{
     id,
     scopeId,
     onFocus: () => {
-      useConsoleStore
-        .getState()
-        .setFocusedBackdropUrl(game.backdrop_url ?? game.cover_url)
+      useConsoleStore.getState().setFocusedBackdropUrl(game.backdrop_url ?? game.cover_url)
     },
     onConfirm: onSelect,
   })
 
   const score =
-    game.opencritic_score ??
-    game.metacritic_score ??
-    (game.rating ? Math.round(game.rating) : null)
+    game.opencritic_score ?? game.metacritic_score ?? (game.rating ? Math.round(game.rating) : null)
 
   return (
     <button
       type="button"
       {...focusProps}
       onMouseEnter={() => {
-        useConsoleStore
-          .getState()
-          .setFocusedBackdropUrl(game.backdrop_url ?? game.cover_url)
+        useConsoleStore.getState().setFocusedBackdropUrl(game.backdrop_url ?? game.cover_url)
       }}
       className={`flex w-full items-center justify-between gap-2.5 rounded-xl border p-2 text-left transition-all cursor-pointer outline-none ${
         isFocused
@@ -1720,11 +1698,7 @@ const StoreChartRowItem: React.FC<{
         </div>
         <div className="min-w-0">
           <p className="truncate text-xs font-extrabold">{game.name}</p>
-          <p
-            className={`truncate text-[10px] ${
-              isLight ? 'text-slate-500' : 'text-slate-400'
-            }`}
-          >
+          <p className={`truncate text-[10px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             {game.genres.slice(0, 2).join(' · ') || game.release_date || 'PC'}
           </p>
         </div>

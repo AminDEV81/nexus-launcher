@@ -14,10 +14,7 @@ import {
   Wand2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  computeRecommendedMonitorScale,
-  useConsoleStore,
-} from '../store/console-store'
+import { computeRecommendedMonitorScale, useConsoleStore } from '../store/console-store'
 import {
   CONSOLE_DARK_THEME_ORDER,
   CONSOLE_LIGHT_THEME_ORDER,
@@ -185,10 +182,14 @@ const ThemeSwatchCard: React.FC<{
 
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className={`text-sm font-extrabold truncate ${isLightMode ? 'text-slate-900' : 'text-white'}`}>
+          <p
+            className={`text-sm font-extrabold truncate ${isLightMode ? 'text-slate-900' : 'text-white'}`}
+          >
             {tokens.name}
           </p>
-          <p className={`text-[0.72rem] line-clamp-1 mt-0.5 ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p
+            className={`text-[0.72rem] line-clamp-1 mt-0.5 ${isLightMode ? 'text-slate-500' : 'text-slate-400'}`}
+          >
             {tokens.subtitle}
           </p>
         </div>
@@ -327,7 +328,8 @@ export const SettingsView: React.FC = () => {
           Console Settings, Display Scale &amp; Themes
         </h1>
         <p className={`text-sm ${isLightMode ? 'text-slate-600' : 'text-slate-300/80'}`}>
-          Customize game cover sizes, text scaling for your monitor or TV, Dark &amp; Light color palettes, and controller options.
+          Customize game cover sizes, text scaling for your monitor or TV, Dark &amp; Light color
+          palettes, and controller options.
         </p>
       </div>
 
@@ -353,9 +355,7 @@ export const SettingsView: React.FC = () => {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2
-                  className={`text-lg font-black ${
-                    isLightMode ? 'text-slate-900' : 'text-white'
-                  }`}
+                  className={`text-lg font-black ${isLightMode ? 'text-slate-900' : 'text-white'}`}
                 >
                   Covers, Text &amp; Interface Size (Display Scale)
                 </h2>
@@ -461,9 +461,7 @@ export const SettingsView: React.FC = () => {
       {/* Visual Theme Gallery: 6 Dark Palettes + 6 Light Palettes */}
       <div
         className={`rounded-3xl border p-6 space-y-6 ${
-          isLightMode
-            ? 'border-slate-300 bg-white/90 shadow-sm'
-            : 'border-white/15 bg-white/[0.04]'
+          isLightMode ? 'border-slate-300 bg-white/90 shadow-sm' : 'border-white/15 bg-white/[0.04]'
         }`}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">

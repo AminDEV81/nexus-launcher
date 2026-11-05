@@ -260,9 +260,7 @@ export const LibraryView: React.FC<LibraryViewProps> = React.memo(
                   }`}
                 >
                   <ChevronDown className="size-4" />
-                  <span>
-                    Show More ({filteredGames.length - visibleCount} remaining)
-                  </span>
+                  <span>Show More ({filteredGames.length - visibleCount} remaining)</span>
                 </button>
               </div>
             )}

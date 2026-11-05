@@ -94,9 +94,7 @@ const Ps5ProfileCircle: React.FC<{
         layoutId={`ps5-profile-name-${profile.id}`}
         transition={MORPH_SPRING}
         className={`max-w-[11rem] truncate text-2xl font-bold tracking-tight transition-colors duration-200 ${
-          isFocused
-            ? 'text-white drop-shadow-[0_2px_12px_rgba(255,255,255,0.4)]'
-            : 'text-white/55'
+          isFocused ? 'text-white drop-shadow-[0_2px_12px_rgba(255,255,255,0.4)]' : 'text-white/55'
         }`}
       >
         {profile.name}

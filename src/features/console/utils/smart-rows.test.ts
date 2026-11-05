@@ -49,9 +49,19 @@ function mockGame(overrides: Partial<Game>): Game {
 describe('Console Smart Rows Builder', () => {
   it('excludes hidden and Memory games and builds smart rows cleanly', () => {
     const games: Game[] = [
-      mockGame({ id: 'g1', name: 'Cyberpunk 2077', is_favorite: true, total_playtime_seconds: 50000 }),
+      mockGame({
+        id: 'g1',
+        name: 'Cyberpunk 2077',
+        is_favorite: true,
+        total_playtime_seconds: 50000,
+      }),
       mockGame({ id: 'g2', name: 'The Witcher 3', genres: ['RPG'], total_playtime_seconds: 1800 }),
-      mockGame({ id: 'g3', name: 'Deus Ex', genres: ['RPG', 'Shooter'], last_played_at: '2025-01-01T00:00:00Z' }),
+      mockGame({
+        id: 'g3',
+        name: 'Deus Ex',
+        genres: ['RPG', 'Shooter'],
+        last_played_at: '2025-01-01T00:00:00Z',
+      }),
       mockGame({ id: 'g_hidden', name: 'Hidden Game', is_hidden: true, is_favorite: true }),
       mockGame({ id: 'g_mem', name: 'Deleted Memory Game', is_memory: true, is_favorite: true }),
     ]

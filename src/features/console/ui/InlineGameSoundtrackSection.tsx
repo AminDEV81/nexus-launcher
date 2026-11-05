@@ -52,8 +52,7 @@ export const InlineGameSoundtrackSection: React.FC<InlineGameSoundtrackSectionPr
         title: gameName,
         coverUrl: coverUrl ?? null,
         steamAppId: steamAppId ?? null,
-        igdbId:
-          typeof igdbId === 'string' ? Number.parseInt(igdbId, 10) || null : (igdbId ?? null),
+        igdbId: typeof igdbId === 'string' ? Number.parseInt(igdbId, 10) || null : (igdbId ?? null),
       })
       .then((resolved) => {
         if (cancelled) return
@@ -134,9 +133,7 @@ export const InlineGameSoundtrackSection: React.FC<InlineGameSoundtrackSectionPr
               {tracks.length > 0 && (
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${
-                    isLight
-                      ? 'bg-indigo-100 text-indigo-800'
-                      : 'bg-cyan-500/20 text-cyan-300'
+                    isLight ? 'bg-indigo-100 text-indigo-800' : 'bg-cyan-500/20 text-cyan-300'
                   }`}
                 >
                   {tracks.length} Full Tracks

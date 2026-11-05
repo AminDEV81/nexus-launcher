@@ -50,13 +50,15 @@ export function HubGamePage() {
   const params = useParams()
   const location = useLocation()
   const igdbId = Number(params.igdbId)
-  const expectedName =
-    (location.state as { expectedName?: string } | null)?.expectedName ?? null
+  const expectedName = (location.state as { expectedName?: string } | null)?.expectedName ?? null
 
-  const { data: game, isPending, isFetching, error, refetch } = useHubGameDetails(
-    igdbId,
-    expectedName,
-  )
+  const {
+    data: game,
+    isPending,
+    isFetching,
+    error,
+    refetch,
+  } = useHubGameDetails(igdbId, expectedName)
   const refreshCatalog = useRefreshHubCatalog()
   const { data: games } = useGames()
 
@@ -114,7 +116,9 @@ export function HubGamePage() {
     try {
       await refreshCatalog.mutateAsync()
       await refetch()
-      toast.success(`Synced latest screenshots, trailers & hardware specs for ${game?.name || 'game'}`)
+      toast.success(
+        `Synced latest screenshots, trailers & hardware specs for ${game?.name || 'game'}`,
+      )
     } catch {
       void refetch()
     }
@@ -242,10 +246,7 @@ export function HubGamePage() {
 
         {/* Item #7: Live Release Countdown Banner on Store Game Page for Unreleased / Wishlisted Games! */}
         {(!isReleased || inWishlist) && (
-          <ReleaseCountdownBanner
-            releaseDate={game.release_date}
-            isWishlist={inWishlist}
-          />
+          <ReleaseCountdownBanner releaseDate={game.release_date} isWishlist={inWishlist} />
         )}
 
         {/* ── 1.5 Telemetry Quick-Glance Strip ───────────────────────── */}

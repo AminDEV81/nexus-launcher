@@ -162,15 +162,15 @@ const NEXUSMODS_SLUG_MAP: Record<string, string> = {
   'far cry new dawn': 'farcrynewdawn',
   'dead space': 'deadspace2023',
   'dead space 2': 'deadspace2',
-  'doom': 'doom',
+  doom: 'doom',
   'doom eternal': 'doometernal',
   'wolfenstein the new order': 'wolfensteintheneworder',
-  'bioshock': 'bioshock',
+  bioshock: 'bioshock',
   'bioshock infinite': 'bioshockinfinite',
-  'dishonored': 'dishonored',
+  dishonored: 'dishonored',
   'dishonored 2': 'dishonored2',
-  'prey': 'prey2017',
-  'deathloop': 'deathloop',
+  prey: 'prey2017',
+  deathloop: 'deathloop',
   'borderlands 2': 'borderlands2',
   'borderlands 3': 'borderlands3',
   'halo the master chief collection': 'halothemasterchiefcollection',
@@ -189,9 +189,9 @@ const NEXUSMODS_SLUG_MAP: Record<string, string> = {
   'detroit become human': 'detroitbecomehuman',
   'it takes two': 'ittakestwo',
   'split fiction': 'splitfiction',
-  'balatro': 'balatro',
+  balatro: 'balatro',
   'slay the spire': 'slaythespire',
-  'celeste': 'celeste',
+  celeste: 'celeste',
   'outer wilds': 'outerwilds',
   'ori and the will of the wisps': 'oriandthewillofthewisps',
   'dead cells': 'deadcells',
@@ -231,8 +231,8 @@ const NEXUSMODS_SLUG_MAP: Record<string, string> = {
   '7 days to die': '7daystodie',
   'ark survival evolved': 'arksurvivalevolved',
   'conan exiles': 'conanexiles',
-  'satisfactory': 'satisfactory',
-  'factorio': 'factorio',
+  satisfactory: 'satisfactory',
+  factorio: 'factorio',
   'cyberpunk 2077 phantom liberty': 'cyberpunk2077',
   'the witcher 3 wild hunt blood and wine': 'witcher3',
   'the witcher 3 wild hunt hearts of stone': 'witcher3',
@@ -243,7 +243,7 @@ const NEXUSMODS_SLUG_MAP: Record<string, string> = {
   'pathfinder wrath of the righteous': 'pathfinderwrathoftherighteous',
   'rogue trader': 'warhammer40kroguetrader',
   'warhammer 40000 rogue trader': 'warhammer40kroguetrader',
-  'sifu': 'sifu',
+  sifu: 'sifu',
 }
 
 function normalizeForNexusLookup(raw: string): string {
@@ -308,11 +308,15 @@ export function resolveNexusModsTarget(gameName: string): NexusModsTarget {
     }
   }
 
-  const cleanSearch = gameName
-    .replace(/\b(?:Deluxe|Ultimate|Complete|Definitive|GOTY|Director's Cut|Edition|Repack|FitGirl|DODI)\b/gi, '')
-    .replace(/[:™®©]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim() || gameName.trim()
+  const cleanSearch =
+    gameName
+      .replace(
+        /\b(?:Deluxe|Ultimate|Complete|Definitive|GOTY|Director's Cut|Edition|Repack|FitGirl|DODI)\b/gi,
+        '',
+      )
+      .replace(/[:™®©]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim() || gameName.trim()
 
   return {
     url: `https://www.nexusmods.com/games?search=${encodeURIComponent(cleanSearch)}`,

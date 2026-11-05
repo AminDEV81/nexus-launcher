@@ -51,12 +51,7 @@ export function buildCoverFallbackChain(
 
   // If primary cover is an IGDB high-res variant, add standard cover_big fallback
   if (normCover && normCover.includes('images.igdb.com/igdb/image/upload/')) {
-    pushUnique(
-      normCover.replace(
-        /\/t_(?:1080p|cover_big_2x|720p)\//,
-        '/t_cover_big/',
-      ),
-    )
+    pushUnique(normCover.replace(/\/t_(?:1080p|cover_big_2x|720p)\//, '/t_cover_big/'))
   }
 
   const resolvedAppId = extractSteamAppId(normCover, normBackdrop, steamAppId, igdbId)
@@ -71,9 +66,7 @@ export function buildCoverFallbackChain(
     pushUnique(
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/library_600x900.jpg`,
     )
-    pushUnique(
-      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`,
-    )
+    pushUnique(`https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`)
     pushUnique(
       `https://cdn.cloudflare.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`,
     )
@@ -88,15 +81,11 @@ export function buildCoverFallbackChain(
     pushUnique(
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/header.jpg`,
     )
-    pushUnique(
-      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/header.jpg`,
-    )
+    pushUnique(`https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/header.jpg`)
     pushUnique(
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/capsule_616x353.jpg`,
     )
-    pushUnique(
-      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/capsule_616x353.jpg`,
-    )
+    pushUnique(`https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/capsule_616x353.jpg`)
   }
 
   return candidates
@@ -158,15 +147,11 @@ export function buildBannerFallbackChain(
     pushUnique(
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/header.jpg`,
     )
-    pushUnique(
-      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/header.jpg`,
-    )
+    pushUnique(`https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/header.jpg`)
     pushUnique(
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/capsule_616x353.jpg`,
     )
-    pushUnique(
-      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/capsule_616x353.jpg`,
-    )
+    pushUnique(`https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/capsule_616x353.jpg`)
   }
 
   pushUnique(normCover)
@@ -175,9 +160,7 @@ export function buildBannerFallbackChain(
     pushUnique(
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${resolvedAppId}/library_600x900.jpg`,
     )
-    pushUnique(
-      `https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`,
-    )
+    pushUnique(`https://cdn.akamai.steamstatic.com/steam/apps/${resolvedAppId}/library_600x900.jpg`)
   }
 
   return candidates

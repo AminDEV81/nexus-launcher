@@ -35,12 +35,20 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     tracks: [
       { title: 'The Trail', artist: 'Marcin Przybyłowicz', durationSec: 169 },
       { title: 'Geralt of Rivia', artist: 'Marcin Przybyłowicz', durationSec: 141 },
-      { title: 'Silver for Monsters...', artist: 'Marcin Przybyłowicz, Percival', durationSec: 139 },
+      {
+        title: 'Silver for Monsters...',
+        artist: 'Marcin Przybyłowicz, Percival',
+        durationSec: 139,
+      },
       { title: '...Steel for Humans', artist: 'Marcin Przybyłowicz, Percival', durationSec: 87 },
       { title: 'Kaer Morhen', artist: 'Marcin Przybyłowicz', durationSec: 155 },
       { title: 'The Fields of Ard Skellig', artist: 'Marcin Przybyłowicz', durationSec: 189 },
       { title: 'Ladies of the Woods', artist: 'Marcin Przybyłowicz', durationSec: 111 },
-      { title: 'The Wolven Storm (Priscilla’s Song)', artist: 'Marcin Przybyłowicz', durationSec: 185 },
+      {
+        title: 'The Wolven Storm (Priscilla’s Song)',
+        artist: 'Marcin Przybyłowicz',
+        durationSec: 185,
+      },
       { title: 'Hunt or Be Hunted', artist: 'Marcin Przybyłowicz', durationSec: 145 },
       { title: 'Lullaby of Woe', artist: 'Marcin Przybyłowicz', durationSec: 151 },
     ],
@@ -57,7 +65,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Chippin’ In', artist: 'SAMURAI', durationSec: 214 },
       { title: 'Outsider No More', artist: 'P.T. Adamczyk', durationSec: 230 },
       { title: 'No Save Point', artist: 'Run The Jewels', durationSec: 194 },
-      { title: 'I Really Want to Stay at Your House', artist: ' Rosa Walton & Hallie Coggins', durationSec: 246 },
+      {
+        title: 'I Really Want to Stay at Your House',
+        artist: ' Rosa Walton & Hallie Coggins',
+        durationSec: 246,
+      },
     ],
   },
   'baldurs gate 3': {
@@ -137,7 +149,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     artist: 'Ilan Eshkeri & Shigeru Umebayashi',
     releaseYear: '2020',
     tracks: [
-      { title: 'The Way of the Ghost', artist: 'Ilan Eshkeri feat. Clare Uchima', durationSec: 216 },
+      {
+        title: 'The Way of the Ghost',
+        artist: 'Ilan Eshkeri feat. Clare Uchima',
+        durationSec: 216,
+      },
       { title: 'Jin Sakai', artist: 'Ilan Eshkeri', durationSec: 171 },
       { title: 'Komoda Beach', artist: 'Ilan Eshkeri', durationSec: 212 },
       { title: 'The Way of the Samurai', artist: 'Shigeru Umebayashi', durationSec: 204 },
@@ -230,7 +246,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     tracks: [
       { title: 'Celestial Symphony (Main Theme)', artist: '8082 Audio', durationSec: 168 },
       { title: 'Black Cloud, Red Fire', artist: '8082 Audio', durationSec: 194 },
-      { title: 'Headless Lingji Bodhisattva (Sanxian Ballad)', artist: 'Xiong Zhuying', durationSec: 156 },
+      {
+        title: 'Headless Lingji Bodhisattva (Sanxian Ballad)',
+        artist: 'Xiong Zhuying',
+        durationSec: 156,
+      },
       { title: 'Seeing Through', artist: '8082 Audio', durationSec: 212 },
       { title: 'Nonsense! (Yellowbrow)', artist: '8082 Audio', durationSec: 225 },
       { title: 'Unfinished (Destined One)', artist: '8082 Audio', durationSec: 242 },
@@ -243,7 +263,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     tracks: [
       { title: 'Alicia', artist: 'Lorien Testard & Alice Duport-Percier', durationSec: 198 },
       { title: 'Lumière', artist: 'Lorien Testard & Alice Duport-Percier', durationSec: 224 },
-      { title: 'Une vie à t’aimer', artist: 'Lorien Testard & Alice Duport-Percier', durationSec: 265 },
+      {
+        title: 'Une vie à t’aimer',
+        artist: 'Lorien Testard & Alice Duport-Percier',
+        durationSec: 265,
+      },
       { title: 'Monoco', artist: 'Lorien Testard', durationSec: 184 },
       { title: 'Verso', artist: 'Lorien Testard', durationSec: 211 },
       { title: 'Clair-Obscur', artist: 'Lorien Testard', durationSec: 246 },
@@ -271,7 +295,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Death to Chronos', artist: 'Darren Korb', durationSec: 184 },
       { title: 'The Silver Sisters', artist: 'Darren Korb', durationSec: 228 },
       { title: 'Coral Crown', artist: 'Darren Korb & Scylla and the Sirens', durationSec: 215 },
-      { title: 'I Am Gonna Claw (Out Your Eyes then Drown You to Death)', artist: 'Darren Korb', durationSec: 244 },
+      {
+        title: 'I Am Gonna Claw (Out Your Eyes then Drown You to Death)',
+        artist: 'Darren Korb',
+        durationSec: 244,
+      },
       { title: 'Song of the Sirens', artist: 'Darren Korb', durationSec: 192 },
       { title: 'Moonlight Guide Us', artist: 'Darren Korb feat. Ashley Barrett', durationSec: 210 },
     ],
@@ -314,12 +342,24 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Full Moon Full Life', artist: 'Azumi Takahashi & Lotus Juice', durationSec: 292 },
       { title: "It's Going Down Now", artist: 'Azumi Takahashi & Lotus Juice', durationSec: 186 },
       { title: 'Color Your Night', artist: 'Azumi Takahashi & Lotus Juice', durationSec: 227 },
-      { title: 'Mass Destruction -Reload-', artist: 'Azumi Takahashi & Lotus Juice', durationSec: 208 },
+      {
+        title: 'Mass Destruction -Reload-',
+        artist: 'Azumi Takahashi & Lotus Juice',
+        durationSec: 208,
+      },
       { title: 'Changing Seasons -Reload-', artist: 'Azumi Takahashi', durationSec: 182 },
-      { title: "When The Moon's Reaching Out Stars -Reload-", artist: 'Azumi Takahashi', durationSec: 166 },
+      {
+        title: "When The Moon's Reaching Out Stars -Reload-",
+        artist: 'Azumi Takahashi',
+        durationSec: 166,
+      },
       { title: 'Want To Be Close -Reload-', artist: 'Azumi Takahashi', durationSec: 155 },
       { title: 'Deep Breath Deep Breath -Reload-', artist: 'Lotus Juice', durationSec: 172 },
-      { title: 'Burn My Dread -Last Battle Reload-', artist: 'Azumi Takahashi & Lotus Juice', durationSec: 265 },
+      {
+        title: 'Burn My Dread -Last Battle Reload-',
+        artist: 'Azumi Takahashi & Lotus Juice',
+        durationSec: 265,
+      },
       { title: 'Memories of You -Reload-', artist: 'Azumi Takahashi', durationSec: 358 },
     ],
   },
@@ -443,7 +483,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Follow You into the Dark', artist: 'RAKAAEL', durationSec: 238 },
       { title: 'Wide Awake', artist: 'Jaimes', durationSec: 210 },
       { title: 'Dark Ocean Summoning', artist: 'Old Gods of Asgard', durationSec: 274 },
-      { title: 'Yötön Yö (Nightless Night)', artist: 'Martti Suosalo & Petri Alanko', durationSec: 256 },
+      {
+        title: 'Yötön Yö (Nightless Night)',
+        artist: 'Martti Suosalo & Petri Alanko',
+        durationSec: 256,
+      },
     ],
   },
   control: {
@@ -505,7 +549,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     tracks: [
       { title: 'Welcome to Los Santos', artist: 'Oh No', durationSec: 154 },
       { title: 'We Were Set Up', artist: 'Tangerine Dream & Woody Jackson', durationSec: 211 },
-      { title: 'A Legitimate Business Man', artist: 'Tangerine Dream & Woody Jackson', durationSec: 177 },
+      {
+        title: 'A Legitimate Business Man',
+        artist: 'Tangerine Dream & Woody Jackson',
+        durationSec: 177,
+      },
       { title: 'The Agency Heist', artist: 'Tangerine Dream & Woody Jackson', durationSec: 202 },
       { title: 'Minor Turbulence', artist: 'Tangerine Dream & Woody Jackson', durationSec: 273 },
       { title: 'Sleepwalking', artist: 'The Chain Gang of 1974', durationSec: 218 },
@@ -598,7 +646,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Stardew Valley Overture', artist: 'ConcernedApe', durationSec: 136 },
       { title: "Spring (It's a Big World Outside)", artist: 'ConcernedApe', durationSec: 239 },
       { title: 'Summer (Nature’s Crescendo)', artist: 'ConcernedApe', durationSec: 210 },
-      { title: "Fall (The Smell of Mushroom)", artist: 'ConcernedApe', durationSec: 216 },
+      { title: 'Fall (The Smell of Mushroom)', artist: 'ConcernedApe', durationSec: 216 },
       { title: 'Winter (The Wind Can Be Still)', artist: 'ConcernedApe', durationSec: 173 },
       { title: 'Dance of the Moonlight Jellies', artist: 'ConcernedApe', durationSec: 112 },
     ],
@@ -670,7 +718,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     releaseYear: '2022',
     tracks: [
       { title: 'In the Flood', artist: 'Lovisa Sjöberg & Oleksa Lozowchuk', durationSec: 242 },
-      { title: 'The World on Her Shoulders', artist: 'Joris de Man feat. Julie Elven', durationSec: 210 },
+      {
+        title: 'The World on Her Shoulders',
+        artist: 'Joris de Man feat. Julie Elven',
+        durationSec: 210,
+      },
       { title: 'Built to Kill', artist: 'The Flight', durationSec: 224 },
       { title: 'Guardian of the Deep', artist: 'Joris de Man', durationSec: 195 },
     ],
@@ -703,7 +755,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Party Escort', artist: 'Kelly Bailey', durationSec: 262 },
       { title: "You're Not a Good Person", artist: 'Kelly Bailey', durationSec: 85 },
       { title: "You Can't Escape You Know", artist: 'Kelly Bailey', durationSec: 384 },
-      { title: 'Still Alive', artist: 'Jonathan Coulton & Ellen McLain (GLaDOS)', durationSec: 176 },
+      {
+        title: 'Still Alive',
+        artist: 'Jonathan Coulton & Ellen McLain (GLaDOS)',
+        durationSec: 176,
+      },
       { title: 'Still Alive (J.C. Mix)', artist: 'Jonathan Coulton', durationSec: 176 },
     ],
   },
@@ -713,7 +769,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     releaseYear: '2011',
     tracks: [
       { title: 'Science is Fun', artist: 'Mike Morasky', durationSec: 153 },
-      { title: 'Concentration Enhancing Menu Initialiser', artist: 'Mike Morasky', durationSec: 137 },
+      {
+        title: 'Concentration Enhancing Menu Initialiser',
+        artist: 'Mike Morasky',
+        durationSec: 137,
+      },
       { title: '9999999', artist: 'Mike Morasky', durationSec: 191 },
       { title: 'The Courtesy Call', artist: 'Mike Morasky', durationSec: 217 },
       { title: 'Technical Difficulties', artist: 'Mike Morasky', durationSec: 202 },
@@ -738,7 +798,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'The Part Where He Kills You', artist: 'Mike Morasky', durationSec: 203 },
       { title: 'Machiavellian Bach', artist: 'Mike Morasky', durationSec: 242 },
       { title: 'Cara Mia Addio!', artist: 'Mike Morasky & Ellen McLain', durationSec: 154 },
-      { title: 'Want You Gone', artist: 'Jonathan Coulton & Ellen McLain (GLaDOS)', durationSec: 142 },
+      {
+        title: 'Want You Gone',
+        artist: 'Jonathan Coulton & Ellen McLain (GLaDOS)',
+        durationSec: 142,
+      },
       { title: 'Spaaaaace', artist: 'Mike Morasky', durationSec: 45 },
     ],
   },
@@ -790,7 +854,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Broken Symmetry', artist: 'Kelly Bailey', durationSec: 103 },
       { title: 'LG Orbifold', artist: 'Kelly Bailey', durationSec: 172 },
       { title: 'Kaon', artist: 'Kelly Bailey', durationSec: 71 },
-      { title: 'You\'re Not Supposed to Be Here', artist: 'Kelly Bailey', durationSec: 161 },
+      { title: "You're Not Supposed to Be Here", artist: 'Kelly Bailey', durationSec: 161 },
       { title: 'Suppression Field', artist: 'Kelly Bailey', durationSec: 63 },
       { title: 'Tau-9', artist: 'Kelly Bailey', durationSec: 126 },
       { title: 'Hard Fought', artist: 'Kelly Bailey', durationSec: 75 },
@@ -816,17 +880,49 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     artist: 'Jamie Christopherson',
     releaseYear: '2013',
     tracks: [
-      { title: 'Rules of Nature (Platinum Mix)', artist: 'Jamie Christopherson & Jason Miller', durationSec: 266 },
-      { title: 'The Only Thing I Know For Real (Maniac Agenda Mix)', artist: 'Jamie Christopherson & Tyson Yen', durationSec: 266 },
+      {
+        title: 'Rules of Nature (Platinum Mix)',
+        artist: 'Jamie Christopherson & Jason Miller',
+        durationSec: 266,
+      },
+      {
+        title: 'The Only Thing I Know For Real (Maniac Agenda Mix)',
+        artist: 'Jamie Christopherson & Tyson Yen',
+        durationSec: 266,
+      },
       { title: 'Dark Skies (Platinum Mix)', artist: 'Jamie Christopherson', durationSec: 261 },
-      { title: "I'm My Own Master Now (Platinum Mix)", artist: 'Jamie Christopherson', durationSec: 256 },
-      { title: 'A Stranger I Remain (Maniac Agenda Mix)', artist: 'Jamie Christopherson & Free Dominguez', durationSec: 265 },
+      {
+        title: "I'm My Own Master Now (Platinum Mix)",
+        artist: 'Jamie Christopherson',
+        durationSec: 256,
+      },
+      {
+        title: 'A Stranger I Remain (Maniac Agenda Mix)',
+        artist: 'Jamie Christopherson & Free Dominguez',
+        durationSec: 265,
+      },
       { title: 'Return to Ashes (Platinum Mix)', artist: 'Jamie Christopherson', durationSec: 264 },
-      { title: 'The Stains of Time (Maniac Agenda Mix)', artist: 'Jamie Christopherson', durationSec: 251 },
+      {
+        title: 'The Stains of Time (Maniac Agenda Mix)',
+        artist: 'Jamie Christopherson',
+        durationSec: 251,
+      },
       { title: 'Red Sun (Maniac Agenda Mix)', artist: 'Jamie Christopherson', durationSec: 253 },
-      { title: 'A Soul Can\'t Be Cut (Platinum Mix)', artist: 'Jamie Christopherson', durationSec: 259 },
-      { title: 'Collective Consciousness (Maniac Agenda Mix)', artist: 'Jamie Christopherson', durationSec: 239 },
-      { title: 'It Has To Be This Way (Platinum Mix)', artist: 'Jamie Christopherson & Jimmy Gnecco', durationSec: 302 },
+      {
+        title: "A Soul Can't Be Cut (Platinum Mix)",
+        artist: 'Jamie Christopherson',
+        durationSec: 259,
+      },
+      {
+        title: 'Collective Consciousness (Maniac Agenda Mix)',
+        artist: 'Jamie Christopherson',
+        durationSec: 239,
+      },
+      {
+        title: 'It Has To Be This Way (Platinum Mix)',
+        artist: 'Jamie Christopherson & Jimmy Gnecco',
+        durationSec: 302,
+      },
       { title: 'The War Still Rages Within', artist: 'Jamie Christopherson', durationSec: 299 },
       { title: 'The Hot Wind Blowing', artist: 'Jamie Christopherson', durationSec: 260 },
     ],
@@ -863,11 +959,19 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Disdrometer', artist: 'Chris Christodoulou', durationSec: 392 },
       { title: 'Into the Doldrums', artist: 'Chris Christodoulou', durationSec: 312 },
       { title: 'A Glacier Eventually Farts', artist: 'Chris Christodoulou', durationSec: 325 },
-      { title: 'The Rain Formerly Known as Purple', artist: 'Chris Christodoulou', durationSec: 475 },
+      {
+        title: 'The Rain Formerly Known as Purple',
+        artist: 'Chris Christodoulou',
+        durationSec: 475,
+      },
       { title: 'Hydrophobia', artist: 'Chris Christodoulou', durationSec: 230 },
       { title: 'Antarctic Oscillation', artist: 'Chris Christodoulou', durationSec: 358 },
       { title: '...con lentitud poderosa', artist: 'Chris Christodoulou', durationSec: 303 },
-      { title: "You're Gonna Need a Bigger Ukulele", artist: 'Chris Christodoulou', durationSec: 306 },
+      {
+        title: "You're Gonna Need a Bigger Ukulele",
+        artist: 'Chris Christodoulou',
+        durationSec: 306,
+      },
     ],
   },
   cuphead: {
@@ -879,13 +983,13 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Inkwell Isle One', artist: 'Kristofer Maddigan', durationSec: 162 },
       { title: 'Botanic Panic', artist: 'Kristofer Maddigan', durationSec: 215 },
       { title: 'Floral Fury', artist: 'Kristofer Maddigan', durationSec: 212 },
-      { title: 'Threatenin\' Zeppelin', artist: 'Kristofer Maddigan', durationSec: 204 },
+      { title: "Threatenin' Zeppelin", artist: 'Kristofer Maddigan', durationSec: 204 },
       { title: 'Clip Joint Calamity', artist: 'Kristofer Maddigan', durationSec: 205 },
       { title: 'Die House (King Dice)', artist: 'Kristofer Maddigan', durationSec: 138 },
       { title: 'Carnival Kerfuffle', artist: 'Kristofer Maddigan', durationSec: 216 },
       { title: 'Aviary Action', artist: 'Kristofer Maddigan', durationSec: 205 },
       { title: 'Railroad Wrath', artist: 'Kristofer Maddigan', durationSec: 222 },
-      { title: 'The King\'s Court', artist: 'Kristofer Maddigan', durationSec: 229 },
+      { title: "The King's Court", artist: 'Kristofer Maddigan', durationSec: 229 },
       { title: 'One Hell of a Time', artist: 'Kristofer Maddigan', durationSec: 218 },
     ],
   },
@@ -942,7 +1046,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Max Payne Theme', artist: 'Kärtsy Hatakka & Kimmo Kajasto', durationSec: 174 },
       { title: 'New York Minute', artist: 'Kärtsy Hatakka & Kimmo Kajasto', durationSec: 198 },
       { title: 'Noir York City', artist: 'Kärtsy Hatakka & Kimmo Kajasto', durationSec: 210 },
-      { title: 'Roscoe Street Station', artist: 'Kärtsy Hatakka & Kimmo Kajasto', durationSec: 185 },
+      {
+        title: 'Roscoe Street Station',
+        artist: 'Kärtsy Hatakka & Kimmo Kajasto',
+        durationSec: 185,
+      },
       { title: 'Valkyr', artist: 'Kärtsy Hatakka & Kimmo Kajasto', durationSec: 224 },
       { title: 'Aesir Plaza', artist: 'Kärtsy Hatakka & Kimmo Kajasto', durationSec: 192 },
     ],
@@ -952,7 +1060,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     artist: 'Kärtsy Hatakka, Kimmo Kajasto & Poets of the Fall',
     releaseYear: '2003',
     tracks: [
-      { title: 'Max Payne 2 Theme (Cello Version)', artist: 'Kärtsy Hatakka & Kimmo Kajasto', durationSec: 138 },
+      {
+        title: 'Max Payne 2 Theme (Cello Version)',
+        artist: 'Kärtsy Hatakka & Kimmo Kajasto',
+        durationSec: 138,
+      },
       { title: 'Late Goodbye', artist: 'Poets of the Fall', durationSec: 227 },
       { title: 'Mona Sax Theme', artist: 'Kärtsy Hatakka & Kimmo Kajasto', durationSec: 184 },
       { title: 'The Choice', artist: 'Kärtsy Hatakka & Kimmo Kajasto', durationSec: 196 },
@@ -978,7 +1090,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     releaseYear: '2002',
     tracks: [
       { title: 'Vice City Theme', artist: 'Lex Horton', durationSec: 148 },
-      { title: 'Crockett\'s Theme', artist: 'Jan Hammer', durationSec: 205 },
+      { title: "Crockett's Theme", artist: 'Jan Hammer', durationSec: 205 },
       { title: 'Self Control (Flash FM)', artist: 'Laura Branigan', durationSec: 246 },
       { title: 'Out of Touch (Flash FM)', artist: 'Hall & Oates', durationSec: 249 },
       { title: 'La Vida Es Una Lenteja (Espantoso)', artist: 'Unaesta', durationSec: 218 },
@@ -1002,13 +1114,21 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     artist: 'Michael Hunter / Rockstar Games',
     releaseYear: '2008',
     tracks: [
-      { title: 'Soviet Connection (Theme from GTA IV)', artist: 'Michael Hunter', durationSec: 172 },
-      { title: 'The Ballad of Gay Tony Theme', artist: 'Aaron Johnston, Jesse Murphy & Avi Bortnick', durationSec: 165 },
+      {
+        title: 'Soviet Connection (Theme from GTA IV)',
+        artist: 'Michael Hunter',
+        durationSec: 172,
+      },
+      {
+        title: 'The Ballad of Gay Tony Theme',
+        artist: 'Aaron Johnston, Jesse Murphy & Avi Bortnick',
+        durationSec: 165,
+      },
       { title: 'The Lost and Damned Theme', artist: 'Stuart Hart', durationSec: 154 },
       { title: 'Liberty City Nocturne', artist: 'Michael Hunter', durationSec: 198 },
     ],
   },
-  'bully': {
+  bully: {
     albumTitle: 'Bully / Canis Canem Edit (Original Soundtrack)',
     artist: 'Shawn Lee',
     releaseYear: '2006',
@@ -1021,7 +1141,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Final Showdown', artist: 'Shawn Lee', durationSec: 188 },
     ],
   },
-  'mafia': {
+  mafia: {
     albumTitle: 'Mafia: The City of Lost Heaven (Original Score)',
     artist: 'Vladimír Šimůnek & Bohemia Symphonic Orchestra',
     releaseYear: '2002',
@@ -1029,7 +1149,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Main Theme (Lost Heaven)', artist: 'Vladimír Šimůnek', durationSec: 204 },
       { title: 'Little Italy', artist: 'Vladimír Šimůnek', durationSec: 175 },
       { title: 'Central Island', artist: 'Vladimír Šimůnek', durationSec: 186 },
-      { title: 'Sarah\'s Theme', artist: 'Vladimír Šimůnek', durationSec: 192 },
+      { title: "Sarah's Theme", artist: 'Vladimír Šimůnek', durationSec: 192 },
       { title: 'Epilogue', artist: 'Vladimír Šimůnek', durationSec: 215 },
     ],
   },
@@ -1069,11 +1189,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     ],
   },
   'assassins creed ii': {
-    albumTitle: 'Assassin\'s Creed II (Original Game Soundtrack)',
+    albumTitle: "Assassin's Creed II (Original Game Soundtrack)",
     artist: 'Jesper Kyd',
     releaseYear: '2009',
     tracks: [
-      { title: 'Ezio\'s Family', artist: 'Jesper Kyd', durationSec: 237 },
+      { title: "Ezio's Family", artist: 'Jesper Kyd', durationSec: 237 },
       { title: 'Earth', artist: 'Jesper Kyd', durationSec: 238 },
       { title: 'Venice Rooftops', artist: 'Jesper Kyd', durationSec: 198 },
       { title: 'Florence Tarantella', artist: 'Jesper Kyd', durationSec: 112 },
@@ -1082,11 +1202,15 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     ],
   },
   'assassins creed iv black flag': {
-    albumTitle: 'Assassin\'s Creed IV: Black Flag (Original Game Soundtrack)',
+    albumTitle: "Assassin's Creed IV: Black Flag (Original Game Soundtrack)",
     artist: 'Brian Tyler',
     releaseYear: '2013',
     tracks: [
-      { title: 'Assassin\'s Creed IV Black Flag Main Theme', artist: 'Brian Tyler', durationSec: 133 },
+      {
+        title: "Assassin's Creed IV Black Flag Main Theme",
+        artist: 'Brian Tyler',
+        durationSec: 133,
+      },
       { title: 'Pyrates Beware', artist: 'Brian Tyler', durationSec: 196 },
       { title: 'Leave Her, Johnny (Sea Shanty)', artist: 'Sean Dagher', durationSec: 136 },
       { title: 'Drunken Sailor (Sea Shanty)', artist: 'Sean Dagher', durationSec: 112 },
@@ -1110,7 +1234,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     artist: 'Snoop Dogg, The Doors & EA Trax',
     releaseYear: '2004',
     tracks: [
-      { title: 'Riders on the Storm (Fredwreck Remix)', artist: 'Snoop Dogg feat. The Doors', durationSec: 365 },
+      {
+        title: 'Riders on the Storm (Fredwreck Remix)',
+        artist: 'Snoop Dogg feat. The Doors',
+        durationSec: 365,
+      },
       { title: 'Black Betty', artist: 'Spiderbait', durationSec: 206 },
       { title: 'Give It All', artist: 'Rise Against', durationSec: 170 },
       { title: 'In My Head', artist: 'Queens of the Stone Age', durationSec: 241 },
@@ -1134,7 +1262,11 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     releaseYear: '2004',
     tracks: [
       { title: 'Snake Eater', artist: 'Cynthia Harrell', durationSec: 178 },
-      { title: 'Metal Gear Solid Main Theme (MGS3 Version)', artist: 'Harry Gregson-Williams', durationSec: 392 },
+      {
+        title: 'Metal Gear Solid Main Theme (MGS3 Version)',
+        artist: 'Harry Gregson-Williams',
+        durationSec: 392,
+      },
       { title: 'CQC', artist: 'Harry Gregson-Williams', durationSec: 148 },
       { title: 'Way to Fall', artist: 'Starsailor', durationSec: 270 },
       { title: 'Debriefing', artist: 'Harry Gregson-Williams', durationSec: 440 },
@@ -1157,10 +1289,18 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     artist: 'Akira Yamaoka & Mary Elizabeth McGlynn',
     releaseYear: '2003',
     tracks: [
-      { title: 'You\'re Not Here', artist: 'Akira Yamaoka feat. Mary Elizabeth McGlynn', durationSec: 226 },
+      {
+        title: "You're Not Here",
+        artist: 'Akira Yamaoka feat. Mary Elizabeth McGlynn',
+        durationSec: 226,
+      },
       { title: 'Breeze - In Monochrome Night', artist: 'Akira Yamaoka', durationSec: 254 },
       { title: 'End of Small Sanctuary', artist: 'Akira Yamaoka', durationSec: 102 },
-      { title: 'Letter - From the Lost Days', artist: 'Akira Yamaoka feat. Mary Elizabeth McGlynn', durationSec: 234 },
+      {
+        title: 'Letter - From the Lost Days',
+        artist: 'Akira Yamaoka feat. Mary Elizabeth McGlynn',
+        durationSec: 234,
+      },
       { title: 'Hometown', artist: 'Akira Yamaoka feat. Joe Romersa', durationSec: 364 },
     ],
   },
@@ -1172,8 +1312,8 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Reign of the Septims', artist: 'Jeremy Soule', durationSec: 110 },
       { title: 'Wings of Kynareth', artist: 'Jeremy Soule', durationSec: 211 },
       { title: 'Harvest Dawn', artist: 'Jeremy Soule', durationSec: 172 },
-      { title: 'Auriel\'s Ascension', artist: 'Jeremy Soule', durationSec: 185 },
-      { title: 'Watchman\'s Ease', artist: 'Jeremy Soule', durationSec: 126 },
+      { title: "Auriel's Ascension", artist: 'Jeremy Soule', durationSec: 185 },
+      { title: "Watchman's Ease", artist: 'Jeremy Soule', durationSec: 126 },
     ],
   },
   'the elder scrolls iii morrowind': {
@@ -1204,7 +1344,7 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
     artist: 'Tracy W. Bush, Derek Duke, Jason Hayes & Glenn Stafford',
     releaseYear: '2002',
     tracks: [
-      { title: 'Arthas\' Betrayal', artist: 'Glenn Stafford', durationSec: 142 },
+      { title: "Arthas' Betrayal", artist: 'Glenn Stafford', durationSec: 142 },
       { title: 'Human Theme (Lordaeron)', artist: 'Tracy W. Bush', durationSec: 265 },
       { title: 'Orc Theme (Kalimdor)', artist: 'Derek Duke', durationSec: 248 },
       { title: 'Night Elf Theme (Ashenvale)', artist: 'Jason Hayes', durationSec: 256 },
@@ -1223,14 +1363,18 @@ const CURATED_OST_CATALOG: Record<string, CuratedOstSpec> = {
       { title: 'Sanctuary', artist: 'Matt Uelmen', durationSec: 248 },
     ],
   },
-  'bioshock': {
+  bioshock: {
     albumTitle: 'BioShock (Original Orchestral Score)',
     artist: 'Garry Schyman',
     releaseYear: '2007',
     tracks: [
-      { title: 'The Ocean on His Shoulders (BioShock Main Theme)', artist: 'Garry Schyman', durationSec: 116 },
+      {
+        title: 'The Ocean on His Shoulders (BioShock Main Theme)',
+        artist: 'Garry Schyman',
+        durationSec: 116,
+      },
       { title: 'Welcome to Rapture', artist: 'Garry Schyman', durationSec: 112 },
-      { title: 'Cohen\'s Masterpiece', artist: 'Garry Schyman', durationSec: 174 },
+      { title: "Cohen's Masterpiece", artist: 'Garry Schyman', durationSec: 174 },
       { title: 'Dancers on a String', artist: 'Garry Schyman', durationSec: 94 },
     ],
   },
@@ -1274,12 +1418,12 @@ const CLASSIC_QUERY_ALIASES: Record<string, string> = {
   'most wanted': 'need for speed most wanted',
   'nfs underground 2': 'need for speed underground 2',
   'underground 2': 'need for speed underground 2',
-  'mgs': 'metal gear solid',
+  mgs: 'metal gear solid',
   'mgs 1': 'metal gear solid',
   'mgs 3': 'metal gear solid 3 snake eater',
   'snake eater': 'metal gear solid 3 snake eater',
-  'oblivion': 'the elder scrolls iv oblivion',
-  'morrowind': 'the elder scrolls iii morrowind',
+  oblivion: 'the elder scrolls iv oblivion',
+  morrowind: 'the elder scrolls iii morrowind',
   'new vegas': 'fallout new vegas',
   'warcraft 3': 'warcraft iii reign of chaos',
   'warcraft iii': 'warcraft iii reign of chaos',
@@ -1288,9 +1432,7 @@ const CLASSIC_QUERY_ALIASES: Record<string, string> = {
   'bully scholarship': 'bully',
 }
 
-export function lookupCuratedSoundtrack(
-  game: GameIdentity,
-): SoundtrackAlbumWithTracks | null {
+export function lookupCuratedSoundtrack(game: GameIdentity): SoundtrackAlbumWithTracks | null {
   if (!game?.title) return null
   const rawCore = extractCoreGameTitle(game.title).toLowerCase()
   const core = CLASSIC_QUERY_ALIASES[rawCore] || rawCore
@@ -1339,7 +1481,11 @@ export function lookupCuratedSoundtrack(
       album_type: 'original_soundtrack',
       artist: spec.artist,
       release_date: spec.releaseYear || game.releaseYear || null,
-      cover_url: game.coverUrl || CURATED_OST_COVERS[core] || resolveAlbumCoverFallback(spec.albumTitle) || null,
+      cover_url:
+        game.coverUrl ||
+        CURATED_OST_COVERS[core] ||
+        resolveAlbumCoverFallback(spec.albumTitle) ||
+        null,
       track_count: tracks.length,
       total_duration_ms: totalDurationMs,
       provider_id: 'curated',
@@ -1351,106 +1497,172 @@ export function lookupCuratedSoundtrack(
 
 export const CURATED_OST_COVERS: Record<string, string> = {
   'elden ring': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1245620/library_600x900_2x.jpg',
-  'the witcher 3 wild hunt': 'https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900_2x.jpg',
+  'the witcher 3 wild hunt':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900_2x.jpg',
   'witcher 3': 'https://cdn.cloudflare.steamstatic.com/steam/apps/292030/library_600x900_2x.jpg',
-  'cyberpunk 2077': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1091500/library_600x900_2x.jpg',
-  'baldurs gate 3': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1086940/library_600x900_2x.jpg',
-  'red dead redemption 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1174180/library_600x900_2x.jpg',
-  'red dead redemption': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2668510/library_600x900_2x.jpg',
+  'cyberpunk 2077':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1091500/library_600x900_2x.jpg',
+  'baldurs gate 3':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1086940/library_600x900_2x.jpg',
+  'red dead redemption 2':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1174180/library_600x900_2x.jpg',
+  'red dead redemption':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2668510/library_600x900_2x.jpg',
   'god of war': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1593500/library_600x900_2x.jpg',
-  'god of war ragnarok': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2322010/library_600x900_2x.jpg',
-  'ghost of tsushima': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2215430/library_600x900_2x.jpg',
-  'the last of us': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
-  'the last of us part i': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
-  'the last of us part 1': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
-  'the last of us part ii': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2531310/library_600x900_2x.jpg',
-  'the last of us part 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2531310/library_600x900_2x.jpg',
-  'clair obscur expedition 33': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1903340/header.jpg',
-  'hollow knight': 'https://cdn.cloudflare.steamstatic.com/steam/apps/367520/library_600x900_2x.jpg',
-  'hades': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145360/library_600x900_2x.jpg',
+  'god of war ragnarok':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2322010/library_600x900_2x.jpg',
+  'ghost of tsushima':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2215430/library_600x900_2x.jpg',
+  'the last of us':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
+  'the last of us part i':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
+  'the last of us part 1':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1888930/library_600x900_2x.jpg',
+  'the last of us part ii':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2531310/library_600x900_2x.jpg',
+  'the last of us part 2':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2531310/library_600x900_2x.jpg',
+  'clair obscur expedition 33':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1903340/header.jpg',
+  'hollow knight':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/367520/library_600x900_2x.jpg',
+  hades: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145360/library_600x900_2x.jpg',
   'hades 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145350/library_600x900_2x.jpg',
   'hades ii': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1145350/library_600x900_2x.jpg',
   'doom eternal': 'https://cdn.cloudflare.steamstatic.com/steam/apps/782330/library_600x900_2x.jpg',
-  'doom': 'https://cdn.cloudflare.steamstatic.com/steam/apps/379720/library_600x900_2x.jpg',
-  'nier automata': 'https://cdn.cloudflare.steamstatic.com/steam/apps/524220/library_600x900_2x.jpg',
-  'persona 5 royal': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1687950/library_600x900_2x.jpg',
+  doom: 'https://cdn.cloudflare.steamstatic.com/steam/apps/379720/library_600x900_2x.jpg',
+  'nier automata':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/524220/library_600x900_2x.jpg',
+  'persona 5 royal':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1687950/library_600x900_2x.jpg',
   'dark souls 3': 'https://cdn.cloudflare.steamstatic.com/steam/apps/374320/library_600x900_2x.jpg',
-  'dark souls iii': 'https://cdn.cloudflare.steamstatic.com/steam/apps/374320/library_600x900_2x.jpg',
-  'sekiro shadows die twice': 'https://cdn.cloudflare.steamstatic.com/steam/apps/814380/library_600x900_2x.jpg',
-  'black myth wukong': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2358720/library_600x900_2x.jpg',
-  'death stranding': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1850570/library_600x900_2x.jpg',
-  'silent hill 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2124490/library_600x900_2x.jpg',
-  'resident evil 4': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2050650/library_600x900_2x.jpg',
+  'dark souls iii':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/374320/library_600x900_2x.jpg',
+  'sekiro shadows die twice':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/814380/library_600x900_2x.jpg',
+  'black myth wukong':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2358720/library_600x900_2x.jpg',
+  'death stranding':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1850570/library_600x900_2x.jpg',
+  'silent hill 2':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2124490/library_600x900_2x.jpg',
+  'resident evil 4':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2050650/library_600x900_2x.jpg',
   'alan wake 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/108710/library_600x900_2x.jpg',
-  'control': 'https://cdn.cloudflare.steamstatic.com/steam/apps/870780/library_600x900_2x.jpg',
-  'celeste': 'https://cdn.cloudflare.steamstatic.com/steam/apps/504230/library_600x900_2x.jpg',
-  'undertale': 'https://cdn.cloudflare.steamstatic.com/steam/apps/391540/library_600x900_2x.jpg',
-  'final fantasy 7 remake': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1462040/library_600x900_2x.jpg',
-  'final fantasy vii remake': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1462040/library_600x900_2x.jpg',
-  'final fantasy 7 rebirth': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2909400/library_600x900_2x.jpg',
-  'final fantasy vii rebirth': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2909400/library_600x900_2x.jpg',
-  'final fantasy 16': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2515020/library_600x900_2x.jpg',
-  'final fantasy xvi': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2515020/library_600x900_2x.jpg',
-  'the elder scrolls 5 skyrim': 'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
-  'the elder scrolls v skyrim': 'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
-  'skyrim': 'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
-  'grand theft auto 5': 'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg',
-  'grand theft auto v': 'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg',
-  'marvels spider man': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1817070/library_600x900_2x.jpg',
+  control: 'https://cdn.cloudflare.steamstatic.com/steam/apps/870780/library_600x900_2x.jpg',
+  celeste: 'https://cdn.cloudflare.steamstatic.com/steam/apps/504230/library_600x900_2x.jpg',
+  undertale: 'https://cdn.cloudflare.steamstatic.com/steam/apps/391540/library_600x900_2x.jpg',
+  'final fantasy 7 remake':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1462040/library_600x900_2x.jpg',
+  'final fantasy vii remake':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1462040/library_600x900_2x.jpg',
+  'final fantasy 7 rebirth':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2909400/library_600x900_2x.jpg',
+  'final fantasy vii rebirth':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2909400/library_600x900_2x.jpg',
+  'final fantasy 16':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2515020/library_600x900_2x.jpg',
+  'final fantasy xvi':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2515020/library_600x900_2x.jpg',
+  'the elder scrolls 5 skyrim':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
+  'the elder scrolls v skyrim':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
+  skyrim: 'https://cdn.cloudflare.steamstatic.com/steam/apps/489830/library_600x900_2x.jpg',
+  'grand theft auto 5':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg',
+  'grand theft auto v':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/271590/library_600x900_2x.jpg',
+  'marvels spider man':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1817070/library_600x900_2x.jpg',
   'marvels spider man 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2651280/header.jpg',
-  'marvels spider man miles morales': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1817190/library_600x900_2x.jpg',
-  'horizon zero dawn': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1151640/library_600x900_2x.jpg',
-  'horizon forbidden west': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2420110/library_600x900_2x.jpg',
-  'detroit become human': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1222140/library_600x900_2x.jpg',
+  'marvels spider man miles morales':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1817190/library_600x900_2x.jpg',
+  'horizon zero dawn':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1151640/library_600x900_2x.jpg',
+  'horizon forbidden west':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2420110/library_600x900_2x.jpg',
+  'detroit become human':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1222140/library_600x900_2x.jpg',
   'lies of p': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1627720/library_600x900_2x.jpg',
-  'armored core 6 fires of rubicon': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1888160/library_600x900_2x.jpg',
-  'armored core vi fires of rubicon': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1888160/library_600x900_2x.jpg',
-  'monster hunter world': 'https://cdn.cloudflare.steamstatic.com/steam/apps/582010/library_600x900_2x.jpg',
-  'monster hunter wilds': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2246340/library_600x900_2x.jpg',
-  'kingdom come deliverance 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg',
-  'kingdom come deliverance ii': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg',
-  'metaphor refantazio': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2679460/library_600x900_2x.jpg',
-  'persona 3 reload': 'https://cdn.cloudflare.steamstatic.com/steam/apps/2161700/library_600x900_2x.jpg',
-  'halo the master chief collection': 'https://cdn.cloudflare.steamstatic.com/steam/apps/976730/library_600x900_2x.jpg',
-  'mass effect legendary edition': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1328670/library_600x900_2x.jpg',
-  'stray': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1332010/library_600x900_2x.jpg',
+  'armored core 6 fires of rubicon':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1888160/library_600x900_2x.jpg',
+  'armored core vi fires of rubicon':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1888160/library_600x900_2x.jpg',
+  'monster hunter world':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/582010/library_600x900_2x.jpg',
+  'monster hunter wilds':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2246340/library_600x900_2x.jpg',
+  'kingdom come deliverance 2':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg',
+  'kingdom come deliverance ii':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1771300/library_600x900_2x.jpg',
+  'metaphor refantazio':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2679460/library_600x900_2x.jpg',
+  'persona 3 reload':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/2161700/library_600x900_2x.jpg',
+  'halo the master chief collection':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/976730/library_600x900_2x.jpg',
+  'mass effect legendary edition':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/1328670/library_600x900_2x.jpg',
+  stray: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1332010/library_600x900_2x.jpg',
   'outer wilds': 'https://cdn.cloudflare.steamstatic.com/steam/apps/753640/library_600x900_2x.jpg',
-  'disco elysium': 'https://cdn.cloudflare.steamstatic.com/steam/apps/632470/library_600x900_2x.jpg',
-  'devil may cry 5': 'https://cdn.cloudflare.steamstatic.com/steam/apps/601150/library_600x900_2x.jpg',
-  'stardew valley': 'https://cdn.cloudflare.steamstatic.com/steam/apps/413150/library_600x900_2x.jpg',
-  'portal': 'https://cdn.cloudflare.steamstatic.com/steam/apps/400/library_600x900_2x.jpg',
+  'disco elysium':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/632470/library_600x900_2x.jpg',
+  'devil may cry 5':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/601150/library_600x900_2x.jpg',
+  'stardew valley':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/413150/library_600x900_2x.jpg',
+  portal: 'https://cdn.cloudflare.steamstatic.com/steam/apps/400/library_600x900_2x.jpg',
   'portal 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/620/library_600x900_2x.jpg',
   'half life': 'https://cdn.cloudflare.steamstatic.com/steam/apps/70/library_600x900_2x.jpg',
   'half life 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/220/library_600x900_2x.jpg',
-  'metal gear rising revengeance': 'https://cdn.cloudflare.steamstatic.com/steam/apps/235460/library_600x900_2x.jpg',
-  'subnautica': 'https://cdn.cloudflare.steamstatic.com/steam/apps/264710/library_600x900_2x.jpg',
-  'risk of rain 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/632360/library_600x900_2x.jpg',
-  'cuphead': 'https://cdn.cloudflare.steamstatic.com/steam/apps/268910/library_600x900_2x.jpg',
+  'metal gear rising revengeance':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/235460/library_600x900_2x.jpg',
+  subnautica: 'https://cdn.cloudflare.steamstatic.com/steam/apps/264710/library_600x900_2x.jpg',
+  'risk of rain 2':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/632360/library_600x900_2x.jpg',
+  cuphead: 'https://cdn.cloudflare.steamstatic.com/steam/apps/268910/library_600x900_2x.jpg',
   'katana zero': 'https://cdn.cloudflare.steamstatic.com/steam/apps/460950/library_600x900_2x.jpg',
-  'ultrakill': 'https://cdn.cloudflare.steamstatic.com/steam/apps/1229490/library_600x900_2x.jpg',
-  'terraria': 'https://cdn.cloudflare.steamstatic.com/steam/apps/105600/library_600x900_2x.jpg',
+  ultrakill: 'https://cdn.cloudflare.steamstatic.com/steam/apps/1229490/library_600x900_2x.jpg',
+  terraria: 'https://cdn.cloudflare.steamstatic.com/steam/apps/105600/library_600x900_2x.jpg',
   'yakuza 0': 'https://cdn.cloudflare.steamstatic.com/steam/apps/638970/library_600x900_2x.jpg',
-  'chrono trigger': 'https://cdn.cloudflare.steamstatic.com/steam/apps/613830/library_600x900_2x.jpg',
+  'chrono trigger':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/613830/library_600x900_2x.jpg',
   'helldivers 2': 'https://cdn.cloudflare.steamstatic.com/steam/apps/553850/library_600x900_2x.jpg',
-  'the legend of zelda breath of the wild': 'https://images.igdb.com/igdb/image/upload/t_cover_big/co3p2d.jpg',
-  'the legend of zelda tears of the kingdom': 'https://images.igdb.com/igdb/image/upload/t_cover_big/co5vmg.jpg',
+  'the legend of zelda breath of the wild':
+    'https://images.igdb.com/igdb/image/upload/t_cover_big/co3p2d.jpg',
+  'the legend of zelda tears of the kingdom':
+    'https://images.igdb.com/igdb/image/upload/t_cover_big/co5vmg.jpg',
   'max payne': 'https://cdn.cloudflare.steamstatic.com/steam/apps/12140/header.jpg',
-  'max payne 2 the fall of max payne': 'https://cdn.cloudflare.steamstatic.com/steam/apps/12150/header.jpg',
+  'max payne 2 the fall of max payne':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/12150/header.jpg',
   'max payne 3': 'https://cdn.cloudflare.steamstatic.com/steam/apps/204100/library_600x900_2x.jpg',
-  'grand theft auto vice city': 'https://cdn.cloudflare.steamstatic.com/steam/apps/12110/header.jpg',
-  'grand theft auto san andreas': 'https://cdn.cloudflare.steamstatic.com/steam/apps/12120/header.jpg',
-  'grand theft auto iv': 'https://cdn.cloudflare.steamstatic.com/steam/apps/12210/library_600x900_2x.jpg',
-  'bully': 'https://cdn.cloudflare.steamstatic.com/steam/apps/12200/header.jpg',
-  'mafia': 'https://cdn.cloudflare.steamstatic.com/steam/apps/40990/library_600x900_2x.jpg',
+  'grand theft auto vice city':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/12110/header.jpg',
+  'grand theft auto san andreas':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/12120/header.jpg',
+  'grand theft auto iv':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/12210/library_600x900_2x.jpg',
+  bully: 'https://cdn.cloudflare.steamstatic.com/steam/apps/12200/header.jpg',
+  mafia: 'https://cdn.cloudflare.steamstatic.com/steam/apps/40990/library_600x900_2x.jpg',
   'mafia ii': 'https://cdn.cloudflare.steamstatic.com/steam/apps/50130/header.jpg',
-  'prince of persia the sands of time': 'https://cdn.cloudflare.steamstatic.com/steam/apps/13600/header.jpg',
-  'prince of persia warrior within': 'https://cdn.cloudflare.steamstatic.com/steam/apps/13500/header.jpg',
-  'assassins creed ii': 'https://cdn.cloudflare.steamstatic.com/steam/apps/33230/library_600x900_2x.jpg',
-  'assassins creed iv black flag': 'https://cdn.cloudflare.steamstatic.com/steam/apps/242050/library_600x900_2x.jpg',
-  'the elder scrolls iv oblivion': 'https://cdn.cloudflare.steamstatic.com/steam/apps/22330/library_600x900_2x.jpg',
-  'the elder scrolls iii morrowind': 'https://cdn.cloudflare.steamstatic.com/steam/apps/22320/library_600x900_2x.jpg',
-  'fallout new vegas': 'https://cdn.cloudflare.steamstatic.com/steam/apps/22380/library_600x900_2x.jpg',
-  'bioshock': 'https://cdn.cloudflare.steamstatic.com/steam/apps/7670/library_600x900_2x.jpg',
+  'prince of persia the sands of time':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/13600/header.jpg',
+  'prince of persia warrior within':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/13500/header.jpg',
+  'assassins creed ii':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/33230/library_600x900_2x.jpg',
+  'assassins creed iv black flag':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/242050/library_600x900_2x.jpg',
+  'the elder scrolls iv oblivion':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/22330/library_600x900_2x.jpg',
+  'the elder scrolls iii morrowind':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/22320/library_600x900_2x.jpg',
+  'fallout new vegas':
+    'https://cdn.cloudflare.steamstatic.com/steam/apps/22380/library_600x900_2x.jpg',
+  bioshock: 'https://cdn.cloudflare.steamstatic.com/steam/apps/7670/library_600x900_2x.jpg',
 }
 
 export function resolveAlbumCoverFallback(rawTitle?: string | null): string | null {
