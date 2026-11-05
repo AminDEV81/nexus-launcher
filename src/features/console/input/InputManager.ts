@@ -148,7 +148,7 @@ export function detectGlyphFamilyFromId(
 export function dedupeLogicalGamepads(
   rawPads: Array<{ index: number; id: string; connected: boolean } | null>,
   dualSenseEmulatingCount: number,
-  dualSenseConnectedCount: number,
+  _dualSenseConnectedCount: number,
   override: ConsoleGlyphOverride = 'auto',
 ): LogicalGamepadDescriptor[] {
   const connected = rawPads.filter((p): p is { index: number; id: string; connected: boolean } =>
