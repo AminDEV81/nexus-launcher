@@ -38,7 +38,8 @@ export function formatElapsed(totalSeconds: number): string {
  * interpret the former as *local* time, which shifted dates by the user's
  * UTC offset. Normalize both forms explicitly before displaying them.
  */
-export function parseStoredUtcDate(value: string): Date | null {
+export function parseStoredUtcDate(value?: string | null): Date | null {
+  if (!value) return null
   const trimmed = value.trim()
   if (!trimmed) return null
 

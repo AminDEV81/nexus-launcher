@@ -240,7 +240,7 @@ export const GameHubView: React.FC<GameHubViewProps> = ({
   const developerText = game.developer || hubDetails?.developer
   const publisherText = game.publisher || hubDetails?.publisher
   const releaseText = game.release_date || hubDetails?.release_date
-  const unreleased = isGameUnreleased(releaseText)
+  const unreleased = isGameUnreleased(releaseText ?? null)
 
   return (
     <FocusScope id="console_game_hub" orientation="vertical" className="space-y-6 pb-20">

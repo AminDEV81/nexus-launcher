@@ -18,7 +18,7 @@ export const ModeSelectModal: React.FC = () => {
   const themeMode = useThemeStore((s) => s.mode)
   const setThemeMode = useThemeStore((s) => s.setMode)
   const consoleThemeId = useConsoleStore((s) => s.theme)
-  const setConsoleTheme = useConsoleStore((s) => s.setTheme)
+  const updateConsoleSetting = useConsoleStore((s) => s.updateConsoleSetting)
 
   const isLight =
     themeMode === 'light' ||
@@ -30,12 +30,12 @@ export const ModeSelectModal: React.FC = () => {
     if (isLight) {
       setThemeMode('dark')
       if (CONSOLE_THEMES[consoleThemeId]?.isLight) {
-        setConsoleTheme('cyberpunk')
+        updateConsoleSetting('theme', 'cyberpunk')
       }
     } else {
       setThemeMode('light')
       if (!CONSOLE_THEMES[consoleThemeId]?.isLight) {
-        setConsoleTheme('light')
+        updateConsoleSetting('theme', 'light')
       }
     }
   }
@@ -92,7 +92,7 @@ export const ModeSelectModal: React.FC = () => {
 
     if (choice === 'console') {
       if (isLight && !CONSOLE_THEMES[consoleThemeId]?.isLight) {
-        setConsoleTheme('light')
+        updateConsoleSetting('theme', 'light')
       }
       useConsoleStore.getState().setLastDesktopRoute(location.pathname || '/')
       navigate('/console')

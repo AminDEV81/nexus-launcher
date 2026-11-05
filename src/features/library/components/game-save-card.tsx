@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   HardDrive,
   FolderOpen,
-  History,
   RefreshCw,
   Plus,
   Trash2,
@@ -17,7 +16,6 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Game, GameSaveDetails, DetectedSaveLocation } from '@/types/models'
-import { useSaveManagerStore } from '@/store/save-manager-store'
 import { useProfileStore } from '@/store/profile-store'
 import * as saveService from '@/services/save-manager'
 import { formatBytes } from '../utils/guess-name'

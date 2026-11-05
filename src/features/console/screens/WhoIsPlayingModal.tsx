@@ -555,9 +555,9 @@ export const WhoIsPlayingModal: React.FC<{
           <AvatarPickerModal
             isOpen={avatarPickerOpen}
             currentAvatar={newAvatar}
-            accentColor={newColor}
+            profileColor={newColor}
             onClose={() => setAvatarPickerOpen(false)}
-            onSelect={(av) => {
+            onSelectAvatar={(av: string) => {
               setNewAvatar(av)
               setAvatarPickerOpen(false)
             }}

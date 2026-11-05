@@ -131,17 +131,13 @@ export function isNintendoGamepadId(rawId: string): boolean {
 
 export function detectGlyphFamilyFromId(
   rawId: string,
-  dualSenseConnectedCount = 0,
+  dualSenseEmulatingCount = 0,
   override: ConsoleGlyphOverride = 'auto',
 ): ConsoleGlyphFamily {
   if (override !== 'auto') return override
+  if (dualSenseEmulatingCount > 0) return 'xbox'
   if (isSonyGamepadId(rawId)) return 'playstation'
   if (isNintendoGamepadId(rawId)) return 'switch'
-  const low = rawId.toLowerCase()
-  if (dualSenseConnectedCount > 0 && (low.includes('xinput') || low.includes('xbox'))) {
-    // When ViGEm Xbox 360 emulation is active for a physical DualSense, keep PlayStation glyphs!
-    return 'playstation'
-  }
   return 'xbox'
 }
 
@@ -177,7 +173,7 @@ export function dedupeLogicalGamepads(
     return {
       index: pad.index,
       id: pad.id,
-      glyphFamily: detectGlyphFamilyFromId(pad.id, dualSenseConnectedCount, override),
+      glyphFamily: detectGlyphFamilyFromId(pad.id, dualSenseEmulatingCount, override),
       isShadowedDuplicate,
     }
   })
