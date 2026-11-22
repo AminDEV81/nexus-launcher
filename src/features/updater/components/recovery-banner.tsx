@@ -32,7 +32,7 @@ export function RecoveryBanner() {
     try {
       await openUrl(url)
     } catch {
-      window.open(url, '_blank')
+      window.open(url, '_blank', 'noopener,noreferrer')
     }
   }
 

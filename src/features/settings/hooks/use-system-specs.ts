@@ -16,17 +16,20 @@ export function useSystemSpecs() {
 }
 
 import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
+import { useLaunchStore } from '@/store/launch-store'
 
 export function useLiveSystemMetrics() {
   const windowActive = useWindowActive()
   const gpuEcoMode = useAppearanceSettingsStore((s) => s.gpuEcoMode)
+  const isAnyGameRunning = useLaunchStore((s) => (s.runningGameIds?.size ?? 0) > 0)
 
   return useQuery({
     queryKey: liveMetricsQueryKey,
     queryFn: getLiveMetrics,
-    refetchInterval: windowActive ? (gpuEcoMode ? 4500 : 2500) : false,
-    staleTime: 2000,
-    refetchOnWindowFocus: true,
+    enabled: !isAnyGameRunning,
+    refetchInterval: windowActive && !isAnyGameRunning ? (gpuEcoMode ? 8000 : 4000) : false,
+    staleTime: 3500,
+    refetchOnWindowFocus: false,
   })
 }
 

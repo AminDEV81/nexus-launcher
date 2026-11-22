@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { Plus, Trash2, Edit2, Check, User, Palette, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Profile } from '@/types/models'
@@ -45,10 +45,12 @@ export function ProfileManagerModal() {
   const [isSaving, setIsSaving] = useState(false)
   const [profileToDelete, setProfileToDelete] = useState<Profile | null>(null)
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false)
+  const syncedEditIdRef = useRef<string | null>(null)
 
   // Sync edit mode if opened with a specific profile ID
   useEffect(() => {
     if (!isOpen) {
+      syncedEditIdRef.current = null
       setIsEditing(false)
       setEditingId(null)
       setName('')
@@ -56,9 +58,10 @@ export function ProfileManagerModal() {
       return
     }
 
-    if (managerModalEditProfileId) {
+    if (managerModalEditProfileId && syncedEditIdRef.current !== managerModalEditProfileId) {
       const target = profiles.find((p) => p.id === managerModalEditProfileId)
       if (target) {
+        syncedEditIdRef.current = managerModalEditProfileId
         setIsEditing(true)
         setEditingId(target.id)
         setName(target.name)
@@ -66,8 +69,7 @@ export function ProfileManagerModal() {
         setSelectedColor(target.color)
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, managerModalEditProfileId])
+  }, [isOpen, managerModalEditProfileId, profiles])
 
   // ESC handler inside modal
   useEffect(() => {

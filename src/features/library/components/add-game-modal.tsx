@@ -639,10 +639,11 @@ function SystemScanStep({ onBack, onComplete }: SystemScanStepProps) {
     },
   })
 
+  const { mutate: runStoreScan } = scanMutation
+
   useEffect(() => {
-    scanMutation.mutate()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    runStoreScan()
+  }, [runStoreScan])
 
   const stores = useMemo(() => {
     if (!result) return []

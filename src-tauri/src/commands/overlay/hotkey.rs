@@ -237,7 +237,7 @@ impl GlobalHotkeyManager {
                         TranslateMessage(&msg);
                         DispatchMessageW(&msg);
                     } else {
-                        std::thread::sleep(std::time::Duration::from_millis(30));
+                        std::thread::sleep(std::time::Duration::from_millis(80));
                     }
                 }
 

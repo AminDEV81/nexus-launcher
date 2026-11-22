@@ -14,6 +14,7 @@ import {
   Activity,
   Rocket,
   Music,
+  Image,
 } from 'lucide-react'
 
 /** Dedicated custom Sony DualSense PS5 Controller icon for the left sidebar */
@@ -59,6 +60,7 @@ export interface NavItem {
 export const DISCOVER_NAV_ITEMS: NavItem[] = [
   { label: 'Game Hub', path: '/hub', icon: Compass },
   { label: 'Soundtrack', path: '/soundtrack', icon: Music, badge: 'OST' },
+  { label: 'Art & Wallpaper', path: '/art-wallpaper', icon: Image, badge: '8K' },
   { label: 'Wishlist', path: '/wishlist', icon: Bookmark },
   { label: 'Download Games', path: '/downloads', icon: Download },
 ]

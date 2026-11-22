@@ -18,6 +18,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 import { useCleanupScan, useExecuteCleanup } from '../hooks/use-cleanup'
+import { StorageTreemapSection } from './storage-treemap-section'
 import type { CleanupCategory } from '@/services/cleanup'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { playButtonClick, playBoostComplete } from '@/lib/sound-engine'
@@ -73,6 +74,7 @@ export function CleanupPanel() {
   const [activeCategory, setActiveCategory] = useState<string>('all')
   const [copiedPath, setCopiedPath] = useState<string | null>(null)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+  const [activeTab, setActiveTab] = useState<'treemap' | 'cache'>('treemap')
 
   const items = useMemo(() => report?.items ?? [], [report?.items])
   const hasItems = items.length > 0
@@ -189,6 +191,48 @@ export function CleanupPanel() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Top Sub-Tab Switcher: Storage Treemap & Redists vs Save & Cache Cleanup */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              playButtonClick()
+              setActiveTab('treemap')
+            }}
+            className={cn(
+              'inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition cursor-pointer',
+              activeTab === 'treemap'
+                ? 'bg-accent text-white shadow-sm'
+                : 'text-muted hover:bg-surface-raised hover:text-text',
+            )}
+          >
+            <HardDrive className="size-3.5" />
+            <span>Storage Treemap &amp; Redists</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              playButtonClick()
+              setActiveTab('cache')
+            }}
+            className={cn(
+              'inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition cursor-pointer',
+              activeTab === 'cache'
+                ? 'bg-accent text-white shadow-sm'
+                : 'text-muted hover:bg-surface-raised hover:text-text',
+            )}
+          >
+            <Trash2 className="size-3.5" />
+            <span>Save &amp; Cache Cleanup</span>
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'treemap' ? (
+        <StorageTreemapSection />
+      ) : (
+        <div className="flex flex-col gap-6">
       {/* Header Metric Dashboard */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {/* Card 1: Reclaimable Space */}
@@ -627,6 +671,8 @@ export function CleanupPanel() {
               </button>
             </div>
           </motion.div>
+        </div>
+      )}
         </div>
       )}
     </div>

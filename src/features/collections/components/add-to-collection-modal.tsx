@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Check,
   FolderPlus,
@@ -48,17 +48,20 @@ export function AddToCollectionModal({ gameId, open, onClose }: AddToCollectionM
   const [searchQuery, setSearchQuery] = useState('')
   const [selected, setSelected] = useState<Set<string> | null>(null)
   const [saving, setSaving] = useState(false)
+  const initializedRef = useRef(false)
 
   useEffect(() => {
-    if (open && memberIds && selected === null) {
-      setSelected(new Set(memberIds))
-    }
     if (!open) {
+      initializedRef.current = false
       setSelected(null)
       setSearchQuery('')
       setNewName('')
+      return
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (memberIds && !initializedRef.current) {
+      initializedRef.current = true
+      setSelected(new Set(memberIds))
+    }
   }, [open, memberIds])
 
   const filteredCollections = useMemo(() => {

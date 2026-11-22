@@ -392,6 +392,369 @@ pub async fn execute_cleanup(
     })
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DriveStorageInfo {
+    pub mount_point: String,
+    pub label: String,
+    pub total_bytes: u64,
+    pub available_bytes: u64,
+    pub used_bytes: u64,
+    pub games_bytes: u64,
+    pub game_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameStorageNode {
+    pub id: String,
+    pub name: String,
+    pub install_path: String,
+    pub drive_mount: String,
+    pub size_bytes: u64,
+    pub playtime_seconds: i64,
+    pub last_played_at: Option<String>,
+    pub days_since_played: Option<i64>,
+    pub is_stale: bool,
+    pub cover_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedistCleanTarget {
+    pub id: String,
+    pub game_id: String,
+    pub game_name: String,
+    pub category: String, // "redist" | "crash_dump"
+    pub label: String,
+    pub path: String,
+    pub size_bytes: u64,
+    pub file_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageAnalysisReport {
+    pub drives: Vec<DriveStorageInfo>,
+    pub games: Vec<GameStorageNode>,
+    pub redists: Vec<RedistCleanTarget>,
+    pub total_games_bytes: u64,
+    pub total_reclaimable_redist_bytes: u64,
+    pub stale_games_bytes: u64,
+    pub stale_games_count: usize,
+}
+
+fn is_redist_dir_name(name: &str) -> bool {
+    let low = name.to_ascii_lowercase();
+    matches!(
+        low.as_str(),
+        "_commonredist"
+            | "commonredist"
+            | "redist"
+            | "redistributables"
+            | "directx"
+            | "vcredist"
+            | "dotnetfx"
+            | "physx"
+            | "crashdumps"
+            | "crashes"
+    )
+}
+
+fn is_crash_dump_file(name: &str) -> bool {
+    let low = name.to_ascii_lowercase();
+    low.ends_with(".dmp") || low.ends_with(".mdmp")
+}
+
+fn scan_game_redists(
+    game_id: &str,
+    game_name: &str,
+    install_dir: &Path,
+    out: &mut Vec<RedistCleanTarget>,
+) {
+    if !install_dir.exists() || !install_dir.is_dir() {
+        return;
+    }
+    let mut visited_dirs: Vec<PathBuf> = Vec::new();
+    for entry in WalkDir::new(install_dir)
+        .max_depth(4)
+        .into_iter()
+        .flatten()
+    {
+        let p = entry.path();
+        if visited_dirs.iter().any(|vd| p != vd && p.starts_with(vd)) {
+            continue;
+        }
+        let fname = entry.file_name().to_string_lossy().to_string();
+        if entry.file_type().is_dir() && is_redist_dir_name(&fname) {
+            visited_dirs.push(p.to_path_buf());
+            let (sz, cnt) = calculate_dir_size_and_count(p);
+            if sz > 0 {
+                let low = fname.to_ascii_lowercase();
+                let cat = if low.contains("crash") { "crash_dump" } else { "redist" };
+                out.push(RedistCleanTarget {
+                    id: format!("redist_{}", p.to_string_lossy()),
+                    game_id: game_id.to_string(),
+                    game_name: game_name.to_string(),
+                    category: cat.to_string(),
+                    label: fname,
+                    path: p.to_string_lossy().to_string(),
+                    size_bytes: sz,
+                    file_count: cnt,
+                });
+            }
+        } else if entry.file_type().is_file() && is_crash_dump_file(&fname) {
+            if let Ok(meta) = entry.metadata() {
+                let sz = meta.len();
+                if sz > 0 {
+                    out.push(RedistCleanTarget {
+                        id: format!("dump_{}", p.to_string_lossy()),
+                        game_id: game_id.to_string(),
+                        game_name: game_name.to_string(),
+                        category: "crash_dump".to_string(),
+                        label: fname,
+                        path: p.to_string_lossy().to_string(),
+                        size_bytes: sz,
+                        file_count: 1,
+                    });
+                }
+            }
+        }
+    }
+}
+
+#[command]
+pub async fn analyze_storage_and_redists(
+    db: State<'_, Database>,
+) -> AppResult<StorageAnalysisReport> {
+    struct RawGameRow {
+        id: String,
+        name: String,
+        install_path: String,
+        install_size_bytes: u64,
+        playtime_seconds: i64,
+        last_played_at: Option<String>,
+        cover_url: Option<String>,
+    }
+
+    let raw_games: Vec<RawGameRow> = {
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, name, install_path, COALESCE(install_size_bytes, 0), COALESCE(playtime_seconds, 0), last_played_at, cover_url                  FROM games WHERE is_installed = 1 AND COALESCE(is_memory, 0) = 0 AND install_path IS NOT NULL AND TRIM(install_path) != ''",
+            )
+            .map_err(AppError::Database)?;
+        let rows = stmt
+            .query_map([], |row| {
+                let sz_raw: i64 = row.get(3)?;
+                Ok(RawGameRow {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    install_path: row.get(2)?,
+                    install_size_bytes: sz_raw.max(0) as u64,
+                    playtime_seconds: row.get(4)?,
+                    last_played_at: row.get(5)?,
+                    cover_url: row.get(6)?,
+                })
+            })
+            .map_err(AppError::Database)?;
+        rows.flatten().collect()
+    };
+
+    tokio::task::spawn_blocking(move || {
+        let disks = sysinfo::Disks::new_with_refreshed_list();
+        let mut drives: Vec<DriveStorageInfo> = disks
+            .list()
+            .iter()
+            .filter(|d| d.total_space() > 0)
+            .map(|d| {
+                let total = d.total_space();
+                let avail = d.available_space();
+                DriveStorageInfo {
+                    mount_point: d.mount_point().to_string_lossy().to_string(),
+                    label: d.name().to_string_lossy().to_string(),
+                    total_bytes: total,
+                    available_bytes: avail,
+                    used_bytes: total.saturating_sub(avail),
+                    games_bytes: 0,
+                    game_count: 0,
+                }
+            })
+            .collect();
+
+        // Sort longest mount_point first for accurate prefix matching
+        let mut drive_mounts: Vec<String> = drives.iter().map(|d| d.mount_point.clone()).collect();
+        drive_mounts.sort_by_key(|b| std::cmp::Reverse(b.len()));
+
+        let now = chrono::Utc::now();
+        let mut games_out: Vec<GameStorageNode> = Vec::new();
+        let mut redists_out: Vec<RedistCleanTarget> = Vec::new();
+        let mut total_games_bytes = 0u64;
+        let mut stale_games_bytes = 0u64;
+        let mut stale_games_count = 0usize;
+
+        for g in raw_games {
+            let path_obj = PathBuf::from(&g.install_path);
+            let size_bytes = if g.install_size_bytes > 0 {
+                g.install_size_bytes
+            } else if path_obj.exists() {
+                calculate_dir_size_and_count(&path_obj).0
+            } else {
+                0
+            };
+
+            let norm_path = g.install_path.to_ascii_lowercase().replace('/', "\\");
+            let drive_mount = drive_mounts
+                .iter()
+                .find(|m| norm_path.starts_with(&m.to_ascii_lowercase().replace('/', "\\")))
+                .cloned()
+                .unwrap_or_else(|| {
+                    g.install_path
+                        .get(0..3)
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "Other".to_string())
+                });
+
+            if let Some(drv) = drives.iter_mut().find(|d| d.mount_point == drive_mount) {
+                drv.games_bytes = drv.games_bytes.saturating_add(size_bytes);
+                drv.game_count += 1;
+            }
+
+            let days_since_played = g.last_played_at.as_deref().and_then(|ts| {
+                chrono::DateTime::parse_from_rfc3339(ts)
+                    .ok()
+                    .map(|dt| (now - dt.with_timezone(&chrono::Utc)).num_days().max(0))
+                    .or_else(|| {
+                        chrono::NaiveDate::parse_from_str(ts.get(0..10)?, "%Y-%m-%d")
+                            .ok()
+                            .map(|nd| (now.date_naive() - nd).num_days().max(0))
+                    })
+            });
+
+            let stale_by_age = match days_since_played {
+                Some(d) => d >= 60,
+                None => g.playtime_seconds == 0,
+            };
+            let is_stale = stale_by_age && size_bytes >= 15 * 1024 * 1024 * 1024;
+            if is_stale {
+                stale_games_bytes = stale_games_bytes.saturating_add(size_bytes);
+                stale_games_count += 1;
+            }
+            total_games_bytes = total_games_bytes.saturating_add(size_bytes);
+
+            scan_game_redists(&g.id, &g.name, &path_obj, &mut redists_out);
+
+            games_out.push(GameStorageNode {
+                id: g.id,
+                name: g.name,
+                install_path: g.install_path,
+                drive_mount,
+                size_bytes,
+                playtime_seconds: g.playtime_seconds,
+                last_played_at: g.last_played_at,
+                days_since_played,
+                is_stale,
+                cover_url: g.cover_url,
+            });
+        }
+
+        games_out.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+        redists_out.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+        let total_reclaimable_redist_bytes = redists_out.iter().map(|r| r.size_bytes).sum();
+
+        Ok(StorageAnalysisReport {
+            drives,
+            games: games_out,
+            redists: redists_out,
+            total_games_bytes,
+            total_reclaimable_redist_bytes,
+            stale_games_bytes,
+            stale_games_count,
+        })
+    })
+    .await
+    .map_err(|e| AppError::Invalid(format!("Storage analysis task failed: {e}")))?
+}
+
+#[command]
+pub async fn clean_redist_targets(
+    db: State<'_, Database>,
+    paths: Vec<String>,
+) -> AppResult<CleanupExecuteReport> {
+    let allowed_roots: Vec<PathBuf> = {
+        let conn = db.connection.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn
+            .prepare(
+                "SELECT install_path FROM games WHERE is_installed = 1 AND install_path IS NOT NULL AND TRIM(install_path) != ''",
+            )
+            .map_err(AppError::Database)?;
+        let rows = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(AppError::Database)?;
+        rows.flatten().map(PathBuf::from).collect()
+    };
+
+    tokio::task::spawn_blocking(move || {
+        let mut freed_bytes = 0u64;
+        let mut deleted_items_count = 0usize;
+        let mut errors = Vec::new();
+
+        for raw in paths {
+            let target = PathBuf::from(&raw);
+            let fname = target
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            let has_parent_dir = target
+                .components()
+                .any(|c| matches!(c, std::path::Component::ParentDir));
+            let is_symlink = std::fs::symlink_metadata(&target)
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false);
+            let is_under_game = !has_parent_dir
+                && !is_symlink
+                && allowed_roots.iter().any(|root| {
+                    target.starts_with(root) && target != *root
+                });
+            let is_safe_target = is_redist_dir_name(&fname) || is_crash_dump_file(&fname);
+
+            if !is_under_game || !is_safe_target {
+                errors.push(format!("Skipped unsafe or unrecognized target: {raw}"));
+                continue;
+            }
+            if !target.exists() {
+                continue;
+            }
+
+            if target.is_dir() {
+                let (sz, _) = calculate_dir_size_and_count(&target);
+                match remove_path_all_with_retry(&target) {
+                    Ok(_) => {
+                        freed_bytes = freed_bytes.saturating_add(sz);
+                        deleted_items_count += 1;
+                    }
+                    Err(e) => errors.push(format!("Failed to delete {raw}: {e}")),
+                }
+            } else if target.is_file() {
+                let sz = target.metadata().map(|m| m.len()).unwrap_or(0);
+                match std::fs::remove_file(&target) {
+                    Ok(_) => {
+                        freed_bytes = freed_bytes.saturating_add(sz);
+                        deleted_items_count += 1;
+                    }
+                    Err(e) => errors.push(format!("Failed to delete {raw}: {e}")),
+                }
+            }
+        }
+
+        Ok(CleanupExecuteReport {
+            freed_bytes,
+            deleted_items_count,
+            errors,
+        })
+    })
+    .await
+    .map_err(|e| AppError::Invalid(format!("Redist cleanup task failed: {e}")))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

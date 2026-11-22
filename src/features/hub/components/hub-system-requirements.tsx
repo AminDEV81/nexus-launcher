@@ -21,6 +21,10 @@ import { cn } from '@/lib/utils'
 import type { SystemRequirementDetail, SystemRequirements } from '@/types/models'
 import {
   estimateGameFpsMatrix,
+  isPcPlatformSupported,
+  type FrameGenMode,
+  type RayTracingMode,
+  type TargetRefreshHz,
   type TargetResolution,
   type UpscalerMode,
 } from '@/features/hub/utils/fps-estimator'
@@ -30,6 +34,7 @@ interface HubSystemRequirementsProps {
   gameTitle?: string
   releaseDate?: string | null
   genres?: string[]
+  platforms?: string[] | null
   className?: string
 }
 
@@ -243,11 +248,16 @@ export function HubSystemRequirements({
   gameTitle,
   releaseDate,
   genres,
+  platforms,
   className,
 }: HubSystemRequirementsProps) {
+  const pcSupported = isPcPlatformSupported(platforms)
   const [viewMode, setViewMode] = useState<'matrix' | 'cards'>('matrix')
-  const [selectedResolution, setSelectedResolution] = useState<TargetResolution>('1080p')
+  const [selectedResolution, setSelectedResolution] = useState<TargetResolution>('1440p')
   const [selectedUpscaler, setSelectedUpscaler] = useState<UpscalerMode>('native')
+  const [rayTracing, setRayTracing] = useState<RayTracingMode>('off')
+  const [frameGen, setFrameGen] = useState<FrameGenMode>('off')
+  const [targetHz, setTargetHz] = useState<TargetRefreshHz>(144)
 
   const { data: pcSpecs } = useQuery({
     queryKey: ['system-specs-hub-check'],
@@ -440,6 +450,9 @@ export function HubSystemRequirements({
         genres,
         selectedResolution,
         selectedUpscaler,
+        rayTracing,
+        frameGen,
+        targetHz,
       }),
     [
       pcSpecs,
@@ -450,6 +463,9 @@ export function HubSystemRequirements({
       genres,
       selectedResolution,
       selectedUpscaler,
+      rayTracing,
+      frameGen,
+      targetHz,
     ],
   )
 
@@ -503,6 +519,47 @@ export function HubSystemRequirements({
       accentColor: 'text-cyan-400',
     },
   ].filter((r) => Boolean(r.minVal || r.recVal))
+
+  if (!pcSupported) {
+    return (
+      <section
+        id="hub-system-requirements"
+        className={cn(
+          'flex flex-col gap-4 rounded-3xl border border-border bg-surface p-6 sm:p-7 shadow-sm',
+          className,
+        )}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-2xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-400">
+              <Gamepad2 className="size-5" />
+            </span>
+            <div>
+              <h3 className="text-base font-extrabold text-text">Console Exclusive Platform</h3>
+              <p className="text-xs text-subtle">
+                {gameTitle ? `${gameTitle} is not released natively on PC.` : 'This title is not released natively on PC.'}
+              </p>
+            </div>
+          </div>
+          {platforms && platforms.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {platforms.map((p) => (
+                <span
+                  key={p}
+                  className="rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-bold text-indigo-300"
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="rounded-2xl border border-border/70 bg-surface-raised/60 px-4 py-3 text-xs text-muted">
+          PC System Requirements and the PC FPS &amp; Resolution Estimator are automatically hidden for console-only titles.
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section
@@ -852,12 +909,94 @@ export function HubSystemRequirements({
                   ))}
                 </div>
               </div>
+
+              {/* Advanced Controls: Ray Tracing, Frame Generation & Target Refresh */}
+              <div className="flex w-full flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface-raised p-1">
+                    {(
+                      [
+                        { id: 'off', label: 'RT Off' },
+                        { id: 'rt_medium', label: 'RT Medium' },
+                        { id: 'rt_ultra', label: 'RT Ultra' },
+                      ] as const
+                    ).map((rt) => (
+                      <button
+                        key={rt.id}
+                        type="button"
+                        onClick={() => setRayTracing(rt.id)}
+                        className={cn(
+                          'rounded-lg px-2 py-1 font-mono text-[10px] font-extrabold transition-all cursor-pointer',
+                          rayTracing === rt.id
+                            ? 'bg-violet-500 text-white shadow-2xs'
+                            : 'text-subtle hover:text-text',
+                        )}
+                      >
+                        {rt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setFrameGen((f) => (f === 'off' ? 'auto' : 'off'))}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 font-mono text-[10.5px] font-extrabold transition-all cursor-pointer',
+                      frameGen === 'auto'
+                        ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-300'
+                        : 'border-border bg-surface-raised text-subtle hover:text-text',
+                    )}
+                  >
+                    <Zap className="size-3" />
+                    <span>{fpsEstimation.frameGenTechName}: {frameGen === 'auto' ? 'ON' : 'OFF'}</span>
+                  </button>
+
+                  <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface-raised p-1">
+                    {([60, 120, 144, 165, 240] as const).map((hz) => (
+                      <button
+                        key={hz}
+                        type="button"
+                        onClick={() => setTargetHz(hz)}
+                        className={cn(
+                          'rounded-lg px-2 py-1 font-mono text-[10px] font-extrabold transition-all cursor-pointer',
+                          targetHz === hz
+                            ? 'bg-accent text-white'
+                            : 'text-subtle hover:text-text',
+                        )}
+                      >
+                        {hz}Hz
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <span className="rounded-lg border border-border/70 bg-surface-raised px-2.5 py-1 font-mono text-[10px] font-bold text-muted">
+                  Engine: {fpsEstimation.engineProfile.name}
+                </span>
+              </div>
+
+              {/* Optimal Recommended Preset Banner */}
+              <div className="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-3.5 shrink-0 text-emerald-400" />
+                  <span className="font-bold text-emerald-300">
+                    Optimal for {targetHz}Hz:
+                  </span>
+                  <span className="font-semibold text-text">
+                    {fpsEstimation.optimalRecommendation.summary}
+                  </span>
+                </div>
+                <span className="font-mono text-[10.5px] font-bold text-emerald-400">
+                  1% Low: {fpsEstimation.optimalRecommendation.onePercentLowFps} FPS •{' '}
+                  {fpsEstimation.optimalRecommendation.frameTimeMs} ms
+                </span>
+              </div>
             </div>
 
             {/* 4 Preset Live FPS Gauge Cards */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {fpsEstimation.activePresets.map((cell) => {
-                const barPct = Math.min(100, Math.max(10, Math.round((cell.avgFps / 144) * 100)))
+                const barPct = Math.min(100, Math.max(10, Math.round((cell.avgFps / targetHz) * 100)))
                 const isSmooth = cell.avgFps >= 60
                 const isPlayable = cell.avgFps >= 38 && cell.avgFps < 60
                 return (

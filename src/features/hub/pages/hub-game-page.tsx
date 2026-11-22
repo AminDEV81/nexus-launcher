@@ -35,6 +35,7 @@ import { HubSoundtrackSection } from '@/features/soundtrack/components/hub/hub-s
 import { ReleaseCountdownBanner } from '@/features/console/ui/ReleaseCountdownBanner'
 import { useGames } from '@/features/library/hooks/use-games'
 import { findLibraryEntry } from '../utils/in-library'
+import { isPcPlatformSupported } from '../utils/fps-estimator'
 import { formatReleaseDate, localDateKey } from '@/features/library/utils/format'
 import { playButtonClick } from '@/lib/sound-engine'
 import { cn } from '@/lib/utils'
@@ -316,9 +317,11 @@ export function HubGamePage() {
               </span>
               <span className="truncate block font-mono text-sm font-extrabold text-cyan-500 dark:text-cyan-300">
                 {game.download_size ||
-                  game.system_requirements?.recommended?.storage ||
-                  game.system_requirements?.minimum?.storage ||
-                  '50 GB'}
+                  (isPcPlatformSupported(game.platforms)
+                    ? game.system_requirements?.recommended?.storage ||
+                      game.system_requirements?.minimum?.storage ||
+                      '50 GB'
+                    : 'Console Release')}
               </span>
             </div>
           </div>
@@ -454,6 +457,7 @@ export function HubGamePage() {
           gameTitle={game.name}
           releaseDate={game.release_date}
           genres={game.genres}
+          platforms={game.platforms}
         />
 
         {/* ── 5. Cinematic Soundtrack Experience ────────────────────── */}

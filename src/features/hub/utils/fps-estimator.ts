@@ -1,9 +1,45 @@
 import type { SystemRequirementDetail, SystemRequirements } from '@/types/models'
 import type { SystemSpecs } from '@/services/system'
 
+export function isPcPlatformSupported(platforms?: string[] | null): boolean {
+  if (!platforms || platforms.length === 0) return true
+  return platforms.some((p) => {
+    const low = p.toLowerCase()
+    return (
+      low.includes('pc') ||
+      low.includes('windows') ||
+      low.includes('steam') ||
+      low.includes('linux') ||
+      low.includes('mac')
+    )
+  })
+}
+
 export type TargetResolution = '1080p' | '1440p' | '4k'
 export type UpscalerMode = 'native' | 'quality' | 'balanced' | 'performance'
 export type GraphicsPreset = 'low' | 'medium' | 'high' | 'ultra'
+export type RayTracingMode = 'off' | 'rt_medium' | 'rt_ultra'
+export type FrameGenMode = 'off' | 'auto'
+export type TargetRefreshHz = 60 | 120 | 144 | 165 | 240
+
+export interface EngineProfile {
+  name: string
+  cpuWeight: number
+  gpuWeight: number
+  vramAddGb: number
+  rtHeavy: boolean
+}
+
+export interface OptimalSettingRecommendation {
+  preset: GraphicsPreset
+  presetLabel: string
+  upscaler: UpscalerMode
+  frameGenEnabled: boolean
+  expectedFps: number
+  onePercentLowFps: number
+  frameTimeMs: number
+  summary: string
+}
 
 export interface PresetFpsEstimate {
   preset: GraphicsPreset
@@ -48,8 +84,14 @@ export interface FullFpsEstimationResult {
   minCpuScore: number
   recCpuScore: number
   upscalerTechName: 'DLSS' | 'FSR' | 'XeSS'
+  frameGenTechName: 'DLSS 3 FG' | 'FSR 3 FG'
+  engineProfile: EngineProfile
   selectedResolution: TargetResolution
   selectedUpscaler: UpscalerMode
+  rayTracing: RayTracingMode
+  frameGen: FrameGenMode
+  targetHz: TargetRefreshHz
+  optimalRecommendation: OptimalSettingRecommendation
   activePresets: PresetFpsEstimate[]
   matrix: ResolutionMatrixRow[]
   bottleneck: BottleneckAnalysis
@@ -116,6 +158,39 @@ export function detectUpscalerTech(gpuName?: string | null): 'DLSS' | 'FSR' | 'X
   if (/rtx\s*(?:20|30|40|50)/.test(s)) return 'DLSS'
   if (/arc\s*[ab]\d+|iris\s*xe/.test(s)) return 'XeSS'
   return 'FSR'
+}
+
+export function detectFrameGenTech(gpuName?: string | null): 'DLSS 3 FG' | 'FSR 3 FG' {
+  const s = (gpuName || '').toLowerCase()
+  if (/rtx\s*(?:40|50)/.test(s)) return 'DLSS 3 FG'
+  return 'FSR 3 FG'
+}
+
+export function detectGameEngineProfile(
+  gameTitle?: string | null,
+  genres: string[] = [],
+  releaseDate?: string | null,
+): EngineProfile {
+  const t = (gameTitle || '').toLowerCase()
+  const g = genres.join(' ').toLowerCase()
+  const year = releaseDate ? Number(releaseDate.slice(0, 4)) || 2024 : 2024
+
+  if (/alan wake|stalker 2|wukong|silent hill 2|hellblade|immortals of aveum|lords of the fallen|remnant 2|tekken 8|clair obscur|expedition 33/.test(t)) {
+    return { name: 'UE5 Lumen / Nanite', cpuWeight: 0.96, gpuWeight: 0.88, vramAddGb: 1.2, rtHeavy: true }
+  }
+  if (/cyberpunk|starfield|dragon's dogma|monster hunter wilds|grand theft auto|red dead|hogwarts|avatar/.test(t)) {
+    return { name: 'AAA Open-World', cpuWeight: 0.88, gpuWeight: 0.92, vramAddGb: 1.0, rtHeavy: true }
+  }
+  if (/counter-strike|valorant|league of legends|dota 2|overwatch|rocket league|apex|fortnite|warzone|call of duty/.test(t)) {
+    return { name: 'Competitive / High-Hz', cpuWeight: 0.92, gpuWeight: 1.12, vramAddGb: -0.4, rtHeavy: false }
+  }
+  if (g.includes('indie') || g.includes('puzzle') || g.includes('card') || g.includes('platform')) {
+    return { name: 'Lightweight / Indie', cpuWeight: 1.15, gpuWeight: 1.25, vramAddGb: -1.2, rtHeavy: false }
+  }
+  if (year >= 2024) {
+    return { name: 'Modern DX12 / Vulkan', cpuWeight: 0.97, gpuWeight: 0.95, vramAddGb: 0.4, rtHeavy: true }
+  }
+  return { name: 'Standard PC Engine', cpuWeight: 1.0, gpuWeight: 1.0, vramAddGb: 0, rtHeavy: false }
 }
 
 export function estimateGpuPerformanceScore(
@@ -314,6 +389,9 @@ export function estimateGameFpsMatrix(params: {
   genres?: string[]
   selectedResolution: TargetResolution
   selectedUpscaler: UpscalerMode
+  rayTracing?: RayTracingMode
+  frameGen?: FrameGenMode
+  targetHz?: TargetRefreshHz
 }): FullFpsEstimationResult {
   const {
     pcSpecs,
@@ -323,7 +401,11 @@ export function estimateGameFpsMatrix(params: {
     genres = [],
     selectedResolution,
     selectedUpscaler,
+    rayTracing = 'off',
+    frameGen = 'off',
+    targetHz = 144,
   } = params
+  const engineProfile = detectGameEngineProfile(gameTitle, genres, releaseDate)
 
   const fallback = buildSynthesizedRequirements(releaseDate, genres, gameTitle)
   const minSpec = systemRequirements?.minimum || fallback.minimum
@@ -437,10 +519,32 @@ export function estimateGameFpsMatrix(params: {
     performance: { gpuBoost1080: 1.5, gpuBoost1440: 1.66, gpuBoost4k: 1.85, vramSaveGb: 1.1 },
   }
 
+  // Architecture-aware RT scaling
+  const gpuLower = userGpuName.toLowerCase()
+  const hasNvidiaRtCores = /rtx\s*(?:20|30|40|50)/.test(gpuLower)
+  const hasRdna3Plus = /rx\s*(?:7\d{3}|9\d{3})/.test(gpuLower)
+  const rtGpuMult =
+    rayTracing === 'off'
+      ? 1.0
+      : rayTracing === 'rt_medium'
+        ? hasNvidiaRtCores
+          ? 0.74
+          : hasRdna3Plus
+            ? 0.68
+            : 0.56
+        : hasNvidiaRtCores
+          ? 0.56
+          : hasRdna3Plus
+            ? 0.48
+            : 0.38
+  const rtCpuMult = rayTracing === 'off' ? 1.0 : rayTracing === 'rt_medium' ? 0.92 : 0.85
+  const rtVramAdd = rayTracing === 'off' ? 0 : rayTracing === 'rt_medium' ? 1.1 : 2.3
+
   const computeCell = (
     res: TargetResolution,
     preset: GraphicsPreset,
     upscaler: UpscalerMode,
+    useFg: FrameGenMode = frameGen,
   ): PresetFpsEstimate => {
     const rc = resConfig[res]
     const pc = presetConfig[preset]
@@ -451,22 +555,40 @@ export function estimateGameFpsMatrix(params: {
 
     const estVramGb = Math.max(
       2.0,
-      Math.round((base1080pHighVramGb + rc.vramAddGb + pc.vramDeltaGb - uc.vramSaveGb) * 10) / 10,
+      Math.round(
+        (base1080pHighVramGb +
+          engineProfile.vramAddGb +
+          rc.vramAddGb +
+          pc.vramDeltaGb +
+          rtVramAdd +
+          (useFg === 'auto' ? 0.6 : 0) -
+          uc.vramSaveGb) *
+          10,
+      ) / 10,
     )
     const vramSpillover = estVramGb > userVramGb + 0.3
-    const vramPenalty = vramSpillover ? Math.max(0.52, 1 - (estVramGb - userVramGb) * 0.14) : 1.0
+    const vramPenalty = vramSpillover ? Math.max(0.45, 1 - (estVramGb - userVramGb) * 0.16) : 1.0
 
-    const rawGpuFps = gpuBase1080pHighFps * rc.gpuMult * pc.gpuMult * upBoost * vramPenalty
-    const rawCpuFps = cpuCeilingBaseFps * pc.cpuMult
+    const rawGpuFps =
+      gpuBase1080pHighFps *
+      engineProfile.gpuWeight *
+      rc.gpuMult *
+      pc.gpuMult *
+      rtGpuMult *
+      upBoost *
+      vramPenalty
+    const rawCpuFps = cpuCeilingBaseFps * engineProfile.cpuWeight * pc.cpuMult * rtCpuMult
 
     // Soft harmonic blend between GPU-bound and CPU-bound FPS so whichever is lower dominates realistically
-    const combinedFps =
+    const baseCombinedFps =
       ((rawGpuFps * rawCpuFps) /
         Math.pow(Math.pow(rawGpuFps, 2.6) + Math.pow(rawCpuFps, 2.6), 1 / 2.6)) *
       ramFactor
 
-    const avgFps = Math.max(12, Math.min(240, Math.round(combinedFps)))
-    const lowRatio = vramSpillover ? 0.64 : ramFactor < 0.9 ? 0.68 : 0.78
+    const fgActive = useFg === 'auto' && baseCombinedFps >= 32
+    const finalFps = fgActive ? baseCombinedFps * 0.94 * 1.68 : baseCombinedFps
+    const avgFps = Math.max(12, Math.min(360, Math.round(finalFps)))
+    const lowRatio = vramSpillover ? 0.62 : ramFactor < 0.9 ? 0.68 : fgActive ? 0.72 : 0.78
     const onePercentLowFps = Math.max(8, Math.round(avgFps * lowRatio))
 
     const spread = Math.max(4, Math.round(avgFps * 0.09))
@@ -540,6 +662,44 @@ export function estimateGameFpsMatrix(params: {
   const rawCpuAtHigh = cpuCeilingBaseFps
 
   const upscalerTechName = detectUpscalerTech(userGpuName)
+  const frameGenTechName = detectFrameGenTech(userGpuName)
+
+  // Find optimal preset + upscaler combo for user's selected resolution & targetHz
+  const candidatePresets: GraphicsPreset[] = ['ultra', 'high', 'medium', 'low']
+  const candidateUpscalers: UpscalerMode[] = ['native', 'quality', 'balanced']
+  let optimalRecommendation: OptimalSettingRecommendation | null = null
+  for (const u of candidateUpscalers) {
+    for (const p of candidatePresets) {
+      const cell = computeCell(selectedResolution, p, u, frameGen)
+      if (cell.avgFps >= Math.min(targetHz, 120) && !cell.vramSpillover) {
+        optimalRecommendation = {
+          preset: p,
+          presetLabel: cell.label,
+          upscaler: u,
+          frameGenEnabled: frameGen === 'auto',
+          expectedFps: cell.avgFps,
+          onePercentLowFps: cell.onePercentLowFps,
+          frameTimeMs: cell.frameTimeMs,
+          summary: `${cell.label} + ${u === 'native' ? 'Native' : `${upscalerTechName} ${u}`}${frameGen === 'auto' ? ` + ${frameGenTechName}` : ''} hits ${cell.avgFps} FPS`,
+        }
+        break
+      }
+    }
+    if (optimalRecommendation) break
+  }
+  if (!optimalRecommendation) {
+    const fallbackCell = computeCell(selectedResolution, 'medium', 'quality', 'auto')
+    optimalRecommendation = {
+      preset: 'medium',
+      presetLabel: fallbackCell.label,
+      upscaler: 'quality',
+      frameGenEnabled: true,
+      expectedFps: fallbackCell.avgFps,
+      onePercentLowFps: fallbackCell.onePercentLowFps,
+      frameTimeMs: fallbackCell.frameTimeMs,
+      summary: `Medium + ${upscalerTechName} Quality + ${frameGenTechName} reaches ${fallbackCell.avgFps} FPS`,
+    }
+  }
 
   let limitingFactor: BottleneckAnalysis['limitingFactor'] = 'balanced'
   let bnTitle = 'Well-Balanced Gaming Configuration'
@@ -589,8 +749,14 @@ export function estimateGameFpsMatrix(params: {
     minCpuScore,
     recCpuScore,
     upscalerTechName,
+    frameGenTechName,
+    engineProfile,
     selectedResolution,
     selectedUpscaler,
+    rayTracing,
+    frameGen,
+    targetHz,
+    optimalRecommendation,
     activePresets,
     matrix,
     bottleneck: {

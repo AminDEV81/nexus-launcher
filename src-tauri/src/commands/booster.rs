@@ -10,10 +10,10 @@
 
 use crate::db::Database;
 use crate::error::AppResult;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use sysinfo::{ProcessesToUpdate, System};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
 
 /// `(name to match against, without any OS-specific extension, display name, category)`.
 const BOOSTABLE_PROCESSES: &[(&str, &str, &str)] = &[
@@ -152,6 +152,10 @@ pub const ALL_MODULE_IDS: &[&str] = &[
     "indexer_pause",
     "visual_fx",
     "timer_res",
+    "cpu_unpark",
+    "dns_flush",
+    "shader_cache",
+    "telemetry_pause",
 ];
 
 /// Remembers the power scheme that was active before the last boost, so
@@ -260,7 +264,7 @@ fn match_boostable_process(process_name: &str) -> Option<(&'static str, &'static
 pub async fn scan_boostable_apps() -> Vec<BoostableApp> {
     tokio::task::spawn_blocking(|| {
         let mut system = System::new();
-        system.refresh_processes(ProcessesToUpdate::All, true);
+        system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::new().with_memory().with_cpu());
 
         let mut grouped: std::collections::HashMap<String, BoostableApp> =
             std::collections::HashMap::new();
@@ -302,7 +306,7 @@ pub async fn scan_boostable_apps() -> Vec<BoostableApp> {
 
 fn close_background_apps(excluded: &[String]) -> (BoostStepResult, Vec<String>, u64) {
     let mut system = System::new();
-    system.refresh_processes(ProcessesToUpdate::All, true);
+    system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::new().with_memory().with_cpu());
 
     let mut closed: Vec<String> = Vec::new();
     let mut freed_bytes: u64 = 0;
@@ -422,7 +426,7 @@ mod ram {
     use crate::commands::booster::{
         format_bytes, BoostStepResult, PROTECTED_SYSTEM_AND_GAMING_PROCESSES,
     };
-    use sysinfo::{ProcessesToUpdate, System};
+    use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
     use windows_sys::Win32::Foundation::CloseHandle;
     use windows_sys::Win32::System::ProcessStatus::EmptyWorkingSet;
     use windows_sys::Win32::System::Threading::{
@@ -446,7 +450,7 @@ mod ram {
         system.refresh_memory();
         let before = system.available_memory();
 
-        system.refresh_processes(ProcessesToUpdate::All, true);
+        system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::new().with_memory().with_cpu());
         let me = std::process::id();
         let fg_pid = unsafe {
             let hwnd = GetForegroundWindow();
@@ -1060,6 +1064,18 @@ where
     if has("timer_res") {
         record(timer_res::boost(state), &mut on_step);
     }
+    if has("cpu_unpark") {
+        record(cpu_unpark_boost(), &mut on_step);
+    }
+    if has("dns_flush") {
+        record(dns_flush_boost(), &mut on_step);
+    }
+    if has("shader_cache") {
+        record(shader_cache_boost(), &mut on_step);
+    }
+    if has("telemetry_pause") {
+        record(telemetry_pause_boost(), &mut on_step);
+    }
 
     BoostReport {
         steps,
@@ -1150,7 +1166,7 @@ pub async fn restore_game_boost(app: tauri::AppHandle) -> AppResult<BoostStepRes
 pub async fn kill_selected_apps(app_names: Vec<String>) -> AppResult<BoostStepResult> {
     tokio::task::spawn_blocking(move || {
         let mut system = System::new();
-        system.refresh_processes(ProcessesToUpdate::All, true);
+        system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::new().with_memory().with_cpu());
         let target_lower: Vec<String> = app_names.iter().map(|s| s.to_lowercase()).collect();
 
         let mut closed: Vec<String> = Vec::new();
@@ -1214,4 +1230,366 @@ pub fn set_process_high_priority(pid: u32) -> bool {
 #[cfg(not(windows))]
 pub fn set_process_high_priority(_pid: u32) -> bool {
     false
+}
+
+// ---------------------------------------------------------------------
+// Pro Booster Modules: CPU Core Unpark, DNS Flush, Shader Cache, Telemetry Pause
+// + Pro Diagnostics: Live Gaming Latency/Jitter & GPU Shader Cache Analyzer
+// ---------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShaderCacheEntry {
+    pub id: String,
+    pub vendor: String, // "NVIDIA" | "AMD" | "DirectX"
+    pub label: String,
+    pub path: String,
+    pub size_bytes: u64,
+    pub file_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LatencyTargetResult {
+    pub name: String,
+    pub host: String,
+    pub region: String,
+    pub avg_ms: Option<u32>,
+    pub jitter_ms: Option<u32>,
+    pub status: String, // "excellent" | "good" | "moderate" | "high" | "offline"
+}
+
+fn collect_shader_cache_dirs() -> Vec<(&'static str, &'static str, &'static str, std::path::PathBuf)> {
+    let mut dirs_list = Vec::new();
+    if let Some(local) = dirs::data_local_dir() {
+        dirs_list.push(("nvidia_dxcache", "NVIDIA", "NVIDIA DirectX Shader Cache", local.join("NVIDIA").join("DXCache")));
+        dirs_list.push(("nvidia_glcache", "NVIDIA", "NVIDIA OpenGL / Vulkan Cache", local.join("NVIDIA").join("GLCache")));
+        dirs_list.push(("amd_dxcache", "AMD", "AMD DirectX Shader Cache", local.join("AMD").join("DxCache")));
+        dirs_list.push(("amd_glcache", "AMD", "AMD OpenGL Cache", local.join("AMD").join("GLCache")));
+        dirs_list.push(("win_d3dscache", "DirectX", "Windows DirectX Shader Cache", local.join("D3DSCache")));
+    }
+    dirs_list
+}
+
+fn dir_size_and_files(dir: &std::path::Path) -> (u64, usize) {
+    if !dir.exists() {
+        return (0, 0);
+    }
+    let mut bytes = 0u64;
+    let mut files = 0usize;
+    for entry in walkdir::WalkDir::new(dir).max_depth(4).into_iter().flatten() {
+        if entry.file_type().is_file() {
+            if let Ok(m) = entry.metadata() {
+                bytes = bytes.saturating_add(m.len());
+                files += 1;
+            }
+        }
+    }
+    (bytes, files)
+}
+
+fn purge_cache_dir_contents(dir: &std::path::Path) -> (u64, usize) {
+    if !dir.exists() {
+        return (0, 0);
+    }
+    let mut freed = 0u64;
+    let mut deleted = 0usize;
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_file() {
+                let sz = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                if std::fs::remove_file(&p).is_ok() {
+                    freed = freed.saturating_add(sz);
+                    deleted += 1;
+                }
+            } else if p.is_dir() {
+                let (sz, cnt) = dir_size_and_files(&p);
+                if std::fs::remove_dir_all(&p).is_ok() {
+                    freed = freed.saturating_add(sz);
+                    deleted += cnt.max(1);
+                }
+            }
+        }
+    }
+    (freed, deleted)
+}
+
+fn cpu_unpark_boost() -> BoostStepResult {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let s1 = std::process::Command::new("powercfg")
+            .args(["/setacvalueindex", "SCHEME_CURRENT", "SUB_PROCESSOR", "CPMINCORES", "100"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        let s2 = std::process::Command::new("powercfg")
+            .args(["/setacvalueindex", "SCHEME_CURRENT", "SUB_PROCESSOR", "PROCTHROTTLEMIN", "100"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        let _ = std::process::Command::new("powercfg")
+            .args(["/setactive", "SCHEME_CURRENT"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+
+        return BoostStepResult {
+            id: "cpu_unpark".into(),
+            label: "CPU Core Unpark & Min-State 100%".into(),
+            applied: s1 || s2,
+            detail: if s1 || s2 {
+                "All CPU cores unparked and minimum processor state locked to 100% on AC power.".into()
+            } else {
+                "Power scheme core unparking skipped (standard user or locked OEM power profile).".into()
+            },
+            metric: if s1 || s2 { Some("100% Cores".into()) } else { None },
+        };
+    }
+    #[cfg(not(windows))]
+    {
+        BoostStepResult {
+            id: "cpu_unpark".into(),
+            label: "CPU Core Unpark & Min-State 100%".into(),
+            applied: false,
+            detail: "Windows-only powercfg core unparking.".into(),
+            metric: None,
+        }
+    }
+}
+
+fn dns_flush_boost() -> BoostStepResult {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let ok = std::process::Command::new("ipconfig")
+            .arg("/flushdns")
+            .creation_flags(CREATE_NO_WINDOW)
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+        return BoostStepResult {
+            id: "dns_flush".into(),
+            label: "DNS Resolver & Socket Cache Flush".into(),
+            applied: ok,
+            detail: if ok {
+                "Flushed stale DNS resolver cache for cleaner matchmaking & lower routing latency.".into()
+            } else {
+                "Could not flush Windows DNS resolver cache.".into()
+            },
+            metric: if ok { Some("DNS Clean".into()) } else { None },
+        };
+    }
+    #[cfg(not(windows))]
+    {
+        BoostStepResult {
+            id: "dns_flush".into(),
+            label: "DNS Resolver & Socket Cache Flush".into(),
+            applied: false,
+            detail: "Windows-only DNS flush.".into(),
+            metric: None,
+        }
+    }
+}
+
+fn shader_cache_boost() -> BoostStepResult {
+    let mut total_freed = 0u64;
+    let mut total_files = 0usize;
+    for (_, _, _, path) in collect_shader_cache_dirs() {
+        let (f, c) = purge_cache_dir_contents(&path);
+        total_freed = total_freed.saturating_add(f);
+        total_files += c;
+    }
+    let mb = total_freed as f64 / (1024.0 * 1024.0);
+    BoostStepResult {
+        id: "shader_cache".into(),
+        label: "GPU Shader Cache Purge (NVIDIA / AMD / DX)".into(),
+        applied: total_files > 0,
+        detail: if total_files > 0 {
+            format!("Cleared {total_files} stale shader cache files ({mb:.1} MB reclaimed); active locked shaders preserved.")
+        } else {
+            "GPU shader caches are already clean or currently in use.".into()
+        },
+        metric: if total_freed > 0 {
+            Some(format!("{mb:.0} MB"))
+        } else {
+            None
+        },
+    }
+}
+
+fn telemetry_pause_boost() -> BoostStepResult {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let mut paused = 0u32;
+        for svc in ["DiagTrack", "SysMain"] {
+            let ok = std::process::Command::new("net")
+                .args(["stop", svc])
+                .creation_flags(CREATE_NO_WINDOW)
+                .status()
+                .map(|s| s.success())
+                .unwrap_or(false);
+            if ok {
+                paused += 1;
+            }
+        }
+        return BoostStepResult {
+            id: "telemetry_pause".into(),
+            label: "Pause Background Telemetry & SysMain".into(),
+            applied: paused > 0,
+            detail: if paused > 0 {
+                format!("Paused {paused} background Windows telemetry/prefetch service(s) to prevent sudden disk spikes.")
+            } else {
+                "Services already paused or require Administrator elevation.".into()
+            },
+            metric: if paused > 0 { Some(format!("{paused} svc")) } else { None },
+        };
+    }
+    #[cfg(not(windows))]
+    {
+        BoostStepResult {
+            id: "telemetry_pause".into(),
+            label: "Pause Background Telemetry & SysMain".into(),
+            applied: false,
+            detail: "Windows-only background service control.".into(),
+            metric: None,
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn scan_shader_caches() -> AppResult<Vec<ShaderCacheEntry>> {
+    tokio::task::spawn_blocking(|| {
+        let mut out = Vec::new();
+        for (id, vendor, label, path) in collect_shader_cache_dirs() {
+            if path.exists() {
+                let (size_bytes, file_count) = dir_size_and_files(&path);
+                out.push(ShaderCacheEntry {
+                    id: id.to_string(),
+                    vendor: vendor.to_string(),
+                    label: label.to_string(),
+                    path: path.to_string_lossy().to_string(),
+                    size_bytes,
+                    file_count,
+                });
+            }
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| crate::error::AppError::Other(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn purge_shader_caches(ids: Option<Vec<String>>) -> AppResult<BoostStepResult> {
+    tokio::task::spawn_blocking(move || {
+        let filter_set: Option<std::collections::HashSet<String>> =
+            ids.map(|v| v.into_iter().collect());
+        let mut total_freed = 0u64;
+        let mut total_files = 0usize;
+        for (id, _, _, path) in collect_shader_cache_dirs() {
+            if let Some(ref set) = filter_set {
+                if !set.contains(id) {
+                    continue;
+                }
+            }
+            let (f, c) = purge_cache_dir_contents(&path);
+            total_freed = total_freed.saturating_add(f);
+            total_files += c;
+        }
+        let mb = total_freed as f64 / (1024.0 * 1024.0);
+        Ok(BoostStepResult {
+            id: "shader_cache".into(),
+            label: "GPU Shader Cache Purge".into(),
+            applied: total_files > 0,
+            detail: if total_files > 0 {
+                format!("Purged {total_files} stale shader files ({mb:.1} MB freed).")
+            } else {
+                "No unlocked shader cache files needed cleanup.".into()
+            },
+            metric: if total_freed > 0 {
+                Some(format!("{mb:.1} MB"))
+            } else {
+                None
+            },
+        })
+    })
+    .await
+    .map_err(|e| crate::error::AppError::Other(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn measure_gaming_latency() -> AppResult<Vec<LatencyTargetResult>> {
+    use std::time::{Duration, Instant};
+    use tokio::net::TcpStream;
+
+    let targets = [
+        ("Cloudflare Gaming DNS", "1.1.1.1:443", "Anycast Edge"),
+        ("Google DNS", "8.8.8.8:443", "Global Anycast"),
+        ("Quad9 Security DNS", "9.9.9.9:443", "Global Anycast"),
+        ("Steam Store / CDN", "store.steampowered.com:443", "Valve Edge"),
+        ("Epic / AWS EU", "ec2.eu-central-1.amazonaws.com:443", "Frankfurt EU"),
+    ];
+
+    let mut handles = Vec::new();
+    for (name, addr, region) in targets {
+        handles.push(tokio::spawn(async move {
+            let mut samples: Vec<u32> = Vec::new();
+            for _ in 0..3 {
+                let start = Instant::now();
+                let res = tokio::time::timeout(
+                    Duration::from_millis(1800),
+                    TcpStream::connect(addr),
+                )
+                .await;
+                if let Ok(Ok(_stream)) = res {
+                    samples.push(start.elapsed().as_millis() as u32);
+                }
+            }
+            if samples.is_empty() {
+                return LatencyTargetResult {
+                    name: name.to_string(),
+                    host: addr.split(':').next().unwrap_or(addr).to_string(),
+                    region: region.to_string(),
+                    avg_ms: None,
+                    jitter_ms: None,
+                    status: "offline".to_string(),
+                };
+            }
+            let sum: u32 = samples.iter().sum();
+            let avg = sum / samples.len() as u32;
+            let min = *samples.iter().min().unwrap_or(&avg);
+            let max = *samples.iter().max().unwrap_or(&avg);
+            let jitter = max.saturating_sub(min);
+            let status = if avg <= 35 {
+                "excellent"
+            } else if avg <= 70 {
+                "good"
+            } else if avg <= 120 {
+                "moderate"
+            } else {
+                "high"
+            };
+            LatencyTargetResult {
+                name: name.to_string(),
+                host: addr.split(':').next().unwrap_or(addr).to_string(),
+                region: region.to_string(),
+                avg_ms: Some(avg),
+                jitter_ms: Some(jitter),
+                status: status.to_string(),
+            }
+        }));
+    }
+
+    let mut results = Vec::new();
+    for h in handles {
+        if let Ok(item) = h.await {
+            results.push(item);
+        }
+    }
+    Ok(results)
 }

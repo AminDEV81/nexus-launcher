@@ -154,7 +154,7 @@ function buildNameWildcardClause(cleanQ: string): string | null {
   const stopWords = new Set(['the', 'a', 'an', 'of', 'and'])
   const tokens = cleanQ
     .split(/[\s\-:'’/&]+/)
-    .map((w) => w.replace(/[^a-zA-Z0-9]/g, ''))
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ''))
     .filter(Boolean)
 
   if (tokens.length === 0) return null

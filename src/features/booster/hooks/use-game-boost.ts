@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import * as boosterService from '@/services/booster'
 import { useSettings, useSetSetting } from '@/features/settings/hooks/use-settings'
+import { useWindowActive } from '@/hooks/use-window-active'
 import {
   liveMetricsQueryKey,
   systemSpecsQueryKey,
@@ -22,18 +23,23 @@ export const BOOSTER_MODULE_IDS = [
   'indexer_pause',
   'visual_fx',
   'timer_res',
+  'cpu_unpark',
+  'dns_flush',
+  'shader_cache',
+  'telemetry_pause',
 ] as const
 export type BoosterModuleId = (typeof BOOSTER_MODULE_IDS)[number]
 
 export type BoosterPresetId = 'esports_max' | 'streamer_safe' | 'memory_stutter' | 'custom'
 
 export function useBoostableApps() {
+  const windowActive = useWindowActive()
   return useQuery({
     queryKey: boostableAppsKey,
     queryFn: boosterService.scanBoostableApps,
-    staleTime: 15_000,
-    refetchInterval: 20_000,
-    refetchOnWindowFocus: true,
+    staleTime: 20_000,
+    refetchInterval: windowActive ? 30_000 : false,
+    refetchOnWindowFocus: false,
   })
 }
 

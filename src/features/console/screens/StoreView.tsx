@@ -649,7 +649,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
         <FocusScope
           id="console_store_header"
           orientation="horizontal"
-          className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-2.5 backdrop-blur-xl ${
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-2.5 ${
             isLight
               ? 'border-slate-200/90 bg-white/88 shadow-[0_8px_30px_rgba(15,23,42,0.06)]'
               : 'border-white/10 bg-[#0b1020]/82 shadow-xl'
@@ -905,7 +905,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
               {/* Top Floating Stage Badges */}
               <div className="relative z-10 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 border border-white/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 border border-white/20 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
                     <TrendingUp className="size-3 text-cyan-300" />
                     Featured &amp; Recommended
                   </span>
@@ -917,7 +917,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
                 </div>
 
                 {heroScore && heroScore > 0 ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-black/70 px-3 py-1 text-xs font-black text-emerald-300 backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-black/70 px-3 py-1 text-xs font-black text-emerald-300">
                     <Sparkles className="size-3" />
                     {heroScore}
                   </span>
@@ -962,7 +962,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
                       className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold transition-all cursor-pointer outline-none ${
                         heroWishlistFocus.isFocused
                           ? 'scale-105 border-amber-300 bg-amber-400 text-slate-950 shadow-lg'
-                          : 'border-white/25 bg-white/10 text-white backdrop-blur-md hover:bg-white/20'
+                          : 'border-white/25 bg-white/10 text-white hover:bg-white/20'
                       }`}
                     >
                       <Heart className="size-3.5 text-rose-400" />
@@ -1507,7 +1507,7 @@ const SteamDealBentoCard: React.FC<{
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/85 via-black/15 to-transparent" />
 
         {score && score > 0 ? (
-          <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/75 px-2 py-0.5 text-[10px] font-black text-emerald-300 backdrop-blur-md">
+          <span className="absolute right-2.5 top-2.5 inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/75 px-2 py-0.5 text-[10px] font-black text-emerald-300">
             <Sparkles className="size-2.5" />
             {score}
           </span>

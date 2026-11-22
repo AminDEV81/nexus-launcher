@@ -39,16 +39,17 @@ export function ScanResultsModal() {
     },
   })
 
+  const { mutate: runScan } = scan
+
   // Kick off a fresh scan every time the modal opens — results are
   // ephemeral and "Allow rescanning anytime" implies each open reflects
   // whatever is installed right now, not a stale cached list.
   useEffect(() => {
     if (isOpen) {
       setResult(null)
-      scan.mutate()
+      runScan()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen])
+  }, [isOpen, runScan])
 
   function toggle(index: number) {
     setSelected((prev) => {

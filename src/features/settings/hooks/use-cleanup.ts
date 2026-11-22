@@ -27,3 +27,29 @@ export function useExecuteCleanup() {
     },
   })
 }
+
+export const storageAnalysisKey = ['cleanup', 'storage-analysis'] as const
+
+export function useStorageAnalysis() {
+  return useQuery({
+    queryKey: storageAnalysisKey,
+    queryFn: cleanupService.analyzeStorageAndRedists,
+    staleTime: 60_000,
+  })
+}
+
+export function useCleanRedistTargets() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: cleanupService.cleanRedistTargets,
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: storageAnalysisKey })
+      if (res.errors.length > 0) {
+        toast.warning(`Cleaned with ${res.errors.length} issue(s): ${res.errors[0]}`)
+      }
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Redist cleanup failed.')
+    },
+  })
+}

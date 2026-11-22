@@ -9,7 +9,7 @@ use std::path::Path;
 use std::process::Command as StdCommand;
 use std::sync::Mutex;
 use std::time::Duration;
-use sysinfo::{Pid, ProcessesToUpdate, System};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use crate::commands::save_manager::locks::SaveManagerLocks;
@@ -92,8 +92,12 @@ pub fn stop_game(
             .map(|name| name.to_string_lossy().to_string())
     });
 
-    let mut system = System::new_all();
-    system.refresh_processes(ProcessesToUpdate::All, true);
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::new(),
+    );
     let process = system
         .process(Pid::from_u32(pid))
         .ok_or_else(|| AppError::NotFound("That game has already closed.".into()))?;
@@ -319,7 +323,7 @@ fn launch_directly(target: &LaunchTarget) -> AppResult<LaunchedProcess> {
         cmd
     } else if cfg!(windows) && ext == "ps1" {
         let mut cmd = StdCommand::new("powershell.exe");
-        cmd.args(["-ExecutionPolicy", "Bypass", "-File", executable_path]);
+        cmd.args(["-NoProfile", "-ExecutionPolicy", "RemoteSigned", "-File", executable_path]);
         cmd
     } else if cfg!(target_os = "linux") && ext == "sh" {
         #[cfg(target_os = "linux")]

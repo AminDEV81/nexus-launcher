@@ -23,9 +23,12 @@
   position: absolute;
   border-radius: 9999px;
   contain: paint;
+  opacity: 0.38;
+}
+
+[data-ambient-motion='true'] .ambient-blob {
   will-change: transform;
   transform: translate3d(0, 0, 0);
-  opacity: 0.38;
 }
 
 [data-theme='light'] .ambient-blob {

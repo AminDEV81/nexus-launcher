@@ -193,7 +193,15 @@ export async function handleRequest(
 
       // Artwork Options Aggregator (Cover, Hero, Logo)
       if (pathname.startsWith('/api/v1/artwork/options/')) {
-        const type = pathname.replace('/api/v1/artwork/options/', '') as 'cover' | 'hero' | 'logo'
+        const rawType = pathname.replace('/api/v1/artwork/options/', '')
+        if (rawType !== 'cover' && rawType !== 'hero' && rawType !== 'logo') {
+          return createErrorResponse(
+            'INVALID_PARAMETER',
+            'Artwork type must be cover, hero, or logo',
+            400,
+          )
+        }
+        const type = rawType
         let steamAppId = url.searchParams.get('app_id')
         const name = url.searchParams.get('name') || ''
 

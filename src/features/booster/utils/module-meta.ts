@@ -8,6 +8,9 @@ import {
   Search,
   Layers,
   Timer,
+  Wifi,
+  Flame,
+  ShieldOff,
   type LucideIcon,
 } from 'lucide-react'
 import type { BoosterModuleId } from '../hooks/use-game-boost'
@@ -132,5 +135,45 @@ export const BOOSTER_MODULES: BoosterModuleMeta[] = [
     category: 'memory_io',
     impactBadge: 'Clean Scratch',
     windowsOnly: false,
+  },
+  {
+    id: 'cpu_unpark',
+    label: 'CPU Core Unparking & 100% Min State',
+    description:
+      'Unparks all physical/logical CPU cores via powercfg so Windows never puts performance cores to sleep mid-game.',
+    icon: Cpu,
+    category: 'cpu_kernel',
+    impactBadge: 'Zero Core Park',
+    windowsOnly: true,
+  },
+  {
+    id: 'dns_flush',
+    label: 'DNS Resolver & Socket Cache Flush',
+    description:
+      'Flushes stale Windows DNS resolver entries before launch for faster matchmaking and lower routing jitter.',
+    icon: Wifi,
+    category: 'os_desktop',
+    impactBadge: '-Ping Jitter',
+    windowsOnly: true,
+  },
+  {
+    id: 'shader_cache',
+    label: 'GPU Shader Cache Cleaner (NV / AMD / DX)',
+    description:
+      'Purges stale DirectX, NVIDIA DXCache/GLCache & AMD DxCache files to eliminate shader compilation stutters.',
+    icon: Flame,
+    category: 'memory_io',
+    impactBadge: 'No Shader Hitch',
+    windowsOnly: true,
+  },
+  {
+    id: 'telemetry_pause',
+    label: 'Pause Windows Telemetry & SysMain',
+    description:
+      'Temporarily stops DiagTrack and SysMain (Superfetch) services so background disk/CPU bursts never interrupt gameplay.',
+    icon: ShieldOff,
+    category: 'os_desktop',
+    impactBadge: '-Disk Spikes',
+    windowsOnly: true,
   },
 ]

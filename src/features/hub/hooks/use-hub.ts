@@ -84,8 +84,8 @@ function createShelfQueryOptions(shelfKey: string, fetcher: () => Promise<HubGam
     initialData: persisted?.data,
     initialDataUpdatedAt: persisted?.updatedAt,
     staleTime: HUB_CACHE_TTL_MS,
-    gcTime: HUB_CACHE_TTL_MS,
-    refetchInterval: HUB_CACHE_TTL_MS,
+    gcTime: 30 * 60_000,
+    refetchInterval: false,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
@@ -364,6 +364,7 @@ export function useHubSearch(query: string, filters: HubSearchFilters = {}) {
       lastPage.length < 16 ? undefined : allPages.length * hubService.HUB_SEARCH_PAGE_SIZE,
     enabled,
     staleTime: 30 * 60_000,
+    gcTime: 30 * 60_000,
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   })

@@ -56,7 +56,7 @@ export function HubScoreBadge({
       }),
     enabled: shouldFetchLive,
     staleTime: 12 * 60 * 60 * 1000,
-    gcTime: 12 * 60 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     retry: false,
@@ -123,7 +123,7 @@ export function HubScoreBadge({
       return (
         <div
           className={cn(
-            'inline-flex items-center gap-1 rounded-xl border border-white/20 bg-black/85 p-1 shadow-[0_6px_16px_rgba(0,0,0,0.65)] backdrop-blur-md',
+            'inline-flex items-center gap-1 rounded-xl border border-white/20 bg-black/85 p-1 shadow-[0_6px_16px_rgba(0,0,0,0.65)]',
             className,
           )}
         >
@@ -172,7 +172,7 @@ export function HubScoreBadge({
         <span
           title={`Critic & Community Score: ${score}% (${igdbTone.label})`}
           className={cn(
-            'inline-flex items-center gap-0.5 rounded-lg px-1.5 py-0.5 font-mono text-[10px] font-black tracking-tight shadow-sm ring-1 backdrop-blur-md',
+            'inline-flex items-center gap-0.5 rounded-lg px-1.5 py-0.5 font-mono text-[10px] font-black tracking-tight shadow-sm ring-1',
             badgeColor,
             className,
           )}
@@ -196,7 +196,7 @@ export function HubScoreBadge({
       return (
         <div
           className={cn(
-            'inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-black/65 px-3.5 py-2 text-xs text-subtle backdrop-blur-md shadow-lg',
+            'inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-black/65 px-3.5 py-2 text-xs text-subtle shadow-lg',
             className,
           )}
         >
@@ -218,7 +218,7 @@ export function HubScoreBadge({
     return (
       <div
         className={cn(
-          'inline-flex flex-wrap items-stretch gap-2.5 rounded-2xl border border-white/15 bg-black/70 p-2 shadow-[0_18px_42px_rgba(0,0,0,0.75)] ring-1 ring-inset ring-white/10 backdrop-blur-2xl',
+          'inline-flex flex-wrap items-stretch gap-2.5 rounded-2xl border border-white/15 bg-black/70 p-2 shadow-[0_18px_42px_rgba(0,0,0,0.75)] ring-1 ring-inset ring-white/10',
           className,
         )}
       >

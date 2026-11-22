@@ -42,3 +42,33 @@ export function restoreGameBoost() {
 export function killSelectedApps(appNames: string[]) {
   return call<BoostStepResult>('kill_selected_apps', { appNames })
 }
+
+export interface ShaderCacheEntry {
+  id: string
+  vendor: string
+  label: string
+  path: string
+  size_bytes: number
+  file_count: number
+}
+
+export interface LatencyTargetResult {
+  name: string
+  host: string
+  region: string
+  avg_ms: number | null
+  jitter_ms: number | null
+  status: 'excellent' | 'good' | 'moderate' | 'high' | 'offline'
+}
+
+export function scanShaderCaches() {
+  return call<ShaderCacheEntry[]>('scan_shader_caches')
+}
+
+export function purgeShaderCaches(ids?: string[]) {
+  return call<BoostStepResult>('purge_shader_caches', { ids: ids ?? null })
+}
+
+export function measureGamingLatency() {
+  return call<LatencyTargetResult[]>('measure_gaming_latency')
+}

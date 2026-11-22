@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 
 /// How often the library list is re-read for game matching.
-const KNOWN_GAMES_REFRESH: Duration = Duration::from_secs(10);
+const KNOWN_GAMES_REFRESH: Duration = Duration::from_secs(45);
 
 pub struct AutoGameWatcher {
     is_running: Arc<AtomicBool>,
@@ -37,23 +37,27 @@ impl AutoGameWatcher {
             let mut known_games = Vec::new();
             let mut known_games_at: Option<Instant> = None;
 
+            let mut sleep_ms: u64 = 1200;
             while is_running.load(Ordering::SeqCst) {
-                tokio::time::sleep(Duration::from_millis(500)).await;
-                if is_hud_active(&app) {
+                tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
+                let hud_active = is_hud_active(&app);
+                if hud_active {
                     OverlayWindowManager::reassert_topmost(&app);
                 }
 
                 let cfg = current_config(&app);
                 let state = app.state::<OverlayState>();
 
-                // Overlay switched off in settings: close anything we opened.
+                // Overlay switched off in settings: close anything we opened and back off to 2s.
                 if !cfg.enabled {
-                    if auto_opened && !state.manually_opened.load(Ordering::SeqCst) && is_hud_active(&app) {
+                    if auto_opened && !state.manually_opened.load(Ordering::SeqCst) && hud_active {
                         let _ = apply_visibility(&app, Some(false), ToggleSource::Auto).await;
                     }
                     auto_opened = false;
+                    sleep_ms = 2000;
                     continue;
                 }
+                sleep_ms = if hud_active || active_game_pid.is_some() { 500 } else { 1200 };
 
                 if known_games_at
                     .map(|t| t.elapsed() >= KNOWN_GAMES_REFRESH)

@@ -65,8 +65,6 @@ mod imp {
             let status = Command::new("powershell.exe")
                 .args([
                     "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
                     "-Command",
                     &format!("Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -Command \"{}\"'", ps_script),
                 ])
@@ -90,8 +88,6 @@ mod imp {
         let output = Command::new("powershell.exe")
             .args([
                 "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
                 "-Command",
                 "Checkpoint-Computer -Description 'Nexus Launcher Gaming Optimization' -RestorePointType 'MODIFY_SETTINGS'",
             ])
@@ -159,8 +155,6 @@ mod imp {
             let status = Command::new("powershell.exe")
                 .args([
                     "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
                     "-Command",
                     &format!("Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -Command \"{}\"'", script),
                 ])
@@ -195,16 +189,21 @@ mod imp {
             KEY_WRITE | KEY_READ,
         ) {
             for key_name in interfaces.enum_keys().flatten() {
-                if let Ok(subkey) = interfaces.open_subkey_with_flags(&key_name, KEY_WRITE) {
-                    // Always remove TcpAckFrequency & TcpDelAckTicks so RSC & full Gigabit download speed are never capped
-                    let _ = subkey.delete_value("TcpAckFrequency");
-                    let _ = subkey.delete_value("TcpDelAckTicks");
-                    if enable {
-                        if subkey.set_value("TCPNoDelay", &1u32).is_err() {
-                            reg_write_failures += 1;
+                match interfaces.open_subkey_with_flags(&key_name, KEY_WRITE) {
+                    Ok(subkey) => {
+                        // Always remove TcpAckFrequency & TcpDelAckTicks so RSC & full Gigabit download speed are never capped
+                        let _ = subkey.delete_value("TcpAckFrequency");
+                        let _ = subkey.delete_value("TcpDelAckTicks");
+                        if enable {
+                            if subkey.set_value("TCPNoDelay", &1u32).is_err() {
+                                reg_write_failures += 1;
+                            }
+                        } else {
+                            let _ = subkey.delete_value("TCPNoDelay");
                         }
-                    } else {
-                        let _ = subkey.delete_value("TCPNoDelay");
+                    }
+                    Err(_) => {
+                        reg_write_failures += 1;
                     }
                 }
             }
@@ -303,8 +302,6 @@ mod imp {
             let status = Command::new("powershell.exe")
                 .args([
                     "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
                     "-Command",
                     &format!("Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -Command \"{}\"'", script),
                 ])
@@ -408,8 +405,6 @@ mod imp {
             let status = Command::new("powershell.exe")
                 .args([
                     "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
                     "-Command",
                     &format!("Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -Command \"{}\"'", script),
                 ])
@@ -481,8 +476,6 @@ mod imp {
             let status = Command::new("powershell.exe")
                 .args([
                     "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
                     "-Command",
                     &format!("Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -Command \"{}\"'", script),
                 ])

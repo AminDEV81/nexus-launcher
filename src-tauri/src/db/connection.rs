@@ -23,6 +23,37 @@ impl Database {
         std::fs::create_dir_all(&data_dir)?;
 
         let db_path = resolve_db_path(&data_dir);
+        if cfg!(debug_assertions) {
+            let prod_db = data_dir.join("nexus.db");
+            if prod_db.exists() {
+                let dev_is_empty = if !db_path.exists() {
+                    true
+                } else {
+                    Connection::open(&db_path)
+                        .ok()
+                        .and_then(|c| {
+                            c.query_row("SELECT COUNT(*) FROM games", [], |r| r.get::<_, i64>(0))
+                                .ok()
+                        })
+                        .unwrap_or(0)
+                        == 0
+                };
+                if dev_is_empty {
+                    let _ = std::fs::remove_file(&db_path);
+                    let _ = std::fs::remove_file(data_dir.join("nexus-dev.db-wal"));
+                    let _ = std::fs::remove_file(data_dir.join("nexus-dev.db-shm"));
+                    let _ = std::fs::copy(&prod_db, &db_path);
+                    let prod_wal = data_dir.join("nexus.db-wal");
+                    if prod_wal.exists() {
+                        let _ = std::fs::copy(&prod_wal, data_dir.join("nexus-dev.db-wal"));
+                    }
+                    let prod_shm = data_dir.join("nexus.db-shm");
+                    if prod_shm.exists() {
+                        let _ = std::fs::copy(&prod_shm, data_dir.join("nexus-dev.db-shm"));
+                    }
+                }
+            }
+        }
         let mut connection = Connection::open(&db_path)?;
 
         // Wait up to 5s if SQLite is momentarily busy (e.g. WAL checkpointing)
@@ -82,5 +113,9 @@ impl Database {
 }
 
 fn resolve_db_path(data_dir: &std::path::Path) -> PathBuf {
-    data_dir.join("nexus.db")
+    if cfg!(debug_assertions) {
+        data_dir.join("nexus-dev.db")
+    } else {
+        data_dir.join("nexus.db")
+    }
 }

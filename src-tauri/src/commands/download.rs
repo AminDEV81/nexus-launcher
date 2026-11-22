@@ -1512,9 +1512,49 @@ fn extract_zip(
     Ok(())
 }
 
-/// Pure-Rust 7z extraction (many game repacks ship as .7z). The
-/// library sanitizes entry names itself — no path traversal surface.
+/// Pure-Rust 7z extraction (many game repacks ship as .7z) with pre-extraction
+/// entry-count, size-limit, and path-traversal validation.
 fn extract_7z(app: &AppHandle, id: &str, file_path: &str, save_path: &str) -> Result<(), String> {
+    let mut file =
+        std::fs::File::open(file_path).map_err(|e| format!("cannot open archive: {e}"))?;
+    let file_len = file
+        .metadata()
+        .map_err(|e| format!("cannot stat archive: {e}"))?
+        .len();
+    let reader = sevenz_rust::SevenZReader::new(&mut file, file_len, sevenz_rust::Password::empty())
+        .map_err(|e| format!("corrupt archive: {e}"))?;
+    let entries = &reader.archive().files;
+    if entries.len() > MAX_ZIP_ENTRIES {
+        return Err(format!(
+            "archive contains too many entries ({} > {MAX_ZIP_ENTRIES}); aborted for safety",
+            entries.len()
+        ));
+    }
+    let mut declared_total_bytes = 0u64;
+    for entry in entries {
+        let name = entry.name();
+        let rel = std::path::Path::new(name);
+        if rel.is_absolute()
+            || rel.components().any(|c| matches!(c, std::path::Component::ParentDir | std::path::Component::Prefix(_)))
+        {
+            return Err(format!("unsafe archive entry path rejected: {name}"));
+        }
+        if entry.size() > MAX_ZIP_ENTRY_BYTES {
+            return Err(format!(
+                "archive entry exceeds maximum allowed file size ({} bytes)",
+                entry.size()
+            ));
+        }
+        declared_total_bytes = declared_total_bytes.saturating_add(entry.size());
+        if declared_total_bytes > MAX_ZIP_TOTAL_BYTES {
+            return Err(
+                "archive total uncompressed size exceeds 150 GB safety limit; extraction aborted"
+                    .into(),
+            );
+        }
+    }
+    drop(reader);
+
     let file =
         std::fs::File::open(file_path).map_err(|e| format!("cannot open archive: {e}"))?;
     let dest = std::path::Path::new(save_path);

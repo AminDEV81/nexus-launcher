@@ -23,7 +23,11 @@ import { useCloseFlowStore } from '@/store/close-flow-store'
 import { useLaunchStore } from '@/store/launch-store'
 import { useWindowActive } from '@/hooks/use-window-active'
 import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
-import { getLiveMetrics } from '@/services/system'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  liveMetricsQueryKey,
+  useLiveSystemMetrics,
+} from '@/features/settings/hooks/use-system-specs'
 import { runGameBoost } from '@/services/booster'
 import { formatBytes } from '@/features/library/utils/guess-name'
 import { cn } from '@/lib/utils'
@@ -48,9 +52,13 @@ export function TitleBar() {
   const openModal = useUpdaterStore((s) => s.openModal)
   const windowActive = useWindowActive()
 
-  // Live Hardware & Controller Mini-HUD State (Surprise #2)
-  const [cpuPercent, setCpuPercent] = useState<number>(0)
-  const [ramUsedGb, setRamUsedGb] = useState<string>('0.0')
+  // Live Hardware & Controller Mini-HUD State (shares React Query cache with useLiveSystemMetrics)
+  const queryClient = useQueryClient()
+  const { data: liveMetrics } = useLiveSystemMetrics()
+  const cpuPercent = liveMetrics ? Math.round(liveMetrics.cpu_usage_percent) : 0
+  const ramUsedGb = liveMetrics
+    ? ((liveMetrics.memory?.used_bytes ?? 0) / (1024 * 1024 * 1024)).toFixed(1)
+    : '0.0'
   const [controllerInfo, setControllerInfo] = useState<QuickControllerSummary>({
     connectedCount: 0,
     emulatingCount: 0,
@@ -93,38 +101,31 @@ export function TitleBar() {
     }
   }, [])
 
-  // Lightweight hardware + controller poll ONLY while window is focused and no game is actively running
+  // Lightweight controller status poll ONLY while window is focused and no game is actively running.
+  // CPU/RAM metrics come from the shared useLiveSystemMetrics() React Query cache (no duplicate IPC).
   useEffect(() => {
     if (!windowActive || isAnyGameRunning) return
     let cancelled = false
 
-    const pollTelemetry = async () => {
+    const pollController = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return
       try {
-        const [metrics, dsSnap] = await Promise.all([
-          getLiveMetrics().catch(() => null),
-          invoke<{ connectedCount?: number; emulatingCount?: number }>('dualsense_get_state').catch(
-            () => null,
-          ),
-        ])
-        if (cancelled) return
-        if (metrics) {
-          setCpuPercent(Math.round(metrics.cpu_usage_percent))
-          setRamUsedGb(((metrics.memory?.used_bytes ?? 0) / (1024 * 1024 * 1024)).toFixed(1))
-        }
-        if (dsSnap) {
-          setControllerInfo({
-            connectedCount: dsSnap.connectedCount ?? 0,
-            emulatingCount: dsSnap.emulatingCount ?? 0,
-          })
-        }
+        const dsSnap = await invoke<{ connectedCount?: number; emulatingCount?: number }>(
+          'dualsense_get_state',
+        ).catch(() => null)
+        if (cancelled || !dsSnap) return
+        setControllerInfo({
+          connectedCount: dsSnap.connectedCount ?? 0,
+          emulatingCount: dsSnap.emulatingCount ?? 0,
+        })
       } catch {
         // Ignore
       }
     }
 
-    void pollTelemetry()
-    const pollIntervalMs = gpuEcoMode ? 8000 : 4000
-    const id = window.setInterval(pollTelemetry, pollIntervalMs)
+    void pollController()
+    const pollIntervalMs = gpuEcoMode ? 20000 : 10000
+    const id = window.setInterval(pollController, pollIntervalMs)
     return () => {
       cancelled = true
       window.clearInterval(id)
@@ -157,11 +158,7 @@ export function TitleBar() {
       const freedLabel =
         report.freed_ram_bytes > 0 ? formatBytes(report.freed_ram_bytes) : 'Standby Cache'
       toast.success(`Quick System Boost complete! Freed ${freedLabel} & optimized power plan.`)
-      const fresh = await getLiveMetrics().catch(() => null)
-      if (fresh) {
-        setCpuPercent(Math.round(fresh.cpu_usage_percent))
-        setRamUsedGb(((fresh.memory?.used_bytes ?? 0) / (1024 * 1024 * 1024)).toFixed(1))
-      }
+      void queryClient.invalidateQueries({ queryKey: liveMetricsQueryKey })
     } catch {
       toast.success('System memory & power profile optimized!')
     } finally {

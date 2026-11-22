@@ -23,6 +23,34 @@ import { useDefaultSteamRegion, useSteamPrice } from '../hooks/use-steam-price'
 import { useHubSearchStore } from '../store/hub-search-store'
 import { useGames, useRestoreGameFromMemory } from '@/features/library/hooks/use-games'
 import { findLibraryEntry } from '../utils/in-library'
+import type { Game } from '@/types/models'
+
+const libraryIndexCache = new WeakMap<
+  Game[],
+  { byIgdb: Map<number, Game>; byName: Map<string, Game> }
+>()
+
+function fastFindLibraryEntry(games: Game[] | undefined, game: HubGame): Game | undefined {
+  if (!games || games.length === 0) return undefined
+  let index = libraryIndexCache.get(games)
+  if (!index) {
+    const byIgdb = new Map<number, Game>()
+    const byName = new Map<string, Game>()
+    for (const g of games) {
+      if (g.igdb_id != null && !byIgdb.has(g.igdb_id)) byIgdb.set(g.igdb_id, g)
+      const norm = g.name.trim().toLowerCase()
+      if (norm && !byName.has(norm)) byName.set(norm, g)
+    }
+    index = { byIgdb, byName }
+    libraryIndexCache.set(games, index)
+  }
+  if (game.igdb_id != null) {
+    const hit = index.byIgdb.get(game.igdb_id)
+    if (hit) return hit
+  }
+  const normName = game.name.trim().toLowerCase()
+  return (normName ? index.byName.get(normName) : undefined) ?? findLibraryEntry(games, game)
+}
 import { buildCoverFallbackChain } from '../utils/cover-fallback'
 import { useUiStore } from '@/store/ui-store'
 import { localDateKey } from '@/features/library/utils/format'
@@ -93,7 +121,7 @@ export const HubGameCard = memo(function HubGameCard({
   const typeInfo = getGameTypeInfo(game.game_type)
   const activeGenreIds = useHubSearchStore((s) => s.genreIds)
 
-  const libraryEntry = useMemo(() => findLibraryEntry(games, game), [games, game])
+  const libraryEntry = useMemo(() => fastFindLibraryEntry(games, game), [games, game])
 
   // Fetch live Steam price & discount percentage on hover (cached for 10 mins)
   const { data: livePrice, isFetching: isFetchingPrice } = useSteamPrice(
@@ -238,27 +266,27 @@ export const HubGameCard = memo(function HubGameCard({
         <div className="absolute inset-x-2.5 top-2.5 z-10 flex items-start justify-between gap-1 pointer-events-none">
           <div className="flex flex-wrap items-center gap-1">
             {installed ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-emerald-400/40 backdrop-blur-md">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-600/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-emerald-400/40">
                 <Check className="size-3" strokeWidth={3} />
                 <span>Installed</span>
               </span>
             ) : isMem ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-600/95 border border-amber-400/40 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-md">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-amber-600/95 border border-amber-400/40 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
                 <RotateCcw className="size-2.5" />
                 <span>In Memory</span>
               </span>
             ) : inLib ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-700/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-emerald-400/30 backdrop-blur-md">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-700/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-emerald-400/30">
                 <Check className="size-3" strokeWidth={3} />
                 <span>In Library</span>
               </span>
             ) : inWish ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-accent/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-white/20 backdrop-blur-md">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-accent/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-white/20">
                 <Bookmark className="size-3" />
                 <span>Wishlist</span>
               </span>
             ) : isUnreleased ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-cyan-600/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-cyan-300/30 backdrop-blur-md tabular-nums">
+              <span className="inline-flex items-center gap-1 rounded-lg bg-cyan-600/95 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm ring-1 ring-cyan-300/30 tabular-nums">
                 <Clock className="size-2.5" />
                 <span>{formatCompactCountdown(game.release_date) || 'Upcoming'}</span>
               </span>
@@ -267,7 +295,7 @@ export const HubGameCard = memo(function HubGameCard({
             {typeInfo && (
               <span
                 className={cn(
-                  'inline-flex items-center rounded-lg px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm ring-1 ring-white/20 backdrop-blur-md',
+                  'inline-flex items-center rounded-lg px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm ring-1 ring-white/20',
                   typeInfo.bg,
                 )}
               >
@@ -312,7 +340,7 @@ export const HubGameCard = memo(function HubGameCard({
               {platformChips.map((plat) => (
                 <span
                   key={plat}
-                  className="rounded-md border border-white/15 bg-black/65 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-white/90 backdrop-blur-sm"
+                  className="rounded-md border border-white/15 bg-black/65 px-1.5 py-0.5 text-[9px] font-bold tracking-wider text-white/90"
                 >
                   {plat}
                 </span>
@@ -321,7 +349,7 @@ export const HubGameCard = memo(function HubGameCard({
             {livePrice ? (
               <span
                 className={cn(
-                  'inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[9.5px] font-extrabold shadow-sm backdrop-blur-md',
+                  'inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[9.5px] font-extrabold shadow-sm',
                   livePrice.is_free
                     ? 'border-emerald-400/40 bg-emerald-600/90 text-white'
                     : livePrice.discount_percent > 0
@@ -337,14 +365,14 @@ export const HubGameCard = memo(function HubGameCard({
                 <span>{livePrice.is_free ? 'FREE' : livePrice.final_formatted}</span>
               </span>
             ) : game.discount_percent && game.discount_percent > 0 ? (
-              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-400/50 bg-black/85 px-1.5 py-0.5 font-mono text-[9.5px] font-extrabold text-emerald-300 shadow-sm backdrop-blur-md">
+              <span className="inline-flex items-center gap-1 rounded-md border border-emerald-400/50 bg-black/85 px-1.5 py-0.5 font-mono text-[9.5px] font-extrabold text-emerald-300 shadow-sm">
                 <span className="rounded bg-emerald-500 px-1 py-0.2 text-[8.5px] font-black text-black">
                   -{game.discount_percent}%
                 </span>
                 <span>{game.sale_price_formatted || 'ON SALE'}</span>
               </span>
             ) : game.hypes != null && game.hypes >= 25 ? (
-              <span className="inline-flex items-center gap-0.5 rounded-md border border-amber-400/30 bg-black/65 px-1.5 py-0.5 text-[9px] font-bold text-amber-300 backdrop-blur-sm">
+              <span className="inline-flex items-center gap-0.5 rounded-md border border-amber-400/30 bg-black/65 px-1.5 py-0.5 text-[9px] font-bold text-amber-300">
                 <Flame className="size-2.5 fill-current text-amber-400" />
                 <span>{game.hypes}</span>
               </span>
@@ -356,7 +384,7 @@ export const HubGameCard = memo(function HubGameCard({
         <div className="absolute inset-0 z-20 flex flex-col justify-end gap-2 bg-gradient-to-t from-black/95 via-black/65 to-transparent p-3 opacity-0 transition-opacity duration-200 group-hover/card:opacity-100">
           {/* Live Steam Price & Discount Showcase Pill on Hover */}
           {!isUnreleased && (
-            <div className="pointer-events-none flex items-center justify-between rounded-xl border border-white/15 bg-black/85 px-2.5 py-1.5 shadow-lg backdrop-blur-md">
+            <div className="pointer-events-none flex items-center justify-between rounded-xl border border-white/15 bg-black/85 px-2.5 py-1.5 shadow-lg">
               <div className="flex items-center gap-1.5 min-w-0">
                 <Tag className="size-3 shrink-0 text-emerald-400" />
                 <span className="truncate text-[10px] font-bold uppercase tracking-wider text-white/80">
@@ -414,7 +442,7 @@ export const HubGameCard = memo(function HubGameCard({
                   e.stopPropagation()
                   restoreGame.mutate(libraryEntry.id)
                 }}
-                className="flex size-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-600 text-white shadow-md transition-all hover:bg-amber-500 hover:border-amber-300 hover:scale-105 active:scale-95 cursor-pointer backdrop-blur-md"
+                className="flex size-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-600 text-white shadow-md transition-all hover:bg-amber-500 hover:border-amber-300 hover:scale-105 active:scale-95 cursor-pointer"
               >
                 {restoreGame.isPending ? (
                   <Loader2 className="size-3.5 animate-spin" />
@@ -470,7 +498,7 @@ export const HubGameCard = memo(function HubGameCard({
                   e.stopPropagation()
                   navigate('/wishlist')
                 }}
-                className="flex size-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-accent/50 bg-accent/30 text-white shadow-sm transition-all hover:bg-accent hover:border-accent hover:scale-105 active:scale-95 cursor-pointer backdrop-blur-md"
+                className="flex size-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-accent/50 bg-accent/30 text-white shadow-sm transition-all hover:bg-accent hover:border-accent hover:scale-105 active:scale-95 cursor-pointer"
               >
                 <BookmarkCheck className="size-3.5 text-accent-hover shrink-0" />
                 <span className="text-xs font-bold truncate">Saved</span>

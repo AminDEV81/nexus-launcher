@@ -1,3 +1,4 @@
+pub mod art_wallpaper;
 pub mod backup;
 pub mod booster;
 pub mod cleanup;

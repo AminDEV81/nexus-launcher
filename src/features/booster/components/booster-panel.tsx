@@ -52,11 +52,12 @@ import {
 } from '@/features/settings/hooks/use-system-specs'
 import { BoosterScanDial, HudCorners, ReactorTelemetryPills } from './booster-scan-dial'
 import { SystemTweaksTab } from './system-tweaks-tab'
+import { BoosterDiagnosticsTab, appendBoostHistory } from './booster-diagnostics-tab'
 import { playBoostCharge, playBoostComplete, playButtonClick } from '@/lib/sound-engine'
 import type { BoostReport } from '@/services/booster'
 
 type BoosterPhase = 'idle' | 'boosting' | 'done'
-type BoosterTab = 'reactor' | 'processes' | 'tweaks'
+type BoosterTab = 'reactor' | 'processes' | 'tweaks' | 'diagnostics'
 
 function formatBytes(bytes?: number | null): string {
   if (!bytes || bytes <= 0 || isNaN(bytes)) return '0 MB'
@@ -80,7 +81,7 @@ const PRESETS: Array<{
     id: 'esports_max',
     label: 'Esports Overdrive',
     badge: 'MAX FPS',
-    description: 'Arms all 10 kernel & memory modules and closes every background bloat app.',
+    description: 'Arms all 14 kernel, CPU unpark, shader cache & memory modules and closes bloatware.',
     icon: Flame,
     modules: BOOSTER_MODULE_IDS,
     whitelistVoice: false,
@@ -245,6 +246,13 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
     try {
       const result = await runBoost.mutateAsync()
       setReport(result)
+      appendBoostHistory({
+        profile: PRESETS.find((p) => p.id === activePreset)?.label ?? 'Custom Loadout',
+        freedRamBytes: result.freed_ram_bytes ?? 0,
+        closedAppsCount: result.closed_apps?.length ?? 0,
+        appliedSteps: result.steps.filter((s) => s.applied).length,
+        totalSteps: result.steps.length,
+      })
     } catch {
       setPhase('idle')
     }
@@ -561,6 +569,13 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
                 icon: Zap,
                 badge: `${tweakStatus?.optimization_score ?? 0}%`,
                 badgeTone: 'emerald',
+              },
+              {
+                id: 'diagnostics' as const,
+                label: 'Pro Diagnostics & Cache',
+                icon: Radar,
+                badge: 'PRO',
+                badgeTone: 'default',
               },
             ].map((tab) => {
               const TabIcon = tab.icon
@@ -1349,6 +1364,19 @@ export function BoosterPanel({ standalonePage = false }: { standalonePage?: bool
                 transition={{ duration: 0.16 * speed, ease: 'easeOut' }}
               >
                 <SystemTweaksTab />
+              </motion.div>
+            )}
+
+            {/* ── TAB 4: PRO DIAGNOSTICS, PING MONITOR & SHADER CACHE ─────────── */}
+            {activeTab === 'diagnostics' && (
+              <motion.div
+                key="booster-tab-diagnostics"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.16 * speed, ease: 'easeOut' }}
+              >
+                <BoosterDiagnosticsTab />
               </motion.div>
             )}
           </AnimatePresence>

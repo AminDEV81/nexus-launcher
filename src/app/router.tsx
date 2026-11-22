@@ -9,6 +9,7 @@ import { CollectionDetailPage } from '@/features/collections/pages/collection-de
 import { HubPage } from '@/features/hub/pages/hub-page'
 import { HubGamePage } from '@/features/hub/pages/hub-game-page'
 import { HubFeedPage } from '@/features/hub/pages/hub-feed-page'
+import { ArtWallpaperPage } from '@/features/art-wallpaper/pages/art-wallpaper-page'
 import { WishlistPage } from '@/features/wishlist/pages/wishlist-page'
 import { MemoryPage } from '@/features/memory/pages/memory-page'
 import { LibrarySkeleton } from '@/features/library/components/library-skeleton'
@@ -36,6 +37,10 @@ export const router = createHashRouter([
       {
         path: '/hub/:igdbId',
         element: <HubGamePage />,
+      },
+      {
+        path: '/art-wallpaper',
+        element: <ArtWallpaperPage />,
       },
       {
         path: '/wishlist',

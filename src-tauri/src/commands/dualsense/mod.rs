@@ -571,7 +571,8 @@ fn run_engine_loop(inner: Arc<Mutex<InnerEngine>>) {
         let target_sleep = if any_connected_or_emulating {
             Duration::from_millis(4)
         } else {
-            Duration::from_millis(35)
+            // Sleep 250ms when no controller is connected/emulating to avoid ~29 wakeups/sec idle CPU burn.
+            Duration::from_millis(250)
         };
         let elapsed = loop_start.elapsed();
         if elapsed < target_sleep {
@@ -896,7 +897,7 @@ pub fn dualsense_install_driver(
     #[cfg(target_os = "windows")]
     let launch_res: Result<std::process::ExitStatus, String> = {
         let ps_arg = format!(
-            "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -ExecutionPolicy Bypass -Command \"winget install --id {} -e --accept-source-agreements --accept-package-agreements\"'",
+            "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile -Command \"winget install --id {} -e --accept-source-agreements --accept-package-agreements\"'",
             pkg_id
         );
         std::process::Command::new("powershell")

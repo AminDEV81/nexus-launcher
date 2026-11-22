@@ -37,6 +37,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (21, include_str!("./sql/0021_overlay_config.sql")),
     (22, include_str!("./sql/0022_reset_wrong_soundtrack_cache.sql")),
     (23, include_str!("./sql/0023_preserve_download_history.sql")),
+    (24, include_str!("./sql/0024_liked_artworks.sql")),
 ];
 
 pub fn run(conn: &mut Connection, db_path: Option<&std::path::Path>) -> AppResult<()> {

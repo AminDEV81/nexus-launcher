@@ -28,7 +28,7 @@ export function HubSteamPriceBadge({
 
   if (isLoading) {
     return (
-      <div className="flex h-11 w-56 animate-pulse items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-md">
+      <div className="flex h-11 w-56 animate-pulse items-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 px-4 py-2">
         <div className="size-5 rounded-full bg-white/20" />
         <div className="h-4 w-32 rounded bg-white/20" />
       </div>
@@ -47,7 +47,7 @@ export function HubSteamPriceBadge({
         whileTap={{ scale: 0.97 }}
         transition={{ duration: 0.2 * speed }}
         onClick={onOpenRegionalModal}
-        className="group relative inline-flex items-center gap-2.5 rounded-2xl border border-emerald-500/50 bg-gradient-to-r from-emerald-500/25 via-emerald-600/20 to-transparent px-4 py-2 text-sm font-bold text-emerald-300 shadow-lg backdrop-blur-md transition-all hover:border-emerald-400 hover:from-emerald-500/35 cursor-pointer"
+        className="group relative inline-flex items-center gap-2.5 rounded-2xl border border-emerald-500/50 bg-gradient-to-r from-emerald-500/25 via-emerald-600/20 to-transparent px-4 py-2 text-sm font-bold text-emerald-300 shadow-lg transition-all hover:border-emerald-400 hover:from-emerald-500/35 cursor-pointer"
       >
         <span className="flex size-6 items-center justify-center rounded-xl bg-emerald-500/30 text-emerald-300 ring-1 ring-emerald-500/40">
           <Sparkles className="size-3.5" />
@@ -70,7 +70,7 @@ export function HubSteamPriceBadge({
       onClick={onOpenRegionalModal}
       title="Click to compare Steam prices across all regions (SteamDB style)"
       className={cn(
-        'group relative flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-2 sm:px-4.5 sm:py-2.5 text-sm shadow-xl backdrop-blur-md transition-all cursor-pointer select-none',
+        'group relative flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-2 sm:px-4.5 sm:py-2.5 text-sm shadow-xl transition-all cursor-pointer select-none',
         hasDiscount
           ? 'border-emerald-500/50 bg-gradient-to-r from-emerald-950/80 via-black/70 to-surface/90 hover:border-emerald-400 hover:shadow-emerald-500/25'
           : 'border-white/25 bg-black/70 hover:border-accent hover:shadow-accent/25',

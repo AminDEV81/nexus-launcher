@@ -329,10 +329,20 @@
   animation: none !important;
 }
 
+[data-gpu-eco='true'] .pointer-events-none[class*='blur-lg'],
+[data-gpu-eco='true'] .pointer-events-none[class*='blur-xl'],
 [data-gpu-eco='true'] .pointer-events-none[class*='blur-2xl'],
 [data-gpu-eco='true'] .pointer-events-none[class*='blur-3xl'],
+[data-window-active='false'] .pointer-events-none[class*='blur-lg'],
+[data-window-active='false'] .pointer-events-none[class*='blur-xl'],
 [data-window-active='false'] .pointer-events-none[class*='blur-2xl'],
 [data-window-active='false'] .pointer-events-none[class*='blur-3xl'] {
   filter: none !important;
   opacity: 0.12 !important;
+}
+
+/* Skip off-screen layout & GPU rasterization for tall media/game grids */
+.nx-cv-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
 }

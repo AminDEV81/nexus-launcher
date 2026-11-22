@@ -57,9 +57,13 @@ export function HubTrailerModal({
   const [isResolvingStream, setIsResolvingStream] = useState(false)
   const [resolvedStream, setResolvedStream] = useState<ResolvedTrailerStream | null>(null)
   const [selectedSteamMovie, setSelectedSteamMovie] = useState<SteamTrailerMovie | null>(null)
-  const [isGoogleConnected, setIsGoogleConnected] = useState(
-    () => localStorage.getItem('google_auth_active') === 'true',
-  )
+  const [isGoogleConnected, setIsGoogleConnected] = useState(() => {
+    try {
+      return localStorage.getItem('google_auth_active') === 'true'
+    } catch {
+      return false
+    }
+  })
   const containerRef = useRef<HTMLDivElement>(null)
   const speed = useAnimationSpeed()
 
@@ -193,7 +197,11 @@ export function HubTrailerModal({
       if (disposed) return
       setIsGoogleConnected(true)
       setIsDockedSigningIn(false)
-      localStorage.setItem('google_auth_active', 'true')
+      try {
+        localStorage.setItem('google_auth_active', 'true')
+      } catch {
+        // Ignore storage errors in restricted environments
+      }
       setPlayerKey((k) => k + 1)
       toast.success('Google account verified! 18+ age-restricted trailers unlocked.')
     })

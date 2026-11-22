@@ -39,6 +39,7 @@ import { ReleaseCountdownBanner } from '../ui/ReleaseCountdownBanner'
 import { ConsoleTrailerShowcase } from '../ui/ConsoleTrailerShowcase'
 import { ConsoleScorecardStrip } from '../ui/ConsoleScorecardStrip'
 import { ConsoleFpsEstimatorSection } from '../ui/ConsoleFpsEstimatorSection'
+import { isPcPlatformSupported } from '@/features/hub/utils/fps-estimator'
 import { normalizeCanonicalStoreTitle } from './StoreView'
 
 export interface StoreGameDetailViewProps {
@@ -689,15 +690,17 @@ export const StoreGameDetailView: React.FC<StoreGameDetailViewProps> = ({
         isLight={isLight}
       />
 
-      {/* Live FPS & Resolution Estimator + PC System Requirements */}
-      <ConsoleFpsEstimatorSection
-        scopeId="console_store_detail_scope"
-        gameName={hubGame.name}
-        releaseDate={effectiveReleaseDate}
-        genres={genres}
-        systemRequirements={sysReq}
-        isLight={isLight}
-      />
+      {/* Live FPS & Resolution Estimator + PC System Requirements (PC titles only) */}
+      {isPcPlatformSupported(details?.platforms ?? hubGame.platforms) && (
+        <ConsoleFpsEstimatorSection
+          scopeId="console_store_detail_scope"
+          gameName={hubGame.name}
+          releaseDate={effectiveReleaseDate}
+          genres={genres}
+          systemRequirements={sysReq}
+          isLight={isLight}
+        />
+      )}
 
       {/* Inline Game Soundtrack Player & Tracklist Section */}
       <div id="game-page-inline-soundtrack">

@@ -269,20 +269,35 @@ fn query_system_battery() -> (Option<u8>, bool) {
 }
 
 #[cfg(target_os = "windows")]
-fn get_os_master_volume() -> Option<u32> {
+type WaveOutGetVolumeFn = unsafe extern "system" fn(usize, *mut u32) -> u32;
+#[cfg(target_os = "windows")]
+type WaveOutSetVolumeFn = unsafe extern "system" fn(usize, u32) -> u32;
+
+#[cfg(target_os = "windows")]
+fn winmm_wave_procs() -> Option<(WaveOutGetVolumeFn, WaveOutSetVolumeFn)> {
+    use std::sync::OnceLock;
     use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
-    unsafe {
+
+    static PROCS: OnceLock<Option<(WaveOutGetVolumeFn, WaveOutSetVolumeFn)>> = OnceLock::new();
+    *PROCS.get_or_init(|| unsafe {
         let dll_name: Vec<u16> = "winmm.dll\0".encode_utf16().collect();
         let hmod = LoadLibraryW(dll_name.as_ptr());
         if hmod.is_null() {
             return None;
         }
-        let proc = GetProcAddress(hmod, b"waveOutGetVolume\0".as_ptr());
-        let Some(func_ptr) = proc else {
-            return None;
-        };
-        type WaveOutGetVolumeFn = unsafe extern "system" fn( usize, *mut u32) -> u32;
-        let wave_get: WaveOutGetVolumeFn = std::mem::transmute(func_ptr);
+        let get_proc = GetProcAddress(hmod, b"waveOutGetVolume\0".as_ptr())?;
+        let set_proc = GetProcAddress(hmod, b"waveOutSetVolume\0".as_ptr())?;
+        Some((
+            std::mem::transmute::<_, WaveOutGetVolumeFn>(get_proc),
+            std::mem::transmute::<_, WaveOutSetVolumeFn>(set_proc),
+        ))
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn get_os_master_volume() -> Option<u32> {
+    let (wave_get, _) = winmm_wave_procs()?;
+    unsafe {
         let mut raw_vol: u32 = 0xFFFF_FFFF;
         if wave_get(usize::MAX, &mut raw_vol) == 0 {
             let left = (raw_vol & 0xFFFF) as f64;
@@ -301,19 +316,10 @@ fn get_os_master_volume() -> Option<u32> {
 
 #[cfg(target_os = "windows")]
 fn set_os_master_volume(level: u32) {
-    use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
+    let Some((_, wave_set)) = winmm_wave_procs() else {
+        return;
+    };
     unsafe {
-        let dll_name: Vec<u16> = "winmm.dll\0".encode_utf16().collect();
-        let hmod = LoadLibraryW(dll_name.as_ptr());
-        if hmod.is_null() {
-            return;
-        }
-        let proc = GetProcAddress(hmod, b"waveOutSetVolume\0".as_ptr());
-        let Some(func_ptr) = proc else {
-            return;
-        };
-        type WaveOutSetVolumeFn = unsafe extern "system" fn(usize, u32) -> u32;
-        let wave_set: WaveOutSetVolumeFn = std::mem::transmute(func_ptr);
         let ch = ((level.min(100) as f64 / 100.0) * 65535.0).round() as u32;
         let packed = (ch & 0xFFFF) | ((ch & 0xFFFF) << 16);
         let _ = wave_set(usize::MAX, packed);

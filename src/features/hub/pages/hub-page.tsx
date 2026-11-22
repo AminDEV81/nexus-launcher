@@ -66,7 +66,7 @@ import { useAppearanceSettingsStore } from '@/store/appearance-settings-store'
 import { localDateKey } from '@/features/library/utils/format'
 import type { HubGame } from '@/types/models'
 
-const SEARCH_DEBOUNCE_MS = 120
+const SEARCH_DEBOUNCE_MS = 300
 
 type DropdownKey = 'sort' | 'genres' | 'platforms' | 'release' | 'rating' | 'edition' | null
 

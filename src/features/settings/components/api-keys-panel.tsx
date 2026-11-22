@@ -28,9 +28,13 @@ export function ApiKeysPanel() {
 
   const [values, setValues] = useState<Record<string, string>>({})
   const [showSecret, setShowSecret] = useState<Record<string, boolean>>({})
-  const [isGoogleConnected, setIsGoogleConnected] = useState(
-    () => localStorage.getItem('google_auth_active') === 'true',
-  )
+  const [isGoogleConnected, setIsGoogleConnected] = useState(() => {
+    try {
+      return localStorage.getItem('google_auth_active') === 'true'
+    } catch {
+      return false
+    }
+  })
 
   useEffect(() => {
     if (settings) setValues(settings)
