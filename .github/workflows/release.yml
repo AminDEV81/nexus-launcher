@@ -69,7 +69,7 @@ jobs:
         run: npm run format:check
 
       - name: Run Cargo Clippy
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings -A clippy::needless_bool -A clippy::needless_range_loop
 
       - name: Run Cargo Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml

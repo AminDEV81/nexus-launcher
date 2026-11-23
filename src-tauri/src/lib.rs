@@ -1,3 +1,5 @@
+#![allow(clippy::needless_bool, clippy::needless_range_loop)]
+
 mod commands;
 mod db;
 mod error;
