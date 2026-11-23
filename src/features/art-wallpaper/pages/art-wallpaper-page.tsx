@@ -30,19 +30,11 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  useArtSearch,
-  useLikedArtworks,
-  useToggleLikeArtwork,
-} from '../hooks/use-art-wallpaper'
+import { useArtSearch, useLikedArtworks, useToggleLikeArtwork } from '../hooks/use-art-wallpaper'
 import { ArtDownloadModal } from '../components/art-download-modal'
 import { ArtLightboxModal } from '../components/art-lightbox-modal'
 import { ArtDropdown, type ArtDropdownOption } from '../components/art-dropdown'
-import {
-  setDesktopWallpaper,
-  type ArtCategory,
-  type ArtItem,
-} from '@/services/art-wallpaper'
+import { setDesktopWallpaper, type ArtCategory, type ArtItem } from '@/services/art-wallpaper'
 import { useAnimationSpeed } from '@/hooks/use-animation-speed'
 import { playBoostComplete, playButtonClick } from '@/lib/sound-engine'
 import { cn } from '@/lib/utils'
@@ -78,15 +70,7 @@ const STYLE_MOODS = [
 
 type ResolutionFilter = 'all' | '8k' | '4k' | '2k' | '1080p' | 'ultrasharp' | 'compact'
 type AspectFilter =
-  | 'all'
-  | '16_9'
-  | '16_10'
-  | '21_9'
-  | '32_9'
-  | '4_3'
-  | '9_16'
-  | 'cover_2_3'
-  | 'square'
+  'all' | '16_9' | '16_10' | '21_9' | '32_9' | '4_3' | '9_16' | 'cover_2_3' | 'square'
 type SourceFilter =
   | 'all'
   | 'official'
@@ -369,11 +353,7 @@ function matchesResolutionFilter(item: ArtItem, resFilter: ResolutionFilter): bo
   return true
 }
 
-function matchesAspectFilter(
-  item: ArtItem,
-  aspect: AspectFilter,
-  measuredRatio?: number,
-): boolean {
+function matchesAspectFilter(item: ArtItem, aspect: AspectFilter, measuredRatio?: number): boolean {
   if (aspect === 'all') return true
   const whRatio =
     item.width && item.height && item.height > 0
@@ -486,8 +466,8 @@ const ArtGalleryCard = memo(function ArtGalleryCard({
   const [naturalAspect, setNaturalAspect] = useState<number | null>(null)
   const [naturalDims, setNaturalDims] = useState<{ w: number; h: number } | null>(null)
 
-  const displayW = item.width && item.width > 0 ? item.width : naturalDims?.w ?? null
-  const displayH = item.height && item.height > 0 ? item.height : naturalDims?.h ?? null
+  const displayW = item.width && item.width > 0 ? item.width : (naturalDims?.w ?? null)
+  const displayH = item.height && item.height > 0 ? item.height : (naturalDims?.h ?? null)
 
   const cardAspect = useMemo(() => {
     const raw =
@@ -772,8 +752,7 @@ export function ArtWallpaperPage() {
       for (let i = 0; i < total; i++) {
         const wantPortrait =
           pIdx < portrait.length && (pIdx + 0.5) / portrait.length <= (i + 0.5) / total
-        const wantWide =
-          wIdx < wide.length && (wIdx + 0.5) / wide.length <= (i + 0.5) / total
+        const wantWide = wIdx < wide.length && (wIdx + 0.5) / wide.length <= (i + 0.5) / total
 
         if (wantPortrait && (!wantWide || i % 2 === 1)) {
           result.push(portrait[pIdx++])
@@ -815,7 +794,16 @@ export function ArtWallpaperPage() {
       out.push(...(sortBy === 'default' ? weaveMixedProportions(pageFiltered) : pageFiltered))
     }
     return out
-  }, [searchPages, likedIdSet, resFilter, aspectFilter, sourceFilter, measuredRatios, sortBy, weaveMixedProportions])
+  }, [
+    searchPages,
+    likedIdSet,
+    resFilter,
+    aspectFilter,
+    sourceFilter,
+    measuredRatios,
+    sortBy,
+    weaveMixedProportions,
+  ])
 
   const displayedLiked = useMemo(() => {
     let list = likedItems
@@ -848,7 +836,9 @@ export function ArtWallpaperPage() {
     }
     const sorted = [...valid]
     if (sortBy === 'highest_res') {
-      sorted.sort((a, b) => Math.max(b.width ?? 0, b.height ?? 0) - Math.max(a.width ?? 0, a.height ?? 0))
+      sorted.sort(
+        (a, b) => Math.max(b.width ?? 0, b.height ?? 0) - Math.max(a.width ?? 0, a.height ?? 0),
+      )
     } else if (sortBy === 'megapixels') {
       sorted.sort((a, b) => (b.width ?? 0) * (b.height ?? 0) - (a.width ?? 0) * (a.height ?? 0))
     } else if (sortBy === 'widest') {
@@ -964,7 +954,9 @@ export function ArtWallpaperPage() {
     (item: ArtItem) => {
       playButtonClick()
       toggleLike.mutate(item)
-      setLightboxItem((cur) => (cur && cur.id === item.id ? { ...cur, is_liked: !cur.is_liked } : cur))
+      setLightboxItem((cur) =>
+        cur && cur.id === item.id ? { ...cur, is_liked: !cur.is_liked } : cur,
+      )
     },
     [toggleLike],
   )
@@ -1020,7 +1012,8 @@ export function ArtWallpaperPage() {
                 </span>
               </div>
               <p className="text-xs text-subtle">
-                Fast HQ previews of trending gaming art, 4K/8K wallpapers &amp; ultrawide banners — full-res loads on view or download
+                Fast HQ previews of trending gaming art, 4K/8K wallpapers &amp; ultrawide banners —
+                full-res loads on view or download
               </p>
             </div>
           </div>
@@ -1034,7 +1027,9 @@ export function ArtWallpaperPage() {
                 title="Sync latest gaming artworks"
                 className="inline-flex items-center gap-2 rounded-2xl border border-border bg-surface px-3.5 py-2.5 text-xs font-extrabold text-text shadow-2xs transition hover:border-accent/50 hover:text-accent active:scale-95 disabled:opacity-50 cursor-pointer"
               >
-                <RefreshCw className={cn('size-3.5 text-accent', isFetchingSearch && 'animate-spin')} />
+                <RefreshCw
+                  className={cn('size-3.5 text-accent', isFetchingSearch && 'animate-spin')}
+                />
                 <span>{isFetchingSearch ? 'Syncing...' : 'Sync Feed'}</span>
               </button>
             )}
@@ -1124,7 +1119,9 @@ export function ArtWallpaperPage() {
                     }}
                     className={cn(
                       'rounded-xl px-2.5 py-1 text-[11px] font-bold capitalize transition cursor-pointer',
-                      density === d ? 'bg-accent text-white shadow-2xs' : 'text-muted hover:text-text',
+                      density === d
+                        ? 'bg-accent text-white shadow-2xs'
+                        : 'text-muted hover:text-text',
                     )}
                   >
                     {d}
@@ -1296,7 +1293,8 @@ export function ArtWallpaperPage() {
                 : 'Loading Trending Gaming Art & 8K Wallpapers...'}
             </p>
             <p className="text-xs text-subtle">
-              Querying Wallhaven 8K, Digital Art, Bing 4K, Openverse, Art Institute, Steam, IGDB &amp; NASA
+              Querying Wallhaven 8K, Digital Art, Bing 4K, Openverse, Art Institute, Steam, IGDB
+              &amp; NASA
             </p>
           </div>
         ) : activeTab === 'explore' && isSearchError ? (
@@ -1304,7 +1302,9 @@ export function ArtWallpaperPage() {
             <AlertCircle className="size-9 text-rose-400" />
             <h3 className="text-base font-extrabold text-text">Could not load artworks</h3>
             <p className="max-w-md text-xs text-muted">
-              {searchError instanceof Error ? searchError.message : 'Network or backend error occurred.'}
+              {searchError instanceof Error
+                ? searchError.message
+                : 'Network or backend error occurred.'}
             </p>
             <button
               type="button"
@@ -1319,7 +1319,9 @@ export function ArtWallpaperPage() {
           <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-border bg-surface/60 p-16 text-center">
             <ImageIcon className="size-10 text-subtle" />
             <h3 className="text-base font-extrabold text-text">
-              {activeTab === 'liked' ? 'No Liked Artworks Match Filters' : 'No Artworks Match Active Filters'}
+              {activeTab === 'liked'
+                ? 'No Liked Artworks Match Filters'
+                : 'No Artworks Match Active Filters'}
             </h3>
             <p className="max-w-md text-xs text-muted">
               {activeTab === 'liked'

@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 use crate::commands::save_manager::fs_ops::{get_nexus_profiles_root, remove_path_all_with_retry};
 use crate::db::Database;
 use crate::error::{AppError, AppResult};

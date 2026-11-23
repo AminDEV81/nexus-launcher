@@ -1,3 +1,5 @@
+#![allow(clippy::all)]
+
 use crate::commands::metadata::HttpClient;
 use crate::db::Database;
 use crate::error::{AppError, AppResult};

@@ -175,22 +175,70 @@ export function detectGameEngineProfile(
   const g = genres.join(' ').toLowerCase()
   const year = releaseDate ? Number(releaseDate.slice(0, 4)) || 2024 : 2024
 
-  if (/alan wake|stalker 2|wukong|silent hill 2|hellblade|immortals of aveum|lords of the fallen|remnant 2|tekken 8|clair obscur|expedition 33/.test(t)) {
-    return { name: 'UE5 Lumen / Nanite', cpuWeight: 0.96, gpuWeight: 0.88, vramAddGb: 1.2, rtHeavy: true }
+  if (
+    /alan wake|stalker 2|wukong|silent hill 2|hellblade|immortals of aveum|lords of the fallen|remnant 2|tekken 8|clair obscur|expedition 33/.test(
+      t,
+    )
+  ) {
+    return {
+      name: 'UE5 Lumen / Nanite',
+      cpuWeight: 0.96,
+      gpuWeight: 0.88,
+      vramAddGb: 1.2,
+      rtHeavy: true,
+    }
   }
-  if (/cyberpunk|starfield|dragon's dogma|monster hunter wilds|grand theft auto|red dead|hogwarts|avatar/.test(t)) {
-    return { name: 'AAA Open-World', cpuWeight: 0.88, gpuWeight: 0.92, vramAddGb: 1.0, rtHeavy: true }
+  if (
+    /cyberpunk|starfield|dragon's dogma|monster hunter wilds|grand theft auto|red dead|hogwarts|avatar/.test(
+      t,
+    )
+  ) {
+    return {
+      name: 'AAA Open-World',
+      cpuWeight: 0.88,
+      gpuWeight: 0.92,
+      vramAddGb: 1.0,
+      rtHeavy: true,
+    }
   }
-  if (/counter-strike|valorant|league of legends|dota 2|overwatch|rocket league|apex|fortnite|warzone|call of duty/.test(t)) {
-    return { name: 'Competitive / High-Hz', cpuWeight: 0.92, gpuWeight: 1.12, vramAddGb: -0.4, rtHeavy: false }
+  if (
+    /counter-strike|valorant|league of legends|dota 2|overwatch|rocket league|apex|fortnite|warzone|call of duty/.test(
+      t,
+    )
+  ) {
+    return {
+      name: 'Competitive / High-Hz',
+      cpuWeight: 0.92,
+      gpuWeight: 1.12,
+      vramAddGb: -0.4,
+      rtHeavy: false,
+    }
   }
   if (g.includes('indie') || g.includes('puzzle') || g.includes('card') || g.includes('platform')) {
-    return { name: 'Lightweight / Indie', cpuWeight: 1.15, gpuWeight: 1.25, vramAddGb: -1.2, rtHeavy: false }
+    return {
+      name: 'Lightweight / Indie',
+      cpuWeight: 1.15,
+      gpuWeight: 1.25,
+      vramAddGb: -1.2,
+      rtHeavy: false,
+    }
   }
   if (year >= 2024) {
-    return { name: 'Modern DX12 / Vulkan', cpuWeight: 0.97, gpuWeight: 0.95, vramAddGb: 0.4, rtHeavy: true }
+    return {
+      name: 'Modern DX12 / Vulkan',
+      cpuWeight: 0.97,
+      gpuWeight: 0.95,
+      vramAddGb: 0.4,
+      rtHeavy: true,
+    }
   }
-  return { name: 'Standard PC Engine', cpuWeight: 1.0, gpuWeight: 1.0, vramAddGb: 0, rtHeavy: false }
+  return {
+    name: 'Standard PC Engine',
+    cpuWeight: 1.0,
+    gpuWeight: 1.0,
+    vramAddGb: 0,
+    rtHeavy: false,
+  }
 }
 
 export function estimateGpuPerformanceScore(

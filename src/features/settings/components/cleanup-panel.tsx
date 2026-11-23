@@ -233,446 +233,451 @@ export function CleanupPanel() {
         <StorageTreemapSection />
       ) : (
         <div className="flex flex-col gap-6">
-      {/* Header Metric Dashboard */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {/* Card 1: Reclaimable Space */}
-        <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-surface/80 p-5 shadow-xs transition-all hover:border-accent/40">
-          <div className="flex items-center justify-between text-muted">
-            <span className="font-mono text-xs font-bold uppercase tracking-wider">
-              Reclaimable Space
-            </span>
-            <Trash2
-              className={cn(
-                'size-4',
-                (report?.total_reclaimable_bytes ?? 0) > 0 ? 'text-accent' : 'text-emerald-500',
-              )}
-            />
-          </div>
-          <div className="mt-2 font-mono text-2xl font-black text-text">
-            {formatBytes(report?.total_reclaimable_bytes ?? 0)}
-          </div>
-          <div className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-            {(report?.total_reclaimable_bytes ?? 0) > 0 ? (
-              <span className="inline-flex items-center gap-1 font-medium text-amber-600 dark:text-amber-400">
-                <AlertCircle className="size-3" />
-                {report?.total_items_count ?? 0} cleanable item(s) found
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="size-3" />
-                Storage is clean &amp; optimized
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Card 2: Selected to Clean */}
-        <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-surface/80 p-5 shadow-xs transition-all hover:border-accent/40">
-          <div className="flex items-center justify-between text-muted">
-            <span className="font-mono text-xs font-bold uppercase tracking-wider">
-              Selected Targets
-            </span>
-            <Sparkles className="size-4 text-accent" />
-          </div>
-          <div className="mt-2 font-mono text-2xl font-black text-accent">
-            {formatBytes(selectedBytes)}
-          </div>
-          <div className="mt-1 flex items-center justify-between text-xs text-muted">
-            <span>
-              {selectedItems.length} of {items.length} items chosen
-            </span>
-            {hasItems && (
-              <div className="flex items-center gap-1.5 font-medium">
-                <button
-                  type="button"
-                  onClick={handleSelectAll}
-                  className="text-accent hover:underline"
-                >
-                  All
-                </button>
-                <span>•</span>
-                <button
-                  type="button"
-                  onClick={handleDeselectAll}
-                  className="text-muted hover:text-text hover:underline"
-                >
-                  None
-                </button>
+          {/* Header Metric Dashboard */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {/* Card 1: Reclaimable Space */}
+            <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-surface/80 p-5 shadow-xs transition-all hover:border-accent/40">
+              <div className="flex items-center justify-between text-muted">
+                <span className="font-mono text-xs font-bold uppercase tracking-wider">
+                  Reclaimable Space
+                </span>
+                <Trash2
+                  className={cn(
+                    'size-4',
+                    (report?.total_reclaimable_bytes ?? 0) > 0 ? 'text-accent' : 'text-emerald-500',
+                  )}
+                />
               </div>
-            )}
-          </div>
-        </div>
+              <div className="mt-2 font-mono text-2xl font-black text-text">
+                {formatBytes(report?.total_reclaimable_bytes ?? 0)}
+              </div>
+              <div className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                {(report?.total_reclaimable_bytes ?? 0) > 0 ? (
+                  <span className="inline-flex items-center gap-1 font-medium text-amber-600 dark:text-amber-400">
+                    <AlertCircle className="size-3" />
+                    {report?.total_items_count ?? 0} cleanable item(s) found
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="size-3" />
+                    Storage is clean &amp; optimized
+                  </span>
+                )}
+              </div>
+            </div>
 
-        {/* Card 3: Protected Saves */}
-        <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5 shadow-xs">
-          <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
-            <span className="font-mono text-xs font-bold uppercase tracking-wider">
-              Protected Game Saves
-            </span>
-            <ShieldCheck className="size-4" />
-          </div>
-          <div className="mt-2 font-mono text-2xl font-black text-text">
-            {formatBytes(report?.live_saves_protected_bytes ?? 0)}
-          </div>
-          <div className="mt-1 text-xs text-muted">
-            Active game saves in{' '}
-            <code className="font-mono text-emerald-600 dark:text-emerald-400">current</code> are
-            never touched.
-          </div>
-        </div>
-      </div>
+            {/* Card 2: Selected to Clean */}
+            <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-surface/80 p-5 shadow-xs transition-all hover:border-accent/40">
+              <div className="flex items-center justify-between text-muted">
+                <span className="font-mono text-xs font-bold uppercase tracking-wider">
+                  Selected Targets
+                </span>
+                <Sparkles className="size-4 text-accent" />
+              </div>
+              <div className="mt-2 font-mono text-2xl font-black text-accent">
+                {formatBytes(selectedBytes)}
+              </div>
+              <div className="mt-1 flex items-center justify-between text-xs text-muted">
+                <span>
+                  {selectedItems.length} of {items.length} items chosen
+                </span>
+                {hasItems && (
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <button
+                      type="button"
+                      onClick={handleSelectAll}
+                      className="text-accent hover:underline"
+                    >
+                      All
+                    </button>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAll}
+                      className="text-muted hover:text-text hover:underline"
+                    >
+                      None
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
 
-      {/* Control Bar: Category Filters & Action Button */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border bg-surface-raised/50 p-3.5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveCategory('all')}
-            className={cn(
-              'rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
-              activeCategory === 'all'
-                ? 'bg-accent text-white shadow-xs'
-                : 'text-muted hover:bg-surface hover:text-text',
-            )}
-          >
-            All Categories ({items.length})
-          </button>
-          {(
-            [
-              'orphaned_saves',
-              'save_snapshots',
-              'orphaned_artworks',
-              'legacy_appdata',
-            ] as CleanupCategory[]
-          ).map((cat) => {
-            const count = items.filter((i) => i.category === cat).length
-            if (count === 0) return null
-            const meta = CATEGORY_META[cat]
-            return (
+            {/* Card 3: Protected Saves */}
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5 shadow-xs">
+              <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+                <span className="font-mono text-xs font-bold uppercase tracking-wider">
+                  Protected Game Saves
+                </span>
+                <ShieldCheck className="size-4" />
+              </div>
+              <div className="mt-2 font-mono text-2xl font-black text-text">
+                {formatBytes(report?.live_saves_protected_bytes ?? 0)}
+              </div>
+              <div className="mt-1 text-xs text-muted">
+                Active game saves in{' '}
+                <code className="font-mono text-emerald-600 dark:text-emerald-400">current</code>{' '}
+                are never touched.
+              </div>
+            </div>
+          </div>
+
+          {/* Control Bar: Category Filters & Action Button */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-border bg-surface-raised/50 p-3.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
-                key={cat}
                 type="button"
-                onClick={() => setActiveCategory(cat)}
+                onClick={() => setActiveCategory('all')}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
-                  activeCategory === cat
+                  'rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
+                  activeCategory === 'all'
                     ? 'bg-accent text-white shadow-xs'
                     : 'text-muted hover:bg-surface hover:text-text',
                 )}
               >
-                <span>{meta.label}</span>
-                <span className="rounded-full bg-surface-raised/60 px-1.5 py-0.2 font-mono text-[10px]">
-                  {count}
-                </span>
+                All Categories ({items.length})
               </button>
-            )
-          })}
-        </div>
-
-        <div className="flex items-center gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={() => refetch()}
-            disabled={isLoading || isRefetching}
-            className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-muted transition-all hover:border-accent/40 hover:text-text active:scale-95 disabled:opacity-50"
-            title="Rescan disk for cleanable items"
-          >
-            <RefreshCw
-              className={cn('size-3.5', (isLoading || isRefetching) && 'animate-spin text-accent')}
-            />
-            <span className="hidden sm:inline">Rescan</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (selectedIds.size > 0) setShowConfirmModal(true)
-            }}
-            disabled={selectedIds.size === 0 || executeMutation.isPending}
-            className={cn(
-              'flex items-center gap-2 rounded-xl px-4 py-2 font-mono text-xs font-black shadow-md transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-40',
-              selectedIds.size > 0
-                ? 'bg-accent hover:bg-accent-hover text-white shadow-accent/25'
-                : 'bg-surface-raised text-muted border border-border',
-            )}
-          >
-            {executeMutation.isPending ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Trash2 className="size-4" />
-            )}
-            <span>Clean Selected {selectedBytes > 0 && `(${formatBytes(selectedBytes)})`}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Target Items List */}
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-border/80 bg-surface/40 py-16 text-muted">
-          <Loader2 className="size-8 animate-spin text-accent" />
-          <span className="font-mono text-xs font-bold uppercase tracking-wider">
-            Scanning storage paths &amp; save hierarchies...
-          </span>
-        </div>
-      ) : !hasItems ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-emerald-500/30 bg-emerald-500/5 py-16 text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-500 shadow-sm ring-1 ring-emerald-500/30">
-            <CheckCircle2 className="size-7" />
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-text">Nexus Storage is Clean!</h3>
-            <p className="mt-1 max-w-md text-xs text-muted">
-              No orphaned save directories, redundant snapshots, or obsolete cache folders were
-              found on disk.
-            </p>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2.5">
-          {/* Master Select All Bar */}
-          {filteredItems.length > 0 && (
-            <div className="flex items-center justify-between rounded-2xl border border-border/80 bg-surface/70 px-4 py-3 shadow-xs">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleToggleSelectAllFiltered}
-                  className="group flex items-center gap-2.5 text-xs font-bold text-text transition-colors hover:text-accent"
-                >
-                  <div
+              {(
+                [
+                  'orphaned_saves',
+                  'save_snapshots',
+                  'orphaned_artworks',
+                  'legacy_appdata',
+                ] as CleanupCategory[]
+              ).map((cat) => {
+                const count = items.filter((i) => i.category === cat).length
+                if (count === 0) return null
+                const meta = CATEGORY_META[cat]
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setActiveCategory(cat)}
                     className={cn(
-                      'flex size-5 items-center justify-center rounded-lg border transition-all',
-                      isAllFilteredSelected
-                        ? 'border-accent bg-accent text-white shadow-xs'
-                        : isSomeFilteredSelected
-                          ? 'border-accent/60 bg-accent/15 text-accent'
-                          : 'border-border/80 bg-surface group-hover:border-accent/50',
+                      'flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-all',
+                      activeCategory === cat
+                        ? 'bg-accent text-white shadow-xs'
+                        : 'text-muted hover:bg-surface hover:text-text',
                     )}
                   >
-                    {isAllFilteredSelected && <Check className="size-3.5 stroke-[3]" />}
-                    {!isAllFilteredSelected && isSomeFilteredSelected && (
-                      <div className="size-2 rounded-xs bg-accent" />
-                    )}
-                  </div>
-                  <span>
-                    Select All{' '}
-                    {activeCategory !== 'all'
-                      ? `in ${CATEGORY_META[activeCategory as CleanupCategory]?.label ?? activeCategory}`
-                      : `(${items.length})`}
-                  </span>
-                </button>
-                <span className="text-muted/40">•</span>
-                <span className="font-mono text-[11px] text-muted">
-                  {selectedFilteredCount} of {filteredItems.length} selected
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleSelectAllFiltered}
-                  className="rounded-xl border border-border/70 bg-surface-raised/60 px-3 py-1.5 text-xs font-bold text-accent transition-all hover:bg-accent hover:text-white active:scale-95"
-                >
-                  Select All
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeselectAllFiltered}
-                  className="rounded-xl border border-border/70 bg-surface px-3 py-1.5 text-xs font-bold text-muted transition-all hover:bg-surface-raised hover:text-text active:scale-95"
-                >
-                  Clear
-                </button>
-              </div>
+                    <span>{meta.label}</span>
+                    <span className="rounded-full bg-surface-raised/60 px-1.5 py-0.2 font-mono text-[10px]">
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-          )}
 
-          {filteredItems.length === 0 && (
-            <div className="rounded-2xl border border-border/80 bg-surface/40 p-8 text-center text-xs text-muted">
-              No items in this category.
-            </div>
-          )}
-
-          <AnimatePresence>
-            {filteredItems.map((item) => {
-              const isSelected = selectedIds.has(item.id)
-              const meta = CATEGORY_META[item.category as CleanupCategory] || {
-                label: item.category,
-                icon: HardDrive,
-                badgeColor: 'border-border bg-surface-raised text-muted',
-              }
-              const Icon = meta.icon
-
-              return (
-                <motion.div
-                  key={item.id}
-                  layout
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  transition={{ duration: 0.15 * speed }}
+            <div className="flex items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => refetch()}
+                disabled={isLoading || isRefetching}
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-muted transition-all hover:border-accent/40 hover:text-text active:scale-95 disabled:opacity-50"
+                title="Rescan disk for cleanable items"
+              >
+                <RefreshCw
                   className={cn(
-                    'group relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-4 transition-all duration-200',
-                    isSelected
-                      ? 'border-accent/40 bg-accent/5 shadow-xs'
-                      : 'border-border/80 bg-surface/60 hover:border-border hover:bg-surface/90',
+                    'size-3.5',
+                    (isLoading || isRefetching) && 'animate-spin text-accent',
                   )}
-                >
-                  <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-                    {/* Custom Cyber Checkbox */}
+                />
+                <span className="hidden sm:inline">Rescan</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedIds.size > 0) setShowConfirmModal(true)
+                }}
+                disabled={selectedIds.size === 0 || executeMutation.isPending}
+                className={cn(
+                  'flex items-center gap-2 rounded-xl px-4 py-2 font-mono text-xs font-black shadow-md transition-all active:scale-95 disabled:pointer-events-none disabled:opacity-40',
+                  selectedIds.size > 0
+                    ? 'bg-accent hover:bg-accent-hover text-white shadow-accent/25'
+                    : 'bg-surface-raised text-muted border border-border',
+                )}
+              >
+                {executeMutation.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Trash2 className="size-4" />
+                )}
+                <span>Clean Selected {selectedBytes > 0 && `(${formatBytes(selectedBytes)})`}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Target Items List */}
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-3xl border border-border/80 bg-surface/40 py-16 text-muted">
+              <Loader2 className="size-8 animate-spin text-accent" />
+              <span className="font-mono text-xs font-bold uppercase tracking-wider">
+                Scanning storage paths &amp; save hierarchies...
+              </span>
+            </div>
+          ) : !hasItems ? (
+            <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-emerald-500/30 bg-emerald-500/5 py-16 text-center">
+              <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-500 shadow-sm ring-1 ring-emerald-500/30">
+                <CheckCircle2 className="size-7" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-text">Nexus Storage is Clean!</h3>
+                <p className="mt-1 max-w-md text-xs text-muted">
+                  No orphaned save directories, redundant snapshots, or obsolete cache folders were
+                  found on disk.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {/* Master Select All Bar */}
+              {filteredItems.length > 0 && (
+                <div className="flex items-center justify-between rounded-2xl border border-border/80 bg-surface/70 px-4 py-3 shadow-xs">
+                  <div className="flex items-center gap-3">
                     <button
                       type="button"
-                      onClick={() => handleToggleItem(item.id)}
-                      className={cn(
-                        'mt-0.5 sm:mt-0 flex size-5 shrink-0 items-center justify-center rounded-lg border transition-all',
-                        isSelected
-                          ? 'border-accent bg-accent text-white shadow-xs'
-                          : 'border-border bg-surface-raised text-transparent group-hover:border-accent/50',
-                      )}
+                      onClick={handleToggleSelectAllFiltered}
+                      className="group flex items-center gap-2.5 text-xs font-bold text-text transition-colors hover:text-accent"
                     >
-                      <Check className="size-3.5 stroke-[3]" />
+                      <div
+                        className={cn(
+                          'flex size-5 items-center justify-center rounded-lg border transition-all',
+                          isAllFilteredSelected
+                            ? 'border-accent bg-accent text-white shadow-xs'
+                            : isSomeFilteredSelected
+                              ? 'border-accent/60 bg-accent/15 text-accent'
+                              : 'border-border/80 bg-surface group-hover:border-accent/50',
+                        )}
+                      >
+                        {isAllFilteredSelected && <Check className="size-3.5 stroke-[3]" />}
+                        {!isAllFilteredSelected && isSomeFilteredSelected && (
+                          <div className="size-2 rounded-xs bg-accent" />
+                        )}
+                      </div>
+                      <span>
+                        Select All{' '}
+                        {activeCategory !== 'all'
+                          ? `in ${CATEGORY_META[activeCategory as CleanupCategory]?.label ?? activeCategory}`
+                          : `(${items.length})`}
+                      </span>
                     </button>
+                    <span className="text-muted/40">•</span>
+                    <span className="font-mono text-[11px] text-muted">
+                      {selectedFilteredCount} of {filteredItems.length} selected
+                    </span>
+                  </div>
 
-                    {/* Category Icon */}
-                    <div
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSelectAllFiltered}
+                      className="rounded-xl border border-border/70 bg-surface-raised/60 px-3 py-1.5 text-xs font-bold text-accent transition-all hover:bg-accent hover:text-white active:scale-95"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAllFiltered}
+                      className="rounded-xl border border-border/70 bg-surface px-3 py-1.5 text-xs font-bold text-muted transition-all hover:bg-surface-raised hover:text-text active:scale-95"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {filteredItems.length === 0 && (
+                <div className="rounded-2xl border border-border/80 bg-surface/40 p-8 text-center text-xs text-muted">
+                  No items in this category.
+                </div>
+              )}
+
+              <AnimatePresence>
+                {filteredItems.map((item) => {
+                  const isSelected = selectedIds.has(item.id)
+                  const meta = CATEGORY_META[item.category as CleanupCategory] || {
+                    label: item.category,
+                    icon: HardDrive,
+                    badgeColor: 'border-border bg-surface-raised text-muted',
+                  }
+                  const Icon = meta.icon
+
+                  return (
+                    <motion.div
+                      key={item.id}
+                      layout
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{ duration: 0.15 * speed }}
                       className={cn(
-                        'hidden sm:flex size-9 shrink-0 items-center justify-center rounded-xl border',
-                        meta.badgeColor,
+                        'group relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border p-4 transition-all duration-200',
+                        isSelected
+                          ? 'border-accent/40 bg-accent/5 shadow-xs'
+                          : 'border-border/80 bg-surface/60 hover:border-border hover:bg-surface/90',
                       )}
                     >
-                      <Icon className="size-4.5" />
-                    </div>
-
-                    {/* Item Information */}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="truncate text-sm font-bold text-text">{item.title}</span>
-                        <span
+                      <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                        {/* Custom Cyber Checkbox */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleItem(item.id)}
                           className={cn(
-                            'rounded-md border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider',
+                            'mt-0.5 sm:mt-0 flex size-5 shrink-0 items-center justify-center rounded-lg border transition-all',
+                            isSelected
+                              ? 'border-accent bg-accent text-white shadow-xs'
+                              : 'border-border bg-surface-raised text-transparent group-hover:border-accent/50',
+                          )}
+                        >
+                          <Check className="size-3.5 stroke-[3]" />
+                        </button>
+
+                        {/* Category Icon */}
+                        <div
+                          className={cn(
+                            'hidden sm:flex size-9 shrink-0 items-center justify-center rounded-xl border',
                             meta.badgeColor,
                           )}
                         >
-                          {meta.label}
-                        </span>
-                        {item.item_count > 0 && (
-                          <span className="font-mono text-[10px] text-muted">
-                            {item.item_count} file{item.item_count === 1 ? '' : 's'}
-                          </span>
-                        )}
+                          <Icon className="size-4.5" />
+                        </div>
+
+                        {/* Item Information */}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="truncate text-sm font-bold text-text">
+                              {item.title}
+                            </span>
+                            <span
+                              className={cn(
+                                'rounded-md border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider',
+                                meta.badgeColor,
+                              )}
+                            >
+                              {meta.label}
+                            </span>
+                            {item.item_count > 0 && (
+                              <span className="font-mono text-[10px] text-muted">
+                                {item.item_count} file{item.item_count === 1 ? '' : 's'}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-0.5 truncate text-xs text-muted">{item.subtitle}</div>
+
+                          {/* Path tooltip / copy */}
+                          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-subtle font-mono truncate">
+                            <span className="truncate max-w-[320px] sm:max-w-md">{item.path}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyPath(item.path)}
+                              className="shrink-0 rounded p-0.5 hover:bg-surface-raised hover:text-text transition-colors"
+                              title="Copy path"
+                            >
+                              {copiedPath === item.path ? (
+                                <Check className="size-3 text-emerald-500" />
+                              ) : (
+                                <Copy className="size-3" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="mt-0.5 truncate text-xs text-muted">{item.subtitle}</div>
-
-                      {/* Path tooltip / copy */}
-                      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-subtle font-mono truncate">
-                        <span className="truncate max-w-[320px] sm:max-w-md">{item.path}</span>
+                      {/* Size and Quick Action */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
+                        <span className="font-mono text-sm font-black text-text">
+                          {formatBytes(item.size_bytes)}
+                        </span>
                         <button
                           type="button"
-                          onClick={() => handleCopyPath(item.path)}
-                          className="shrink-0 rounded p-0.5 hover:bg-surface-raised hover:text-text transition-colors"
-                          title="Copy path"
+                          onClick={() => {
+                            setSelectedIds(new Set([item.id]))
+                            setShowConfirmModal(true)
+                          }}
+                          className="rounded-xl border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-500 transition-all active:scale-95"
                         >
-                          {copiedPath === item.path ? (
-                            <Check className="size-3 text-emerald-500" />
-                          ) : (
-                            <Copy className="size-3" />
-                          )}
+                          Delete
                         </button>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Size and Quick Action */}
-                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
-                    <span className="font-mono text-sm font-black text-text">
-                      {formatBytes(item.size_bytes)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedIds(new Set([item.id]))
-                        setShowConfirmModal(true)
-                      }}
-                      className="rounded-xl border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-500 transition-all active:scale-95"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </motion.div>
-              )
-            })}
-          </AnimatePresence>
-        </div>
-      )}
-
-      {/* Confirmation Modal */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm"
-            onClick={() => setShowConfirmModal(false)}
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-surface p-6 shadow-2xl text-text z-10"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-2xl border border-rose-500/30 bg-rose-500/15 text-rose-500">
-                <Trash2 className="size-5.5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-text">Confirm Storage Cleanup</h3>
-                <p className="text-xs text-muted">Permanent file deletion</p>
-              </div>
+                    </motion.div>
+                  )
+                })}
+              </AnimatePresence>
             </div>
+          )}
 
-            <div className="mt-4 rounded-2xl border border-border bg-surface-raised/60 p-4 text-xs text-muted">
-              <div className="flex items-center justify-between border-b border-border/60 pb-2">
-                <span>Selected Items:</span>
-                <span className="font-mono font-bold text-text">{selectedItems.length}</span>
-              </div>
-              <div className="flex items-center justify-between pt-2">
-                <span>Total Space to Reclaim:</span>
-                <span className="font-mono font-black text-rose-500 dark:text-rose-400">
-                  {formatBytes(selectedBytes)}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
-              <ShieldCheck className="size-4 shrink-0 text-emerald-500" />
-              <span>
-                Safety verified: Your active game saves in{' '}
-                <code className="font-mono font-bold">current</code> will not be affected.
-              </span>
-            </div>
-
-            <div className="mt-6 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
+          {/* Confirmation Modal */}
+          {showConfirmModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm"
                 onClick={() => setShowConfirmModal(false)}
-                className="rounded-xl border border-border px-4 py-2 text-xs font-bold text-muted hover:bg-surface-raised hover:text-text transition-all"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative w-full max-w-md overflow-hidden rounded-3xl border border-border bg-surface p-6 shadow-2xl text-text z-10"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleExecute}
-                disabled={executeMutation.isPending}
-                className="flex items-center gap-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 font-mono text-xs font-black shadow-md transition-all active:scale-95"
-              >
-                {executeMutation.isPending ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="size-3.5" />
-                )}
-                <span>Permanently Free Space</span>
-              </button>
+                <div className="flex items-center gap-3">
+                  <div className="flex size-11 items-center justify-center rounded-2xl border border-rose-500/30 bg-rose-500/15 text-rose-500">
+                    <Trash2 className="size-5.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-text">Confirm Storage Cleanup</h3>
+                    <p className="text-xs text-muted">Permanent file deletion</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-border bg-surface-raised/60 p-4 text-xs text-muted">
+                  <div className="flex items-center justify-between border-b border-border/60 pb-2">
+                    <span>Selected Items:</span>
+                    <span className="font-mono font-bold text-text">{selectedItems.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <span>Total Space to Reclaim:</span>
+                    <span className="font-mono font-black text-rose-500 dark:text-rose-400">
+                      {formatBytes(selectedBytes)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+                  <ShieldCheck className="size-4 shrink-0 text-emerald-500" />
+                  <span>
+                    Safety verified: Your active game saves in{' '}
+                    <code className="font-mono font-bold">current</code> will not be affected.
+                  </span>
+                </div>
+
+                <div className="mt-6 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmModal(false)}
+                    className="rounded-xl border border-border px-4 py-2 text-xs font-bold text-muted hover:bg-surface-raised hover:text-text transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExecute}
+                    disabled={executeMutation.isPending}
+                    className="flex items-center gap-1.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 font-mono text-xs font-black shadow-md transition-all active:scale-95"
+                  >
+                    {executeMutation.isPending ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-3.5" />
+                    )}
+                    <span>Permanently Free Space</span>
+                  </button>
+                </div>
+              </motion.div>
             </div>
-          </motion.div>
-        </div>
-      )}
+          )}
         </div>
       )}
     </div>

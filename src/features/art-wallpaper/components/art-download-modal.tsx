@@ -58,10 +58,7 @@ export function ArtDownloadModal({ item, onClose }: ArtDownloadModalProps) {
   const [progress, setProgress] = useState<ArtDownloadProgressEvent | null>(null)
   const [savedPath, setSavedPath] = useState<string | null>(null)
 
-  const downloadId = useMemo(
-    () => (item ? `artdl_${item.id}_${Date.now()}` : ''),
-    [item],
-  )
+  const downloadId = useMemo(() => (item ? `artdl_${item.id}_${Date.now()}` : ''), [item])
 
   useEffect(() => {
     if (!item) return
@@ -222,7 +219,9 @@ export function ArtDownloadModal({ item, onClose }: ArtDownloadModalProps) {
                 />
                 <div className="flex min-w-0 flex-1 flex-col justify-between gap-2.5">
                   <div>
-                    <div className="line-clamp-2 text-sm font-extrabold text-text">{item.title}</div>
+                    <div className="line-clamp-2 text-sm font-extrabold text-text">
+                      {item.title}
+                    </div>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10.5px]">
                       <span className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 font-bold uppercase text-accent">
                         {item.source}

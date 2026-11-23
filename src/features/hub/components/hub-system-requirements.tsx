@@ -537,7 +537,9 @@ export function HubSystemRequirements({
             <div>
               <h3 className="text-base font-extrabold text-text">Console Exclusive Platform</h3>
               <p className="text-xs text-subtle">
-                {gameTitle ? `${gameTitle} is not released natively on PC.` : 'This title is not released natively on PC.'}
+                {gameTitle
+                  ? `${gameTitle} is not released natively on PC.`
+                  : 'This title is not released natively on PC.'}
               </p>
             </div>
           </div>
@@ -555,7 +557,8 @@ export function HubSystemRequirements({
           )}
         </div>
         <div className="rounded-2xl border border-border/70 bg-surface-raised/60 px-4 py-3 text-xs text-muted">
-          PC System Requirements and the PC FPS &amp; Resolution Estimator are automatically hidden for console-only titles.
+          PC System Requirements and the PC FPS &amp; Resolution Estimator are automatically hidden
+          for console-only titles.
         </div>
       </section>
     )
@@ -948,7 +951,9 @@ export function HubSystemRequirements({
                     )}
                   >
                     <Zap className="size-3" />
-                    <span>{fpsEstimation.frameGenTechName}: {frameGen === 'auto' ? 'ON' : 'OFF'}</span>
+                    <span>
+                      {fpsEstimation.frameGenTechName}: {frameGen === 'auto' ? 'ON' : 'OFF'}
+                    </span>
                   </button>
 
                   <div className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface-raised p-1">
@@ -959,9 +964,7 @@ export function HubSystemRequirements({
                         onClick={() => setTargetHz(hz)}
                         className={cn(
                           'rounded-lg px-2 py-1 font-mono text-[10px] font-extrabold transition-all cursor-pointer',
-                          targetHz === hz
-                            ? 'bg-accent text-white'
-                            : 'text-subtle hover:text-text',
+                          targetHz === hz ? 'bg-accent text-white' : 'text-subtle hover:text-text',
                         )}
                       >
                         {hz}Hz
@@ -979,9 +982,7 @@ export function HubSystemRequirements({
               <div className="flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs">
                 <div className="flex items-center gap-2">
                   <Sparkles className="size-3.5 shrink-0 text-emerald-400" />
-                  <span className="font-bold text-emerald-300">
-                    Optimal for {targetHz}Hz:
-                  </span>
+                  <span className="font-bold text-emerald-300">Optimal for {targetHz}Hz:</span>
                   <span className="font-semibold text-text">
                     {fpsEstimation.optimalRecommendation.summary}
                   </span>
@@ -996,7 +997,10 @@ export function HubSystemRequirements({
             {/* 4 Preset Live FPS Gauge Cards */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {fpsEstimation.activePresets.map((cell) => {
-                const barPct = Math.min(100, Math.max(10, Math.round((cell.avgFps / targetHz) * 100)))
+                const barPct = Math.min(
+                  100,
+                  Math.max(10, Math.round((cell.avgFps / targetHz) * 100)),
+                )
                 const isSmooth = cell.avgFps >= 60
                 const isPlayable = cell.avgFps >= 38 && cell.avgFps < 60
                 return (

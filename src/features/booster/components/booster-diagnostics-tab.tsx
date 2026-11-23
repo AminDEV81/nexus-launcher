@@ -13,11 +13,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  measureGamingLatency,
-  purgeShaderCaches,
-  scanShaderCaches,
-} from '@/services/booster'
+import { measureGamingLatency, purgeShaderCaches, scanShaderCaches } from '@/services/booster'
 import { playBoostComplete, playButtonClick } from '@/lib/sound-engine'
 import { cn } from '@/lib/utils'
 
@@ -151,7 +147,10 @@ export function BoosterDiagnosticsTab() {
             className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3.5 py-2 text-xs font-bold text-text transition hover:border-accent/50 hover:text-accent disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw
-              className={cn('size-3.5 text-accent', (isTestingLatency || isRefetchingLatency) && 'animate-spin')}
+              className={cn(
+                'size-3.5 text-accent',
+                (isTestingLatency || isRefetchingLatency) && 'animate-spin',
+              )}
             />
             <span>{isTestingLatency || isRefetchingLatency ? 'Measuring...' : 'Test Latency'}</span>
           </button>
@@ -181,7 +180,9 @@ export function BoosterDiagnosticsTab() {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-xs font-extrabold text-text">{item.name}</div>
-                      <div className="truncate font-mono text-[10px] text-subtle">{item.region}</div>
+                      <div className="truncate font-mono text-[10px] text-subtle">
+                        {item.region}
+                      </div>
                     </div>
                     <span
                       className={cn(
@@ -219,7 +220,8 @@ export function BoosterDiagnosticsTab() {
                 GPU Shader Cache Analyzer (NVIDIA / AMD / DirectX)
               </h3>
               <p className="text-xs text-subtle">
-                Stale shader caches after driver updates cause micro-stutter — safely purge unlocked files
+                Stale shader caches after driver updates cause micro-stutter — safely purge unlocked
+                files
               </p>
             </div>
           </div>

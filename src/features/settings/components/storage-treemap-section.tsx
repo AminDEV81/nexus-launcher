@@ -144,7 +144,9 @@ export function StorageTreemapSection() {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-surface p-12 text-center">
         <Loader2 className="size-7 animate-spin text-accent" />
-        <p className="text-sm font-bold text-text">Analyzing Drives, Game Folders &amp; Redists...</p>
+        <p className="text-sm font-bold text-text">
+          Analyzing Drives, Game Folders &amp; Redists...
+        </p>
         <p className="text-xs text-subtle">Scanning installed titles and safe cleanup targets</p>
       </div>
     )
@@ -352,7 +354,9 @@ export function StorageTreemapSection() {
                         </span>
                         <div className="flex items-center justify-between gap-1 text-[10px] font-mono font-bold opacity-90">
                           <span>{formatBytes(rect.game.size_bytes)}</span>
-                          {rect.game.is_stale && <Clock className="size-3 shrink-0 text-amber-300" />}
+                          {rect.game.is_stale && (
+                            <Clock className="size-3 shrink-0 text-amber-300" />
+                          )}
                         </div>
                       </>
                     )}
@@ -444,7 +448,9 @@ export function StorageTreemapSection() {
         {redists.length === 0 ? (
           <div className="flex items-center gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-xs text-emerald-300">
             <ShieldCheck className="size-4 shrink-0" />
-            <span>No leftover redistributable installers or crash dumps found in your game folders.</span>
+            <span>
+              No leftover redistributable installers or crash dumps found in your game folders.
+            </span>
           </div>
         ) : (
           <div className="flex max-h-64 flex-col gap-1.5 overflow-y-auto pr-1">

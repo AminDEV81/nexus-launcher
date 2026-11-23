@@ -89,9 +89,7 @@ export function ArtDropdown<T extends string>({
         <span className="text-[10.5px] font-semibold uppercase tracking-wider text-subtle">
           {label}:
         </span>
-        <span className="max-w-[140px] truncate font-extrabold text-text">
-          {selected?.label}
-        </span>
+        <span className="max-w-[140px] truncate font-extrabold text-text">{selected?.label}</span>
         {isFiltered && <span className="size-1.5 rounded-full bg-accent" />}
         <ChevronDown
           className={cn(

@@ -85,7 +85,7 @@ function createShelfQueryOptions(shelfKey: string, fetcher: () => Promise<HubGam
     initialDataUpdatedAt: persisted?.updatedAt,
     staleTime: HUB_CACHE_TTL_MS,
     gcTime: 30 * 60_000,
-    refetchInterval: false,
+    refetchInterval: false as const,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,

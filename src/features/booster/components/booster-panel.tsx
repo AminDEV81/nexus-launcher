@@ -81,7 +81,8 @@ const PRESETS: Array<{
     id: 'esports_max',
     label: 'Esports Overdrive',
     badge: 'MAX FPS',
-    description: 'Arms all 14 kernel, CPU unpark, shader cache & memory modules and closes bloatware.',
+    description:
+      'Arms all 14 kernel, CPU unpark, shader cache & memory modules and closes bloatware.',
     icon: Flame,
     modules: BOOSTER_MODULE_IDS,
     whitelistVoice: false,

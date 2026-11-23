@@ -159,7 +159,11 @@ export function ArtLightboxModal({
                   className="rounded-xl border border-border bg-surface p-2 text-muted transition hover:border-accent/50 hover:text-accent cursor-pointer"
                   title="Copy Direct Image URL"
                 >
-                  {copied ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
+                  {copied ? (
+                    <Check className="size-4 text-emerald-500" />
+                  ) : (
+                    <Copy className="size-4" />
+                  )}
                 </button>
 
                 <button
@@ -187,7 +191,9 @@ export function ArtLightboxModal({
                       : 'border-border bg-surface text-text hover:border-rose-400/50 hover:text-rose-500',
                   )}
                 >
-                  <Heart className={cn('size-3.5', item.is_liked && 'fill-rose-500 text-rose-500')} />
+                  <Heart
+                    className={cn('size-3.5', item.is_liked && 'fill-rose-500 text-rose-500')}
+                  />
                   <span>{item.is_liked ? 'Liked' : 'Like'}</span>
                 </button>
 

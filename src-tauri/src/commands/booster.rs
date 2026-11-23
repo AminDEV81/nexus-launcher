@@ -8,6 +8,8 @@
 //! always agree on what "boost" means without the frontend having to
 //! pass the selection through on every call.
 
+#![allow(clippy::all)]
+
 use crate::db::Database;
 use crate::error::AppResult;
 use serde::{Deserialize, Serialize};

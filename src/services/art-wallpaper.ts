@@ -48,7 +48,6 @@ export async function searchArtWallpapers(
   })
 }
 
-
 export async function toggleLikeArtwork(item: ArtItem): Promise<boolean> {
   return invoke<boolean>('toggle_like_artwork', { item })
 }
